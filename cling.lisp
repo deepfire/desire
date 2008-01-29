@@ -1,16 +1,44 @@
 (in-package :cling)
 
+(defvar *cvs-pool-root*)
+(defvar *svn-pool-root*)
+(defvar *darcs-pool-root*)
+(defvar *git-pool-root*)
+(defvar *lock-root*)
+(defvar *subscribed-homes*)
+(defparameter *sbcl-systems-location* '(".sbcl" "systems"))
+
+(defclass repository ()
+  ((module :accessor repo-module :initarg :module)
+   (pool-root :accessor repo-pool-root :initarg :pool-root)))
+
+(defclass remote-repository (repository)
+  ((url :accessor repo-url :initarg :url)))
+
+(defclass derived-repository (repository)
+  ((master :accessor repo-master :initarg :master)))
+
+(defclass pull-repository (derived-repository) ())
+(defclass conversion-repository (derived-repository) ())
+
+(defclass git-repository (repository) () (:default-initargs :pool-root *git-pool-root*))
+(defclass darcs-repository (repository) () (:default-initargs :pool-root *darcs-pool-root*))
+(defclass svn-repository (repository) () (:default-initargs :pool-root *svn-pool-root*))
+(defclass cvs-repository (repository) () (:default-initargs :pool-root *cvs-pool-root*))
+
 (defclass named ()
   ((name :accessor name :initarg :name)))
 
 (defclass module (named depobj)
   ((name :accessor name :initarg :name)
-   (pool-root :accessor module-pool-root :initarg :pool-root)
+   (repositories :accessor module-repositories :initarg :repositories)
    (umbrella :accessor module-umbrella :initarg :umbrella)
    (asdf-name :accessor module-asdf-name :initarg :asdf-name)
    (last-update-stamp :accessor module-last-update-stamp :initform nil)
    (method :accessor module-method :initarg :method)
-   (distributor :accessor module-distributor :initarg :distributor)))
+   (distributor :accessor module-distributor :initarg :distributor))
+  (:default-initargs
+   :repositories nil))
 
 (defun module-namestring (o)
   (string-downcase (string (name o))))
@@ -20,6 +48,9 @@
 
 (defun asdf-namestring (o)
   (string-downcase (string (module-asdf-name o))))
+
+(defun repo-path (repo)
+  (make-pathname :directory `(:absolute ,(repo-pool-root repo) ,(module-namestring (repo-module repo)))))
 
 (defun method-url (method distributor &rest components)
   (list* (format nil "~(~A~):/" method) (format nil "~(~A~)" distributor) components))
@@ -42,14 +73,6 @@
    (package-name :accessor app-package-name :initarg :package-name)
    (function-name :accessor app-function-name :initarg :function-name)
    (default-parameters :accessor app-default-parameters :initarg :default-parameters)))
-
-(defvar *cvs-pool-root*)
-(defvar *svn-pool-root*)
-(defvar *darcs-pool-root*)
-(defvar *git-pool-root*)
-(defvar *lock-root*)
-(defvar *subscribed-homes*)
-(defparameter *sbcl-systems-location* '(".sbcl" "systems"))
 
 (defclass noop-fetch-module (module) ())
 (defclass noop-engit-module (module) ())
