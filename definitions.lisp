@@ -1,5 +1,12 @@
 (in-package :cling)
 
+(setf *cvs-pool-root* "/mnt/enter/cvs/"
+      *svn-pool-root* "/mnt/enter/svn/"
+      *darcs-pool-root* "/mnt/enter/darcs/"
+      *git-pool-root* "/mnt/etherstorm/git/"
+      *lock-root* "/var/lock/"
+      *subscribed-homes* '("/home/deepfire/"))
+
 (defdistributor feelingofgreen.ru
   (:modules
    (local-module
@@ -9,8 +16,8 @@
 
 (defdistributor common-lisp.net
   (:url-schemas
-   (rsync (module) "common-lisp.net" "project" (umbrella-name module) "cvsroot")
-   (http (module) "common-lisp.net" "project" (umbrella-name module) "darcs" (named-namestring module)))
+   (rsync (module) "common-lisp.net" "project" (umbrella-namestring module) "cvsroot")
+   (http (module) "common-lisp.net" "project" (umbrella-namestring module) "darcs" (module-namestring module)))
   (:modules
    (cvs-module
     flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse
@@ -25,57 +32,57 @@
 
 (defdistributor christophe
   (:url-schemas
-   (http (module) "common-lisp.net" "~crhodes" (named-namestring module)))
+   (http (module) "common-lisp.net" "~crhodes" (module-namestring module)))
   (:modules
    (darcs-module
     clx)))
 
 (defdistributor luis
   (:url-schemas
-   (http (module) "common-lisp.net" "~loliveira" "darcs" (umbrella-name module)))
+   (http (module) "common-lisp.net" "~loliveira" "darcs" (umbrella-namestring module)))
   (:modules
    (darcs-module
     trivial-features babel (cffi+lotsastuff cffi))))
 
 (defdistributor ediware@luis
   (:url-schemas
-   (http (module) "common-lisp.net" "~loliveira" "ediware" (named-namestring module)))
+   (http (module) "common-lisp.net" "~loliveira" "ediware" (module-namestring module)))
   (:modules
    (darcs-module
     cl-ppcre flexi-streams cl-fad hunchentoot chunga url-rewrite cl-who drakma)))
 
 (defdistributor repo.or.cz
   (:url-schemas
-   (git (module) "repo.or.cz" (format nil "~A.git" (named-namestring module))))
+   (git (module) "repo.or.cz" (format nil "~A.git" (module-namestring module))))
   (:modules
    (git-module
     darcs2git closure-html)))
 
 (defdistributor lichteblau.com
   (:url-schemas
-   (http (module) "www.lichteblau.com" "git" (format nil "~A.git" (named-namestring module))))
+   (http (module) "www.lichteblau.com" "git" (format nil "~A.git" (module-namestring module))))
   (:modules
    (git-http-module
     cxml-rng cxml-stp clim-alerts)))
 
 (defdistributor lichteblau@clnet
   (:url-schemas
-   (http (module) "common-lisp.net" "~dlichteblau" "inofficial" (named-namestring module)))
+   (http (module) "common-lisp.net" "~dlichteblau" "inofficial" (module-namestring module)))
   (:modules
    (darcs-module
     mel-base)))
 
 (defdistributor sullivan
   (:url-schemas
-   (http (module) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (named-namestring module)))
+   (http (module) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (module-namestring module)))
   (:modules
    (darcs-module
     midi spatial-trees)))
 
 (defdistributor b9.com
   (:url-schemas
-   (git (module) (or ("b9.com" (format nil "~A.git" (named-namestring module)))
-                     ;; ("lycia.ath.cx" (named-namestring module)) ;; works like a tarpit
+   (git (module) (or ("b9.com" (format nil "~A.git" (module-namestring module)))
+                     ;; ("lycia.ath.cx" (module-namestring module)) ;; works like a tarpit
                      ))) ;; Stelian says it's a daily mirror
   (:modules
    (git-module
@@ -83,35 +90,35 @@
 
 (defdistributor fractalconcept.com
   (:url-schemas
-   (http (module) "www.fractalconcept.com:8000" "public" "open-source" (named-namestring module)))
+   (http (module) "www.fractalconcept.com:8000" "public" "open-source" (module-namestring module)))
   (:modules
    (svn-module
     cl-pdf cl-typesetting)))
 
 (defdistributor www.pps.jussieu.fr
   (:url-schemas
-   (http (module) "www.pps.jussieu.fr" "~jch" "software" "repos" (named-namestring module)))
+   (http (module) "www.pps.jussieu.fr" "~jch" "software" "repos" (module-namestring module)))
   (:modules
    (darcs-module
     cl-yacc)))
 
 (defdistributor tuxee.net
   (:url-schemas
-   (git (module) "git.tuxee.net" (named-namestring module)))
+   (git (module) "git.tuxee.net" (module-namestring module)))
   (:modules
    (git-module
     cl-vectors)))
 
 (defdistributor xach.com
   (:url-schemas
-   (git (module) "git.xach.com" (format nil "~A.git" (named-namestring module))))
+   (git (module) "git.xach.com" (format nil "~A.git" (module-namestring module))))
   (:modules
    (git-module
     salza2 zpng vecto zpb-ttf)))
 
 (defdistributor boinkor.net
   (:url-schemas
-   (git (module) "sbcl.boinkor.net" (named-namestring module)))
+   (git (module) "sbcl.boinkor.net" (module-namestring module)))
   (:modules
    (git-module
     sbcl)))
@@ -155,3 +162,5 @@
   (zpng salza2))
 
 (minimise-dependencies)
+
+(defapplication 'climacs 'climacs 'climacs 'climacs-rv)

@@ -1,65 +1,67 @@
-(defpackage cling
-  (:use :common-lisp :alexandria :pergamum :iterate :depsolver)
-  (:export
-   #:defdistributor #:define-module-dependencies #:module #:update))
-
 (in-package :cling)
 
 (defclass named ()
   ((name :accessor name :initarg :name)))
 
-(defgeneric named-namestring (o)
-  (:method ((o named))
-    (string-downcase (string (name o)))))
-
 (defclass module (named depobj)
-  ((pool-root :accessor module-pool-root :initarg :pool-root)
+  ((name :accessor name :initarg :name)
+   (pool-root :accessor module-pool-root :initarg :pool-root)
    (umbrella :accessor module-umbrella :initarg :umbrella)
    (asdf-name :accessor module-asdf-name :initarg :asdf-name)
    (last-update-stamp :accessor module-last-update-stamp :initform nil)
    (method :accessor module-method :initarg :method)
    (distributor :accessor module-distributor :initarg :distributor)))
 
+(defun module-namestring (o)
+  (string-downcase (string (name o))))
+
+(defun umbrella-namestring (module)
+  (string-downcase (string (module-umbrella module))))
+
 (defun asdf-namestring (o)
   (string-downcase (string (module-asdf-name o))))
-
-(defun umbrella-name (module)
-  (string-downcase (string (module-umbrella module))))
 
 (defun method-url (method distributor &rest components)
   (list* (format nil "~(~A~):/" method) (format nil "~(~A~)" distributor) components))
 
-(defgeneric %module-urls (method distributor module))
+(defgeneric module-urls (method distributor module))
 
 (defun merge-paths (&rest paths)
   (namestring (make-pathname :directory paths)))
 
 (defun url (o)
-  (let ((urls (mapcar (curry #'apply #'merge-paths :relative) (%module-urls (module-method o) (module-distributor o) o))))
+  "Provided a module O, yield the primary URL and the list of the backup URLs as the zeroth and first values, respectively."
+  (let ((urls (mapcar (curry #'apply #'merge-paths :relative) (module-urls (module-method o) (module-distributor o) o))))
     (values (first urls) (rest urls))))
 
 (defmethod print-object ((o module) stream)
   (format stream "#<~@<~S ~S method: ~S distributor: ~S url: ~S ASDF name: ~S~:@>>" (type-of o) (name o) (module-method o) (module-distributor o) (url o) (module-asdf-name o)))
 
-(defparameter *cvs-pool-root* "/mnt/enter/cvs/")
-(defparameter *svn-pool-root* "/mnt/enter/svn/")
-(defparameter *darcs-pool-root* "/mnt/enter/darcs/")
-(defparameter *git-pool-root* "/mnt/etherstorm/git/")
-(defparameter *lock-root* "/var/lock/")
+(defclass application (named)
+  ((module :accessor app-module :initarg :module)
+   (package-name :accessor app-package-name :initarg :package-name)
+   (function-name :accessor app-function-name :initarg :function-name)
+   (default-parameters :accessor app-default-parameters :initarg :default-parameters)))
 
+(defvar *cvs-pool-root*)
+(defvar *svn-pool-root*)
+(defvar *darcs-pool-root*)
+(defvar *git-pool-root*)
+(defvar *lock-root*)
+(defvar *subscribed-homes*)
 (defparameter *sbcl-systems-location* '(".sbcl" "systems"))
-(defparameter *subscribed-homes* '("/home/deepfire/"))
 
 (defclass noop-fetch-module (module) ())
-(defclass noop-import-module (module) ())
+(defclass noop-engit-module (module) ())
 (defclass cvs-module (module) () (:default-initargs :method 'rsync :pool-root *cvs-pool-root*))
 (defclass darcs-module (module) () (:default-initargs :method 'http :pool-root *darcs-pool-root*))
 (defclass svn-module (module) () (:default-initargs :method 'svn :pool-root *svn-pool-root*))
-(defclass git-module (noop-import-module) () (:default-initargs :method 'git :pool-root *git-pool-root*))
-(defclass git-http-module (noop-import-module) () (:default-initargs :method 'http :pool-root *git-pool-root*))
-(defclass local-module (noop-import-module noop-fetch-module) () (:default-initargs :method 'nothing))
+(defclass git-module (noop-engit-module) () (:default-initargs :method 'git :pool-root *git-pool-root*))
+(defclass git-http-module (noop-engit-module) () (:default-initargs :method 'http :pool-root *git-pool-root*))
+(defclass local-module (noop-engit-module noop-fetch-module) () (:default-initargs :method 'nothing))
 
 (defparameter *software-modules* (make-hash-table :test 'eq))
+(defparameter *applications* (make-hash-table :test 'eq))
 (defparameter *leaves* (make-hash-table :test 'eq))
 (defparameter *nonleaves* (make-hash-table :test 'eq))
 
@@ -70,6 +72,21 @@
 (defun module (name)
   (or (gethash name *software-modules*)
       (error "~@<undefined module ~S~:@>" name)))
+
+(defun defapplication (name module-name package-name function-name &rest default-parameters)
+  (setf (gethash name *applications*) (make-instance 'application :module (module module-name)
+                                                     :package-name package-name :function-name function-name :default-parameters default-parameters)))
+
+(defun app (name)
+  (gethash name *applications*))
+
+(defun run (app &rest parameters)
+  (let ((module (app-module app)))
+    (unless (asdf-loadable-p module)
+      (update module))
+    (unless (find-package (app-package-name app))
+      (asdf:oos 'asdf:load-op (module-asdf-name module)))
+    (apply (symbol-function (find-symbol (string (app-function-name app)) (app-package-name app))) (or parameters (app-default-parameters app)))))
 
 (defun mark-non-leaf (depkey dep)
   (setf (gethash depkey *nonleaves*) dep))
@@ -86,7 +103,7 @@
                                                                  (cdar bodies-spec)
                                                                  (list bodies-spec))))
                                                  (with-gensyms (m d)
-                                                   `(defmethod %module-urls ((,m (eql ',method)) (,d (eql ',name)) ,module)
+                                                   `(defmethod module-urls ((,m (eql ',method)) (,d (eql ',name)) ,module)
                                                       (declare (ignorable ,d))
                                                       (list ,@(mapcar (curry #'list* 'method-url m) bodies))))))))
                                (:modules
@@ -138,82 +155,6 @@
           (iter (for (nil (dep . color)) in-hashtable (depsolver::%depobj-dep# module))
                 (unioning (module-full-dependencies dep (cons module stack)))))))
 
-(define-condition external-program-failure (error)
-  ((program :accessor cond-program :initarg :program)
-   (parameters :accessor cond-parameters :initarg :parameters)
-   (status :accessor cond-status :initarg :status))
-  (:report (lambda (cond stream)
-             (format stream "~@<running ~A~{ ~A~} failed with exit status ~S~:@>" (cond-program cond) (cond-parameters cond) (cond-status cond)))))
-
-(defun run-external-program (program-pathname parameters)
-  (lret* ((exit-code (sb-ext:process-exit-code (apply #'sb-ext:run-program program-pathname parameters '(:output t))))
-          (success (zerop exit-code)))
-    (unless success
-      (error 'external-program-failure :program program-pathname :parameters parameters :status exit-code))))
-
-(defmacro define-external-program (name pathname)
-  `(defun ,name (&rest parameters)
-     (run-external-program ,pathname parameters)))
-
-(define-external-program darcs #p"/usr/bin/darcs")
-(define-external-program git #p"/usr/bin/git")
-(define-external-program rsync #p"/usr/bin/rsync")
-(define-external-program svn #p"/usr/bin/svn")
-(define-external-program git-cvsimport #p"/usr/bin/git-cvsimport")
-(define-external-program darcs2git #p"/mnt/enter/git/darcs2git/darcs2git.py")
-(define-external-program darcs-to-git #p"/mnt/enter/git/darcs-to-git/darcs-to-git")
-(define-external-program rm #p"/bin/rm")
-
-(defun gitpath (o)
-  (merge-paths :absolute *git-pool-root* (named-namestring o)))
-
-(defun sourcepath (o)
-  (merge-paths :absolute (module-pool-root o) (named-namestring o)))
-
-(define-condition about-to-purge (error)
-  ((directory :accessor cond-directory :initarg :directory))
-  (:report (lambda (cond stream)
-             (format stream "~@<about to purge ~S~:@>" (cond-directory cond)))))
-
-(defun purge-directory (pathname)
-  (block wall
-    (restart-bind ((purge (lambda () (return-from wall))
-                     :report-function (lambda (stream) (format stream "~@<Proceed with purging the directory.~:@>"))
-                     :test-function (lambda (cond) (typep cond 'about-to-purge))))
-      (error 'about-to-purge :directory pathname)))
-  (rm "-rf" pathname))
-
-(defun purge-module-source-directory (module)
-  (purge-directory (sourcepath module)))
-
-(defun purge-module-git-directory (module)
-  (purge-directory (gitpath module)))
-
-(defun purge-module (module)
-  (funcall (bukkake-combine #'purge-module-source-directory #'purge-module-git-directory) module))
-
-(defmacro with-changed-directory (dir &body body)
-  (with-gensyms (old)
-    (once-only (dir)
-      `(let ((,old (sb-posix:getcwd))
-             (*default-pathname-defaults* (parse-namestring ,dir)))
-         (sb-posix:chdir ,dir)
-         (unwind-protect (progn ,@body)
-           (sb-posix:chdir ,old))))))
-
-(defmacro do-directory-pathnames ((var (&rest directory-components)) &body body)
-  `(dolist (,var (directory (make-pathname :directory '(,@directory-components) :name :wild)))
-     ,@body))
-
-(defmacro within-module ((module &rest pathname-elements) &body body)
-  `(with-changed-directory (namestring (make-pathname :directory `(:absolute ,(gitpath ,module) ,,@pathname-elements)))
-     ,@body))
-
-(defun move-to-directory (pathname target-directory)
-  (if (pathname-name pathname)
-      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (pathname-directory target-directory) :name (pathname-name pathname))))
-      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (append (pathname-directory target-directory) (list (lastcar (pathname-directory pathname)))))))))
-
 (defun repository-bare-p (module)
   (within-module (module)
     (null (probe-file ".git"))))
@@ -242,22 +183,19 @@
         (with-open-file (s "git-daemon-export-ok" :if-does-not-exist :create) t)
         (and (delete-file "git-daemon-export-ok") nil))))
 
-(defun present-p (o)
-  (not (null (probe-file (gitpath o)))))
-
 (defun asdf-definition (o)
-  (make-pathname :directory `(:absolute ,*git-pool-root* ,(named-namestring o)) :name (asdf-namestring o) :type "asd"))
+  (make-pathname :directory `(:absolute ,*git-pool-root* ,(module-namestring o)) :name (asdf-namestring o) :type "asd"))
 
 (defun asdf-symlink (o home)
   (make-pathname :directory `(:absolute ,home ,@*sbcl-systems-location*) :name (asdf-namestring o) :type "asd"))
 
-(defun asdfly-loadable-p (o &optional (home (first *subscribed-homes*)))
+(defun asdf-loadable-p (o &optional (home (first *subscribed-homes*)))
   (and (probe-file (asdf-symlink o home))
        (probe-file (sb-posix:readlink (asdf-symlink o home)))))
 
-(defun (setf asdfly-loadable-p) (val o home)
+(defun (setf asdf-loadable-p) (val o home)
   (if val
-      (unless (asdfly-loadable-p o home)
+      (unless (asdf-loadable-p o home)
         (let ((symlink (asdf-symlink o home)))
           (when (probe-file symlink)
             (sb-posix:unlink symlink)) ;; FIXME: delete-file refuses to remove dead symlinks)
@@ -284,67 +222,65 @@
     (declare (ignore o url)) t))
 
 (defmethod fetch-module ((o darcs-module) &key url)
-  (let ((local-path (merge-paths :absolute *darcs-pool-root* (named-namestring o))))
+  (let ((local-path (merge-paths :absolute *darcs-pool-root* (module-namestring o))))
     (if (probe-file local-path)
         (darcs "pull" "--all" "--repodir" local-path url)
         (darcs "get" url local-path))))
 
 (defmethod fetch-module ((o git-module) &key url)
-  (let ((local-path (merge-paths :absolute *git-pool-root* (named-namestring o))))
+  (let ((local-path (merge-paths :absolute *git-pool-root* (module-namestring o))))
     (if (probe-file local-path)
         (with-changed-directory local-path
           (git "pull" url))
         (git "clone" url local-path))))
 
 (defmethod fetch-module ((o svn-module) &key url)
-  (svn "checkout" url (merge-paths :absolute *svn-pool-root* (named-namestring o))))
+  (svn "checkout" url (merge-paths :absolute *svn-pool-root* (module-namestring o))))
 
 (defmethod fetch-module ((o cvs-module) &key url)
-  (rsync "-ravPz" url (merge-paths :absolute *cvs-pool-root* (named-namestring o))))
+  (rsync "-ravPz" url (merge-paths :absolute *cvs-pool-root* (module-namestring o))))
 
-(defgeneric import-module (o)
-  (:method ((o noop-import-module))
+(defgeneric engit-module (o)
+  (:method ((o noop-engit-module))
     (declare (ignore o)) t))
 
-(defmethod import-module ((o cvs-module))
-  (ensure-directories-exist (merge-paths :absolute *lock-root* (named-namestring o)))
-  (git-cvsimport "-v" "-C" (merge-paths :absolute *git-pool-root* (named-namestring o)) "-d" (format nil ":local:~A~A" *cvs-pool-root* (named-namestring o)) (named-namestring o)))
+(defmethod engit-module ((o cvs-module))
+  (ensure-directories-exist (merge-paths :absolute *lock-root* (module-namestring o)))
+  (git-cvsimport "-v" "-C" (merge-paths :absolute *git-pool-root* (module-namestring o)) "-d" (format nil ":local:~A~A" *cvs-pool-root* (module-namestring o)) (module-namestring o)))
 
-(defmethod import-module ((o darcs-module))
-  (ensure-directories-exist (module-gitpath o))
+(defmethod engit-module ((o darcs-module))
+  (ensure-directories-exist (gitpath o))
   (within-module (o)
-    (darcs-to-git (module-sourcepath o)))
+    (darcs-to-git (sourcepath o)))
   (when (repository-bare-p o)
     (setf (repository-bare-p o) nil)))
 
-;; (defmethod import-module ((o darcs-module))
-;;   (darcs2git (merge-paths :absolute *darcs-pool-root* (named-namestring o)) "-d" (merge-paths :absolute *git-pool-root* (named-namestring o)))
+;; (defmethod engit-module ((o darcs-module))
+;;   (darcs2git (merge-paths :absolute *darcs-pool-root* (module-namestring o)) "-d" (merge-paths :absolute *git-pool-root* (module-namestring o)))
 ;;   (when (repository-bare-p o)
 ;;     (setf (repository-bare-p o) nil)))
 
-(defun update-unchecked (o &key skip-present)
-  (let* ((full-set (module-full-dependencies o)))
-    (flet ((report (module)
-             (format t "updating ~S from ~A~%" (name module) (url module))))
-     (mapc (bukkake-combine #'report #'fetch-module #'import-module)
-           (xform-if skip-present (curry #'remove-if #'present-p) full-set)))))
+(defun uplink-module (o &key (homes *subscribed-homes*))
+  (mapc (curry #'(setf asdf-loadable-p) t o) homes))
 
-(defun update (o &key skip-present)
+(defun update (o &key skip-present (check-success t))
   (let* ((full-set (module-full-dependencies o))
-         (initially-unloadable (remove-if #'asdfly-loadable-p full-set)))
+         (initially-unloadable (remove-if #'asdf-loadable-p full-set)))
     (flet ((report (module)
              (format t "updating ~S from ~A~%" (name module) (url module))))
-     (mapc (bukkake-combine #'report #'fetch-module #'import-module (compose (rcurry #'mapc *subscribed-homes*) (curry #'curry #'(setf asdfly-loadable-p) t)))
-           (xform-if skip-present (curry #'remove-if #'present-p) full-set)))
-    (let* ((unloadable (remove-if #'asdfly-loadable-p full-set))
+      (mapc (bukkake #'report #'fetch-module #'engit-module #'uplink-module)
+            (xform-if skip-present (curry #'remove-if #'asdf-loadable-p) full-set)))
+    (let* ((unloadable (remove-if #'asdf-loadable-p full-set))
            (degraded (intersection unloadable (set-difference full-set initially-unloadable))))
-      (cond (degraded
+      (cond ((not check-success)
+             (warn "~@<success check suppressed~:@>"))
+            (degraded
              (error "~@<modules degraded after update: ~S~:@>" degraded))
             (unloadable
              (error "~@<modules remained unloadable after update: ~S~:@>" unloadable))
             (t)))))
 
 (defun gui (module)
-  (with-changed-directory (module-gitpath module) 
+  (with-changed-directory (gitpath module) 
     (git "gui" ;; :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ))
          )))
