@@ -9,107 +9,84 @@
 (defparameter *sbcl-systems-location* '(".sbcl" "systems"))
 
 (defclass repository ()
-  ((module :accessor repo-module :initarg :module)
-   (pool-root :accessor repo-pool-root :initarg :pool-root)))
+  ((module :accessor repo-module :initarg :module)))
+
+(defclass git-repository (repository) ())
+(defclass darcs-repository (repository) ())
+(defclass svn-repository (repository) ())
+(defclass cvs-repository (repository) ())
 
 (defclass remote-repository (repository)
-  ((url :accessor repo-url :initarg :url)))
+  ((url :accessor repo-url :initarg :url)
+   (umbrella :accessor repo-umbrella :initarg :umbrella)
+   (method :accessor repo-method :initarg :method)
+   (distributor :accessor repo-distributor :initarg :distributor)))
 
-(defclass derived-repository (repository)
-  ((master :accessor repo-master :initarg :master)))
+(defclass remote-git-repository (git-repository) () (:default-initargs :method 'git))
+(defclass remote-git-http-repository (git-repository) () (:default-initargs :method 'http))
+(defclass remote-darcs-repository (darcs-repository) () (:default-initargs :method 'http))
+(defclass remote-svn-repository (svn-repository) () (:default-initargs :method 'svn))
+(defclass remote-cvs-repository (cvs-repository) () (:default-initargs :method 'rsync))
 
-(defclass pull-repository (derived-repository) ())
-(defclass conversion-repository (derived-repository) ())
+(defgeneric distributor-repo-url (method distributor repo))
 
-(defclass git-repository (repository) () (:default-initargs :pool-root *git-pool-root*))
-(defclass darcs-repository (repository) () (:default-initargs :pool-root *darcs-pool-root*))
-(defclass svn-repository (repository) () (:default-initargs :pool-root *svn-pool-root*))
-(defclass cvs-repository (repository) () (:default-initargs :pool-root *cvs-pool-root*))
+(defgeneric url (o)
+  (:method ((o remote-repository))
+    (namestring (make-pathname :directory `(:relative ,(format nil "~(~A~):/" (repo-method o)) ,@(distributor-repo-url (repo-method o) (repo-distributor o) o))))))
+
+(defclass local-repository (repository)
+  ((pool-root :accessor repo-pool-root :initarg :pool-root)))
+
+(defgeneric path (repo)
+  (:method ((o local-repository))
+    (make-pathname :directory `(:absolute ,(repo-pool-root o) ,(downstring (name (repo-module o)))))))
+
+(defclass derived-repository (local-repository)
+  ((master :accessor repo-master :initarg :master)
+   (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
+
+(defclass local-git-repository (derived-repository git-repository) () (:default-initargs :pool-root *git-pool-root*))
+(defclass local-darcs-repository (derived-repository darcs-repository) () (:default-initargs :pool-root *darcs-pool-root*))
+(defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root *svn-pool-root*))
+(defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root *cvs-pool-root*))
+
 
 (defclass named ()
   ((name :accessor name :initarg :name)))
 
+(defun downstring (x)
+  (string-downcase (string x)))
+
 (defclass module (named depobj)
   ((name :accessor name :initarg :name)
-   (repositories :accessor module-repositories :initarg :repositories)
-   (umbrella :accessor module-umbrella :initarg :umbrella)
    (asdf-name :accessor module-asdf-name :initarg :asdf-name)
-   (last-update-stamp :accessor module-last-update-stamp :initform nil)
-   (method :accessor module-method :initarg :method)
-   (distributor :accessor module-distributor :initarg :distributor))
+   (repositories :accessor module-repositories :initarg :repositories)
+   (master-repo :accessor module-master-repo :initarg :master-repo))
   (:default-initargs
    :repositories nil))
 
-(defun module-namestring (o)
-  (string-downcase (string (name o))))
-
-(defun umbrella-namestring (module)
-  (string-downcase (string (module-umbrella module))))
-
-(defun asdf-namestring (o)
-  (string-downcase (string (module-asdf-name o))))
-
-(defun repo-path (repo)
-  (make-pathname :directory `(:absolute ,(repo-pool-root repo) ,(module-namestring (repo-module repo)))))
-
-(defun method-url (method distributor &rest components)
-  (list* (format nil "~(~A~):/" method) (format nil "~(~A~)" distributor) components))
-
-(defgeneric module-urls (method distributor module))
-
-(defun merge-paths (&rest paths)
-  (namestring (make-pathname :directory paths)))
-
-(defun url (o)
-  "Provided a module O, yield the primary URL and the list of the backup URLs as the zeroth and first values, respectively."
-  (let ((urls (mapcar (curry #'apply #'merge-paths :relative) (module-urls (module-method o) (module-distributor o) o))))
-    (values (first urls) (rest urls))))
-
 (defmethod print-object ((o module) stream)
-  (format stream "#<~@<~S ~S method: ~S distributor: ~S url: ~S ASDF name: ~S~:@>>" (type-of o) (name o) (module-method o) (module-distributor o) (url o) (module-asdf-name o)))
-
-(defclass application (named)
-  ((module :accessor app-module :initarg :module)
-   (package-name :accessor app-package-name :initarg :package-name)
-   (function-name :accessor app-function-name :initarg :function-name)
-   (default-parameters :accessor app-default-parameters :initarg :default-parameters)))
-
-(defclass noop-fetch-module (module) ())
-(defclass noop-engit-module (module) ())
-(defclass cvs-module (module) () (:default-initargs :method 'rsync :pool-root *cvs-pool-root*))
-(defclass darcs-module (module) () (:default-initargs :method 'http :pool-root *darcs-pool-root*))
-(defclass svn-module (module) () (:default-initargs :method 'svn :pool-root *svn-pool-root*))
-(defclass git-module (noop-engit-module) () (:default-initargs :method 'git :pool-root *git-pool-root*))
-(defclass git-http-module (noop-engit-module) () (:default-initargs :method 'http :pool-root *git-pool-root*))
-(defclass local-module (noop-engit-module noop-fetch-module) () (:default-initargs :method 'nothing))
+  (format stream "#<~@<~S ~S ASDF name: ~S~:@>>" (type-of o) (name o) (module-asdf-name o)))
 
 (defparameter *software-modules* (make-hash-table :test 'eq))
-(defparameter *applications* (make-hash-table :test 'eq))
-(defparameter *leaves* (make-hash-table :test 'eq))
-(defparameter *nonleaves* (make-hash-table :test 'eq))
 
-(defun defmodule (type distributor name umbrella-name asdf-name)
-  (assert (subtypep type 'module))
-  (setf (gethash name *software-modules*) (make-instance type :name name :distributor distributor :umbrella umbrella-name :asdf-name asdf-name)))
+(defun defmodule (name &key (asdf-name name))
+  (setf (gethash name *software-modules*) (make-instance 'module :name name :asdf-name asdf-name)))
+
+;; subclassing
+;; what's the type signified by TYPE?
+;; whether, and what type, if yes, do we want the remote repository to be?
+;; whether, and what type, if yes, do we want the mirror repository to be?
+(defun define-module-repositories (module type umbrella-name)
+  )
 
 (defun module (name)
   (or (gethash name *software-modules*)
       (error "~@<undefined module ~S~:@>" name)))
 
-(defun defapplication (name module-name package-name function-name &rest default-parameters)
-  (setf (gethash name *applications*) (make-instance 'application :module (module module-name)
-                                                     :package-name package-name :function-name function-name :default-parameters default-parameters)))
 
-(defun app (name)
-  (gethash name *applications*))
-
-(defun run (app &rest parameters)
-  (let ((module (app-module app)))
-    (unless (asdf-loadable-p module)
-      (update module))
-    (unless (find-package (app-package-name app))
-      (asdf:oos 'asdf:load-op (module-asdf-name module)))
-    (apply (symbol-function (find-symbol (string (app-function-name app)) (app-package-name app))) (or parameters (app-default-parameters app)))))
+(defparameter *leaves* (make-hash-table :test 'eq))
+(defparameter *nonleaves* (make-hash-table :test 'eq))
 
 (defun mark-non-leaf (depkey dep)
   (setf (gethash depkey *nonleaves*) dep))
@@ -117,28 +94,28 @@
 (defun mark-maybe-leaf (depeekey depee)
   (setf (gethash depeekey *leaves*) depee))
 
+(defun merge-paths (&rest paths)
+  (namestring (make-pathname :directory paths)))
+
 (defmacro defdistributor (name &rest definitions)
   `(progn ,@(iter (for (op . op-body) in definitions)
                   (appending (ecase op
                                (:url-schemas
-                                (iter (for (method (module) . bodies-spec) in op-body)
-                                      (collect (let ((bodies (if (and (consp (car bodies-spec)) (eq (caar bodies-spec) 'or))
-                                                                 (cdar bodies-spec)
-                                                                 (list bodies-spec))))
-                                                 (with-gensyms (m d)
-                                                   `(defmethod module-urls ((,m (eql ',method)) (,d (eql ',name)) ,module)
-                                                      (declare (ignorable ,d))
-                                                      (list ,@(mapcar (curry #'list* 'method-url m) bodies))))))))
-                               (:modules
-                                (iter (for (type . module-specs) in op-body)
+                                (iter (for (method (repo) . body) in op-body)
+                                      (collect (with-gensyms (m d)
+                                                 `(defmethod distributor-repo-url ((,m (eql ',method)) (,d (eql ',name)) ,repo)
+                                                    (declare (ignorable ,d))
+                                                    `(,,@repo))))))
+                               (:repositories
+                                (iter (for (type . repo-specs) in op-body)
                                       (unless (find-class type)
-                                        (error "~@<unknown module type ~S~:@>" type))
-                                      (appending (iter (for module-spec in module-specs)
-                                                       (appending (destructuring-bind (umbrella-name . module-names) (if (consp module-spec) module-spec (list module-spec module-spec))
-                                                                    (iter (for module-name in module-names)
-                                                                          (collect (destructuring-bind (module-name &key asdf-name) (if (consp module-name) module-name
-                                                                                                                                        (list module-name :asdf-name module-name))
-                                                                                     `(defmodule ',type ',name ',module-name ',umbrella-name ',asdf-name)))))))))))))))
+                                        (error "~@<unknown repository type ~S~:@>" type))
+                                      (appending (iter (for repo-spec in repo-specs)
+                                                       (appending (destructuring-bind (umbrella-name . module-specs) (if (consp repo-spec) repo-spec (list repo-spec repo-spec))
+                                                                    (iter (for module-spec in module-specs)
+                                                                          (for full-module-spec = (ensure-cons module-spec))
+                                                                          (collect `(let ((or (module ',(car full-module-spec)) (defmodule ,@full-module-spec)))
+                                                                                      (define-module-repositories module ',type ',umbrella-name)))))))))))))))
 
 (defmacro define-module-dependencies (&body body)
   `(iter (for (module-name . dependencies) in '(,@body))
@@ -178,6 +155,32 @@
           (iter (for (nil (dep . color)) in-hashtable (depsolver::%depobj-dep# module))
                 (unioning (module-full-dependencies dep (cons module stack)))))))
 
+
+(defclass application (named)
+  ((module :accessor app-module :initarg :module)
+   (package-name :accessor app-package-name :initarg :package-name)
+   (function-name :accessor app-function-name :initarg :function-name)
+   (default-parameters :accessor app-default-parameters :initarg :default-parameters)))
+
+(defparameter *applications* (make-hash-table :test 'eq))
+
+(defun defapplication (name module-name package-name function-name &rest default-parameters)
+  (setf (gethash name *applications*) (make-instance 'application :module (module module-name)
+                                                     :package-name package-name :function-name function-name :default-parameters default-parameters)))
+
+(defun app (name)
+  (gethash name *applications*))
+
+(defun run (app &rest parameters)
+  (let ((module (app-module app)))
+    (unless (asdf-loadable-p module)
+      (update module))
+    (unless (find-package (app-package-name app))
+      (asdf:oos 'asdf:load-op (module-asdf-name module)))
+    (apply (symbol-function (find-symbol (string (app-function-name app)) (app-package-name app))) (or parameters (app-default-parameters app)))))
+
+
+
 (defun repository-bare-p (module)
   (within-module (module)
     (null (probe-file ".git"))))
@@ -207,10 +210,10 @@
         (and (delete-file "git-daemon-export-ok") nil))))
 
 (defun asdf-definition (o)
-  (make-pathname :directory `(:absolute ,*git-pool-root* ,(module-namestring o)) :name (asdf-namestring o) :type "asd"))
+  (make-pathname :directory `(:absolute ,*git-pool-root* ,(downstring (name o))) :name (downstring (module-asdf-name o)) :type "asd"))
 
 (defun asdf-symlink (o home)
-  (make-pathname :directory `(:absolute ,home ,@*sbcl-systems-location*) :name (asdf-namestring o) :type "asd"))
+  (make-pathname :directory `(:absolute ,home ,@*sbcl-systems-location*) :name (downstring (module-asdf-name o)) :type "asd"))
 
 (defun asdf-loadable-p (o &optional (home (first *subscribed-homes*)))
   (and (probe-file (asdf-symlink o home))
@@ -240,36 +243,32 @@
                                :report-function (lambda (stream) (format stream "Try fetching from other backup URLs."))))
                 (call-next-method o :url url)
                 (return-from fetch-module t))
-              (finally (warn 'module-fetch-failed :module o))))))
-  (:method ((o noop-fetch-module) &key url)
-    (declare (ignore o url)) t))
+              (finally (warn 'module-fetch-failed :module o)))))))
 
 (defmethod fetch-module ((o darcs-module) &key url)
-  (let ((local-path (merge-paths :absolute *darcs-pool-root* (module-namestring o))))
+  (let ((local-path (merge-paths :absolute *darcs-pool-root* (downstring (name o)))))
     (if (probe-file local-path)
         (darcs "pull" "--all" "--repodir" local-path url)
         (darcs "get" url local-path))))
 
 (defmethod fetch-module ((o git-module) &key url)
-  (let ((local-path (merge-paths :absolute *git-pool-root* (module-namestring o))))
+  (let ((local-path (merge-paths :absolute *git-pool-root* (downstring (name o)))))
     (if (probe-file local-path)
         (with-changed-directory local-path
           (git "pull" url))
         (git "clone" url local-path))))
 
 (defmethod fetch-module ((o svn-module) &key url)
-  (svn "checkout" url (merge-paths :absolute *svn-pool-root* (module-namestring o))))
+  (svn "checkout" url (merge-paths :absolute *svn-pool-root* (downstring (name o)))))
 
 (defmethod fetch-module ((o cvs-module) &key url)
-  (rsync "-ravPz" url (merge-paths :absolute *cvs-pool-root* (module-namestring o))))
+  (rsync "-ravPz" url (merge-paths :absolute *cvs-pool-root* (downstring (name o)))))
 
-(defgeneric engit-module (o)
-  (:method ((o noop-engit-module))
-    (declare (ignore o)) t))
+(defgeneric engit-module (o))
 
 (defmethod engit-module ((o cvs-module))
-  (ensure-directories-exist (merge-paths :absolute *lock-root* (module-namestring o)))
-  (git-cvsimport "-v" "-C" (merge-paths :absolute *git-pool-root* (module-namestring o)) "-d" (format nil ":local:~A~A" *cvs-pool-root* (module-namestring o)) (module-namestring o)))
+  (ensure-directories-exist (merge-paths :absolute *lock-root* (downstring (name o))))
+  (git-cvsimport "-v" "-C" (merge-paths :absolute *git-pool-root* (downstring (name o))) "-d" (format nil ":local:~A~A" *cvs-pool-root* (downstring (name o))) (downstring (name o))))
 
 (defmethod engit-module ((o darcs-module))
   (ensure-directories-exist (gitpath o))
@@ -279,7 +278,7 @@
     (setf (repository-bare-p o) nil)))
 
 ;; (defmethod engit-module ((o darcs-module))
-;;   (darcs2git (merge-paths :absolute *darcs-pool-root* (module-namestring o)) "-d" (merge-paths :absolute *git-pool-root* (module-namestring o)))
+;;   (darcs2git (merge-paths :absolute *darcs-pool-root* (downstring (name o))) "-d" (merge-paths :absolute *git-pool-root* (downstring (name o))))
 ;;   (when (repository-bare-p o)
 ;;     (setf (repository-bare-p o) nil)))
 

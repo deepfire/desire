@@ -16,8 +16,8 @@
 
 (defdistributor common-lisp.net
   (:url-schemas
-   (rsync (module) "common-lisp.net" "project" (umbrella-namestring module) "cvsroot")
-   (http (module) "common-lisp.net" "project" (umbrella-namestring module) "darcs" (module-namestring module)))
+   (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella-name repo)) "cvsroot")
+   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella-name repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs-module
     flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse
@@ -32,93 +32,91 @@
 
 (defdistributor christophe
   (:url-schemas
-   (http (module) "common-lisp.net" "~crhodes" (module-namestring module)))
+   (http (repo) "common-lisp.net" "~crhodes" (downstring (name (repo-module repo)))))
   (:modules
    (darcs-module
     clx)))
 
 (defdistributor luis
   (:url-schemas
-   (http (module) "common-lisp.net" "~loliveira" "darcs" (umbrella-namestring module)))
+   (http (repo) "common-lisp.net" "~loliveira" "darcs" (downstring (repo-umbrella-name repo))))
   (:modules
    (darcs-module
     trivial-features babel (cffi+lotsastuff cffi))))
 
 (defdistributor ediware@luis
   (:url-schemas
-   (http (module) "common-lisp.net" "~loliveira" "ediware" (module-namestring module)))
+   (http (repo) "common-lisp.net" "~loliveira" "ediware" (downstring (name (repo-module repo)))))
   (:modules
    (darcs-module
     cl-ppcre flexi-streams cl-fad hunchentoot chunga url-rewrite cl-who drakma)))
 
 (defdistributor repo.or.cz
   (:url-schemas
-   (git (module) "repo.or.cz" (format nil "~A.git" (module-namestring module))))
+   (git (repo) "repo.or.cz" (format nil "~A.git" (downstring (name (repo-module repo))))))
   (:modules
    (git-module
     darcs2git closure-html)))
 
 (defdistributor lichteblau.com
   (:url-schemas
-   (http (module) "www.lichteblau.com" "git" (format nil "~A.git" (module-namestring module))))
+   (http (repo) "www.lichteblau.com" "git" (format nil "~A.git" (downstring (name (repo-module repo))))))
   (:modules
    (git-http-module
     cxml-rng cxml-stp clim-alerts)))
 
 (defdistributor lichteblau@clnet
   (:url-schemas
-   (http (module) "common-lisp.net" "~dlichteblau" "inofficial" (module-namestring module)))
+   (http (repo) "common-lisp.net" "~dlichteblau" "inofficial" (downstring (name (repo-module repo)))))
   (:modules
    (darcs-module
     mel-base)))
 
 (defdistributor sullivan
   (:url-schemas
-   (http (module) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (module-namestring module)))
+   (http (repo) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (downstring (name (repo-module repo)))))
   (:modules
    (darcs-module
     midi spatial-trees)))
 
 (defdistributor b9.com
   (:url-schemas
-   (git (module) (or ("b9.com" (format nil "~A.git" (module-namestring module)))
-                     ;; ("lycia.ath.cx" (module-namestring module)) ;; works like a tarpit
-                     ))) ;; Stelian says it's a daily mirror
+   (git (repo) "b9.com" (format nil "~A.git" (downstring (name (repo-module repo))))))
   (:modules
    (git-module
     puri md5 cl-base64 clsql rt)))
 
 (defdistributor fractalconcept.com
   (:url-schemas
-   (http (module) "www.fractalconcept.com:8000" "public" "open-source" (module-namestring module)))
+   (http (repo) "www.fractalconcept.com:8000" "public" "open-source" (downstring (name (repo-module repo)))))
   (:modules
    (svn-module
     cl-pdf cl-typesetting)))
 
 (defdistributor www.pps.jussieu.fr
   (:url-schemas
-   (http (module) "www.pps.jussieu.fr" "~jch" "software" "repos" (module-namestring module)))
+   (http (repo) "www.pps.jussieu.fr" "~jch" "software" "repos" (downstring (name (repo-module repo)))))
   (:modules
    (darcs-module
     cl-yacc)))
 
 (defdistributor tuxee.net
   (:url-schemas
-   (git (module) "git.tuxee.net" (module-namestring module)))
+   (git (repo) "git.tuxee.net" (downstring (name (repo-module repo)))))
   (:modules
    (git-module
     cl-vectors)))
 
 (defdistributor xach.com
   (:url-schemas
-   (git (module) "git.xach.com" (format nil "~A.git" (module-namestring module))))
+   (git (repo) "git.xach.com" (format nil "~A.git" (downstring (name (repo-module repo))))))
   (:modules
    (git-module
     salza2 zpng vecto zpb-ttf)))
 
 (defdistributor boinkor.net
   (:url-schemas
-   (git (module) "sbcl.boinkor.net" (module-namestring module)))
+   (git (repo) "sbcl.boinkor.net" (downstring (name (repo-module repo)))))
   (:modules
    (git-module
     sbcl)))
