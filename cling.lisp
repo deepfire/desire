@@ -68,16 +68,17 @@
                                                     (declare (ignorable ,m ,d))
                                                     (list ,@body))))))
                                (:modules
-                                (with-gensyms (module full-module-spec remote-spec type umbrella-name)
-                                 `((iter (for (,full-module-spec ,type ,umbrella-name) in
+                                (with-gensyms (module module-prespec module-spec remote-spec type umbrella-name)
+                                 `((iter (for (,module-prespec ,type ,umbrella-name) in
                                               ',(iter (for (type . repo-specs) in op-body)
                                                       (appending (iter (for repo-spec in repo-specs)
                                                                        (appending (destructuring-bind (umbrella-name . module-specs) (if (consp repo-spec) repo-spec (list repo-spec repo-spec))
-                                                                                    (iter (for module-spec in module-specs)
-                                                                                          (for full-module-spec = (ensure-cons module-spec))
-                                                                                          (collect (list full-module-spec type umbrella-name)))))))))
-                                         (for ,remote-spec = (remove-from-plist (rest ,full-module-spec) :asdf-name))
-                                         (let ((,module (or (module (car ,full-module-spec) :when-does-not-exist :ignore) (apply #'defmodule ,full-module-spec))))
+                                                                                    (iter (for module-preprespec in module-specs)
+                                                                                          (for module-prespec = (ensure-cons module-preprespec))
+                                                                                          (collect (list module-prespec type umbrella-name)))))))))
+                                         (for ,remote-spec = (remove-from-plist (rest ,module-prespec) :asdf-name))
+                                         (for ,module-spec = (cons (first ,module-prespec) (remove-from-plist (rest ,module-prespec) :cvs-module)))
+                                         (let ((,module (or (module (car ,module-spec) :when-does-not-exist :ignore) (apply #'defmodule ,module-spec))))
                                            (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name ,remote-spec)))))))))))
 
 (defun mark-non-leaf (depkey dep)
