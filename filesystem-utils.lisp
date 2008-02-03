@@ -13,18 +13,32 @@
     (unless success
       (error 'external-program-failure :program program-pathname :parameters parameters :status exit-code))))
 
-(defmacro define-external-program (name pathname)
-  `(defun ,name (&rest parameters)
-     (run-external-program ,pathname parameters)))
+(defvar *executable-search-path* '(#p"/usr/bin/" #p"/bin/"))
 
-(define-external-program darcs #p"/usr/bin/darcs")
-(define-external-program git #p"/usr/bin/git")
-(define-external-program rsync #p"/usr/bin/rsync")
-(define-external-program svn #p"/usr/bin/svn")
-(define-external-program git-cvsimport #p"/usr/bin/git-cvsimport")
-(define-external-program darcs2git #p"/mnt/enter/git/darcs2git/darcs2git.py")
-(define-external-program darcs-to-git #p"/mnt/enter/git/darcs-to-git/darcs-to-git")
-(define-external-program rm #p"/bin/rm")
+(define-condition executable-not-found (error)
+  ((name :accessor cond-name :initarg :name)
+   (search-path :accessor cond-search-path :initarg :search-path))
+  (:report (lambda (cond stream)
+             (format stream "~@<executable named ~S wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
+
+(defun find-executable (name &optional (paths *executable-search-path*))
+  (iter (for path in paths)
+        (for exec-path = (merge-pathnames path (make-pathname :name name)))
+        (when (probe-file exec-path) (leave exec-path))
+        (finally (error 'executable-not-found :name name :search-path paths))))
+
+(defmacro define-external-program (name &optional (exec-name (string-downcase (symbol-name name))))
+  `(let ((pathname (find-executable ,exec-name)))
+     (defun ,name (&rest parameters)
+       (run-external-program pathname parameters))))
+
+(define-external-program darcs)
+(define-external-program git)
+(define-external-program rsync)
+(define-external-program svn)
+(define-external-program git-cvsimport)
+(define-external-program darcs-to-git)
+(define-external-program rm)
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))
