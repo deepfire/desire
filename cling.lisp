@@ -31,8 +31,8 @@
   (lret ((user-perspective (apply #'make-instance 'user-perspective user-perspective-initargs)))
     (iter (for (name module) in-hashtable (modules from))
           (let* ((derived-module (make-instance 'module :name name :asdf-name (module-asdf-name module)))
-                 (remote (make-instance 'remote-git-repo :module derived-module :distributor distributor))
-                 (local (make-instance 'user-local-git-repo :module derived-module :master remote)))
+                 (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
+                 (local (make-instance 'user-local-git-repository :module derived-module :master remote)))
             (setf (module name) derived-module
                   (module-master-repo derived-module) local
                   (module-repositories derived-module) (list local remote))))))
