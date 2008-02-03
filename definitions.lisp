@@ -4,10 +4,11 @@
       *svn-pool-root* "/mnt/enter/svn/"
       *darcs-pool-root* "/mnt/enter/darcs/"
       *git-pool-root* "/mnt/etherstorm/git/"
-      *lock-root* "/var/lock/"
-      *subscribed-homes* '("/home/deepfire/"))
+      *lock-root* "/var/lock/")
 
 (defdistributor feelingofgreen.ru
+  (:url-schemas
+   (git (repo) "git.feelingofgreen.ru" (downstring (name (repo-module repo)))))
   (:modules
    (local-module
     bin pergamum semi-precious lispdb cling bintype elf cl-io-mod captured-stream doc dwarf
@@ -16,8 +17,8 @@
 
 (defdistributor common-lisp.net
   (:url-schemas
-   (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella-name repo)) "cvsroot")
-   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella-name repo)) "darcs" (downstring (name repo))))
+   (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "cvsroot")
+   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs-module
     flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse
@@ -39,7 +40,7 @@
 
 (defdistributor luis
   (:url-schemas
-   (http (repo) "common-lisp.net" "~loliveira" "darcs" (downstring (repo-umbrella-name repo))))
+   (http (repo) "common-lisp.net" "~loliveira" "darcs" (downstring (repo-umbrella repo))))
   (:modules
    (darcs-module
     trivial-features babel (cffi+lotsastuff cffi))))

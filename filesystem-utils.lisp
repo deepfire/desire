@@ -51,3 +51,8 @@
 (defmacro do-directory-pathnames ((var (&rest directory-components)) &body body)
   `(dolist (,var (directory (make-pathname :directory '(,@directory-components) :name :wild)))
      ,@body))
+
+(defun move-to-directory (pathname target-directory)
+  (if (pathname-name pathname)
+      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (pathname-directory target-directory) :name (pathname-name pathname))))
+      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (append (pathname-directory target-directory) (list (lastcar (pathname-directory pathname)))))))))

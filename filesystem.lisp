@@ -1,19 +1,33 @@
 (in-package :cling)
 
-(defun gitpath (o)
-  (merge-paths :absolute *git-pool-root* (module-namestring o)))
-
-(defun sourcepath (o)
-  (merge-paths :absolute (module-pool-root o) (module-namestring o)))
-
-(defun purge-fasls (module)
-  (mapc #'delete-file (directory (make-pathname :directory `(:absolute ,(gitpath module) :wild-inferiors) :name :wild :type "fasl"))))
-
-(defmacro within-module ((module &rest pathname-elements) &body body)
-  `(with-changed-directory (namestring (make-pathname :directory `(:absolute ,(gitpath ,module) ,,@pathname-elements)))
+(defmacro within-repository ((repo &rest pathname-elements) &body body)
+  `(with-changed-directory (namestring (make-pathname :directory `(:absolute ,(path ,repo) ,,@pathname-elements)))
      ,@body))
 
-(defun move-to-directory (pathname target-directory)
-  (if (pathname-name pathname)
-      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (pathname-directory target-directory) :name (pathname-name pathname))))
-      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (append (pathname-directory target-directory) (list (lastcar (pathname-directory pathname)))))))))
+(defun repository-bare-p (repo)
+  (within-repository (repo)
+    (null (probe-file ".git"))))
+
+(defun (setf repository-bare-p) (val repo)
+  (within-repository (repo)
+    (if val
+        (error "not implemented")
+        (progn
+          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
+            (sb-posix:mkdir ".git" #o755)
+            (dolist (filename git-files)
+              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
+          (git "config" "--replace-all" "core.bare" "false")
+          (git "checkout" "master")
+          (git "reset" "--hard")
+          nil))))
+
+(defun world-readable-p (repo)
+  (within-repository (repo ".git")
+    (not (null (probe-file "git-daemon-export-ok")))))
+
+(defun (setf world-readable-p) (val repo)
+  (within-repository (repo ".git")
+    (if val
+        (with-open-file (s "git-daemon-export-ok" :if-does-not-exist :create) t)
+        (and (delete-file "git-daemon-export-ok") nil))))
