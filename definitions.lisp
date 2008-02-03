@@ -1,11 +1,5 @@
 (in-package :cling)
 
-(setf *cvs-pool-root* "/mnt/enter/cvs/"
-      *svn-pool-root* "/mnt/enter/svn/"
-      *darcs-pool-root* "/mnt/enter/darcs/"
-      *git-pool-root* "/mnt/etherstorm/git/"
-      *lock-root* "/var/lock/")
-
 (defdistributor feelingofgreen.ru
   (:url-schemas
    (git (repo) "git.feelingofgreen.ru" (downstring (name (repo-module repo)))))

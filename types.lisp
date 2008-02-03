@@ -1,11 +1,36 @@
 (in-package :cling)
 
-(defvar *cvs-pool-root*)
-(defvar *svn-pool-root*)
-(defvar *darcs-pool-root*)
-(defvar *git-pool-root*)
-(defvar *lock-root*)
-(defparameter *user-pool-root* (namestring (make-pathname :directory (append (pathname-directory (user-homedir-pathname)) (list "{asdf}")))))
+(defclass perspective ()
+  ((modules :accessor modules :initarg :modules)
+   (leaves :accessor leaves :initarg :leaves)
+   (nonleaves :accessor nonleaves :initarg :nonleaves))
+  (:default-initargs
+   :modules (make-hash-table :test 'eq)
+   :leaves (make-hash-table :test 'eq)
+   :nonleaves (make-hash-table :test 'eq)))
+
+(defclass gateway-perspective (perspective)
+  ((git-pool :accessor git-pool :initarg :git-pool)
+   (darcs-pool :accessor darcs-pool :initarg :darcs-pool)
+   (svn-pool :accessor svn-pool :initarg :svn-pool)
+   (cvs-pool :accessor cvs-pool :initarg :cvs-pool)
+   (lockdir :accessor lockdir :initarg :lockdir))
+  (:default-initargs
+   :git-pool   "/mnt/etherstorm/git/"
+   :darcs-pool "/mnt/enter/darcs/"
+   :svn-pool   "/mnt/enter/svn/"
+   :cvs-pool   "/mnt/enter/cvs/"
+   :lockdir    "/var/lock/"))
+
+(defclass user-perspective (perspective)
+  ((home :accessor home :initarg :home)
+   (user-git-pool :accessor user-git-pool :initarg :user-git-pool))
+  (:default-initargs
+   :home (user-homedir-pathname)))
+
+(defmethod initialize-instance :after ((o user-perspective) &key user-git-pool &allow-other-keys)
+  (setf (user-git-pool o) (or user-git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
+
 (defparameter *sbcl-systems-location* '(".sbcl" "systems"))
 
 (defclass repository ()
@@ -48,11 +73,11 @@
    (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
 
 (defclass local-git-repository (derived-repository git-repository) ())
-(defclass site-local-git-repository (site-repository local-git-repository) () (:default-initargs :pool-root *git-pool-root*))
-(defclass user-local-git-repository (user-repository local-git-repository) () (:default-initargs :pool-root *user-pool-root*))
-(defclass local-darcs-repository (derived-repository darcs-repository) () (:default-initargs :pool-root *darcs-pool-root*))
-(defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root *svn-pool-root*))
-(defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root *cvs-pool-root*))
+(defclass site-local-git-repository (site-repository local-git-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
+(defclass user-local-git-repository (user-repository local-git-repository) () (:default-initargs :pool-root (user-git-pool *perspective*)))
+(defclass local-darcs-repository (derived-repository darcs-repository) () (:default-initargs :pool-root (darcs-pool *perspective*)))
+(defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root (svn-pool *perspective*)))
+(defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root (cvs-pool *perspective*)))
 
 (defclass named ()
   ((name :accessor name :initarg :name)))

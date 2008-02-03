@@ -1,26 +1,40 @@
 (in-package :cling)
 
-(deftype role () '(member :gateway :user))
-(defvar *role* :gateway)
-(proclaim '(type role *role*))
+(defvar *perspectives* (make-hash-table :test 'eq))
+(defvar *perspective*)
 
-(defparameter *software-modules* (make-hash-table :test 'eq))
+(defun perspective (name)
+  (gethash name *perspectives*))
+
+(defun (setf perspective) (val name)
+  (declare (type perspective val))
+  (setf (gethash name *perspectives*) val))
+
+(setf (perspective :gateway) (make-instance 'gateway-perspective)
+      *perspective* (perspective :gateway))
+
+(defun derive-user-perspective (from name distributor)
+  (lret ((user-perspective (make-instance 'user-perspective)))
+    (iter (for (name module) in-hashtable (modules from))
+          (let* ((derived-module (make-instance 'module :name name :asdf-name (asdf-name module)))
+                 (remote (make-instance 'remote-git-repo :module derived-module :distributor distributor))
+                 (local (make-instance 'user-local-git-repo :module derived-module :master remote)))
+            (setf (gethash name (modules user-perspective)) derived-module
+                  (module-master-repo derived-module) local
+                  (module-repositories (list local remote)))))))
 
 (defun defmodule (name &key (asdf-name name))
-  (setf (gethash name *software-modules*) (make-instance 'module :name name :asdf-name asdf-name)))
+  (setf (gethash name (modules *perspective*)) (make-instance 'module :name name :asdf-name asdf-name)))
 
 (defun module (name)
-  (or (gethash name *software-modules*)
-      (error "~@<undefined module ~S~:@>" name)))
-
-(defparameter *leaves* (make-hash-table :test 'eq))
-(defparameter *nonleaves* (make-hash-table :test 'eq))
+  (or (gethash name (modules *perspective*))
+      (error "~@<module ~S not defined in perspective ~S~:@>" name perspective)))
 
 (defun mark-non-leaf (depkey dep)
-  (setf (gethash depkey *nonleaves*) dep))
+  (setf (gethash depkey (nonleaves *perspective*)) dep))
 
 (defun mark-maybe-leaf (depeekey depee)
-  (setf (gethash depeekey *leaves*) depee))
+  (setf (gethash depeekey (leaves *perspective*)) depee))
 
 ;; subclassing
 ;; what's the type signified by TYPE?
@@ -28,9 +42,6 @@
 ;; whether, and what type, if yes, do we want the mirror repository to be?
 (defun define-module-repositories (module type umbrella-name)
   )
-
-(defun merge-paths (&rest paths)
-  (namestring (make-pathname :directory paths)))
 
 (defmacro defdistributor (name &rest definitions)
   `(progn ,@(iter (for (method (repo) . body) in definitions)
@@ -131,8 +142,8 @@
   (rsync "-ravPz" (url from) (namestring (path to))))
 
 (defmethod pull ((to local-git-repository) (from local-cvs-repository))
-  (ensure-directories-exist (merge-paths :absolute *lock-root* (downstring (name (repo-module to)))))
-  (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A~A" *cvs-pool-root* (downstring (name o))) (downstring (name o))))
+  (ensure-directories-exist (make-pathname :directory `(:absolute ,(lockdir *perspective*) (downstring (name (repo-module to))))))
+  (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (name (repo-module to)))))
 
 (defmethod pull ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))
