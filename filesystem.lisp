@@ -1,7 +1,7 @@
 (in-package :cling)
 
 (defmacro within-repository ((repo &rest pathname-elements) &body body)
-  `(with-changed-directory (namestring (make-pathname :directory `(:absolute ,(path ,repo) ,,@pathname-elements)))
+  `(with-changed-directory (namestring (make-pathname :directory (append (pathname-directory (path ,repo)) (list ,@pathname-elements))))
      ,@body))
 
 (defun repository-bare-p (repo)

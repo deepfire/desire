@@ -5,9 +5,9 @@
    (leaves :accessor leaves :initarg :leaves)
    (nonleaves :accessor nonleaves :initarg :nonleaves))
   (:default-initargs
-   :modules (make-hash-table :test 'eq)
-   :leaves (make-hash-table :test 'eq)
-   :nonleaves (make-hash-table :test 'eq)))
+   :modules (make-hash-table :test 'equal)
+   :leaves (make-hash-table :test 'equal)
+   :nonleaves (make-hash-table :test 'equal)))
 
 (defclass gateway-perspective (perspective)
   ((git-pool :accessor git-pool :initarg :git-pool)
@@ -31,10 +31,17 @@
 (defmethod initialize-instance :after ((o user-perspective) &key user-git-pool &allow-other-keys)
   (setf (user-git-pool o) (or user-git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
+(defvar *perspective*)
 (defparameter *sbcl-systems-location* '(".sbcl" "systems"))
+
+(defclass named ()
+  ((name :accessor name :initarg :name)))
 
 (defclass repository ()
   ((module :accessor repo-module :initarg :module)))
+
+(defmethod name ((o repository))
+  (name (repo-module o)))
 
 (defclass git-repository (repository) ())
 (defclass darcs-repository (repository) ())
@@ -46,11 +53,16 @@
    (method :accessor repo-method :initarg :method)
    (distributor :accessor repo-distributor :initarg :distributor)))
 
-(defclass remote-git-repository (git-repository) () (:default-initargs :method 'git))
+(defclass remote-git-repository (remote-repository git-repository) () (:default-initargs :method 'git))
 (defclass remote-git-http-repository (remote-git-repository) () (:default-initargs :method 'http))
-(defclass remote-darcs-repository (darcs-repository) () (:default-initargs :method 'http))
-(defclass remote-svn-repository (svn-repository) () (:default-initargs :method 'svn))
-(defclass remote-cvs-repository (cvs-repository) () (:default-initargs :method 'rsync))
+(defclass remote-darcs-repository (remote-repository darcs-repository) () (:default-initargs :method 'http))
+(defclass remote-svn-repository (remote-repository svn-repository) () (:default-initargs :method 'svn))
+(defclass remote-cvs-repository (remote-repository cvs-repository) 
+  ((cvs-module :accessor repo-cvs-module :initarg :cvs-module))
+  (:default-initargs :method 'rsync))
+
+(defmethod initialize-instance :after ((o remote-cvs-repository) &key cvs-module &allow-other-keys)
+  (setf (repo-cvs-module o) (or cvs-module (name o))))
 
 (defgeneric distributor-repo-url (method distributor repo))
 
@@ -65,22 +77,21 @@
   (:method ((o local-repository))
     (make-pathname :directory `(:absolute ,(repo-pool-root o) ,(downstring (name (repo-module o)))))))
 
-(defclass site-repository (local-repository) ())
-(defclass user-repository (local-repository) ())
+(defclass site-repository (local-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
+(defclass user-repository (local-repository) () (:default-initargs :pool-root (user-git-pool *perspective*)))
 
 (defclass derived-repository (local-repository)
   ((master :accessor repo-master :initarg :master)
    (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
 
-(defclass local-git-repository (derived-repository git-repository) ())
-(defclass site-local-git-repository (site-repository local-git-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
-(defclass user-local-git-repository (user-repository local-git-repository) () (:default-initargs :pool-root (user-git-pool *perspective*)))
+(defclass local-git-repository (git-repository) ())
+(defclass site-local-derived-git-repository (site-repository derived-repository local-git-repository) ())
+(defclass user-local-derived-git-repository (user-repository derived-repository local-git-repository) ())
+(defclass site-local-origin-git-repository (site-repository local-git-repository) ())
+(defclass user-local-origin-git-repository (user-repository local-git-repository) ())
 (defclass local-darcs-repository (derived-repository darcs-repository) () (:default-initargs :pool-root (darcs-pool *perspective*)))
 (defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root (svn-pool *perspective*)))
 (defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root (cvs-pool *perspective*)))
-
-(defclass named ()
-  ((name :accessor name :initarg :name)))
 
 (defun downstring (x)
   (string-downcase (string x)))
