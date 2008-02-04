@@ -158,7 +158,7 @@
   (pergamum alexandria iterate)
   (bintype pergamum)
   (elf bintype)
-  (lispdb pergamum semi-precious sb-x86-portio linedit bordeaux-threads swank elf cffi)
+  (lispdb pergamum semi-precious sb-x86-portio linedit bordeaux-threads slime elf cffi)
   (cling pergamum semi-precious))
 
 (minimise-dependencies)
