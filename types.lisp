@@ -68,7 +68,11 @@
 
 (defgeneric url (o)
   (:method ((o remote-repository))
-    (namestring (make-pathname :directory `(:relative ,(format nil "~(~A~):/" (repo-method o)) ,@(distributor-repo-url (repo-method o) (repo-distributor o) o))))))
+    (with-output-to-string (s)
+           (format s "~(~A~)://" (repo-method o))
+           (iter (for x in (distributor-repo-url (repo-method o) (repo-distributor o) o))
+                 (princ x s)
+                 (princ #\/ s)))))
 
 (defclass local-repository (repository)
   ((pool-root :accessor repo-pool-root :initarg :pool-root)))
