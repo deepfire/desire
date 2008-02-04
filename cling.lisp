@@ -27,17 +27,6 @@
   (declare (type module val))
   (setf (gethash (coerce-to-name name) (modules *perspective*)) val))
 
-(defun derive-user-perspective (from distributor &rest user-perspective-initargs)
-  (lret ((user-perspective (apply #'make-instance 'user-perspective user-perspective-initargs)))
-    (let ((*perspective* user-perspective))
-      (iter (for (name module) in-hashtable (modules from))
-            (let* ((derived-module (make-instance 'module :name name :asdf-name (module-asdf-name module)))
-                   (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
-                   (local (make-instance 'user-local-derived-git-repository :module derived-module :master remote)))
-              (setf (module name) derived-module
-                    (module-master-repo derived-module) local
-                    (module-repositories derived-module) (list local remote)))))))
-
 (defun defmodule (name &key (asdf-name name))
   (setf (module name) (make-instance 'module :name name :asdf-name asdf-name)))
 
@@ -120,11 +109,29 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
+(defun module-direct-dependencies (module)
+  (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# module))
+        (collect dep)))
+
 (defun module-full-dependencies (module &optional stack)
   (unless (member module stack)
     (cons module
-          (iter (for (nil (dep . color)) in-hashtable (depsolver::%depobj-dep# module))
+          (iter (for dep in (module-direct-dependencies module))
                 (unioning (module-full-dependencies dep (cons module stack)))))))
+
+(defun derive-user-perspective (from distributor &rest user-perspective-initargs)
+  (lret ((user-perspective (apply #'make-instance 'user-perspective user-perspective-initargs)))
+    (let ((*perspective* user-perspective))
+      (iter (for (name module) in-hashtable (modules from))
+            (let* ((derived-module (make-instance 'module :name name :asdf-name (module-asdf-name module)))
+                   (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
+                   (local (make-instance 'user-local-derived-git-repository :module derived-module :master remote)))
+              (setf (module name) derived-module
+                    (module-master-repo derived-module) local
+                    (module-repositories derived-module) (list local remote))))
+      (iter (for (name module) in-hashtable (modules from))
+            (iter (for dep in (module-direct-dependencies module))
+                  (depend (module name) (module (name dep))))))))
 
 (defgeneric pull (to from))
 

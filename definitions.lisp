@@ -158,6 +158,7 @@
 
 (define-module-dependencies
   (pergamum alexandria iterate)
-  (lispdb pergamum semi-precious sb-x86-portio linedit))
+  (lispdb pergamum semi-precious sb-x86-portio linedit)
+  (cling pergamum semi-precious))
 
 (defapplication 'climacs 'climacs 'climacs 'climacs-rv)
