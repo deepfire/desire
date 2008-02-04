@@ -154,11 +154,13 @@
   (zip salza2 trivial-gray-streams flexi-streams)
   (zpng salza2))
 
-(minimise-dependencies)
-
 (define-module-dependencies
   (pergamum alexandria iterate)
-  (lispdb pergamum semi-precious sb-x86-portio linedit)
+  (bintype pergamum)
+  (elf bintype)
+  (lispdb pergamum semi-precious sb-x86-portio linedit bordeaux-threads swank elf cffi)
   (cling pergamum semi-precious))
+
+(minimise-dependencies)
 
 (defapplication 'climacs 'climacs 'climacs 'climacs-rv)
