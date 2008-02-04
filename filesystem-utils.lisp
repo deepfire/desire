@@ -13,7 +13,7 @@
     (unless success
       (error 'external-program-failure :program program-pathname :parameters parameters :status exit-code))))
 
-(defvar *executable-search-path* #-win32 '(#p"/usr/bin/" #p"/bin/") #+win32 '(#p"c:\\program files\\git\\bin\\git.exe"))
+(defvar *executable-search-path* #-win32 '(#p"/usr/bin/" #p"/bin/") #+win32 '(#p"c:\\program files\\git\\bin\\"))
 
 (define-condition executable-not-found (error)
   ((name :accessor cond-name :initarg :name)
@@ -23,7 +23,7 @@
 
 (defun find-executable (name &optional (paths *executable-search-path*))
   (iter (for path in paths)
-        (for exec-path = (merge-pathnames path (make-pathname :name name)))
+        (for exec-path = (merge-pathnames path (make-pathname :name name #+win32 #+win32 :type "exe")))
         (when (probe-file exec-path) (leave exec-path))
         (finally (error 'executable-not-found :name name :search-path paths))))
 
