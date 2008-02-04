@@ -2,7 +2,7 @@
 
 (defun asdf-definition (o)
   (declare (type module o))
-  (merge-pathnames (make-pathname :name (downstring (module-asdf-name o)) :type "asd") (path (module-master-repo o))))
+  (make-pathname :directory (pathname-directory (path (module-master-repo o))) :name (downstring (module-asdf-name o)) :type "asd"))
 
 #-win32
 (defun asdf-symlink (o)

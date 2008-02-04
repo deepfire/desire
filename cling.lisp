@@ -158,7 +158,8 @@
   (if (probe-file path)
       (with-changed-directory path
         (git "pull" url))
-      (git "clone" url path)))
+      (with-changed-directory (repo-pool-root to)
+        (git "clone" url))))
 
 (defmethod pull ((to local-svn-repository) (from remote-svn-repository))
   (svn "checkout" (url from) (namestring (path to))))

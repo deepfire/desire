@@ -79,7 +79,7 @@
 
 (defgeneric path (repo)
   (:method ((o local-repository))
-    (make-pathname :directory `(:absolute ,(repo-pool-root o) ,(downstring (name (repo-module o)))))))
+    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
 
 (defclass site-repository (local-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
 (defclass user-repository (local-repository) () (:default-initargs :pool-root (user-git-pool *perspective*)))
