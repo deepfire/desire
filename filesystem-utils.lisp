@@ -19,24 +19,32 @@
                                                                               #p"i:\\program files\\git\\bin\\" #p"j:\\program files\\git\\bin\\"
                                                                               #p"k:\\program files\\git\\bin\\" #p"l:\\program files\\git\\bin\\"))
 
-(define-condition executable-not-found (error)
+(define-condition executable-not-found (warning)
   ((name :accessor cond-name :initarg :name)
    (search-path :accessor cond-search-path :initarg :search-path))
   (:report (lambda (cond stream)
-             (format stream "~@<executable named ~S wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
+             (format stream "~@<an executable, named ~S, wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
 
-(defun find-executable (name &optional (paths *executable-search-path*))
+(define-condition required-executable-not-found (error)
+  ((name :accessor cond-name :initarg :name)
+   (search-path :accessor cond-search-path :initarg :search-path))
+  (:report (lambda (cond stream)
+             (format stream "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
+
+(defun find-executable (name &key (paths *executable-search-path*) critical)
   (iter (for path in paths)
         (for exec-path = (merge-pathnames path (make-pathname :name name #+win32 #+win32 :type "exe")))
         (when (probe-file exec-path) (leave exec-path))
-        (finally (error 'executable-not-found :name name :search-path paths))))
+        (finally (if critical
+                     (error 'required-executable-not-found :name name :search-path paths)
+                     (warn 'executable-not-found :name name :search-path paths)))))
 
-(defmacro define-external-program (name &optional (exec-name (string-downcase (symbol-name name))))
-  `(let ((pathname (find-executable ,exec-name)))
+(defmacro define-external-program (name &key critical (exec-name (string-downcase (symbol-name name))))
+  `(let ((pathname (find-executable ,exec-name ,@(when critical `(:critical t)))))
      (defun ,name (&rest parameters)
        (run-external-program pathname parameters))))
 
-(define-external-program git)
+(define-external-program git :critical t)
 (define-external-program rm)
 #-win32
 (progn
