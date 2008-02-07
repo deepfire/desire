@@ -7,7 +7,7 @@
    (local-repository
     bin pergamum semi-precious lispdb cling bintype elf cl-io-mod captured-stream doc dwarf
     ieee-latex clxs sb-x86-portio
-    mcdust-one mclinux mdb newlib pestilence x86-linux x86-win32)))
+    giveio mcdbio winnt-lptaccess mcdust-one mclinux mdb newlib pestilence x86-linux x86-win32)))
 
 (defdistributor common-lisp.net
   (:url-schemas
