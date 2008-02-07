@@ -12,7 +12,8 @@
 (defdistributor common-lisp.net
   (:url-schemas
    (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "cvsroot")
-   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
+   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo)))
+   (svn (repo) "common-lisp.net" "project" (downstring (name repo)) "svn"))
   (:modules
    (cvs-repository
     flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse (linedit (linedit :cvs-module src))
@@ -83,7 +84,7 @@
 
 (defdistributor fractalconcept.com
   (:url-schemas
-   (http (repo) "www.fractalconcept.com:8000" "public" "open-source" (downstring (name repo))))
+   (svn (repo) "www.fractalconcept.com:8000" "public" "open-source" (downstring (name repo))))
   (:modules
    (svn-repository
     cl-pdf cl-typesetting)))
