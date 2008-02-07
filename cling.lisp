@@ -21,14 +21,30 @@
 (defun module (name &key (when-does-not-exist :error))
   (or (gethash (coerce-to-name name) (modules *perspective*))
       (when (eq when-does-not-exist :error)
-        (error "~@<module ~S not defined in perspective ~S~:@>" name *perspective*))))
+        (error "~@<module ~A not defined in perspective ~S~:@>" name *perspective*))))
 
 (defun (setf module) (val name)
   (declare (type module val))
   (setf (gethash (coerce-to-name name) (modules *perspective*)) val))
 
+(defun repo (name &key (when-does-not-exist :error))
+  (declare (type list name))
+  (or (gethash (mapcar #'coerce-to-name name) (repositories *perspective*))
+      (when (eq when-does-not-exist :error)
+        (error "~@<repository ~A not defined in perspective ~S~:@>" name *perspective*))))
+
+(defun (setf repo) (val name)
+  (declare (type repository val) (type list name))
+  (setf (gethash (mapcar #'coerce-to-name name) (repositories *perspective*)) val))
+
 (defun defmodule (name &key (asdf-name name))
   (setf (module name) (make-instance 'module :name name :asdf-name asdf-name)))
+
+(defun map-perspective-modules (fn perspective)
+  (maphash-values fn (modules perspective)))
+
+(defun map-perspective-repositories (fn perspective)
+  (maphash-values fn (repositories perspective)))
 
 (defgeneric repository-import-chain (type)
   (:method ((type (eql 'local-repository))) (values '(site-local-origin-git-repository)))
@@ -40,12 +56,15 @@
 
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remote) (repository-import-chain type)
-    (let ((local-repos (mapcar (rcurry #'make-instance :module module) locals))
-          (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module remote-initargs)) (ensure-list remote))))
-      (iter (for (mirror master) on (append local-repos (ensure-list remote-repo)))
+    (let* ((local-repos (mapcar (rcurry #'make-instance :module module) locals))
+           (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module remote-initargs)) (ensure-list remote)))
+           (repos (append local-repos (ensure-list remote-repo))))
+      (iter (for repo in repos)
+            (setf (repo (repo-name repo)) repo))
+      (iter (for (mirror master) on repos)
             (when (and master (typep mirror 'derived-repository))
               (setf (repo-master mirror) master)))
-      (setf (module-repositories module) (append local-repos remote-repo)
+      (setf (module-repositories module) repos
             (module-master-repo module) (first local-repos)))))
 
 (defmacro defdistributor (name &rest definitions)
@@ -121,6 +140,7 @@
 
 (defun derive-user-perspective (from distributor &rest user-perspective-initargs)
   (lret ((user-perspective (apply #'make-instance 'user-perspective user-perspective-initargs)))
+    (ensure-directories-exist (git-pool user-perspective))
     (let ((*perspective* user-perspective))
       (iter (for (name module) in-hashtable (modules from))
             (let* ((derived-module (make-instance 'module :name name :asdf-name (module-asdf-name module)))
@@ -128,7 +148,8 @@
                    (local (make-instance 'user-local-derived-git-repository :module derived-module :master remote)))
               (setf (module name) derived-module
                     (module-master-repo derived-module) local
-                    (module-repositories derived-module) (list local remote))))
+                    (module-repositories derived-module) (list local remote)
+                    (values (repo (repo-name local)) (repo (repo-name remote))) (values local remote))))
       (iter (for (name module) in-hashtable (modules from))
             (iter (for dep in (module-direct-dependencies module))
                   (depend (module name) (module (name dep))))))))
@@ -155,6 +176,13 @@
   (with-condition-restart-binding ((external-program-failure resignal))
     (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (signal 'repository-pull-failed :from from :to to))))
       (call-next-method to from))))
+
+(defmethod pull :around ((to git-repository) from)
+  (let ((preexisting (probe-file (path to))))
+    (call-next-method)
+    (unless preexisting ;; new shiny repository
+      (when (default-world-readable *perspective*)
+        (setf (world-readable-p to) t)))))
 
 (defmethod pull ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)

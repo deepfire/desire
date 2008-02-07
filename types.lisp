@@ -2,16 +2,20 @@
 
 (defclass perspective ()
   ((modules :accessor modules :initarg :modules)
+   (repositories :accessor repositories :initarg :repositories)
    (leaves :accessor leaves :initarg :leaves)
-   (nonleaves :accessor nonleaves :initarg :nonleaves))
+   (nonleaves :accessor nonleaves :initarg :nonleaves)
+   (git-pool :accessor git-pool :initarg :git-pool)
+   (default-world-readable :accessor default-world-readable :initarg :default-world-readable))
   (:default-initargs
    :modules (make-hash-table :test 'equal)
+   :repositories (make-hash-table :test 'equal)
    :leaves (make-hash-table :test 'equal)
-   :nonleaves (make-hash-table :test 'equal)))
+   :nonleaves (make-hash-table :test 'equal)
+   :default-world-readable t))
 
 (defclass gateway-perspective (perspective)
-  ((git-pool :accessor git-pool :initarg :git-pool)
-   (darcs-pool :accessor darcs-pool :initarg :darcs-pool)
+  ((darcs-pool :accessor darcs-pool :initarg :darcs-pool)
    (svn-pool :accessor svn-pool :initarg :svn-pool)
    (cvs-pool :accessor cvs-pool :initarg :cvs-pool)
    (lockdir :accessor lockdir :initarg :lockdir))
@@ -22,14 +26,21 @@
    :cvs-pool   "/mnt/enter/cvs/"
    :lockdir    "/var/lock/"))
 
+(defmethod print-object ((o gateway-perspective) stream)
+  (format stream "~@<#<~S default to ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
+          (type-of o) (default-world-readable o) (git-pool o) (darcs-pool o) (svn-pool o) (cvs-pool o) (lockdir o)))
+
 (defclass user-perspective (perspective)
-  ((home :accessor home :initarg :home)
-   (user-git-pool :accessor user-git-pool :initarg :user-git-pool))
+  ((home :accessor home :initarg :home))
   (:default-initargs
    :home (user-homedir-pathname)))
 
-(defmethod initialize-instance :after ((o user-perspective) &key user-git-pool &allow-other-keys)
-  (setf (user-git-pool o) (or user-git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
+(defmethod print-object ((o user-perspective) stream)
+  (format stream "~@<#<~S default to ~:[non-~;~]world-readable, git: ~S, home: ~S>~:@>"
+          (type-of o) (default-world-readable o) (git-pool o) (home o)))
+
+(defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
+  (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
 (defvar *perspective*)
 (defparameter *sbcl-systems-location* '(".sbcl" "systems"))
@@ -74,6 +85,9 @@
                  (princ x s)
                  (princ #\/ s)))))
 
+(defmethod print-object ((o remote-repository) stream)
+  (format stream "~@<#<~S ~S>~:@>" (type-of o) (url o)))
+
 (defclass local-repository (repository)
   ((pool-root :accessor repo-pool-root :initarg :pool-root)))
 
@@ -81,8 +95,11 @@
   (:method ((o local-repository))
     (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
 
+(defmethod print-object ((o local-repository) stream)
+  (format stream "~@<#<~S ~S>~:@>" (type-of o) (path o)))
+
 (defclass site-repository (local-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
-(defclass user-repository (local-repository) () (:default-initargs :pool-root (user-git-pool *perspective*)))
+(defclass user-repository (local-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
 
 (defclass derived-repository (local-repository)
   ((master :accessor repo-master :initarg :master)
@@ -96,6 +113,19 @@
 (defclass local-darcs-repository (derived-repository darcs-repository) () (:default-initargs :pool-root (darcs-pool *perspective*)))
 (defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root (svn-pool *perspective*)))
 (defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root (cvs-pool *perspective*)))
+
+(defun coerce-repo-type-to-mnemonic (type)
+  (list (cond ((subtypep type 'local-repository) 'local)
+              ((subtypep type 'remote-repository) 'remote)
+              (t (error "~@<malformed repository type specifier ~S~:@>" type)))
+        (cond ((subtypep type 'git-repository) 'git)
+              ((subtypep type 'darcs-repository) 'darcs)
+              ((subtypep type 'svn-repository) 'svn)
+              ((subtypep type 'cvs-repository) 'cvs)
+              (t (error "~@<malformed repository type specifier ~S~:@>" type)))))
+
+(defun repo-name (repo)
+  (cons (name (repo-module repo)) (coerce-repo-type-to-mnemonic (type-of repo))))
 
 (defun downstring (x)
   (string-downcase (string x)))
