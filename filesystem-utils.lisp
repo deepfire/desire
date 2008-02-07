@@ -13,7 +13,11 @@
     (unless success
       (error 'external-program-failure :program program-pathname :parameters parameters :status exit-code))))
 
-(defvar *executable-search-path* #-win32 '(#p"/usr/bin/" #p"/bin/") #+win32 '(#p"c:\\program files\\git\\bin\\"))
+(defvar *executable-search-path* #-win32 '(#p"/usr/bin/" #p"/bin/") #+win32 '(#p"c:\\program files\\git\\bin\\" #p"d:\\program files\\git\\bin\\"
+                                                                              #p"e:\\program files\\git\\bin\\" #p"f:\\program files\\git\\bin\\"
+                                                                              #p"g:\\program files\\git\\bin\\" #p"h:\\program files\\git\\bin\\"
+                                                                              #p"i:\\program files\\git\\bin\\" #p"j:\\program files\\git\\bin\\"
+                                                                              #p"k:\\program files\\git\\bin\\" #p"l:\\program files\\git\\bin\\"))
 
 (define-condition executable-not-found (error)
   ((name :accessor cond-name :initarg :name)
