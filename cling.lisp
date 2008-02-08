@@ -39,8 +39,8 @@
   (declare (type repository val) (type list name))
   (setf (gethash (mapcar #'coerce-to-name name) (repositories *perspective*)) val))
 
-(defun defmodule (name &key (asdf-name name))
-  (setf (module name) (make-instance 'module :name name :asdf-name asdf-name)))
+(defun defmodule (perspective name &key (asdf-name name))
+  (setf (module name) (make-instance 'module :perspective perspective :name name :asdf-name asdf-name)))
 
 (defun map-perspective-modules (fn perspective)
   (maphash-values fn (modules perspective)))
@@ -92,7 +92,7 @@
                                          (for ,module-spec = (cons (first ,module-prespec) (remove-from-plist (rest ,module-prespec) :cvs-module)))
                                          (when (module (car ,module-spec) :if-does-not-exist :continue)
                                            (warn "~@<redefining module ~A in DEFDISTRIBUTOR~:@>" (car ,module-spec)))
-                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (apply #'defmodule ,module-spec))))
+                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (apply #'defmodule *perspective* ,module-spec))))
                                            (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name ,remote-spec)))))))))))
 
 (defun mark-non-leaf (depkey dep)
@@ -148,7 +148,7 @@
     (ensure-directories-exist (git-pool perspective))
     (let ((*perspective* perspective))
       (iter (for (name module) in-hashtable (modules from))
-            (let* ((derived-module (make-instance 'module :name name :asdf-name (module-asdf-name module)))
+            (let* ((derived-module (make-instance 'module :perspective perspective :name name :asdf-name (module-asdf-name module)))
                    (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
                    (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
               (setf (module name) derived-module

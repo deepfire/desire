@@ -22,7 +22,7 @@
 
 (defmethod print-object ((o gateway-perspective) stream)
   (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
-          (type-of o) (default-world-readable o) (git-pool o) (darcs-pool o) (svn-pool o) (cvs-pool o) (lockdir o)))
+          (type-of o) (default-world-readable o) (slot-value* o 'git-pool) (slot-value* o 'darcs-pool) (slot-value* o 'svn-pool) (slot-value* o 'cvs-pool) (slot-value* o 'lockdir)))
 
 (defclass user-perspective (perspective)
   ((home :accessor home :initarg :home))
@@ -31,7 +31,7 @@
 
 (defmethod print-object ((o user-perspective) stream)
   (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, home: ~S>~:@>"
-          (type-of o) (default-world-readable o) (git-pool o) (home o)))
+          (type-of o) (default-world-readable o) (slot-value* o 'git-pool) (home o)))
 
 (defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
   (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
@@ -82,13 +82,7 @@
 (defmethod print-object ((o remote-repository) stream)
   (format stream "~@<#<~S ~S>~:@>" (type-of o) (url o)))
 
-(defclass local-repository (repository)
-  ((pool-root :accessor repo-pool-root :initarg :pool-root))
-  (:default-initargs :pool-root (git-pool *perspective*)))
-
-(defgeneric path (repo)
-  (:method ((o local-repository))
-    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
+(defclass local-repository (repository) ())
 
 (defmethod print-object ((o local-repository) stream)
   (format stream "~@<#<~S ~S>~:@>" (type-of o) (path o)))
@@ -105,9 +99,19 @@
 (defclass user-local-derived-git-repository (user-repository derived-repository local-git-repository) ())
 (defclass site-local-origin-git-repository (site-repository local-git-repository) ())
 (defclass user-local-origin-git-repository (user-repository local-git-repository) ())
-(defclass local-darcs-repository (derived-repository darcs-repository) () (:default-initargs :pool-root (darcs-pool *perspective*)))
-(defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root (svn-pool *perspective*)))
-(defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root (cvs-pool *perspective*)))
+(defclass local-darcs-repository (derived-repository darcs-repository) ())
+(defclass local-svn-repository (derived-repository svn-repository) ())
+(defclass local-cvs-repository (derived-repository cvs-repository) ())
+
+(defgeneric repo-pool-root (repo)
+  (:method ((o local-git-repository)) (git-pool (module-perspective (repo-module o))))
+  (:method ((o local-darcs-repository)) (darcs-pool (module-perspective (repo-module o))))
+  (:method ((o local-svn-repository)) (svn-pool (module-perspective (repo-module o))))
+  (:method ((o local-cvs-repository)) (cvs-pool (module-perspective (repo-module o)))))
+
+(defgeneric path (repo)
+  (:method ((o local-repository))
+    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
 
 (defun perspective-master-repo-typemap (perspective-type)
   (ecase perspective-type
@@ -131,7 +135,7 @@
   (string-downcase (string x)))
 
 (defclass module (named depobj)
-  ((name :accessor name :initarg :name)
+  ((perspective :accessor module-perspective :initarg :perspective)
    (asdf-name :accessor module-asdf-name :initarg :asdf-name)
    (repositories :accessor module-repositories :initarg :repositories)
    (master-repo :accessor module-master-repo :initarg :master-repo))
@@ -139,7 +143,7 @@
    :repositories nil))
 
 (defmethod print-object ((o module) stream)
-  (format stream "#<~@<~S ~S ASDF name: ~S~:@>>" (type-of o) (name o) (module-asdf-name o)))
+  (format stream "#<~@<~S ~S perspective: ~S, ASDF name: ~S~:@>>" (type-of o) (slot-value* o 'name) (slot-value* o 'perspective) (slot-value* o 'asdf-name)))
 
 (defclass application (named)
   ((module :accessor app-module :initarg :module)
