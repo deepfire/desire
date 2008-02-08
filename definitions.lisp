@@ -27,7 +27,7 @@
    (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
     (closer closer-mop lw-compat)
-    (clbuild cl-webdav skippy salza trivial-sockets split-sequence rfc2388 psgraph parse-number net-telent-date))
+    (clbuild clbuild cl-webdav skippy salza trivial-sockets split-sequence rfc2388 psgraph parse-number net-telent-date))
    (svn (usocket/trunk usocket) (trunk cl-irc) graphic-forms)))
 
 (defdistributor christophe
