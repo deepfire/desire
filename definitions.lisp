@@ -12,7 +12,7 @@
   (:url-schemas
    (git (repo) "anongit.freedesktop.org" "git" "xorg" "lib" (downstring (name repo))))
   (:modules
-   (git libpciaccess)))
+   (git (libpciaccess (libpciaccess :asdf-name nil)))))
 
 (defdistributor common-lisp.net
   (:url-schemas
