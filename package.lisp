@@ -3,7 +3,7 @@
   (:export
    #:*perspective* #:perspective #:gateway-perspective #:user-perspective #:derive-perspective #:switch-perspective
    #:default-world-readable
-   #:map-modules #:map-repositories #:map-master-repositories
+   #:map-modules #:map-repositories
    #:defdistributor #:define-module-dependencies #:define-program
    #:module #:repo #:path #:url #:pull #:update #:purge-fasls))
 

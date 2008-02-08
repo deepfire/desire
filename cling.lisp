@@ -42,14 +42,11 @@
 (defun defmodule (perspective name &key (asdf-name name))
   (setf (module name) (make-instance 'module :perspective perspective :name name :asdf-name asdf-name)))
 
-(defun map-modules (fn perspective)
-  (maphash-values fn (modules perspective)))
+(defun map-modules (fn perspective &key key test test-not &rest rest)
+  (apply #'maphash-values fn (modules perspective) rest))
 
-(defun map-repositories (fn perspective)
-  (maphash-values fn (repositories perspective)))
-
-(defun map-master-repositories (fn perspective)
-  (map-modules (the function (compose fn #'module-master-repo)) perspective))
+(defun map-repositories (fn perspective &key key test test-not &rest rest)
+  (apply #'maphash-values fn (repositories perspective) rest))
 
 (defun repository-import-chain (type)
   (ecase type
