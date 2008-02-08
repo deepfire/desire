@@ -143,14 +143,14 @@
           (iter (for dep in (module-direct-dependencies module))
                 (unioning (module-full-dependencies dep (cons module stack)))))))
 
-(defun derive-user-perspective (from distributor &rest user-perspective-initargs)
-  (lret ((user-perspective (apply #'make-instance 'user-perspective user-perspective-initargs)))
-    (ensure-directories-exist (git-pool user-perspective))
-    (let ((*perspective* user-perspective))
+(defun derive-perspective (from type distributor &rest perspective-initargs)
+  (lret ((perspective (apply #'make-instance type perspective-initargs)))
+    (ensure-directories-exist (git-pool perspective))
+    (let ((*perspective* perspective))
       (iter (for (name module) in-hashtable (modules from))
             (let* ((derived-module (make-instance 'module :name name :asdf-name (module-asdf-name module)))
                    (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
-                   (local (make-instance 'user-local-derived-git-repository :module derived-module :master remote)))
+                   (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
               (setf (module name) derived-module
                     (module-master-repo derived-module) local
                     (module-repositories derived-module) (list local remote)
@@ -158,6 +158,9 @@
       (iter (for (name module) in-hashtable (modules from))
             (iter (for dep in (module-direct-dependencies module))
                   (depend (module name) (module (name dep))))))))
+
+(defun switch-perspective (type distributor &rest perspective-initargs)
+  (setf *perspective* (apply #'derive-perspective *perspective* type distributor perspective-initargs)))
 
 (defgeneric pull (to from))
 
