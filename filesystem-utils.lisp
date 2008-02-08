@@ -50,8 +50,8 @@
 (progn
   (define-external-program darcs)
   (define-external-program rsync)
-  (define-external-program svn)
   (define-external-program git-cvsimport)
+  (define-external-program git-svnimport)
   (define-external-program darcs-to-git))
 
 (define-condition about-to-purge (error)
