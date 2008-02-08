@@ -49,7 +49,7 @@
   (maphash-values fn (repositories perspective)))
 
 (defun map-master-repositories (fn perspective)
-  (map-modules (compose fn #'module-master-repo) perspective))
+  (map-modules (the function (compose fn #'module-master-repo)) perspective))
 
 (defun repository-import-chain (type)
   (ecase type
