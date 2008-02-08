@@ -26,9 +26,17 @@
     (cl-plus-ssl cl+ssl trivial-gray-streams))
    (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
-    (closer closer-mop lw-compat)
-    (clbuild clbuild cl-webdav skippy salza trivial-sockets split-sequence rfc2388 psgraph parse-number net-telent-date))
+    (closer closer-mop lw-compat))
    (svn (usocket/trunk usocket) (trunk cl-irc) graphic-forms)))
+
+(defdistributor clnet-clbuild
+  (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" (downstring (name repo))))
+  (:modules (darcs clbuild)))
+
+(defdistributor clnet-clbuild-mirror
+  (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" "mirror" (downstring (name repo))))
+  (:modules (darcs
+             (clbuild cl-webdav skippy salza trivial-sockets split-sequence rfc2388 psgraph parse-number net-telent-date ltk ironclad chipz))))
 
 (defdistributor christophe
   (:url-schemas
