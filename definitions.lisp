@@ -17,9 +17,8 @@
 (defdistributor common-lisp.net
   (:url-schemas
    (cvs-rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "cvsroot")
-   (svn-rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)))
-   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo)))
-   (svn (repo) "common-lisp.net" "project" (downstring (name repo)) "svn"))
+   (svn-rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "svn")
+   (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs
     flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse (linedit (linedit :cvs-module src))
