@@ -9,34 +9,34 @@
   (declare (type module o))
   (make-pathname :directory (append (pathname-directory (user-homedir-pathname)) *sbcl-systems-location*) :name (downstring (module-asdf-name o)) :type "asd"))
 
-(defgeneric asdf-loadable-p (o))
+(defgeneric asdfly-okay (o))
 
-(defmethod asdf-loadable-p ((o module))
-  (asdf-loadable-p (module-master-repo o)))
+(defmethod asdfly-okay ((o module))
+  (asdfly-okay (module-master-repo o)))
 
-(defmethod asdf-loadable-p :around ((o repository))
+(defmethod asdfly-okay :around ((o repository))
   (or (null (module-asdf-name (repo-module o)))
       (call-next-method)))
 
-(defmethod asdf-loadable-p ((o user-repository))
+(defmethod asdfly-okay ((o user-repository))
   (not (null (probe-file (asdf-definition (repo-module o))))))
 
 #-win32
-(defmethod asdf-loadable-p ((o site-repository))
+(defmethod asdfly-okay ((o site-repository))
   (and (probe-file (asdf-symlink (repo-module o)))
        (probe-file (sb-posix:readlink (asdf-symlink (repo-module o))))))
 
-(defgeneric (setf asdf-loadable-p) (val o))
+(defgeneric ensure-asdfly-okay (o))
 
-(defmethod (setf asdf-loadable-p) (val (o module))
-  (setf (asdf-loadable-p (module-master-repo o)) val))
+(defmethod ensure-asdfly-okay ((o module))
+  (ensure-asdfly-okay (module-master-repo o)))
 
-(defmethod (setf asdf-loadable-p) ((val (eql t)) (o user-repository))
+(defmethod ensure-asdfly-okay ((o user-repository))
   t)
 
 #-win32
-(defmethod (setf asdf-loadable-p) ((val (eql t)) (o site-repository))
-  (unless (asdf-loadable-p o)
+(defmethod ensure-asdfly-okay ((o site-repository))
+  (unless (asdfly-okay o)
     (let ((symlink (asdf-symlink (repo-module o))))
       (when (probe-file symlink)
         (sb-posix:unlink symlink)) ;; FIXME: delete-file refuses to remove dead symlinks)

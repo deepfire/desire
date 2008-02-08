@@ -229,13 +229,13 @@
 
 (defun update-single (o)
   (pull-chain (module-master-repo o))
-  (setf (asdf-loadable-p o) t))
+  (ensure-asdfly-okay o))
 
 (defun update (o &key skip-present (check-success t))
   (let* ((full-set (module-full-dependencies o))
-         (initially-unloadable (remove-if #'asdf-loadable-p full-set)))
-    (mapc #'update-single (xform-if skip-present (curry #'remove-if #'asdf-loadable-p) full-set))
-    (let* ((still-unloadable (remove-if #'asdf-loadable-p full-set))
+         (initially-unloadable (remove-if #'asdfly-okay full-set)))
+    (mapc #'update-single (xform-if skip-present (curry #'remove-if #'asdfly-okay) full-set))
+    (let* ((still-unloadable (remove-if #'asdfly-okay full-set))
            (degraded (intersection still-unloadable (set-difference full-set initially-unloadable))))
       (cond ((not check-success)
              (warn "~@<success check suppressed~:@>"))
