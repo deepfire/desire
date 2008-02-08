@@ -14,6 +14,10 @@
 (defmethod asdf-loadable-p ((o module))
   (asdf-loadable-p (module-master-repo o)))
 
+(defmethod asdf-loadable-p :around ((o repository))
+  (or (null (module-asdf-name (repo-module o)))
+      (call-next-method)))
+
 (defmethod asdf-loadable-p ((o user-repository))
   (not (null (probe-file (asdf-definition (repo-module o))))))
 

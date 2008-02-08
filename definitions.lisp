@@ -31,7 +31,7 @@
 
 (defdistributor clnet-clbuild
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" (downstring (name repo))))
-  (:modules (darcs clbuild)))
+  (:modules (darcs (clbuild (clbuild :asdf-name nil)))))
 
 (defdistributor clnet-clbuild-mirror
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" "mirror" (downstring (name repo))))
@@ -115,7 +115,7 @@
   (:url-schemas
    (git (repo) "sbcl.boinkor.net" (downstring (name repo))))
   (:modules
-   (git sbcl)))
+   (git (sbcl (sbcl :asdf-name nil)))))
 
 ;; TODO: acl-compat
 
