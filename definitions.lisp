@@ -88,7 +88,7 @@
 
 (defdistributor fractalconcept.com
   (:url-schemas
-   (svn (repo) "www.fractalconcept.com:8000" "public" "open-source" (downstring (name repo))))
+   (rsync (repo) "www.fractalconcept.com:8000" "public" "open-source" (downstring (name repo))))
   (:modules
    (svn cl-pdf cl-typesetting)))
 

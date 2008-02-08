@@ -61,10 +61,10 @@
 (defclass remote-git-repository (remote-repository git-repository) () (:default-initargs :method 'git))
 (defclass remote-git-http-repository (remote-git-repository) () (:default-initargs :method 'http))
 (defclass remote-darcs-repository (remote-repository darcs-repository) () (:default-initargs :method 'http))
-(defclass remote-svn-repository (remote-repository svn-repository) () (:default-initargs :method 'svn-rsync))
+(defclass remote-svn-repository (remote-repository svn-repository) () (:default-initargs :method 'rsync))
 (defclass remote-cvs-repository (remote-repository cvs-repository) 
   ((cvs-module :accessor repo-cvs-module :initarg :cvs-module))
-  (:default-initargs :method 'cvs-rsync))
+  (:default-initargs :method 'rsync))
 
 (defmethod initialize-instance :after ((o remote-cvs-repository) &key cvs-module &allow-other-keys)
   (setf (repo-cvs-module o) (or cvs-module (name o))))
