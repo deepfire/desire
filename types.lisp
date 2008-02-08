@@ -114,6 +114,11 @@
 (defclass local-svn-repository (derived-repository svn-repository) () (:default-initargs :pool-root (svn-pool *perspective*)))
 (defclass local-cvs-repository (derived-repository cvs-repository) () (:default-initargs :pool-root (cvs-pool *perspective*)))
 
+(defun perspective-master-repo-typemap (perspective-type)
+  (ecase perspective-type
+    (gateway-perspective 'site-local-derived-git-repository)
+    (user-perspective 'user-local-derived-git-repository)))
+
 (defun coerce-repo-type-to-mnemonic (type)
   (list (cond ((subtypep type 'local-repository) 'local)
               ((subtypep type 'remote-repository) 'remote)
