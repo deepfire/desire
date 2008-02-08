@@ -138,7 +138,7 @@
   (graphic-forms trivial-features alexandria babel cffi lw-compat closer-mop)
   (gsharp trivial-features alexandria babel cffi spatial-trees slime mcclim flexichain midi closure-common puri trivial-gray-streams cxml)
   (hunchentoot cl-who chunga cl-base64 cl-ppcre trivial-features alexandria babel cffi trivial-gray-streams flexi-streams cl+ssl md5 rfc2388 url-rewrite)
-  (mcclim trivial-features alexandria babel cffi spatial-trees flexichain slime clx)
+  (mcclim trivial-features alexandria babel cffi spatial-trees flexichain slime clx graphic-forms)
   (mel-base trivial-features alexandria babel cffi trivial-gray-streams flexi-streams cl+ssl)
   (plexippus-xpath closure-common puri trivial-gray-streams cxml parse-number cl-ppcre cl-yacc)
   (trivial-features rt babel cffi alexandria)
