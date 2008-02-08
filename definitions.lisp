@@ -4,10 +4,15 @@
   (:url-schemas
    (git (repo) "git.feelingofgreen.ru" (downstring (name repo))))
   (:modules
-   (local-repository
-    bin pergamum semi-precious lispdb cling bintype elf cl-io-mod captured-stream doc dwarf
-    ieee-latex clxs sb-x86-portio
-    giveio mcdbio winnt-lptaccess mcdust-one mclinux mdb newlib pestilence x86-linux x86-win32)))
+   (local
+    pergamum semi-precious lispdb cling bintype elf cl-io-mod captured-stream dwarf
+    ieee-latex clxs sb-x86-portio)))
+
+(defdistributor freedesktop.org
+  (:url-schemas
+   (git (repo) "anongit.freedesktop.org" "git" "xorg" "lib" (downstring (name repo))))
+  (:modules
+   (git libpciaccess)))
 
 (defdistributor common-lisp.net
   (:url-schemas
@@ -15,107 +20,94 @@
    (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo)))
    (svn (repo) "common-lisp.net" "project" (downstring (name repo)) "svn"))
   (:modules
-   (cvs-repository
+   (cvs
     flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse (linedit (linedit :cvs-module src))
     (cl-jpeg cljl)
     (cl-plus-ssl cl+ssl trivial-gray-streams))
-   (darcs-repository
+   (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
     (closer closer-mop lw-compat)
     (clbuild cl-webdav skippy salza trivial-sockets split-sequence rfc2388 psgraph parse-number net-telent-date))
-   (svn-repository
-    (usocket/trunk usocket) (trunk cl-irc) graphic-forms)))
+   (svn (usocket/trunk usocket) (trunk cl-irc) graphic-forms)))
 
 (defdistributor christophe
   (:url-schemas
    (http (repo) "common-lisp.net" "~crhodes" (downstring (name repo))))
   (:modules
-   (darcs-repository
-    clx)))
+   (darcs clx)))
 
 (defdistributor luis
   (:url-schemas
    (http (repo) "common-lisp.net" "~loliveira" "darcs" (downstring (repo-umbrella repo))))
   (:modules
-   (darcs-repository
-    trivial-features babel (cffi+lotsastuff cffi))))
+   (darcs trivial-features babel (cffi+lotsastuff cffi))))
 
 (defdistributor ediware@luis
   (:url-schemas
    (http (repo) "common-lisp.net" "~loliveira" "ediware" (downstring (name repo))))
   (:modules
-   (darcs-repository
+   (darcs
     cl-ppcre flexi-streams cl-fad hunchentoot chunga url-rewrite cl-who drakma)))
 
 (defdistributor repo.or.cz
   (:url-schemas
    (git (repo) "repo.or.cz" (format nil "~A.git" (downstring (name repo)))))
   (:modules
-   (git-repository
-    darcs2git closure-html)))
+   (git darcs2git closure-html)))
 
 (defdistributor lichteblau.com
   (:url-schemas
    (http (repo) "www.lichteblau.com" "git" (format nil "~A.git" (downstring (name repo)))))
   (:modules
-   (git-http-repository
-    cxml-rng cxml-stp clim-alerts)))
+   (git-http cxml-rng cxml-stp clim-alerts)))
 
 (defdistributor lichteblau@clnet
   (:url-schemas
    (http (repo) "common-lisp.net" "~dlichteblau" "inofficial" (downstring (name repo))))
   (:modules
-   (darcs-repository
-    mel-base)))
+   (darcs mel-base)))
 
 (defdistributor sullivan
   (:url-schemas
    (http (repo) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (downstring (name repo))))
   (:modules
-   (darcs-repository
-    midi spatial-trees)))
+   (darcs midi spatial-trees)))
 
 (defdistributor b9.com
   (:url-schemas
    (git (repo) "b9.com" (format nil "~A.git" (downstring (name repo)))))
   (:modules
-   (git-repository
-    puri md5 cl-base64 clsql rt)))
+   (git puri md5 cl-base64 clsql rt)))
 
 (defdistributor fractalconcept.com
   (:url-schemas
    (svn (repo) "www.fractalconcept.com:8000" "public" "open-source" (downstring (name repo))))
   (:modules
-   (svn-repository
-    cl-pdf cl-typesetting)))
+   (svn cl-pdf cl-typesetting)))
 
 (defdistributor www.pps.jussieu.fr
   (:url-schemas
    (http (repo) "www.pps.jussieu.fr" "~jch" "software" "repos" (downstring (name repo))))
   (:modules
-   (darcs-repository
-    cl-yacc)))
+   (darcs cl-yacc)))
 
 (defdistributor tuxee.net
   (:url-schemas
    (git (repo) "git.tuxee.net" (downstring (name repo))))
   (:modules
-   (git-repository
-    cl-vectors)))
+   (git cl-vectors)))
 
 (defdistributor xach.com
   (:url-schemas
    (git (repo) "git.xach.com" (format nil "~A.git" (downstring (name repo)))))
   (:modules
-   (git-repository
-    salza2 zpng vecto zpb-ttf)))
+   (git salza2 zpng vecto zpb-ttf)))
 
 (defdistributor boinkor.net
   (:url-schemas
    (git (repo) "sbcl.boinkor.net" (downstring (name repo))))
   (:modules
-   (git-repository
-    sbcl)))
+   (git sbcl)))
 
 ;; TODO: acl-compat
 
@@ -155,11 +147,18 @@
   (zip salza2 trivial-gray-streams flexi-streams)
   (zpng salza2))
 
+(defdistributor feelingofgreen.ru
+  (:modules
+   (local
+    bin doc giveio mcdbio winnt-lptaccess mcdust-one mclinux mdb newlib pestilence x86-linux x86-win32)))
+
 (define-module-dependencies
   (pergamum alexandria iterate)
   (bintype pergamum)
   (elf bintype)
-  (lispdb pergamum semi-precious sb-x86-portio linedit bordeaux-threads slime elf cffi)
+  (dwarf bintype)
+  (cl-io-mod bintype)
+  (lispdb pergamum semi-precious sb-x86-portio linedit libpciaccess bordeaux-threads slime elf cffi)
   (cling pergamum semi-precious))
 
 (minimise-dependencies)

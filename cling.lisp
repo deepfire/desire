@@ -48,13 +48,14 @@
 (defun map-perspective-repositories (fn perspective)
   (maphash-values fn (repositories perspective)))
 
-(defgeneric repository-import-chain (type)
-  (:method ((type (eql 'local-repository))) (values '(site-local-origin-git-repository)))
-  (:method ((type (eql 'git-repository))) (values '(site-local-derived-git-repository) 'remote-git-repository))
-  (:method ((type (eql 'git-http-repository))) (values '(site-local-derived-git-repository) 'remote-git-http-repository))
-  (:method ((type (eql 'darcs-repository))) (values '(site-local-derived-git-repository local-darcs-repository) 'remote-darcs-repository))
-  (:method ((type (eql 'svn-repository))) (values '(site-local-derived-git-repository local-svn-repository) 'remote-svn-repository))
-  (:method ((type (eql 'cvs-repository))) (values '(site-local-derived-git-repository local-cvs-repository) 'remote-cvs-repository)))
+(defun repository-import-chain (type)
+  (ecase type
+    (local    (values '(site-local-origin-git-repository)))
+    (git      (values '(site-local-derived-git-repository) 'remote-git-repository))
+    (git-http (values '(site-local-derived-git-repository) 'remote-git-http-repository))
+    (darcs    (values '(site-local-derived-git-repository local-darcs-repository) 'remote-darcs-repository))
+    (svn      (values '(site-local-derived-git-repository local-svn-repository) 'remote-svn-repository))
+    (cvs      (values '(site-local-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
 
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remote) (repository-import-chain type)
