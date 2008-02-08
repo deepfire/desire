@@ -18,19 +18,21 @@
     (symbol (symbol-name name))
     (string name)))
 
-(defun module (name &key (when-does-not-exist :error))
+(defun module (name &key (if-does-not-exist :error))
   (or (gethash (coerce-to-name name) (modules *perspective*))
-      (when (eq when-does-not-exist :error)
+      (when (eq if-does-not-exist :error)
         (error "~@<module ~A not defined in perspective ~S~:@>" name *perspective*))))
 
 (defun (setf module) (val name)
   (declare (type module val))
+  (when (module name :if-does-not-exist :continue)
+    (warn "~@<redefining module ~A~:@>" name))
   (setf (gethash (coerce-to-name name) (modules *perspective*)) val))
 
-(defun repo (name &key (when-does-not-exist :error))
+(defun repo (name &key (if-does-not-exist :error))
   (declare (type list name))
   (or (gethash (mapcar #'coerce-to-name name) (repositories *perspective*))
-      (when (eq when-does-not-exist :error)
+      (when (eq if-does-not-exist :error)
         (error "~@<repository ~A not defined in perspective ~S~:@>" name *perspective*))))
 
 (defun (setf repo) (val name)
@@ -87,7 +89,9 @@
                                                                                           (collect (list module-prespec type umbrella-name)))))))))
                                          (for ,remote-spec = (remove-from-plist (rest ,module-prespec) :asdf-name))
                                          (for ,module-spec = (cons (first ,module-prespec) (remove-from-plist (rest ,module-prespec) :cvs-module)))
-                                         (let ((,module (or (module (car ,module-spec) :when-does-not-exist :ignore) (apply #'defmodule ,module-spec))))
+                                         (when (module (car ,module-spec) :if-does-not-exist :continue)
+                                           (warn "~@<redefining module ~A in DEFDISTRIBUTOR~:@>" (car ,module-spec)))
+                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (apply #'defmodule ,module-spec))))
                                            (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name ,remote-spec)))))))))))
 
 (defun mark-non-leaf (depkey dep)
