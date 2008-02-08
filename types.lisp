@@ -18,13 +18,7 @@
   ((darcs-pool :accessor darcs-pool :initarg :darcs-pool)
    (svn-pool :accessor svn-pool :initarg :svn-pool)
    (cvs-pool :accessor cvs-pool :initarg :cvs-pool)
-   (lockdir :accessor lockdir :initarg :lockdir))
-  (:default-initargs
-   :git-pool   "/mnt/etherstorm/git/"
-   :darcs-pool "/mnt/enter/darcs/"
-   :svn-pool   "/mnt/enter/svn/"
-   :cvs-pool   "/mnt/enter/cvs/"
-   :lockdir    "/var/lock/"))
+   (lockdir :accessor lockdir :initarg :lockdir)))
 
 (defmethod print-object ((o gateway-perspective) stream)
   (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
