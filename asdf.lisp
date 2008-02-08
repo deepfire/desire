@@ -50,6 +50,7 @@
 
 
 (defun cling-modules-search (system)
-  (probe-file (asdf-definition (module system))))
+  (when-let ((module (module system :if-does-not-exist :continue)))
+    (probe-file (asdf-definition module))))
 
 (push 'cling-modules-search asdf:*system-definition-search-functions*)
