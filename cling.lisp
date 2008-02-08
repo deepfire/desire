@@ -219,7 +219,7 @@
       (with-changed-directory path
         (git "svn" "fetch"))
       (with-changed-directory (repo-pool-root to)
-        (git "svn" "clone" (namestring (path from))))))
+        (git "svn" "clone" (path-as-url (namestring (path from)))))))
 
 (defmethod pull ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))

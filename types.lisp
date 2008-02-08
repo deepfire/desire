@@ -113,6 +113,9 @@
   (:method ((o local-repository))
     (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
 
+(defun path-as-url (path)
+  (format nil "file:/~A" path))
+
 (defun perspective-master-repo-typemap (perspective-type)
   (ecase perspective-type
     (gateway-perspective 'site-derived-git-repository)
