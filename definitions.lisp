@@ -26,7 +26,7 @@
    (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
     (closer closer-mop lw-compat))
-   (svn usocket cl-irc graphic-forms)))
+   (svn usocket cl-irc (graphic-forms (graphic-forms :asdf-name graphic-forms-uitoolkit)))))
 
 (defdistributor clnet-clbuild
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" (downstring (name repo))))
