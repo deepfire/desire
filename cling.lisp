@@ -50,12 +50,12 @@
 
 (defun repository-import-chain (type)
   (ecase type
-    (local    (values '(site-local-origin-git-repository)))
-    (git      (values '(site-local-derived-git-repository) 'remote-git-repository))
-    (git-http (values '(site-local-derived-git-repository) 'remote-git-http-repository))
-    (darcs    (values '(site-local-derived-git-repository local-darcs-repository) 'remote-darcs-repository))
-    (svn      (values '(site-local-derived-git-repository local-svn-repository) 'remote-svn-repository))
-    (cvs      (values '(site-local-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
+    (local    (values '(site-origin-git-repository)))
+    (git      (values '(site-derived-git-repository) 'remote-git-repository))
+    (git-http (values '(site-derived-git-repository) 'remote-git-http-repository))
+    (darcs    (values '(site-derived-git-repository local-darcs-repository) 'remote-darcs-repository))
+    (svn      (values '(site-derived-git-repository local-svn-repository) 'remote-svn-repository))
+    (cvs      (values '(site-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
 
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remote) (repository-import-chain type)

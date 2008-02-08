@@ -95,10 +95,10 @@
    (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
 
 (defclass local-git-repository (git-repository) ())
-(defclass site-local-derived-git-repository (site-repository derived-repository local-git-repository) ())
-(defclass user-local-derived-git-repository (user-repository derived-repository local-git-repository) ())
-(defclass site-local-origin-git-repository (site-repository local-git-repository) ())
-(defclass user-local-origin-git-repository (user-repository local-git-repository) ())
+(defclass site-derived-git-repository (site-repository derived-repository local-git-repository) ())
+(defclass user-derived-git-repository (user-repository derived-repository local-git-repository) ())
+(defclass site-origin-git-repository (site-repository local-git-repository) ())
+(defclass user-origin-git-repository (user-repository local-git-repository) ())
 (defclass local-darcs-repository (derived-repository darcs-repository) ())
 (defclass local-svn-repository (derived-repository svn-repository) ())
 (defclass local-cvs-repository (derived-repository cvs-repository) ())
@@ -115,8 +115,8 @@
 
 (defun perspective-master-repo-typemap (perspective-type)
   (ecase perspective-type
-    (gateway-perspective 'site-local-derived-git-repository)
-    (user-perspective 'user-local-derived-git-repository)))
+    (gateway-perspective 'site-derived-git-repository)
+    (user-perspective 'user-derived-git-repository)))
 
 (defun coerce-repo-type-to-mnemonic (type)
   (list (cond ((subtypep type 'local-repository) 'local)
