@@ -214,6 +214,13 @@
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
   (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (repo-cvs-module (repo-master from)))))
 
+(defmethod pull ((to local-git-repository) (from local-svn-repository) &aux (path (namestring (path to))))
+  (if (probe-file path)
+      (with-changed-directory path
+        (git "svn" "fetch"))
+      (with-changed-directory (repo-pool-root to)
+        (git "svn" "clone" (path from)))))
+
 (defmethod pull ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))
   (within-repository (to)
