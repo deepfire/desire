@@ -16,8 +16,7 @@
 
 (defdistributor common-lisp.net
   (:url-schemas
-   (cvs-rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "cvsroot")
-   (svn-rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "svn")
+   (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "cvsroot")
    (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs
