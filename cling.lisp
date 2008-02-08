@@ -200,7 +200,7 @@
 (defmethod pull ((to local-git-repository) (from remote-git-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)
       (with-changed-directory path
-        (git "pull" url))
+        (git "pull"))
       (with-changed-directory (repo-pool-root to)
         (git "clone" url))))
 
