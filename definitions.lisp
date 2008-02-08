@@ -16,7 +16,7 @@
 
 (defdistributor common-lisp.net
   (:url-schemas
-   (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "cvsroot")
+   (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)))
    (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs
@@ -26,7 +26,7 @@
    (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
     (closer closer-mop lw-compat))
-   (svn (usocket/trunk usocket) (trunk cl-irc) graphic-forms)))
+   (svn usocket cl-irc graphic-forms)))
 
 (defdistributor clnet-clbuild
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" (downstring (name repo))))

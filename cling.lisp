@@ -205,10 +205,10 @@
         (git "clone" url))))
 
 (defmethod pull ((to local-svn-repository) (from remote-svn-repository))
-  (svn "checkout" (url from) (namestring (path to))))
+  (rsync "-ravPz" (format nil "~Ssvn" (url from)) (namestring (path to))))
 
 (defmethod pull ((to local-cvs-repository) (from remote-cvs-repository))
-  (rsync "-ravPz" (url from) (namestring (path to))))
+  (rsync "-ravPz" (format nil "~Scvsroot" (url from)) (namestring (path to))))
 
 (defmethod pull ((to local-git-repository) (from local-cvs-repository))
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
