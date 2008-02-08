@@ -11,7 +11,7 @@
 
 (defun run (app &rest parameters)
   (let ((module (app-module app)))
-    (unless (asdf-loadable-p module)
+    (unless (asdfly-okay module)
       (update module))
     (asdf:oos 'asdf:load-op (module-asdf-name module))
     (apply (symbol-function (find-symbol (string (app-function-name app)) (app-package-name app))) (or parameters (app-default-parameters app)))))
