@@ -89,7 +89,8 @@
   (format stream "~@<#<~S ~S>~:@>" (type-of o) (url o)))
 
 (defclass local-repository (repository)
-  ((pool-root :accessor repo-pool-root :initarg :pool-root)))
+  ((pool-root :accessor repo-pool-root :initarg :pool-root))
+  (:default-initargs :pool-root (git-pool *perspective*)))
 
 (defgeneric path (repo)
   (:method ((o local-repository))
@@ -98,8 +99,8 @@
 (defmethod print-object ((o local-repository) stream)
   (format stream "~@<#<~S ~S>~:@>" (type-of o) (path o)))
 
-(defclass site-repository (local-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
-(defclass user-repository (local-repository) () (:default-initargs :pool-root (git-pool *perspective*)))
+(defclass site-repository (local-repository) ())
+(defclass user-repository (local-repository) ())
 
 (defclass derived-repository (local-repository)
   ((master :accessor repo-master :initarg :master)
