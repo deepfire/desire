@@ -54,7 +54,7 @@
     (git      (values '(site-derived-git-repository) 'remote-git-repository))
     (git-http (values '(site-derived-git-repository) 'remote-git-http-repository))
     (darcs    (values '(site-derived-git-repository local-darcs-repository) 'remote-darcs-repository))
-    (svn      (values '(site-derived-git-repository local-svn-repository) 'remote-svn-repository))
+    (svn      (values '(site-derived-git-repository local-git-svn-repository local-svn-repository) 'remote-svn-repository))
     (cvs      (values '(site-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
 
 (defun define-module-repositories (module type &rest remote-initargs)
@@ -214,12 +214,18 @@
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
   (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (repo-cvs-module (repo-master from)))))
 
-(defmethod pull ((to local-git-repository) (from local-svn-repository) &aux (path (namestring (path to))))
+(defmethod pull ((to local-git-svn-repository) (from local-svn-repository) &aux (path (namestring (path to))))
+  (with-changed-directory path
+    (unless (probe-file ".git")
+      (git "svn" "init" "--trunk=." "--tags=.svn/tags" "--branches=.svn/branches" (path-as-url (namestring (path from)))))
+    (git "svn" "fetch")))
+
+(defmethod pull ((to local-git-repository) (from local-git-repository) &aux (path (namestring (path to))))
   (if (probe-file path)
       (with-changed-directory path
-        (git "svn" "fetch"))
+        (git "fetch"))
       (with-changed-directory (repo-pool-root to)
-        (git "svn" "clone" (path-as-url (namestring (path from)))))))
+        (git "clone" (namestring (path from))))))
 
 (defmethod pull ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))

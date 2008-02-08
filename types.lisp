@@ -101,12 +101,14 @@
 (defclass user-origin-git-repository (user-repository local-git-repository) ())
 (defclass local-darcs-repository (derived-repository darcs-repository) ())
 (defclass local-svn-repository (derived-repository svn-repository) ())
+(defclass local-git-svn-repository (derived-repository local-git-repository) ())
 (defclass local-cvs-repository (derived-repository cvs-repository) ())
 
 (defgeneric repo-pool-root (repo)
   (:method ((o local-git-repository)) (git-pool (module-perspective (repo-module o))))
   (:method ((o local-darcs-repository)) (darcs-pool (module-perspective (repo-module o))))
   (:method ((o local-svn-repository)) (svn-pool (module-perspective (repo-module o))))
+  (:method ((o local-git-svn-repository)) (svn-pool (module-perspective (repo-module o))))
   (:method ((o local-cvs-repository)) (cvs-pool (module-perspective (repo-module o)))))
 
 (defgeneric path (repo)
