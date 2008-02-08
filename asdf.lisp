@@ -47,3 +47,10 @@
     (mapc #'delete-file (directory (make-pathname :directory (append (pathname-directory (path o)) (list :wild-inferiors)) :name :wild :type "fasl"))))
   (:method ((o module))
     (purge-fasls (module-master-repo o))))
+
+
+(defun cling-modules-search (system)
+  (when-let ((module (module system :if-does-not-exist :continue)))
+    (probe-file (asdf-definition module))))
+
+(push 'cling-modules-search asdf:*system-definition-search-functions*)

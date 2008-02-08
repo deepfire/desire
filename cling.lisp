@@ -15,8 +15,8 @@
 (defun coerce-to-name (name)
   (declare (type (or symbol string) name))
   (typecase name
-    (symbol (symbol-name name))
-    (string name)))
+    (symbol (string-upcase (symbol-name name)))
+    (string (string-upcase name))))
 
 (defun module (name &key (if-does-not-exist :error))
   (or (gethash (coerce-to-name name) (modules *perspective*))
@@ -205,21 +205,17 @@
         (git "clone" url))))
 
 (defmethod pull ((to local-svn-repository) (from remote-svn-repository))
-  (rsync "-ravPz" (format nil "~Ssvn" (url from)) (namestring (path to))))
+  (rsync "-ravPz" (format nil "~Asvn/" (url from)) (namestring (path to))))
 
 (defmethod pull ((to local-cvs-repository) (from remote-cvs-repository))
-  (rsync "-ravPz" (format nil "~Scvsroot" (url from)) (namestring (path to))))
+  (rsync "-ravPz" (format nil "~Acvsroot/" (url from)) (namestring (path to))))
 
 (defmethod pull ((to local-git-repository) (from local-cvs-repository))
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
   (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (repo-cvs-module (repo-master from)))))
 
-(defmethod pull ((to local-git-repository) (from local-svn-repository) &aux (path (namestring (path to))))
-  (if (probe-file path)
-      (with-changed-directory path
-        (git "svn" "fetch"))
-      (with-changed-directory (repo-pool-root to)
-        (git "svn" "clone" (path-as-url (namestring (path from)))))))
+(defmethod pull ((to local-git-repository) (from local-svn-repository))
+  (git-svnimport "-C" (namestring (path to)) (path-as-url (namestring (path from)))))
 
 (defmethod pull ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))
