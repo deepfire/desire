@@ -27,7 +27,7 @@
    :lockdir    "/var/lock/"))
 
 (defmethod print-object ((o gateway-perspective) stream)
-  (format stream "~@<#<~S default to ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
+  (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
           (type-of o) (default-world-readable o) (git-pool o) (darcs-pool o) (svn-pool o) (cvs-pool o) (lockdir o)))
 
 (defclass user-perspective (perspective)
@@ -36,7 +36,7 @@
    :home (user-homedir-pathname)))
 
 (defmethod print-object ((o user-perspective) stream)
-  (format stream "~@<#<~S default to ~:[non-~;~]world-readable, git: ~S, home: ~S>~:@>"
+  (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, home: ~S>~:@>"
           (type-of o) (default-world-readable o) (git-pool o) (home o)))
 
 (defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
