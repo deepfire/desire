@@ -15,8 +15,8 @@
 (defun coerce-to-name (name)
   (declare (type (or symbol string) name))
   (typecase name
-    (symbol (symbol-name name))
-    (string name)))
+    (symbol (string-upcase (symbol-name name)))
+    (string (string-upcase name))))
 
 (defun module (name &key (if-does-not-exist :error))
   (or (gethash (coerce-to-name name) (modules *perspective*))
