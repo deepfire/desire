@@ -6,6 +6,7 @@
    #:map-modules #:map-repositories
    #:defdistributor #:define-module-dependencies #:define-program
    #:module #:repo #:path #:url #:pull #:update #:purge-fasls
-   #:asdfly-okay #:ensure-asdfly-okay #:world-readable-p))
+   #:asdfly-okay #:ensure-asdfly-okay #:world-readable-p
+   #:init))
 
 (in-package :cling)

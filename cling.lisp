@@ -248,6 +248,11 @@
              (error "~@<modules remained unloadable after update: ~S~:@>" still-unloadable))
             (t)))))
 
+(defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".clingrc")))
+  (format t "loading user run control file ~S~%" runcontrol)
+  (let ((*package* (find-package :cling)))
+    (load runcontrol)))
+
 (defun gui (module)
   (with-changed-directory (path (module-master-repo module)) 
     (git "gui" ;; :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ))
