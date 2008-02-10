@@ -153,7 +153,7 @@
     (ensure-directories-exist (git-pool perspective))
     (let ((*perspective* perspective))
       (iter (for (name module) in-hashtable (modules from))
-            (let* ((derived-module (make-instance 'module :perspective perspective :name name :asdf-name (module-asdf-name module)))
+            (let* ((derived-module (make-instance 'module :perspective perspective :name (name module) :asdf-name (module-asdf-name module)))
                    (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
                    (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
               (setf (module name) derived-module
