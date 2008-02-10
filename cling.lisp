@@ -29,6 +29,11 @@
     (warn "~@<redefining module ~A~:@>" name))
   (setf (gethash (coerce-to-name name) (modules *perspective*)) val))
 
+(defun coerce-to-module (module-spec)
+  (etypecase module-spec
+    (module module-spec)
+    (symbol (module module-spec))))
+
 (defun repo (name &key (if-does-not-exist :error))
   (declare (type list name))
   (or (gethash (mapcar #'coerce-to-name name) (repositories *perspective*))
@@ -133,15 +138,15 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun module-direct-dependencies (module)
-  (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# module))
+(defun module-direct-dependencies (os &aux (o (coerce-to-module os)))
+  (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# o))
         (collect dep)))
 
-(defun module-full-dependencies (module &optional stack)
-  (unless (member module stack)
-    (cons module
-          (iter (for dep in (module-direct-dependencies module))
-                (unioning (module-full-dependencies dep (cons module stack)))))))
+(defun module-full-dependencies (os &optional stack &aux (o (coerce-to-module os)))
+  (unless (member o stack)
+    (cons o
+          (iter (for dep in (module-direct-dependencies o))
+                (unioning (module-full-dependencies dep (cons o stack)))))))
 
 (defun derive-perspective (from type distributor &rest perspective-initargs)
   (lret ((perspective (apply #'make-instance type perspective-initargs)))
@@ -230,11 +235,11 @@
     (pull-chain (repo-master o))
     (pull o (repo-master o))))
 
-(defun update-single (o)
+(defun update-single (os &aux (o (coerce-to-module os)))
   (pull-chain (module-master-repo o))
   (ensure-asdfly-okay o))
 
-(defun update (o &key skip-present (check-success t))
+(defun update (os &key skip-present (check-success t) &aux (o (coerce-to-module os)))
   (let* ((full-set (module-full-dependencies o))
          (initially-unloadable (remove-if #'asdfly-okay full-set)))
     (mapc #'update-single (xform-if skip-present (curry #'remove-if #'asdfly-okay) full-set))
@@ -248,12 +253,19 @@
              (error "~@<modules remained unloadable after update: ~S~:@>" still-unloadable))
             (t)))))
 
+(defun load-asdf (os &aux (o (coerce-to-module os)))
+  (asdf:oos 'asdf:load-op (find-symbol (name o))))
+
+(defun cling (os &aux (o (coerce-to-module os)))
+  (update o)
+  (load-asdf o))
+
 (defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".clingrc")))
   (format t "loading user run control file ~S~%" runcontrol)
   (let ((*package* (find-package :cling)))
     (load runcontrol)))
 
-(defun gui (module)
-  (with-changed-directory (path (module-master-repo module)) 
+(defun gui (os &aux (o (coerce-to-module os)))
+  (with-changed-directory (path (module-master-repo o)) 
     (git "gui" ;; :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ))
          )))
