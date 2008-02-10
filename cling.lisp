@@ -220,7 +220,7 @@
   (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (repo-cvs-module (repo-master from)))))
 
 (defmethod pull ((to local-git-repository) (from local-svn-repository))
-  (git-svnimport "-C" (namestring (path to)) (path-as-url (namestring (path from)))))
+  (git-svnimport "-C" (namestring (path to)) (url from)))
 
 (defmethod pull ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))

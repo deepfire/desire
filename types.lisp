@@ -71,7 +71,11 @@
 
 (defgeneric distributor-repo-url (method distributor repo))
 
+(defgeneric path (repo))
+
 (defgeneric url (o)
+  (:method ((o local-repository))
+    (format nil "file://~A" (namestring (path o))))
   (:method ((o remote-repository))
     (with-output-to-string (s)
            (format s "~(~A~)://" (repo-method o))
@@ -109,12 +113,8 @@
   (:method ((o local-svn-repository)) (svn-pool (module-perspective (repo-module o))))
   (:method ((o local-cvs-repository)) (cvs-pool (module-perspective (repo-module o)))))
 
-(defgeneric path (repo)
-  (:method ((o local-repository))
-    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
-
-(defun path-as-url (path)
-  (format nil "file://~A" path))
+(defmethod path ((o local-repository))
+    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o))))))
 
 (defun perspective-master-repo-typemap (perspective-type)
   (ecase perspective-type
