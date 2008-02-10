@@ -18,7 +18,7 @@
   ((darcs-pool :accessor darcs-pool :initarg :darcs-pool)
    (svn-pool :accessor svn-pool :initarg :svn-pool)
    (cvs-pool :accessor cvs-pool :initarg :cvs-pool)
-   (lockdir :accessor lockdir :initarg :lockdir)))
+   (lockdir :accessor lockdir :initarg :lockdir :documentation "Learn how to get rid of that.")))
 
 (defmethod print-object ((o gateway-perspective) stream)
   (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
@@ -116,6 +116,7 @@
 (defmethod path ((o local-repository))
     (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o))))))
 
+;; what about origin repositories?
 (defun perspective-master-repo-typemap (perspective-type)
   (ecase perspective-type
     (gateway-perspective 'site-derived-git-repository)
