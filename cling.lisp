@@ -149,16 +149,21 @@
     (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (signal 'repository-pull-failed :from from :to to))))
       (call-next-method to from))))
 
+(defgeneric update-configuration (repository)
+  (:method ((o repository)) t)
+  (:method ((o local-git-repository))
+    (let ((gitignore (make-pathname :directory (pathname-directory (path o)) :name ".gitignore")))
+      (unless (probe-file gitignore)
+        (with-open-file (s gitignore :direction :output :if-does-not-exist :create)
+          (format s ".gitignore~%*~~~%*.o~%*.fasl~%"))))))
+
 (defmethod pull :around ((to git-repository) from)
-  (let* ((preexisting (probe-file (path to)))
-         (gitignore (make-pathname :directory (pathname-directory (path to)) :name ".gitignore")))
+  (let ((preexisting (probe-file (path to))))
     (call-next-method)
     (unless preexisting ;; new shiny repository
       (when (default-world-readable *perspective*)
         (setf (world-readable-p to) t)))
-    (unless (probe-file gitignore)
-      (with-open-file (s gitignore :direction :output :if-does-not-exist :create)
-        (format s ".gitignore~%*~~~%*.o~%*.fasl~%")))))
+    (update-configuration to)))
 
 (defmethod pull ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)
