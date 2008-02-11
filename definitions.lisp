@@ -29,7 +29,9 @@
    (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
     (closer closer-mop lw-compat))
-   (svn usocket cl-irc (graphic-forms (graphic-forms :systems (graphic-forms-uitoolkit))))))
+   (svn usocket cl-irc (graphic-forms (graphic-forms :systems (graphic-forms-uitoolkit
+                                                               (macro-utilities :relativity ("src" "external-libraries" "practicals-1.0.3" "Chapter08"))
+                                                               (binary-data :relativity ("src" "external-libraries" "practicals-1.0.3" "Chapter24"))))))))
 
 (defdistributor clnet-clbuild
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" (downstring (name repo))))

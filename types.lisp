@@ -156,7 +156,10 @@
 
 (defclass system (named)
   ((module :accessor system-module :initarg :module)
-   (repository :accessor system-repository :initarg :repository)))
+   (repository :accessor system-repository :initarg :repository)
+   (relativity :accessor system-relativity :initarg :relativity))
+  (:default-initargs
+   :relativity nil))
 
 (defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
   (setf (system-repository o) (module-master-repository module)))

@@ -4,7 +4,7 @@
 
 (defun system-definition-path (o)
   (declare (type system o))
-  (make-pathname :directory (pathname-directory (path (system-repository o))) :name (downstring (name o)) :type "asd"))
+  (make-pathname :directory (append (pathname-directory (path (system-repository o))) (system-relativity o)) :name (downstring (name o)) :type "asd"))
 
 #-win32
 (defun system-sbcl-symlink-path (o)

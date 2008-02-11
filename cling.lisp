@@ -22,9 +22,14 @@
     (svn      (values '(site-derived-git-repository local-svn-repository) 'remote-svn-repository))
     (cvs      (values '(site-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
 
-(defun define-module-systems (module system-names)
-  (let ((systems (mapcar (curry (the function (rcurry #'make-instance :module module)) 'system :name) system-names)))
-    (appendf (module-systems module) (mapcar #'(setf system) systems system-names))))
+(defun system-spec (o)
+  (cons (name o) (when-let ((rel (system-relativity o))) (list :relativity rel))))
+
+(defun define-module-systems (module system-specs)
+  (let ((systems (iter (for system-spec in system-specs)
+                       (destructuring-bind (name &key relativity) (ensure-list system-spec)
+                         (collect (make-instance 'system :module module :name name :relativity relativity))))))
+    (appendf (module-systems module) (mapcar #'(setf system) systems (mapcar #'name systems)))))
 
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remote) (repository-import-chain type)
@@ -52,7 +57,7 @@
                     (module-master-repository derived-module) local
                     (module-repositories derived-module) (list local remote)
                     (values (repo (repo-name local)) (repo (repo-name remote))) (values local remote))
-              (define-module-systems derived-module (mapcar #'name (module-systems module)))))
+              (define-module-systems derived-module (mapcar #'system-spec (module-systems module)))))
       (iter (for (name module) in-hashtable (modules from))
             (iter (for dep in (module-direct-dependencies module))
                   (depend (module name) (module (name dep))))))))
