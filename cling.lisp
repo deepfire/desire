@@ -150,11 +150,15 @@
       (call-next-method to from))))
 
 (defmethod pull :around ((to git-repository) from)
-  (let ((preexisting (probe-file (path to))))
+  (let* ((preexisting (probe-file (path to)))
+         (gitignore (make-pathname :directory (pathname-directory (path to)) :name ".gitignore")))
     (call-next-method)
     (unless preexisting ;; new shiny repository
       (when (default-world-readable *perspective*)
-        (setf (world-readable-p to) t)))))
+        (setf (world-readable-p to) t)))
+    (unless (probe-file gitignore)
+      (with-open-file (s gitignore :direction :output :if-does-not-exist :create)
+        (format s ".gitignore~%*~~~%*.o~%*.fasl~%")))))
 
 (defmethod pull ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)
