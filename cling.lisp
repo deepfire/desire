@@ -1,57 +1,17 @@
 (in-package :cling)
 
-(defvar *perspectives* (make-hash-table :test 'eq))
+(defun define-module (perspective name)
+  (setf (module name) (make-instance 'module :perspective perspective :name name)))
 
-(defun perspective (name)
-  (gethash name *perspectives*))
+(defun module-direct-dependencies (os &aux (o (coerce-to-module os)))
+  (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# o))
+        (collect dep)))
 
-(defun (setf perspective) (val name)
-  (declare (type perspective val))
-  (setf (gethash name *perspectives*) val))
-
-(setf (perspective :gateway) (make-instance 'gateway-perspective)
-      *perspective* (perspective :gateway))
-
-(defun coerce-to-name (name)
-  (declare (type (or symbol string) name))
-  (typecase name
-    (symbol (string-upcase (symbol-name name)))
-    (string (string-upcase name))))
-
-(defun module (name &key (if-does-not-exist :error))
-  (or (gethash (coerce-to-name name) (modules *perspective*))
-      (when (eq if-does-not-exist :error)
-        (error "~@<module ~A not defined in perspective ~S~:@>" name *perspective*))))
-
-(defun (setf module) (val name)
-  (declare (type module val))
-  (when (module name :if-does-not-exist :continue)
-    (warn "~@<redefining module ~A~:@>" name))
-  (setf (gethash (coerce-to-name name) (modules *perspective*)) val))
-
-(defun coerce-to-module (module-spec)
-  (etypecase module-spec
-    (module module-spec)
-    (symbol (module module-spec))))
-
-(defun repo (name &key (if-does-not-exist :error))
-  (declare (type list name))
-  (or (gethash (mapcar #'coerce-to-name name) (repositories *perspective*))
-      (when (eq if-does-not-exist :error)
-        (error "~@<repository ~A not defined in perspective ~S~:@>" name *perspective*))))
-
-(defun (setf repo) (val name)
-  (declare (type repository val) (type list name))
-  (setf (gethash (mapcar #'coerce-to-name name) (repositories *perspective*)) val))
-
-(defun defmodule (perspective name &key (asdf-name name))
-  (setf (module name) (make-instance 'module :perspective perspective :name name :asdf-name asdf-name)))
-
-(defun map-modules (fn perspective &rest rest)
-  (apply #'maphash-values fn (modules perspective) rest))
-
-(defun map-repositories (fn perspective &rest rest)
-  (apply #'maphash-values fn (repositories perspective) rest))
+(defun module-full-dependencies (os &optional stack &aux (o (coerce-to-module os)))
+  (unless (member o stack)
+    (cons o
+          (iter (for dep in (module-direct-dependencies o))
+                (unioning (module-full-dependencies dep (cons o stack)))))))
 
 (defun repository-import-chain (type)
   (ecase type
@@ -62,10 +22,14 @@
     (svn      (values '(site-derived-git-repository local-svn-repository) 'remote-svn-repository))
     (cvs      (values '(site-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
 
+(defun define-module-systems (module system-names)
+  (let ((systems (mapcar (curry (the function (rcurry #'make-instance :module module)) 'system :name) system-names)))
+    (appendf (module-systems module) (mapcar #'(setf system) systems system-names))))
+
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remote) (repository-import-chain type)
     (let* ((local-repos (mapcar (rcurry #'make-instance :module module) locals))
-           (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module remote-initargs)) (ensure-list remote)))
+           (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module (alexandria::sans remote-initargs :systems))) (ensure-list remote)))
            (repos (append local-repos (ensure-list remote-repo))))
       (iter (for repo in repos)
             (setf (repo (repo-name repo)) repo))
@@ -73,7 +37,28 @@
             (when (and master (typep mirror 'derived-repository))
               (setf (repo-master mirror) master)))
       (setf (module-repositories module) repos
-            (module-master-repo module) (first local-repos)))))
+            (module-master-repository module) (first local-repos))
+      (define-module-systems module (getf remote-initargs :systems (list (name module)))))))
+
+(defun derive-perspective (from type distributor &rest perspective-initargs)
+  (lret ((new-perspective (apply #'make-instance type perspective-initargs)))
+    (ensure-directories-exist (git-pool new-perspective))
+    (let ((*perspective* new-perspective))
+      (iter (for (name module) in-hashtable (modules from))
+            (let* ((derived-module (make-instance 'module :perspective new-perspective :name (name module)))
+                   (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
+                   (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
+              (setf (module name) derived-module
+                    (module-master-repository derived-module) local
+                    (module-repositories derived-module) (list local remote)
+                    (values (repo (repo-name local)) (repo (repo-name remote))) (values local remote))
+              (define-module-systems derived-module (mapcar #'name (module-systems module)))))
+      (iter (for (name module) in-hashtable (modules from))
+            (iter (for dep in (module-direct-dependencies module))
+                  (depend (module name) (module (name dep))))))))
+
+(defun switch-perspective (type distributor &rest perspective-initargs)
+  (setf *perspective* (apply #'derive-perspective *perspective* type distributor perspective-initargs)))
 
 (defmacro defdistributor (name &rest definitions)
   `(progn ,@(iter (for (op . op-body) in definitions)
@@ -86,19 +71,17 @@
                                                     (list ,@body))))))
                                (:modules
                                 (with-gensyms (module module-prespec module-spec remote-spec type umbrella-name)
-                                 `((iter (for (,module-prespec ,type ,umbrella-name) in
+                                 `((iter (for (,module-spec ,type ,umbrella-name) in
                                               ',(iter (for (type . repo-specs) in op-body)
                                                       (appending (iter (for repo-spec in repo-specs)
                                                                        (appending (destructuring-bind (umbrella-name . module-specs) (if (consp repo-spec) repo-spec (list repo-spec repo-spec))
                                                                                     (iter (for module-preprespec in module-specs)
                                                                                           (for module-prespec = (ensure-cons module-preprespec))
                                                                                           (collect (list module-prespec type umbrella-name)))))))))
-                                         (for ,remote-spec = (remove-from-plist (rest ,module-prespec) :asdf-name))
-                                         (for ,module-spec = (cons (first ,module-prespec) (remove-from-plist (rest ,module-prespec) :cvs-module)))
                                          (when (module (car ,module-spec) :if-does-not-exist :continue)
                                            (warn "~@<redefining module ~A in DEFDISTRIBUTOR~:@>" (car ,module-spec)))
-                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (apply #'defmodule *perspective* ,module-spec))))
-                                           (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name ,remote-spec)))))))))))
+                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (define-module *perspective* (car ,module-spec)))))
+                                           (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name (rest ,module-spec))))))))))))
 
 (defun mark-non-leaf (depkey dep)
   (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
@@ -137,35 +120,6 @@
     (maphash-values #'minimise (leaves *perspective*))
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
-
-(defun module-direct-dependencies (os &aux (o (coerce-to-module os)))
-  (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# o))
-        (collect dep)))
-
-(defun module-full-dependencies (os &optional stack &aux (o (coerce-to-module os)))
-  (unless (member o stack)
-    (cons o
-          (iter (for dep in (module-direct-dependencies o))
-                (unioning (module-full-dependencies dep (cons o stack)))))))
-
-(defun derive-perspective (from type distributor &rest perspective-initargs)
-  (lret ((perspective (apply #'make-instance type perspective-initargs)))
-    (ensure-directories-exist (git-pool perspective))
-    (let ((*perspective* perspective))
-      (iter (for (name module) in-hashtable (modules from))
-            (let* ((derived-module (make-instance 'module :perspective perspective :name (name module) :asdf-name (module-asdf-name module)))
-                   (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
-                   (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
-              (setf (module name) derived-module
-                    (module-master-repo derived-module) local
-                    (module-repositories derived-module) (list local remote)
-                    (values (repo (repo-name local)) (repo (repo-name remote))) (values local remote))))
-      (iter (for (name module) in-hashtable (modules from))
-            (iter (for dep in (module-direct-dependencies module))
-                  (depend (module name) (module (name dep))))))))
-
-(defun switch-perspective (type distributor &rest perspective-initargs)
-  (setf *perspective* (apply #'derive-perspective *perspective* type distributor perspective-initargs)))
 
 (defgeneric pull (to from))
 
@@ -236,14 +190,14 @@
     (pull o (repo-master o))))
 
 (defun update-single (os &aux (o (coerce-to-module os)))
-  (pull-chain (module-master-repo o))
-  (ensure-asdfly-okay o))
+  (pull-chain (module-master-repository o))
+  (ensure-loadable o))
 
-(defun update (os &key skip-present (check-success t) &aux (o (coerce-to-module os)))
+(defun update (os &key skip-loadable (check-success t) &aux (o (coerce-to-module os)))
   (let* ((full-set (module-full-dependencies o))
-         (initially-unloadable (remove-if #'asdfly-okay full-set)))
-    (mapc #'update-single (xform-if skip-present (curry #'remove-if #'asdfly-okay) full-set))
-    (let* ((still-unloadable (remove-if #'asdfly-okay full-set))
+         (initially-unloadable (remove-if #'loadable full-set)))
+    (mapc #'update-single (xform-if skip-loadable (curry #'remove-if #'loadable) full-set))
+    (let* ((still-unloadable (remove-if #'loadable full-set))
            (degraded (intersection still-unloadable (set-difference full-set initially-unloadable))))
       (cond ((not check-success)
              (warn "~@<success check suppressed~:@>"))
@@ -253,12 +207,9 @@
              (error "~@<modules remained unloadable after update: ~S~:@>" still-unloadable))
             (t)))))
 
-(defun load-asdf (os &aux (o (coerce-to-module os)))
-  (asdf:oos 'asdf:load-op (find-symbol (name o))))
-
-(defun cling (os &aux (o (coerce-to-module os)))
-  (update o)
-  (load-asdf o))
+(defun cling (os &key skip-loadable &aux (o (coerce-to-module os)))
+  (update o :skip-loadable skip-loadable)
+  (load-system o))
 
 (defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".clingrc")))
   (format t "loading user run control file ~S~%" runcontrol)
@@ -266,6 +217,6 @@
     (load runcontrol)))
 
 (defun gui (os &aux (o (coerce-to-module os)))
-  (with-changed-directory (path (module-master-repo o)) 
+  (with-changed-directory (path (module-master-repository o)) 
     (git "gui" ;; :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ))
          )))
