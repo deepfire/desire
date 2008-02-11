@@ -3,6 +3,8 @@
 (defclass perspective ()
   ((modules :accessor modules :initarg :modules)
    (repositories :accessor repositories :initarg :repositories)
+   (systems :accessor systems :initarg :systems)
+   (applications :accessor applications :initarg :applications)
    (leaves :accessor leaves :initarg :leaves)
    (nonleaves :accessor nonleaves :initarg :nonleaves)
    (git-pool :accessor git-pool :initarg :git-pool)
@@ -10,6 +12,8 @@
   (:default-initargs
    :modules (make-hash-table :test 'equal)
    :repositories (make-hash-table :test 'equal)
+   :systems (make-hash-table :test 'equal)
+   :applications (make-hash-table :test 'equal)
    :leaves (make-hash-table :test 'equal)
    :nonleaves (make-hash-table :test 'equal)
    :default-world-readable t))
@@ -18,7 +22,7 @@
   ((darcs-pool :accessor darcs-pool :initarg :darcs-pool)
    (svn-pool :accessor svn-pool :initarg :svn-pool)
    (cvs-pool :accessor cvs-pool :initarg :cvs-pool)
-   (lockdir :accessor lockdir :initarg :lockdir)))
+   (lockdir :accessor lockdir :initarg :lockdir :documentation "Learn how to get rid of that.")))
 
 (defmethod print-object ((o gateway-perspective) stream)
   (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
@@ -36,9 +40,6 @@
 (defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
   (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
-(defvar *perspective*)
-(defparameter *sbcl-systems-location* '(".sbcl" "systems"))
-
 (defclass named ()
   ((name :accessor name :initarg :name)))
 
@@ -53,10 +54,24 @@
 (defclass svn-repository (repository) ())
 (defclass cvs-repository (repository) ())
 
+(defclass local-repository (repository) ())
 (defclass remote-repository (repository)
   ((umbrella :accessor repo-umbrella :initarg :umbrella)
    (method :accessor repo-method :initarg :method)
    (distributor :accessor repo-distributor :initarg :distributor)))
+
+(defun coerce-repo-type-to-mnemonic (type)
+  (list (cond ((subtypep type 'local-repository) 'local)
+              ((subtypep type 'remote-repository) 'remote)
+              (t (error "~@<malformed repository type specifier ~S~:@>" type)))
+        (cond ((subtypep type 'git-repository) 'git)
+              ((subtypep type 'darcs-repository) 'darcs)
+              ((subtypep type 'svn-repository) 'svn)
+              ((subtypep type 'cvs-repository) 'cvs)
+              (t (error "~@<malformed repository type specifier ~S~:@>" type)))))
+
+(defun repo-name (repo)
+  (cons (name (repo-module repo)) (coerce-repo-type-to-mnemonic (type-of repo))))
 
 (defclass remote-git-repository (remote-repository git-repository) () (:default-initargs :method 'git))
 (defclass remote-git-http-repository (remote-git-repository) () (:default-initargs :method 'http))
@@ -71,7 +86,11 @@
 
 (defgeneric distributor-repo-url (method distributor repo))
 
+(defgeneric path (repo))
+
 (defgeneric url (o)
+  (:method ((o local-repository))
+    (format nil "file://~A" (namestring (path o))))
   (:method ((o remote-repository))
     (with-output-to-string (s)
            (format s "~(~A~)://" (repo-method o))
@@ -81,8 +100,6 @@
 
 (defmethod print-object ((o remote-repository) stream)
   (format stream "~@<#<~S ~S>~:@>" (type-of o) (url o)))
-
-(defclass local-repository (repository) ())
 
 (defmethod print-object ((o local-repository) stream)
   (format stream "~@<#<~S ~S>~:@>" (type-of o) (path o)))
@@ -109,47 +126,96 @@
   (:method ((o local-svn-repository)) (svn-pool (module-perspective (repo-module o))))
   (:method ((o local-cvs-repository)) (cvs-pool (module-perspective (repo-module o)))))
 
-(defgeneric path (repo)
-  (:method ((o local-repository))
-    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o)))))))
+(defun downstring (x)
+  (string-downcase (string x)))
 
-(defun path-as-url (path)
-  (format nil "file://~A" path))
+(defmethod path ((o local-repository))
+    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o))))))
 
+;; what about origin repositories?
 (defun perspective-master-repo-typemap (perspective-type)
   (ecase perspective-type
     (gateway-perspective 'site-derived-git-repository)
     (user-perspective 'user-derived-git-repository)))
 
-(defun coerce-repo-type-to-mnemonic (type)
-  (list (cond ((subtypep type 'local-repository) 'local)
-              ((subtypep type 'remote-repository) 'remote)
-              (t (error "~@<malformed repository type specifier ~S~:@>" type)))
-        (cond ((subtypep type 'git-repository) 'git)
-              ((subtypep type 'darcs-repository) 'darcs)
-              ((subtypep type 'svn-repository) 'svn)
-              ((subtypep type 'cvs-repository) 'cvs)
-              (t (error "~@<malformed repository type specifier ~S~:@>" type)))))
-
-(defun repo-name (repo)
-  (cons (name (repo-module repo)) (coerce-repo-type-to-mnemonic (type-of repo))))
-
-(defun downstring (x)
-  (string-downcase (string x)))
-
 (defclass module (named depobj)
   ((perspective :accessor module-perspective :initarg :perspective)
-   (asdf-name :accessor module-asdf-name :initarg :asdf-name)
    (repositories :accessor module-repositories :initarg :repositories)
-   (master-repo :accessor module-master-repo :initarg :master-repo))
+   (master-repository :accessor module-master-repository :initarg :master-repo)
+   (systems :accessor module-systems :initarg :systems))
   (:default-initargs
-   :repositories nil))
+   :repositories nil
+   :systems nil))
 
 (defmethod print-object ((o module) stream)
-  (format stream "#<~@<~S ~S perspective: ~S, ASDF name: ~S~:@>>" (type-of o) (slot-value* o 'name) (slot-value* o 'perspective) (slot-value* o 'asdf-name)))
+  (format stream "#<~@<~S ~S perspective: ~S~:@>>" (type-of o) (slot-value* o 'name) (slot-value* o 'perspective)))
+
+(defun module-core-system (o)
+  (declare (type module o))
+  (first (module-systems o)))
+
+(defclass system (named)
+  ((module :accessor system-module :initarg :module)
+   (repository :accessor system-repository :initarg :repository)
+   (relativity :accessor system-relativity :initarg :relativity))
+  (:default-initargs
+   :relativity nil))
+
+(defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
+  (setf (system-repository o) (module-master-repository module)))
 
 (defclass application (named)
-  ((module :accessor app-module :initarg :module)
-   (package-name :accessor app-package-name :initarg :package-name)
-   (function-name :accessor app-function-name :initarg :function-name)
+  ((system :accessor app-system :initarg :system)
+   (package :accessor app-package :initarg :package)
+   (function :accessor app-function :initarg :function)
    (default-parameters :accessor app-default-parameters :initarg :default-parameters)))
+
+;;;
+;;; Root, accessors and coercers: PERSPECTIVE, MODULE, REPO, SYSTEM and APP; COERCE-TO-MODULE and COERCE-TO-SYSTEM.
+;;;
+
+(defun coerce-to-name (name)
+  (declare (type (or symbol string) name))
+  (typecase name
+    (symbol (string-upcase (symbol-name name)))
+    (string (string-upcase name))))
+
+(defmacro define-container-hash-accessor (container-name accessor-name &key (type accessor-name) compound-name-p container-transform name-transform-fn parametrize-container
+                                          coercer mapper (when-exists :warn))
+  (declare (type (member :continue :warn :error) when-exists))
+  (let* ((container (if parametrize-container 'container container-name))
+         (container-form (if container-transform `(,container-transform ,container) container))
+         (hash-key-form (cond ((null name-transform-fn) 'name)
+                              ((null compound-name-p) `(,name-transform-fn name))
+                              (t `(mapcar #',name-transform-fn name)))))
+    (when (and parametrize-container coercer)
+      (error "~@<cannot define coercers for accessors with parametrized containers in DEFINE-CONTAINER-ACCESSOR~:@>"))
+    `(progn
+       (defun ,accessor-name (,@(when parametrize-container `(,container)) name &key (if-does-not-exist :error))
+         (or (gethash ,hash-key-form ,container-form)
+             (when (eq if-does-not-exist :error)
+               (error "~@<~A ~A not defined in ~S~:@>" ,(string-downcase (string type)) name ,container))))
+       (defun (setf ,accessor-name) (val ,@(when parametrize-container `(,container)) name)
+         (declare (type ,type val))
+         ,@(unless (eq when-exists :continue)
+             `((when (,accessor-name name :if-does-not-exist :continue)
+                 (,(case when-exists (:warn 'warn) (:error 'error)) "~@<redefining ~A ~A~:@>" ,(string-downcase (string type)) name))))
+         (setf (gethash ,hash-key-form ,container-form) val))
+       ,@(when coercer
+           `((defun ,(format-symbol (symbol-package accessor-name) "COERCE-TO-~A" type) (spec)
+               (declare (type (or ,type symbol) spec))
+               (etypecase spec
+                 (,type spec)
+                 (symbol (,accessor-name spec))))))
+       ,@(when mapper
+           `((defun ,(format-symbol (symbol-package accessor-name) "MAP-~A" (or container-transform mapper)) (fn ,@(when parametrize-container `(,container)) &rest parameters)
+               (apply #'maphash-values fn ,container-form parameters)))))))
+
+(defvar *perspectives*)
+(defvar *perspective*)
+
+(define-container-hash-accessor *perspectives* perspective :name-transform-fn coerce-to-name)
+(define-container-hash-accessor *perspective* module :container-transform modules      :name-transform-fn coerce-to-name :coercer t :mapper t)
+(define-container-hash-accessor *perspective* repo   :container-transform repositories :name-transform-fn coerce-to-name :type repository :mapper t :compound-name-p t)
+(define-container-hash-accessor *perspective* system :container-transform systems      :name-transform-fn coerce-to-name :coercer t :mapper t)
+(define-container-hash-accessor *perspective* app    :container-transform applications :name-transform-fn coerce-to-name :type application)

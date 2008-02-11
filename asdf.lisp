@@ -1,56 +1,62 @@
 (in-package :cling)
 
-(defun asdf-definition (o)
-  (declare (type module o))
-  (make-pathname :directory (pathname-directory (path (module-master-repo o))) :name (downstring (module-asdf-name o)) :type "asd"))
+(defparameter *sbcl-systems-location* '(".sbcl" "systems"))
+
+(defun system-definition-path (o)
+  (declare (type system o))
+  (make-pathname :directory (append (pathname-directory (path (system-repository o))) (system-relativity o)) :name (downstring (name o)) :type "asd"))
 
 #-win32
-(defun asdf-symlink (o)
-  (declare (type module o))
-  (make-pathname :directory (append (pathname-directory (user-homedir-pathname)) *sbcl-systems-location*) :name (downstring (module-asdf-name o)) :type "asd"))
+(defun system-sbcl-symlink-path (o)
+  (declare (type system o))
+  (make-pathname :directory (append (pathname-directory (user-homedir-pathname)) *sbcl-systems-location*) :name (downstring (name o)) :type "asd"))
 
-(defgeneric asdfly-okay (o))
+(defgeneric loadable (o)
+  (:method ((o module))
+    (if-let ((system (module-core-system o)))
+            (loadable system)
+            t))
+  (:method ((o system))
+    (etypecase (system-repository o)
+      (user-repository (not (null (probe-file (system-definition-path o)))))
+      #-win32
+      (site-repository (and (probe-file (system-sbcl-symlink-path o))
+                            (probe-file (sb-posix:readlink (system-sbcl-symlink-path o))))))))
 
-(defmethod asdfly-okay ((o module))
-  (asdfly-okay (module-master-repo o)))
+(defgeneric ensure-loadable (o)
+  (:method ((o module))
+    (every #'ensure-loadable (module-systems o)))
+  (:method ((o system))
+    (etypecase (system-repository o)
+      (user-repository t)
+      #-win32
+      (site-repository
+       (unless (loadable o)
+         (let ((symlink (system-sbcl-symlink-path o)))
+           (when (probe-file symlink)
+             (sb-posix:unlink symlink)) ;; FIXME: delete-file refuses to remove dead symlinks
+           (sb-posix:symlink (system-definition-path o) symlink)))))))
 
-(defmethod asdfly-okay :around ((o repository))
-  (or (null (module-asdf-name (repo-module o)))
-      (call-next-method)))
-
-(defmethod asdfly-okay ((o user-repository))
-  (not (null (probe-file (asdf-definition (repo-module o))))))
-
-#-win32
-(defmethod asdfly-okay ((o site-repository))
-  (and (probe-file (asdf-symlink (repo-module o)))
-       (probe-file (sb-posix:readlink (asdf-symlink (repo-module o))))))
-
-(defgeneric ensure-asdfly-okay (o))
-
-(defmethod ensure-asdfly-okay ((o module))
-  (ensure-asdfly-okay (module-master-repo o)))
-
-(defmethod ensure-asdfly-okay ((o user-repository))
-  t)
-
-#-win32
-(defmethod ensure-asdfly-okay ((o site-repository))
-  (unless (asdfly-okay o)
-    (let ((symlink (asdf-symlink (repo-module o))))
-      (when (probe-file symlink)
-        (sb-posix:unlink symlink)) ;; FIXME: delete-file refuses to remove dead symlinks)
-      (sb-posix:symlink (asdf-definition (repo-module o)) (asdf-symlink (repo-module o))))))
+(defun load-system (os)
+  (declare (type (or symbol module system) os))
+  (asdf:oos 'asdf:load-op (name (typecase os
+                                  (symbol (system os))
+                                  (module (module-core-system os))
+                                  (system os)))))
 
 (defgeneric purge-fasls (o)
   (:method ((o repository))
     (mapc #'delete-file (directory (make-pathname :directory (append (pathname-directory (path o)) (list :wild-inferiors)) :name :wild :type "fasl"))))
+  (:method ((o system))
+    (purge-fasls (system-repository o)))
   (:method ((o module))
-    (purge-fasls (module-master-repo o))))
+    (purge-fasls (module-master-repository o)))
+  (:method (o)
+    (etypecase o
+      (symbol (mapc (compose #'purge-fasls #'module-core-system) (module-full-dependencies (module o)))))))
 
+(defun cling-find-system (name)
+  (when-let ((system (system name :if-does-not-exist :continue)))
+    (probe-file (system-definition-path system))))
 
-(defun cling-modules-search (system)
-  (when-let ((module (module system :if-does-not-exist :continue)))
-    (probe-file (asdf-definition module))))
-
-(push 'cling-modules-search asdf:*system-definition-search-functions*)
+(push 'cling-find-system asdf:*system-definition-search-functions*)

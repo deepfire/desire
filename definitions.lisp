@@ -1,18 +1,21 @@
 (in-package :cling)
 
+(setf *perspectives* (make-hash-table :test 'equal)
+      (perspective 'gateway) (make-instance 'gateway-perspective)
+      *perspective* (perspective 'gateway))
+
 (defdistributor feelingofgreen.ru
-  (:url-schemas
-   (git (repo) "git.feelingofgreen.ru" (downstring (name repo))))
+    (:url-schemas
+     (git (repo) "git.feelingofgreen.ru" (downstring (name repo))))
   (:modules
-   (local
-    pergamum semi-precious lispdb cling bintype elf cl-io-mod captured-stream dwarf
-    ieee-latex clxs sb-x86-portio)))
+   (local pergamum semi-precious lispdb bintype elf cl-io-mod captured-stream dwarf cling climb
+          ieee-latex clxs sb-x86-portio)))
 
 (defdistributor freedesktop.org
   (:url-schemas
    (git (repo) "anongit.freedesktop.org" "git" "xorg" "lib" (downstring (name repo))))
   (:modules
-   (git (libpciaccess (libpciaccess :asdf-name nil)))))
+   (git (libpciaccess (libpciaccess :systems nil)))))
 
 (defdistributor common-lisp.net
   (:url-schemas
@@ -20,17 +23,20 @@
    (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs
-    flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :asdf-name swank)) beirc eclipse (linedit (linedit :cvs-module src))
+    flexichain (mcclim (mcclim :systems (mcclim clim-listener clouseau clim-examples)))
+    zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :systems (swank))) beirc eclipse (linedit (linedit :cvs-module src))
     (cl-jpeg cljl)
     (cl-plus-ssl cl+ssl trivial-gray-streams))
    (darcs
     alexandria bordeaux-threads climplayer plexippus-xpath iterate
     (closer closer-mop lw-compat))
-   (svn usocket cl-irc (graphic-forms (graphic-forms :asdf-name graphic-forms-uitoolkit)))))
+   (svn usocket cl-irc (graphic-forms (graphic-forms :systems (graphic-forms-uitoolkit
+                                                               (macro-utilities :relativity ("src" "external-libraries" "practicals-1.0.3" "Chapter08"))
+                                                               (binary-data :relativity ("src" "external-libraries" "practicals-1.0.3" "Chapter24"))))))))
 
 (defdistributor clnet-clbuild
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" (downstring (name repo))))
-  (:modules (darcs (clbuild (clbuild :asdf-name nil)))))
+  (:modules (darcs (clbuild (clbuild :systems nil)))))
 
 (defdistributor clnet-clbuild-mirror
   (:url-schemas (http (repo) "common-lisp.net" "project" "clbuild" "mirror" (downstring (name repo))))
@@ -114,7 +120,7 @@
   (:url-schemas
    (git (repo) "sbcl.boinkor.net" (downstring (name repo))))
   (:modules
-   (git (sbcl (sbcl :asdf-name nil)))))
+   (git (sbcl (sbcl :systems nil)))))
 
 ;; TODO: acl-compat
 
@@ -170,4 +176,4 @@
 
 (minimise-dependencies)
 
-(defapplication 'climacs 'climacs 'climacs 'climacs-rv)
+(define-application 'climacs 'climacs 'climacs 'climacs-rv)
