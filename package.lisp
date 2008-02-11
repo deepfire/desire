@@ -11,3 +11,5 @@
    #:init))
 
 (in-package :cling)
+
+(require :sb-posix)
