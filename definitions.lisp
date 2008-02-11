@@ -171,7 +171,7 @@
   (elf bintype)
   (dwarf bintype)
   (cl-io-mod bintype)
-  (lispdb pergamum semi-precious sb-x86-portio linedit libpciaccess bordeaux-threads slime elf cffi)
+  (lispdb pergamum semi-precious sb-x86-portio linedit libpciaccess bordeaux-threads slime elf cffi mcclim)
   (cling pergamum semi-precious))
 
 (minimise-dependencies)
