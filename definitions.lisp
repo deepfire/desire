@@ -23,7 +23,8 @@
    (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name repo))))
   (:modules
    (cvs
-    flexichain mcclim zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :systems (swank))) beirc eclipse (linedit (linedit :cvs-module src))
+    flexichain (mcclim (mcclim :systems (mcclim clim-listener clouseau clim-examples)))
+    zip (cxml cxml closure-common) closure gsharp climacs (slime (slime :systems (swank))) beirc eclipse (linedit (linedit :cvs-module src))
     (cl-jpeg cljl)
     (cl-plus-ssl cl+ssl trivial-gray-streams))
    (darcs
