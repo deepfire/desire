@@ -8,10 +8,9 @@
              (format stream "~@<running ~A~{ ~A~} failed with exit status ~S~:@>" (cond-program cond) (cond-parameters cond) (cond-status cond)))))
 
 (defun run-external-program (program-pathname parameters)
-  (lret* ((exit-code (sb-ext:process-exit-code (apply #'sb-ext:run-program program-pathname parameters '(:output t))))
-          (success (zerop exit-code)))
-    (unless success
-      (error 'external-program-failure :program program-pathname :parameters parameters :status exit-code))))
+  (let ((exit-code (sb-ext:process-exit-code (apply #'sb-ext:run-program program-pathname parameters '(:output t)))))
+    (or (zerop exit-code)
+        (error 'external-program-failure :program program-pathname :parameters parameters :status exit-code))))
 
 (defvar *executable-search-path* #-win32 '(#p"/usr/bin/" #p"/bin/") #+win32 '(#p"c:\\program files\\git\\bin\\" #p"d:\\program files\\git\\bin\\"
                                                                               #p"e:\\program files\\git\\bin\\" #p"f:\\program files\\git\\bin\\"
