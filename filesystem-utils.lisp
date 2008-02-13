@@ -47,6 +47,7 @@
 (define-external-program rm)
 #-win32
 (progn
+  (define-external-program false)
   (define-external-program darcs)
   (define-external-program rsync)
   (define-external-program git-cvsimport)

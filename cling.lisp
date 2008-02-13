@@ -75,7 +75,7 @@
                                                     (declare (ignorable ,m ,d))
                                                     (list ,@body))))))
                                (:modules
-                                (with-gensyms (module module-prespec module-spec remote-spec type umbrella-name)
+                                (with-gensyms (module module-spec type umbrella-name)
                                  `((iter (for (,module-spec ,type ,umbrella-name) in
                                               ',(iter (for (type . repo-specs) in op-body)
                                                       (appending (iter (for repo-spec in repo-specs)
@@ -128,7 +128,7 @@
 
 (defgeneric pull (to from))
 
-(define-condition repository-pull-failed (warning)
+(define-condition repository-pull-failed (simple-warning)
   ((from :accessor cond-from :type repository :initarg :from)
    (to :accessor cond-to :type repository :initarg :to))
   (:report (lambda (cond stream)
@@ -146,8 +146,8 @@
 (defmethod pull :around (to from)
   (format t "pulling from ~S to ~S~%" from to)
   (with-condition-restart-binding ((external-program-failure resignal))
-    (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (signal 'repository-pull-failed :from from :to to))))
-      (call-next-method to from))))
+    (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (warn 'repository-pull-failed :from from :to to) (return-from pull))))
+      (call-next-method))))
 
 (defgeneric update-configuration (repository)
   (:method ((o repository)) t)
