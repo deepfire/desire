@@ -94,6 +94,12 @@
       (error 'about-to-purge :directory pathname)))
   (rm "-rf" pathname))
 
+(defun change-directory (pathname)
+  "Change both Lisp's *DEFAULT-PATHNAME-DEFAULTS* and the underlying OS's idea of the current directory."
+  (declare (type pathname pathname))
+  (setf *default-pathname-defaults* pathname)
+  (zerop (sb-posix:chdir (namestring pathname))))
+
 (defmacro with-changed-directory (dir &body body)
   (with-gensyms (old)
     (once-only (dir)
