@@ -31,3 +31,14 @@
     (if val
         (with-open-file (s "git-daemon-export-ok" :if-does-not-exist :create) t)
         (and (delete-file "git-daemon-export-ok") nil))))
+
+(defun repo-var (repo var)
+  (declare (type git-repository repo) (type symbol var))
+  (within-repository (repo)
+    (multiple-value-bind (status output) (run-external-program 'git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :capture-output t)
+      (or status (string-right-trim '(#\Return #\Newline) output)))))
+
+(defun (setf repo-var) (val repo var)
+  (declare (type git-repository repo) (type symbol var) (type string val))
+  (within-repository (repo)
+    (run-external-program 'git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
