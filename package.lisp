@@ -6,7 +6,7 @@
    #:map-modules #:map-repositories #:map-systems #:map-applications
    #:module-direct-dependencies #:module-full-dependencies
    #:defdistributor #:define-module-dependencies #:define-application 
-   #:pull #:update #:load-system #:cling #:purge-fasls #:run
+   #:fetch #:update #:load-system #:cling #:purge-fasls #:run
    #:loadable #:ensure-loadable #:world-readable-p
    #:init))
 

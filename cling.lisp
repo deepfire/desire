@@ -126,13 +126,13 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defgeneric pull (to from))
+(defgeneric fetch (to from))
 
-(define-condition repository-pull-failed (simple-warning)
+(define-condition repository-fetch-failed (simple-warning)
   ((from :accessor cond-from :type repository :initarg :from)
    (to :accessor cond-to :type repository :initarg :to))
   (:report (lambda (cond stream)
-             (format stream "~@<failed to pull from ~S to ~S~:@>" (cond-from cond) (cond-to cond)))))
+             (format stream "~@<failed to fetch from ~S to ~S~:@>" (cond-from cond) (cond-to cond)))))
 
 ;;;   (multiple-value-bind (primary backups) (url from)
 ;;;     (with-condition-restart-binding ((external-program-failure continue))
@@ -143,10 +143,10 @@
 ;;;               (return-from fetch-module t))
 ;;;             (finally (warn 'module-fetch-failed :module o)))))
 
-(defmethod pull :around (to from)
-  (format t "pulling from ~S to ~S~%" from to)
+(defmethod fetch :around (to from)
+  (format t "fetching: ~S => ~S~%" from to)
   (with-condition-restart-binding ((external-program-failure resignal))
-    (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (warn 'repository-pull-failed :from from :to to) (return-from pull))))
+    (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (warn 'repository-fetch-failed :from from :to to) (return-from fetch))))
       (call-next-method))))
 
 (defgeneric update-configuration (repository)
@@ -157,7 +157,7 @@
         (with-open-file (s gitignore :direction :output :if-does-not-exist :create)
           (format s ".gitignore~%*~~~%*.o~%*.fasl~%"))))))
 
-(defmethod pull :around ((to git-repository) from)
+(defmethod fetch :around ((to git-repository) from)
   (let ((preexisting (probe-file (path to))))
     (call-next-method)
     (unless preexisting ;; new shiny repository
@@ -165,46 +165,46 @@
         (setf (world-readable-p to) t)))
     (update-configuration to)))
 
-(defmethod pull ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
+(defmethod fetch ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)
       (darcs "pull" "--all" "--repodir" path url)
       (darcs "get" url path)))
 
-(defmethod pull ((to local-git-repository) (from remote-git-repository) &aux (path (namestring (path to))) (url (url from)))
+(defmethod fetch ((to local-git-repository) (from remote-git-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)
       (with-changed-directory path
         (git "pull"))
       (with-changed-directory (repo-pool-root to)
         (git "clone" url))))
 
-(defmethod pull ((to local-svn-repository) (from remote-svn-repository))
+(defmethod fetch ((to local-svn-repository) (from remote-svn-repository))
   (rsync "-ravPz" (format nil "~Asvn/" (url from)) (namestring (path to))))
 
-(defmethod pull ((to local-cvs-repository) (from remote-cvs-repository))
+(defmethod fetch ((to local-cvs-repository) (from remote-cvs-repository))
   (rsync "-ravPz" (format nil "~Acvsroot/" (url from)) (namestring (path to))))
 
-(defmethod pull ((to local-git-repository) (from local-cvs-repository))
+(defmethod fetch ((to local-git-repository) (from local-cvs-repository))
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
   (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (repo-cvs-module (repo-master from)))))
 
-(defmethod pull ((to local-git-repository) (from local-svn-repository))
+(defmethod fetch ((to local-git-repository) (from local-svn-repository))
   (git-svnimport "-C" (namestring (path to)) (url from)))
 
-(defmethod pull ((to local-git-repository) (from local-darcs-repository))
+(defmethod fetch ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))
   (within-repository (to)
     (darcs-to-git (namestring (path from))))
   (when (repository-bare-p to)
     (setf (repository-bare-p to) nil)))
 
-(defgeneric pull-chain (repo)
+(defgeneric fetch-chain (repo)
   (:method (o) t)
   (:method ((o derived-repository))
-    (pull-chain (repo-master o))
-    (pull o (repo-master o))))
+    (fetch-chain (repo-master o))
+    (fetch o (repo-master o))))
 
 (defun update-single (os &aux (o (coerce-to-module os)))
-  (pull-chain (module-master-repository o))
+  (fetch-chain (module-master-repository o))
   (ensure-loadable o))
 
 (defun update (os &key skip-loadable (check-success t) &aux (o (coerce-to-module os)))

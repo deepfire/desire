@@ -1,4 +1,4 @@
 (in-package :cling)
 
-(defmethod pull ((to (eql :please)) (from (eql :fail)))
+(defmethod fetch ((to (eql :please)) (from (eql :fail)))
   (false))
