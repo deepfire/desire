@@ -8,7 +8,7 @@
     (:url-schemas
      (git (repo) "git.feelingofgreen.ru" (downstring (name repo))))
   (:modules
-   (local pergamum semi-precious lispdb bintype elf cl-io-mod captured-stream dwarf cling climb
+   (local pergamum semi-precious lispdb bintype elf cl-io-mod captured-stream dwarf cling climb cl-git
           ieee-latex clxs sb-x86-portio)))
 
 (defdistributor freedesktop.org
@@ -172,7 +172,8 @@
   (dwarf bintype)
   (cl-io-mod bintype)
   (lispdb pergamum semi-precious sb-x86-portio linedit libpciaccess bordeaux-threads slime elf cffi mcclim)
-  (cling pergamum semi-precious))
+  (cling pergamum semi-precious)
+  (cl-git pergamum cffi))
 
 (minimise-dependencies)
 
