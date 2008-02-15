@@ -66,7 +66,7 @@
   (:url-schemas
    (git (repo) "repo.or.cz" (format nil "~A.git" (downstring (name repo)))))
   (:modules
-   (git darcs2git closure-html)))
+   (git (git (git :systems nil)) darcs2git closure-html)))
 
 (defdistributor lichteblau.com
   (:url-schemas
