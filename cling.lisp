@@ -126,6 +126,23 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
+(defun read-branches (o)
+  (declare (type git-repository o))
+  (with-input-from-external-program (str 'git (list "peek-remote" (url o)))
+    (let ((*read-base* 16) (unreadable (make-unreadable-object)))
+      (iter (for ref = (read str nil unreadable))
+            (for branch-name = (read-line str nil unreadable))
+            (until (or (eq ref unreadable) (eq branch-name unreadable)))
+            (collect (cons branch-name ref))))))
+
+(defun clone (to from)
+  (declare (type to local-git-repository) (type from remote-git-repository))
+  (with-changed-directory (namestring (ensure-directories-exist (path to)))
+    (git "init"))
+  (setf (repo-var to 'remote.origin.url) (url from)
+        (repo-var to 'remote.origin.fetch) "+refs/heads/*:refs/heads/*")
+  #| sync local/remote HEADs |#)
+
 (defgeneric fetch (to from))
 
 (define-condition repository-fetch-failed (simple-warning)
@@ -165,10 +182,11 @@
         (setf (world-readable-p to) t)))
     (update-configuration to)))
 
-(defmethod fetch ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
-  (if (probe-file path)
-      (darcs "pull" "--all" "--repodir" path url)
-      (darcs "get" url path)))
+;; (defmethod fetch ((to local-git-repository) (from remote-git-repository) &aux (path (namestring (path to))) (url (url from)))
+;;   (unless (probe-file path)
+;;     (clone to from))
+;;   (with-changed-directory path
+;;     (git "fetch")))
 
 (defmethod fetch ((to local-git-repository) (from remote-git-repository) &aux (path (namestring (path to))) (url (url from)))
   (if (probe-file path)
@@ -176,6 +194,11 @@
         (git "pull"))
       (with-changed-directory (repo-pool-root to)
         (git "clone" url))))
+
+(defmethod fetch ((to local-darcs-repository) (from remote-darcs-repository) &aux (path (namestring (path to))) (url (url from)))
+  (if (probe-file path)
+      (darcs "pull" "--all" "--repodir" path url)
+      (darcs "get" url path)))
 
 (defmethod fetch ((to local-svn-repository) (from remote-svn-repository))
   (rsync "-ravPz" (format nil "~Asvn/" (url from)) (namestring (path to))))
@@ -233,5 +256,4 @@
 
 (defun gui (os &aux (o (coerce-to-module os)))
   (with-changed-directory (path (module-master-repository o)) 
-    (git "gui" ;; :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ))
-         )))
+    (git "gui" #| :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ)) |#)))
