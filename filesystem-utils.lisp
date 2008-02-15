@@ -38,25 +38,19 @@
   (:report (lambda (cond stream)
              (format stream "~@<running ~A~{ ~A~} failed with exit status ~S~:@>" (cond-program cond) (cond-parameters cond) (cond-status cond)))))
 
-(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) capture-output &aux (pathname (executable name)))
+(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output t) &aux (pathname (executable name)))
   "Run an external program at PATHNAME with PARAMETERS. Return a value associated with the exit code, by the means of VALID-EXIT-CODES, or signal a condition of type EXTERNAL-PROGRAM-FAILURE."
-  (with-output-to-string (str)
-    (return-from run-external-program
-      (values (let ((exit-code (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output (if capture-output str t)))))
-                (cdr (or (assoc exit-code valid-exit-codes)
-                         (signal 'external-program-failure :program pathname :parameters parameters :status exit-code))))
-              (when capture-output (get-output-stream-string str))))))
+  (let ((exit-code (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output))))
+    (cdr (or (assoc exit-code valid-exit-codes)
+             (signal 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
 
-(defun read-if (predicate string &aux (offset 0))
-  (let ((*read-eval* nil))
-    (iter (for (values ret newoffset) = (read-from-string string nil 0 :start offset))
-          (while (funcall predicate ret))
-          (collect ret)
-          (setf offset newoffset))))
-
-(defun run-external-program-reading-output (name parameters &key (valid-exit-codes (acons 0 t nil)))
-  (multiple-value-bind (status output) (run-external-program name parameters :valid-exit-codes valid-exit-codes :capture-output t)
-    (values status (read-if #'symbolp output))))
+(defmacro with-input-from-external-program ((stream-var name params) &body body)
+  (with-gensyms (block str)
+    `(block ,block
+       (with-output-to-string (,str)
+         (run-external-program ,name ,params :output ,str)
+         (with-input-from-string (,stream-var (get-output-stream-string ,str))
+           (return-from ,block (progn ,@body)))))))
 
 (defvar *valid-exit-code-extension* nil)
 
