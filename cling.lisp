@@ -140,7 +140,7 @@
                            ref))))))
 
 (defun clone (to from)
-  (declare (type to local-git-repository) (type from remote-git-repository))
+  (declare (type local-git-repository to) (type remote-git-repository from))
   (with-changed-directory (namestring (ensure-directories-exist (path to)))
     (git "init"))
   (setf (repo-var to 'remote.origin.url) (url from)
