@@ -56,7 +56,8 @@
       (symbol (mapc (compose #'purge-fasls #'module-core-system) (module-full-dependencies (module o)))))))
 
 (defun cling-find-system (name)
-  (when-let ((system (system name :if-does-not-exist :continue)))
-    (probe-file (system-definition-path system))))
+  (when (boundp '*perspective*)
+    (when-let ((system (system name :if-does-not-exist :continue)))
+      (probe-file (system-definition-path system)))))
 
 (push 'cling-find-system asdf:*system-definition-search-functions*)
