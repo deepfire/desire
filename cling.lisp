@@ -14,46 +14,46 @@
   (cons (name o) (when-let ((rel (system-relativity o))) (list :relativity rel))))
 
 (defun define-module-systems (module system-specs)
-  (mapcar (compose (curry #'apply (curry #'make-instance 'system :module module :name)) (curry #'xform-if-not #'listp #'list)) system-specs)
-  (iter (for system-spec in system-specs)
-        (destructuring-bind (name &key relativity) (ensure-list system-spec)
-          (push (make-instance 'system :module module :name name :relativity relativity) (module-systems module)))))
+  (appendf (module-systems module)
+           (mapcar (compose (curry #'apply (curry #'make-instance 'system :module module :name)) #'ensure-list) system-specs)))
 
 (defun repository-import-chain (type)
   (ecase type
     (local    (values '(site-origin-git-repository)))
-    (git      (values '(site-derived-git-repository) 'remote-git-repository))
-    (git-http (values '(site-derived-git-repository) 'remote-git-http-repository))
-    (darcs    (values '(site-derived-git-repository local-darcs-repository) 'remote-darcs-repository))
-    (svn      (values '(site-derived-git-repository local-svn-repository) 'remote-svn-repository))
-    (cvs      (values '(site-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
-
-(defun define-module-repositories (module type &rest remote-initargs)
-  (multiple-value-bind (locals remote) (repository-import-chain type)
-    (let* ((local-repos (mapcar (rcurry #'make-instance :module module) locals))
-           (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module (alexandria::sans remote-initargs :systems))) (ensure-list remote))))
-      (iter (for (derived master) on (setf (module-repositories module) (append local-repos (ensure-list remote-repo))))
-            (when (and master (typep derived 'derived-repository))
-              (setf (repo-master derived) master)))
-      (setf (module-master-repository module) (first local-repos))
-      (define-module-systems module (getf remote-initargs :systems (list (name module)))))))
+    (git      (values '(site-derived-git-repository) '(remote-git-repository)))
+    (git-http (values '(site-derived-git-repository) '(remote-git-http-repository)))
+    (darcs    (values '(site-derived-git-repository local-darcs-repository) '(remote-darcs-repository)))
+    (svn      (values '(site-derived-git-repository local-svn-repository) '(remote-svn-repository)))
+    (cvs      (values '(site-derived-git-repository local-cvs-repository) '(remote-cvs-repository)))))
 
 (defun repository-derivation-chain (type)
   (ecase type
-    ((gateway-perspective user-perspective)    (values '(site-origin-git-repository)))))
+    (gateway-perspective (values '(site-derived-git-repository) '(remote-git-repository)))
+    (user-perspective    (values '(user-derived-git-repository) '(remote-git-repository)))
+    (local-perspective   (values '(site-origin-git-repository))))) ;; behavior is desired, but semantics are skewed...
+
+(defun arrange-module-repositories (module locals remotes)
+  (iter (for (derived master) on (setf (module-repositories module) (append locals remotes)))
+        (while master)
+        (setf (repo-master derived) master))
+  (setf (module-master-repository module) (first locals)))
+
+(defun define-module-repositories (module type &rest remote-initargs)
+  (multiple-value-bind (locals remotes) (repository-import-chain type)
+    (arrange-module-repositories module
+                                 (mapcar (rcurry #'make-instance :module module) locals)
+                                 (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module remote-initargs)) remotes))))
 
 (defun derive-perspective (from type distributor &rest perspective-initargs)
   (lret ((new-perspective (apply #'make-instance type :name type perspective-initargs)))
     (ensure-directories-exist (git-pool new-perspective))
     (let ((*perspective* new-perspective))
-      (iter (for (name module) in-hashtable (modules from))
-            (let* ((derived-module (make-instance 'module :perspective new-perspective :name (name module)))
-                   (remote (make-instance 'remote-git-repository :module derived-module :distributor distributor))
-                   (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
-              (setf (module name) derived-module
-                    (module-master-repository derived-module) local
-                    (module-repositories derived-module) (list local remote))
-              (define-module-systems derived-module (mapcar #'system-spec (module-systems module)))))
+      (multiple-value-bind (locals remotes) (repository-derivation-chain type)
+        (iter (for (nil origin-module) in-hashtable (modules from))
+              (let ((module (make-instance 'module :perspective new-perspective :name (name origin-module))))
+                (arrange-module-repositories module (mapcar (rcurry #'make-instance :module module) locals) (mapcar (rcurry #'make-instance :module module :distributor distributor) remotes))
+                (define-module-systems module (mapcar #'system-spec (module-systems origin-module))))))
+      ;; should be copy-deps elsewhere...
       (iter (for (name module) in-hashtable (modules from))
             (iter (for dep in (module-direct-dependencies module))
                   (depend (module name) (module (name dep))))))))
@@ -61,13 +61,13 @@
 (defun switch-perspective (type distributor &rest perspective-initargs)
   (setf *perspective* (apply #'derive-perspective *perspective* type distributor perspective-initargs)))
 
-(defmacro defdistributor (name &rest definitions)
+(defmacro defdistributor (dist-name &rest definitions)
   `(progn ,@(iter (for (op . op-body) in definitions)
                   (appending (ecase op
                                (:url-schemas
                                 (iter (for (method (repo) . body) in op-body)
                                       (collect (with-gensyms (m d)
-                                                 `(defmethod distributor-repo-url ((,m (eql ',method)) (,d (eql ',name)) ,repo)
+                                                 `(defmethod distributor-repo-url ((,m (eql ',method)) (,d (eql ',dist-name)) ,repo)
                                                     (declare (ignorable ,m ,d))
                                                     (list ,@body))))))
                                (:modules
@@ -79,10 +79,9 @@
                                                                                     (iter (for module-preprespec in module-specs)
                                                                                           (for module-prespec = (ensure-cons module-preprespec))
                                                                                           (collect (list module-prespec type umbrella-name)))))))))
-                                         (when (module (car ,module-spec) :if-does-not-exist :continue)
-                                           (warn "~@<redefining module ~A in DEFDISTRIBUTOR~:@>" (car ,module-spec)))
-                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (make-instance 'module :perspective *perspective* :name (car ,module-spec)))))
-                                           (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name (rest ,module-spec))))))))))))
+                                         (let ((,module (or (module (first ,module-spec) :if-does-not-exist :continue) (make-instance 'module :perspective *perspective* :name (car ,module-spec)))))
+                                           (apply #'define-module-repositories ,module ,type :distributor ',dist-name :umbrella ,umbrella-name (alexandria::sans (rest ,module-spec) :systems))
+                                           (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
 
 (defun mark-non-leaf (depkey dep)
   (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))

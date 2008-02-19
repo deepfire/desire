@@ -55,6 +55,12 @@
   (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, home: ~S>~:@>"
           (type-of o) (default-world-readable o) (slot-value* o 'git-pool) (home o)))
 
+(defclass local-perspective (perspective) ())
+
+(defmethod print-object ((o local-perspective) stream)
+  (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S>~:@>"
+          (type-of o) (default-world-readable o) (slot-value* o 'git-pool)))
+
 (defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
   (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
@@ -127,7 +133,7 @@
   ((master :accessor repo-master :initarg :master)
    (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
 
-(defclass local-git-repository (git-repository) ())
+(defclass local-git-repository (local-repository git-repository) ())
 (defclass site-derived-git-repository (site-repository derived-repository local-git-repository) ())
 (defclass user-derived-git-repository (user-repository derived-repository local-git-repository) ())
 (defclass site-origin-git-repository (site-repository local-git-repository) ())
@@ -146,13 +152,7 @@
   (string-downcase (string x)))
 
 (defmethod path ((o local-repository))
-    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o))))))
-
-;; what about origin repositories?
-(defun perspective-master-repo-typemap (perspective-type)
-  (ecase perspective-type
-    (gateway-perspective 'site-derived-git-repository)
-    (user-perspective 'user-derived-git-repository)))
+  (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (downstring (name o))))))
 
 (defclass module (registered depobj)
   ((perspective :accessor module-perspective :initarg :perspective)
