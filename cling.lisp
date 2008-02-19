@@ -1,8 +1,5 @@
 (in-package :cling)
 
-(defun define-module (perspective name)
-  (setf (module name) (make-instance 'module :perspective perspective :name name)))
-
 (defun module-direct-dependencies (os &aux (o (coerce-to-module os)))
   (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# o))
         (collect dep)))
@@ -13,6 +10,15 @@
           (iter (for dep in (module-direct-dependencies o))
                 (unioning (module-full-dependencies dep (cons o stack)))))))
 
+(defun system-spec (o)
+  (cons (name o) (when-let ((rel (system-relativity o))) (list :relativity rel))))
+
+(defun define-module-systems (module system-specs)
+  (mapcar (compose (curry #'apply (curry #'make-instance 'system :module module :name)) (curry #'xform-if-not #'listp #'list)) system-specs)
+  (iter (for system-spec in system-specs)
+        (destructuring-bind (name &key relativity) (ensure-list system-spec)
+          (push (make-instance 'system :module module :name name :relativity relativity) (module-systems module)))))
+
 (defun repository-import-chain (type)
   (ecase type
     (local    (values '(site-origin-git-repository)))
@@ -22,31 +28,22 @@
     (svn      (values '(site-derived-git-repository local-svn-repository) 'remote-svn-repository))
     (cvs      (values '(site-derived-git-repository local-cvs-repository) 'remote-cvs-repository))))
 
-(defun system-spec (o)
-  (cons (name o) (when-let ((rel (system-relativity o))) (list :relativity rel))))
-
-(defun define-module-systems (module system-specs)
-  (let ((systems (iter (for system-spec in system-specs)
-                       (destructuring-bind (name &key relativity) (ensure-list system-spec)
-                         (collect (make-instance 'system :module module :name name :relativity relativity))))))
-    (appendf (module-systems module) (mapcar #'(setf system) systems (mapcar #'name systems)))))
-
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remote) (repository-import-chain type)
     (let* ((local-repos (mapcar (rcurry #'make-instance :module module) locals))
-           (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module (alexandria::sans remote-initargs :systems))) (ensure-list remote)))
-           (repos (append local-repos (ensure-list remote-repo))))
-      (iter (for repo in repos)
-            (setf (repo (repo-name repo)) repo))
-      (iter (for (mirror master) on repos)
-            (when (and master (typep mirror 'derived-repository))
-              (setf (repo-master mirror) master)))
-      (setf (module-repositories module) repos
-            (module-master-repository module) (first local-repos))
+           (remote-repo (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module (alexandria::sans remote-initargs :systems))) (ensure-list remote))))
+      (iter (for (derived master) on (setf (module-repositories module) (append local-repos (ensure-list remote-repo))))
+            (when (and master (typep derived 'derived-repository))
+              (setf (repo-master derived) master)))
+      (setf (module-master-repository module) (first local-repos))
       (define-module-systems module (getf remote-initargs :systems (list (name module)))))))
 
+(defun repository-derivation-chain (type)
+  (ecase type
+    ((gateway-perspective user-perspective)    (values '(site-origin-git-repository)))))
+
 (defun derive-perspective (from type distributor &rest perspective-initargs)
-  (lret ((new-perspective (apply #'make-instance type perspective-initargs)))
+  (lret ((new-perspective (apply #'make-instance type :name type perspective-initargs)))
     (ensure-directories-exist (git-pool new-perspective))
     (let ((*perspective* new-perspective))
       (iter (for (name module) in-hashtable (modules from))
@@ -55,8 +52,7 @@
                    (local (make-instance (perspective-master-repo-typemap type) :module derived-module :master remote)))
               (setf (module name) derived-module
                     (module-master-repository derived-module) local
-                    (module-repositories derived-module) (list local remote)
-                    (values (repo (repo-name local)) (repo (repo-name remote))) (values local remote))
+                    (module-repositories derived-module) (list local remote))
               (define-module-systems derived-module (mapcar #'system-spec (module-systems module)))))
       (iter (for (name module) in-hashtable (modules from))
             (iter (for dep in (module-direct-dependencies module))
@@ -85,7 +81,7 @@
                                                                                           (collect (list module-prespec type umbrella-name)))))))))
                                          (when (module (car ,module-spec) :if-does-not-exist :continue)
                                            (warn "~@<redefining module ~A in DEFDISTRIBUTOR~:@>" (car ,module-spec)))
-                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (define-module *perspective* (car ,module-spec)))))
+                                         (let ((,module (or (module (car ,module-spec) :if-does-not-exist :continue) (make-instance 'module :perspective *perspective* :name (car ,module-spec)))))
                                            (apply #'define-module-repositories ,module ,type :distributor ',name :umbrella ,umbrella-name (rest ,module-spec))))))))))))
 
 (defun mark-non-leaf (depkey dep)
@@ -237,7 +233,7 @@
 (defun update (os &key skip-loadable (check-success t) &aux (o (coerce-to-module os)))
   (let* ((full-set (module-full-dependencies o))
          (initially-unloadable (remove-if #'loadable full-set)))
-    (mapc #'update-single (xform-if skip-loadable (curry #'remove-if #'loadable) full-set))
+    (mapc #'update-single (xform skip-loadable (curry #'remove-if #'loadable) full-set))
     (let* ((still-unloadable (remove-if #'loadable full-set))
            (degraded (intersection still-unloadable (set-difference full-set initially-unloadable))))
       (cond ((not check-success)

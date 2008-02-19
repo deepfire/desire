@@ -1,8 +1,7 @@
 (in-package :cling)
 
 (setf *perspectives* (make-hash-table :test 'equal)
-      (perspective 'gateway) (make-instance 'gateway-perspective)
-      *perspective* (perspective 'gateway))
+      *perspective* (make-instance 'gateway-perspective :name 'root))
 
 (defdistributor feelingofgreen.ru
     (:url-schemas

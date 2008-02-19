@@ -1,6 +1,23 @@
 (in-package :cling)
 
-(defclass perspective ()
+(defclass named ()
+  ((name :accessor name :initarg :name)))
+
+(defclass registered (named)
+  ((registrator :accessor registered-registrator :type function :initarg :registrator)))
+
+(defgeneric fully-qualified-name (o)
+  (:documentation "A name which is supposed to be unique within the use domain.")
+  (:method ((o registered)) (name o)))
+
+(defmethod initialize-instance :after ((o registered) &key registrator &allow-other-keys)
+  "Designed for SETF."
+  (funcall registrator o (fully-qualified-name o)))
+
+(defvar *perspectives*)
+(defvar *perspective*)
+
+(defclass perspective (registered)
   ((modules :accessor modules :initarg :modules)
    (repositories :accessor repositories :initarg :repositories)
    (systems :accessor systems :initarg :systems)
@@ -10,6 +27,7 @@
    (git-pool :accessor git-pool :initarg :git-pool)
    (default-world-readable :accessor default-world-readable :initarg :default-world-readable))
   (:default-initargs
+   :registrator #'(setf perspective)
    :modules (make-hash-table :test 'equal)
    :repositories (make-hash-table :test 'equal)
    :systems (make-hash-table :test 'equal)
@@ -40,11 +58,9 @@
 (defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
   (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
-(defclass named ()
-  ((name :accessor name :initarg :name)))
-
-(defclass repository ()
-  ((module :accessor repo-module :initarg :module)))
+(defclass repository (registered)
+  ((module :accessor repo-module :initarg :module))
+  (:default-initargs :registrator #'(setf repo)))
 
 (defmethod name ((o repository))
   (name (repo-module o)))
@@ -70,8 +86,8 @@
               ((subtypep type 'cvs-repository) 'cvs)
               (t (error "~@<malformed repository type specifier ~S~:@>" type)))))
 
-(defun repo-name (repo)
-  (cons (name (repo-module repo)) (coerce-repo-type-to-mnemonic (type-of repo))))
+(defmethod fully-qualified-name ((o repository))
+  (cons (name (repo-module o)) (coerce-repo-type-to-mnemonic (type-of o))))
 
 (defclass remote-git-repository (remote-repository git-repository) () (:default-initargs :method 'git))
 (defclass remote-git-http-repository (remote-git-repository) () (:default-initargs :method 'http))
@@ -138,12 +154,13 @@
     (gateway-perspective 'site-derived-git-repository)
     (user-perspective 'user-derived-git-repository)))
 
-(defclass module (named depobj)
+(defclass module (registered depobj)
   ((perspective :accessor module-perspective :initarg :perspective)
    (repositories :accessor module-repositories :initarg :repositories)
    (master-repository :accessor module-master-repository :initarg :master-repo)
    (systems :accessor module-systems :initarg :systems))
   (:default-initargs
+   :registrator #'(setf module)
    :repositories nil
    :systems nil))
 
@@ -154,21 +171,23 @@
   (declare (type module o))
   (first (module-systems o)))
 
-(defclass system (named)
+(defclass system (registered)
   ((module :accessor system-module :initarg :module)
    (repository :accessor system-repository :initarg :repository)
    (relativity :accessor system-relativity :initarg :relativity))
   (:default-initargs
+   :registrator #'(setf system)
    :relativity nil))
 
 (defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
   (setf (system-repository o) (module-master-repository module)))
 
-(defclass application (named)
+(defclass application (registered)
   ((system :accessor app-system :initarg :system)
    (package :accessor app-package :initarg :package)
    (function :accessor app-function :initarg :function)
-   (default-parameters :accessor app-default-parameters :initarg :default-parameters)))
+   (default-parameters :accessor app-default-parameters :initarg :default-parameters))
+  (:default-initargs :registrator #'(setf app)))
 
 ;;;
 ;;; Root, accessors and coercers: PERSPECTIVE, MODULE, REPO, SYSTEM and APP; COERCE-TO-MODULE and COERCE-TO-SYSTEM.
@@ -179,9 +198,6 @@
   (typecase name
     (symbol (string-upcase (symbol-name name)))
     (string (string-upcase name))))
-
-(defvar *perspectives*)
-(defvar *perspective*)
 
 (define-container-hash-accessor *perspectives* perspective :name-transform-fn coerce-to-name)
 (define-container-hash-accessor *perspective* module :container-transform modules      :name-transform-fn coerce-to-name :coercer t :mapper t)
