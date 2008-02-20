@@ -146,7 +146,13 @@
 (defdistributor feelingofgreen.ru
   (:modules
    (local
-    bin doc giveio mcdbio winnt-lptaccess mcdust-one mclinux mdb newlib pestilence x86-linux x86-win32)))
+    dot-gitignore
+    bin
+    doc
+    libmdb mdb giveio mcdbio winnt-lptaccess x86-linux x86-win32 mcdust-one
+    mclinux
+    newlib
+    pestilence)))
 
 (define-module-dependencies
   (pergamum alexandria iterate)
