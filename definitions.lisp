@@ -105,6 +105,12 @@
   (:modules
    (git (sbcl (sbcl :systems nil)))))
 
+;; Can't handle that yet: the url schema isn't quite flexible enough.
+;; (defdistributor sourceforge.net
+;;   (:url-schemas (rsync (repo) (format nil "~A.svn.sourceforge.net" (downstring (name repo))) "svn" (downstring (name repo))))
+;;   (:modules
+;;    (svn (lispbuilder (lispbuilder :systems (lispbuilder-sdl lispbuilder-sdl-ttf lispbuilder-sdl-image))))))
+
 ;; TODO: acl-compat
 
 (define-module-dependencies
