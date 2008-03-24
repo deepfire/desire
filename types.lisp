@@ -167,6 +167,9 @@
 (defmethod print-object ((o module) stream)
   (format stream "#<~@<~S ~S perspective: ~S~:@>>" (type-of o) (slot-value* o 'name) (slot-value* o 'perspective)))
 
+(defmethod path ((o module))
+  (path (module-master-repository o)))
+
 (defun module-core-system (o)
   (declare (type module o))
   (first (module-systems o)))
