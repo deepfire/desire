@@ -7,7 +7,7 @@
    #:module-direct-dependencies #:module-full-dependencies
    #:defdistributor #:define-module-dependencies #:define-application 
    #:fetch #:update #:load-system #:cling #:purge-fasls #:run
-   #:loadable #:ensure-loadable #:world-readable-p
+   #:loadable-p #:ensure-loadable #:world-readable-p
    #:init))
 
 (in-package :cling)

@@ -11,10 +11,10 @@
   (declare (type system o))
   (make-pathname :directory (append (pathname-directory (user-homedir-pathname)) *sbcl-systems-location*) :name (downstring (name o)) :type "asd"))
 
-(defgeneric loadable (o)
+(defgeneric loadable-p (o)
   (:method ((o module))
     (if-let ((system (module-core-system o)))
-            (loadable system)
+            (loadable-p system)
             t))
   (:method ((o system))
     (etypecase (system-repository o)
@@ -31,7 +31,7 @@
       (user-repository t)
       #-win32
       (site-repository
-       (unless (loadable o)
+       (unless (loadable-p o)
          (let ((symlink (system-sbcl-symlink-path o)))
            (when (probe-file symlink)
              (sb-posix:unlink symlink)) ;; FIXME: delete-file refuses to remove dead symlinks

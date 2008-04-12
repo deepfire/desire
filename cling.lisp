@@ -231,9 +231,9 @@
 
 (defun update (os &key skip-loadable (check-success t) &aux (o (coerce-to-module os)))
   (let* ((full-set (module-full-dependencies o))
-         (initially-unloadable (remove-if #'loadable full-set)))
-    (mapc #'update-single (xform skip-loadable (curry #'remove-if #'loadable) full-set))
-    (let* ((still-unloadable (remove-if #'loadable full-set))
+         (initially-unloadable (remove-if #'loadable-p full-set)))
+    (mapc #'update-single (xform skip-loadable (curry #'remove-if #'loadable-p) full-set))
+    (let* ((still-unloadable (remove-if #'loadable-p full-set))
            (degraded (intersection still-unloadable (set-difference full-set initially-unloadable))))
       (cond ((not check-success)
              (warn "~@<success check suppressed~:@>"))
