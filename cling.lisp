@@ -247,11 +247,13 @@
   (update o :skip-loadable skip-loadable)
   (load-system o))
 
-(defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".clingrc")))
+(defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".clingrc")) (try-load-clung t))
   (format t "loading user run control file ~S~%" runcontrol)
   (let ((*package* (find-package :cling)))
     (when (probe-file runcontrol)
-      (load runcontrol))))
+      (load runcontrol)))
+  (when (and try-load-clung (loadable-p (module 'clung)))
+    (require :clung)))
 
 (defun gui (os &aux (o (coerce-to-module os)))
   (with-changed-directory (path (module-master-repository o)) 
