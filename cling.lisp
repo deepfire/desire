@@ -207,7 +207,7 @@
 
 (defmethod fetch ((to local-git-repository) (from local-cvs-repository))
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
-  (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (path from)) (downstring (repo-cvs-module (repo-master from)))))
+  (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring (path from)))) (downstring (repo-cvs-module (repo-master from)))))
 
 (defmethod fetch ((to local-git-repository) (from local-svn-repository))
   (git-svnimport "-C" (namestring (path to)) (url from)))
