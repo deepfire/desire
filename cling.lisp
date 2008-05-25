@@ -200,7 +200,7 @@
       (darcs "get" url path)))
 
 (defmethod fetch ((to local-svn-repository) (from remote-svn-repository))
-  (rsync "-ravPz" (format nil "~Asvn/" (url from)) (namestring (path to))))
+  (rsync "-ravPz" (url from) (namestring (path to))))
 
 (defmethod fetch ((to local-cvs-repository) (from remote-cvs-repository))
   (rsync "-ravPz" (format nil "~Acvsroot/" (url from)) (namestring (path to))))
@@ -209,8 +209,13 @@
   (ensure-directories-exist (make-pathname :directory (append (pathname-directory (lockdir *perspective*)) (list (downstring (name (repo-module to)))))))
   (git-cvsimport "-v" "-C" (namestring (path to)) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring (path from)))) (downstring (repo-cvs-module (repo-master from)))))
 
-(defmethod fetch ((to local-git-repository) (from local-svn-repository))
-  (git-svnimport "-C" (namestring (path to)) (url from)))
+(defmethod fetch ((to local-git-repository) (from local-svn-repository) &aux (path (namestring (path to))))
+  (unless (probe-file path)
+    (ensure-directories-exist path)
+    (with-changed-directory path
+      (git-svn "init" (url from))))
+  (with-changed-directory path
+      (git-svn "fetch")))
 
 (defmethod fetch ((to local-git-repository) (from local-darcs-repository))
   (ensure-directories-exist (namestring (path to)))
