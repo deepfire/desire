@@ -205,5 +205,7 @@
 (define-container-hash-accessor *perspectives* perspective :name-transform-fn coerce-to-name)
 (define-container-hash-accessor *perspective* module :container-transform modules      :name-transform-fn coerce-to-name :coercer t :mapper t)
 (define-container-hash-accessor *perspective* repo   :container-transform repositories :name-transform-fn coerce-to-name :type repository :mapper t :compound-name-p t)
+(define-container-hash-accessor *perspective* repo*  :container-transform repositories :name-transform-fn coerce-to-name :type repository :compound-name-p t
+                                                     :spread-compound-name-p t)
 (define-container-hash-accessor *perspective* system :container-transform systems      :name-transform-fn coerce-to-name :coercer t :mapper t)
 (define-container-hash-accessor *perspective* app    :container-transform applications :name-transform-fn coerce-to-name :type application)
