@@ -281,4 +281,8 @@
 
 (defun gui (os &aux (o (coerce-to-module os)))
   (with-changed-directory (path (module-master-repository o)) 
-    (git "gui" #| :environment (cons "DISPLAY=10.128.0.1:0.0" (sb-ext:posix-environ)) |#)))
+    (git "gui")))
+
+(defun vui (os &aux (o (coerce-to-module os)))
+  (with-changed-directory (path (module-master-repository o)) 
+    (gitk "--all")))

@@ -73,7 +73,8 @@
   (define-external-program rsync)
   (define-external-program git-cvsimport)
   (define-external-program git-svn)
-  (define-external-program darcs-to-git))
+  (define-external-program darcs-to-git)
+  (define-external-program gitk))
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))
