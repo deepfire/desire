@@ -16,6 +16,11 @@
    (darcs
     alexandria iterate)))
 
+(defdistributor sanityinc.com
+  (:url-schemas (git (repo) "git.sanityinc.com" (format nil "~A" (downstring (name repo)))))
+  (:modules
+   (git (darcs-to-git (darcs-to-git :systems nil)))))
+
 (define-module-dependencies
   (pergamum alexandria iterate)
   (cling pergamum semi-precious)
