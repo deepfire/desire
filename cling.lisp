@@ -142,6 +142,15 @@
         (repo-var to 'remote.origin.fetch) "+refs/heads/*:refs/heads/*")
   #| sync local/remote HEADs |#)
 
+;;;
+;;; Remote update-ness:
+;;;
+;;; git: peek-remote, contents of HEAD
+;;; svn: rsync, mod date of db/current
+;;; cvs: rsync, mod date of CVSROOT/history (anything better?)
+;;; darcs: no wai? (http header wootery?)
+;;;
+
 (defgeneric time-identity (repo)
   (:method-combination primary-method-not-required)
   (:method :around ((o symbol))
@@ -237,9 +246,10 @@
 
 (defgeneric fetch-desired-p (repo)
   (:method ((o derived-repository))
-    (etypecase (repo-master o)
-      (local-repository (> (time-identity (repo-master o)) (time-identity o)))
-      (remote-repository t))))
+    (or (not (probe-file (path o)))
+        (etypecase (repo-master o)
+          (local-repository (> (time-identity (repo-master o)) (time-identity o)))
+          (remote-repository t)))))
 
 (defgeneric fetch-chain (repo)
   (:method (o) t)
