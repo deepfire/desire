@@ -33,16 +33,18 @@
     (local-perspective   (values '(site-origin-git-repository))))) ;; behavior is desired, but semantics are skewed...
 
 (defun arrange-module-repositories (module locals remotes)
-  (iter (for (derived master) on (setf (module-repositories module) (append locals remotes)))
+  (iter (for (derived master) on (append locals remotes))
         (while master)
         (setf (repo-master derived) master))
-  (setf (module-master-repository module) (first locals)))
+;;   (setf (module-master-repository module) (first locals))
+  )
 
 (defun define-module-repositories (module type &rest remote-initargs)
   (multiple-value-bind (locals remotes) (repository-import-chain type)
-    (arrange-module-repositories module
-                                 (mapcar (rcurry #'make-instance :module module) locals)
-                                 (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module remote-initargs)) remotes))))
+    (arrange-module-repositories
+     module
+     (mapcar (rcurry #'make-instance :module module) locals)
+     (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module :distributor (module-distributor module) remote-initargs)) remotes))))
 
 (defun derive-perspective (from type distributor &rest perspective-initargs)
   (lret ((new-perspective (apply #'make-instance type :name type perspective-initargs)))
@@ -62,26 +64,33 @@
   (setf *perspective* (apply #'derive-perspective *perspective* type distributor perspective-initargs)))
 
 (defmacro defdistributor (dist-name &rest definitions)
-  `(progn ,@(iter (for (op . op-body) in definitions)
-                  (appending (ecase op
-                               (:url-schemas
-                                (iter (for (method (repo) . body) in op-body)
-                                      (collect (with-gensyms (m d)
-                                                 `(defmethod distributor-repo-url ((,m (eql ',method)) (,d (eql ',dist-name)) ,repo)
-                                                    (declare (ignorable ,m ,d))
-                                                    (list ,@body))))))
-                               (:modules
-                                (with-gensyms (module module-spec type umbrella-name)
-                                 `((iter (for (,module-spec ,type ,umbrella-name) in
-                                              ',(iter (for (type . repo-specs) in op-body)
-                                                      (appending (iter (for repo-spec in repo-specs)
-                                                                       (appending (destructuring-bind (umbrella-name . module-specs) (if (consp repo-spec) repo-spec (list repo-spec repo-spec))
-                                                                                    (iter (for module-preprespec in module-specs)
-                                                                                          (for module-prespec = (ensure-cons module-preprespec))
-                                                                                          (collect (list module-prespec type umbrella-name)))))))))
-                                         (let ((,module (or (module (first ,module-spec) :if-does-not-exist :continue) (make-instance 'module :perspective *perspective* :name (car ,module-spec)))))
-                                           (apply #'define-module-repositories ,module ,type :distributor ',dist-name :umbrella ,umbrella-name (alexandria::sans (rest ,module-spec) :systems))
-                                           (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
+  `(progn
+          (make-instance 'distributor :name ',dist-name
+                         :url-forms (list ,@(iter (for (method (repo) . body) in (rest (find :url-schemas definitions :key #'first)))
+                                                  (collect `(list ',method ',body))))
+                         :url-fns (list ,@(iter (for (method (repo) . body) in (rest (find :url-schemas definitions :key #'first)))
+                                                (collect `(list ',method (lambda (,repo) (list ,@body)))))))
+          ,@(iter (for (op . op-body) in definitions)
+             (appending (ecase op
+                          (:url-schemas
+                           (iter (for (method (repo) . body) in op-body)
+                                 (collect (with-gensyms (m d)
+                                            `(defmethod distributor-repo-url ((,m (eql ',method)) (,d (eql ',dist-name)) ,repo)
+                                               (declare (ignorable ,m ,d))
+                                               (list ,@body))))))
+                          (:modules
+                           (with-gensyms (module module-spec type umbrella-name)
+                             `((iter (for (,module-spec ,type ,umbrella-name) in
+                                          ',(iter (for (type . repo-specs) in op-body)
+                                                  (appending (iter (for repo-spec in repo-specs)
+                                                                   (appending (destructuring-bind (umbrella-name . module-specs) (if (consp repo-spec) repo-spec (list repo-spec repo-spec))
+                                                                                (iter (for module-preprespec in module-specs)
+                                                                                      (for module-prespec = (ensure-cons module-preprespec))
+                                                                                      (collect (list module-prespec type umbrella-name)))))))))
+                                     (let ((,module (or (module (first ,module-spec) :if-does-not-exist :continue)
+                                                        (make-instance 'module :distributor (distributor ',dist-name) :perspective *perspective* :name (car ,module-spec)))))
+                                       (apply #'define-module-repositories ,module ,type :distributor ',dist-name :umbrella ,umbrella-name (alexandria::sans (rest ,module-spec) :systems))
+                                       (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
 
 (defun mark-non-leaf (depkey dep)
   (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
