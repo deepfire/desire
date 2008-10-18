@@ -297,11 +297,3 @@
       (load runcontrol)))
   (when (and try-load-clung (loadable-p (module 'clung)))
     (require :clung)))
-
-(defun gui (os &aux (o (coerce-to-module os)))
-  (with-changed-directory (path (module-master-repository o)) 
-    (git "gui")))
-
-(defun vui (os &aux (o (coerce-to-module os)))
-  (with-changed-directory (path (module-master-repository o)) 
-    (gitk "--all")))

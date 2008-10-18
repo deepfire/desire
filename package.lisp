@@ -8,7 +8,7 @@
    #:defdistributor #:define-module-dependencies #:define-application 
    #:fetch #:update #:load-system #:cling #:purge-fasls #:run
    #:loadable-p #:ensure-loadable #:world-readable-p
-   #:init #:gui #:vui))
+   #:init))
 
 (in-package :cling)
 
