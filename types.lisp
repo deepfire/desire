@@ -99,8 +99,10 @@
    :registrator #'(setf module)    
    :distributor nil :depends-on nil :systems nil :repositories nil))
 
+(defclass essential-module (module) ())
+
 (defmethod print-object ((o module) stream)
-  (format stream "~@<#M(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
+  (format stream "~@<#M(~;~A ~A~{ ~S~}~;)~:@>" (type-of o) (symbol-name (name o))
           (append (list :distributor (name (module-distributor o)))
                   (when-let (deps (remove-duplicates (append (module-depends-on o) (map-dependencies #'name o))))
                     (list :depends-on (list 'quote deps)))
@@ -109,9 +111,10 @@
 
 (defun module-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key distributor &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (type name &rest initargs &key distributor &allow-other-keys) (read stream nil nil t)
+    (assert (subtypep type 'module))
     `(or (module ',name :if-does-not-exist :continue)
-         (make-instance 'module :name ',name :distributor (distributor ',distributor) ,@(remove-from-plist initargs :distributor :systems)))))
+         (make-instance ',type :name ',name :distributor (distributor ',distributor) ,@(remove-from-plist initargs :distributor :systems)))))
 
 (defmethod initialize-instance :after ((o module) &key distributor &allow-other-keys)
   (push o (distributor-modules distributor)))

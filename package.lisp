@@ -1,9 +1,15 @@
 (defpackage cling
   (:use :common-lisp :alexandria :pergamum :iterate :depsolver)
   (:export
-   #:*perspective* #:perspective #:module #:repo #:system #:app #:path #:url
-   #:gateway-perspective #:user-perspective #:derive-perspective #:switch-perspective #:default-world-readable
-   #:map-modules #:map-repositories #:map-systems #:map-applications
+   ;; types.lisp
+   #:perspective #:gateway-perspective #:user-perspective #:local-perspective #:*perspective* #:default-world-readable
+   #:distributor #:module #:essential-module #:system #:application
+   #:repository #:git #:darcs #:cvs #:svn #:remote #:local
+   #:git-repository #:darcs-repository #:cvs-repository #:svn-repository #:remote-repostitory #:local-repository
+   #:map-distributors #:map-modules #:map-systems #:map-applications #:map-repositories
+   ;; cling.lisp
+   #:repo #:system #:app #:path #:url
+   #:derive-perspective #:switch-perspective
    #:module-direct-dependencies #:module-full-dependencies
    #:defdistributor #:define-module-dependencies #:define-application 
    #:fetch #:update #:load-system #:cling #:purge-fasls #:run
