@@ -295,5 +295,6 @@
   (let ((*package* (find-package :cling)))
     (when (probe-file runcontrol)
       (load runcontrol)))
-  (when (and try-load-clung (loadable-p (module 'clung)))
-    (require :clung)))
+;;   (when (and try-load-clung (loadable-p (module 'clung)))
+;;     (require :clung))
+  )
