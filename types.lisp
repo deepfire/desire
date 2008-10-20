@@ -18,7 +18,7 @@
   (string-downcase (string x)))
 
 (defvar *perspectives*)
-(defvar *perspective*)
+(defvar *perspective* nil)
 
 (defclass perspective (registered)
   ((distributors :accessor distributors :initarg :distributors)
