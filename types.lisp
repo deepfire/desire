@@ -297,7 +297,8 @@
 (define-container-hash-accessor *perspective* app    :container-transform applications :name-transform-fn coerce-to-name :type application)
 
 (defun load-perspective (stream)
-  (let ((*readtable* (copy-readtable)))
+  (let ((*readtable* (copy-readtable))
+        (*package* #.*package*))
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
     (set-dispatch-macro-character #\# #\R 'repository-reader *readtable*)
@@ -306,7 +307,8 @@
     (load stream)))
 
 (defun serialize-perspective (&optional stream (perspective *perspective*))
-  (let ((*print-case* :downcase))
+  (let ((*print-case* :downcase)
+        (*package* #.*package*))
     (format stream "~&;;;~%;;; Distributors~%;;;")
     (iter (for (nil d) in-hashtable (distributors perspective)) (print d stream))
     (format stream "~%~%;;;~%;;; Modules~%;;;")
