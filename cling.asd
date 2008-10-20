@@ -11,5 +11,4 @@
                (:file "filesystem" :depends-on ("filesystem-utils" "types"))
                (:file "asdf" :depends-on ("types" "filesystem"))
                (:file "cling" :depends-on ("types" "asdf"))
-               (:file "application" :depends-on ("cling"))
-               (:file "definitions" :depends-on ("cling" "application"))))
+               (:file "application" :depends-on ("cling"))))
