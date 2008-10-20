@@ -299,6 +299,29 @@
 (define-container-hash-accessor *perspective* system :container-transform systems      :name-transform-fn coerce-to-name :coercer t :mapper t)
 (define-container-hash-accessor *perspective* app    :container-transform applications :name-transform-fn coerce-to-name :type application)
 
+(defun minimise-dependencies (&aux (loops (make-hash-table :test #'equal)))
+  (labels ((maybe-remove-nonleaf (name leaf)
+             (unless (satisfied-p leaf)
+               (remhash name (leaves *perspective*))))
+           (minimise (current &optional acc-deps)
+             (cond ((member current acc-deps) ;; is there a dependency loop?
+                    (push (first acc-deps) (gethash current loops))
+                    (undepend current (first acc-deps)))
+                   (t
+                    (dolist (overdep (intersection (cdr acc-deps) (mapcar #'cadr (hash-table-alist (depsolver::%depobj-dep# current)))))
+                      (undepend current overdep))
+                    (mapc (rcurry #'minimise (cons current acc-deps)) (mapcar #'cdr (hash-table-alist (depsolver::%depobj-rdep# current))))))))
+    (maphash #'maybe-remove-nonleaf (leaves *perspective*))
+    (maphash-values #'minimise (leaves *perspective*))
+    (iter (for (dependent deplist) in-hashtable loops)
+          (mapc (curry #'depend dependent) deplist))))
+
+(defun mark-non-leaf (depkey dep)
+  (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
+
+(defun mark-maybe-leaf (depeekey depee)
+  (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee))
+
 (defun load-perspective (stream)
   (let ((*readtable* (copy-readtable))
         (*package* #.*package*))
@@ -307,7 +330,19 @@
     (set-dispatch-macro-character #\# #\R 'repository-reader *readtable*)
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
-    (load stream)))
+    (load stream)
+    (map-modules (lambda (o)
+                   (when (module-depends-on o)
+                     (mark-non-leaf (name o) o))
+                   (dolist (depname (module-depends-on o))
+                     (let ((dep (module depname :if-does-not-exist :continue)))
+                       (unless dep
+                         (error "~@<Deserialisation failure: can't find ~S's dependency ~S~:@>" o depname))
+                       (depsolver:depend o dep)
+                       (mark-maybe-leaf depname dep)))
+                   (setf (module-depends-on o) nil)))
+    (minimise-dependencies)
+    t))
 
 (defun serialize-perspective (&optional stream (perspective *perspective*))
   (let ((*print-case* :downcase)

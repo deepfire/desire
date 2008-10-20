@@ -92,12 +92,6 @@
                                        (apply #'define-module-repositories ,module ,type :distributor ',dist-name :umbrella ,umbrella-name (alexandria::sans (rest ,module-spec) :systems))
                                        (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
 
-(defun mark-non-leaf (depkey dep)
-  (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
-
-(defun mark-maybe-leaf (depeekey depee)
-  (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee))
-
 (defmacro define-module-dependencies (&body body)
   `(iter (for (module-name . dependencies) in '(,@body))
          (for module = (module module-name))
@@ -112,23 +106,6 @@
                    (collect (name depdep)))))
     (iter (for (name nonleaf) in-hashtable (nonleaves *perspective*))
           (collect (cons name (module-deps nonleaf))))))
-
-(defun minimise-dependencies (&aux (loops (make-hash-table :test #'equal)))
-  (labels ((maybe-remove-nonleaf (name leaf)
-             (unless (satisfied-p leaf)
-               (remhash name (leaves *perspective*))))
-           (minimise (current &optional acc-deps)
-             (cond ((member current acc-deps) ;; is there a dependency loop?
-                    (push (first acc-deps) (gethash current loops))
-                    (undepend current (first acc-deps)))
-                   (t
-                    (dolist (overdep (intersection (cdr acc-deps) (mapcar #'cadr (hash-table-alist (depsolver::%depobj-dep# current)))))
-                      (undepend current overdep))
-                    (mapc (rcurry #'minimise (cons current acc-deps)) (mapcar #'cdr (hash-table-alist (depsolver::%depobj-rdep# current))))))))
-    (maphash #'maybe-remove-nonleaf (leaves *perspective*))
-    (maphash-values #'minimise (leaves *perspective*))
-    (iter (for (dependent deplist) in-hashtable loops)
-          (mapc (curry #'depend dependent) deplist))))
 
 (defun read-refs (o)
   (declare (type git-repository o))
