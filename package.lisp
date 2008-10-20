@@ -8,6 +8,7 @@
    #:git-repository #:darcs-repository #:cvs-repository #:svn-repository #:remote-repostitory #:local-repository
    #:map-distributors #:map-modules #:map-systems #:map-applications #:map-repositories
    #:serialize-perspective #:load-perspective
+   #:*force-modules-essential*
    ;; cling.lisp
    #:repo #:system #:app #:path #:url
    #:derive-perspective #:switch-perspective
