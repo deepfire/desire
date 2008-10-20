@@ -151,8 +151,8 @@
    :registrator #'(setf app)))
 
 (defmethod print-object ((o application) stream)
-  (format stream "~@<#A(~;~A{ ~S}~;)~:@>" (symbol-name (name o))
-          (list :system (name (app-system o)) :package (package-name (app-package o)) :function (symbol-name (app-function o))
+  (format stream "~@<#A(~;~A~{ ~A~}~;)~:@>" (symbol-name (name o))
+          (list :system (name (app-system o)) :package (string (app-package o)) :function (string (app-function o))
                 :default-parameters (list 'quote (app-default-parameters o)))))
 
 (defun application-reader (stream &optional sharp char)
