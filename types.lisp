@@ -316,11 +316,21 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun mark-non-leaf (depkey dep)
-  (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
-
-(defun mark-maybe-leaf (depeekey depee)
-  (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee))
+(defun postprocess-module (o)
+  "Leaf processing, dependency relinking."
+  (labels ((mark-non-leaf (depkey dep)
+             (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
+           (mark-maybe-leaf (depeekey depee)
+             (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee)))
+    (when (module-depends-on o)
+      (mark-non-leaf (name o) o))
+    (dolist (depname (module-depends-on o))
+      (let ((dep (module depname :if-does-not-exist :continue)))
+        (unless dep
+          (error "~@<Deserialisation failure: can't find ~S's dependency ~S~:@>" o depname))
+        (depsolver:depend o dep)
+        (mark-maybe-leaf depname dep)))
+    (setf (module-depends-on o) nil)))
 
 (defun load-perspective (stream)
   (let ((*readtable* (copy-readtable))
@@ -331,16 +341,7 @@
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
     (load stream)
-    (map-modules (lambda (o)
-                   (when (module-depends-on o)
-                     (mark-non-leaf (name o) o))
-                   (dolist (depname (module-depends-on o))
-                     (let ((dep (module depname :if-does-not-exist :continue)))
-                       (unless dep
-                         (error "~@<Deserialisation failure: can't find ~S's dependency ~S~:@>" o depname))
-                       (depsolver:depend o dep)
-                       (mark-maybe-leaf depname dep)))
-                   (setf (module-depends-on o) nil)))
+    (map-modules #'postprocess-module)
     (minimise-dependencies)
     t))
 
@@ -355,3 +356,11 @@
     (iter (for (nil s) in-hashtable (systems perspective)) (print s stream))
     (format stream "~%~%;;;~%;;; Applications~%;;;")
     (iter (for (nil a) in-hashtable (applications perspective)) (print a stream))))
+
+(defun test-core (&optional (path-from "/tmp/essential") (path-to "/tmp/essential2") (force-essential nil))
+  (setf *perspectives* (make-hash-table :test 'equal)
+        *perspective* (make-instance 'gateway-perspective :name 'root))
+  (load-perspective path-from)
+  (let ((*force-modules-essential* force-essential))
+    (with-output-to-file (f path-to)
+      (serialize-perspective f))))
