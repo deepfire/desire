@@ -70,26 +70,49 @@
   (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
 (defclass distributor (registered)
-  ((url-forms :accessor url-forms :initarg :url-forms)
-   (url-fns :accessor url-fns :initarg :url-fns)
+  ((locations :accessor distributor-locations :initarg :locations)
    (modules :accessor distributor-modules :initarg :modules)
-   (repositories :accessor distributor-repositories :initarg :repositories))
+   (repositories :accessor distributor-repositories :initarg :repositories)
+   (url-forms :accessor distributor-url-forms :initarg :url-forms)
+   (url-fns :accessor distributor-url-fns :initarg :url-fns))
   (:default-initargs
-   :registrator #'(setf distributor)
-   :modules nil
-   :repositories nil))
-
-(defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A ~S~{ ~S~}~;)~:@>" (symbol-name (name o)) (url-forms o) (list :modules (list 'quote (mapcar #'name (distributor-modules o))))))
+   :registrator #'(setf distributor) :url-forms nil
+   :locations nil :modules nil :repositories nil))
 
 (defun distributor-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name url-forms &rest initargs) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key locations &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (make-instance 'distributor :name ',name :url-forms ',url-forms
-                        :url-fns (list ,@(iter (for (schema form) in url-forms)
-                                               (collect `(list ',schema (lambda (repo) (list ,@form))))))
-                        ,@(remove-from-plist initargs :modules :repositories)))))
+         (make-instance 'distributor :name ',name :locations (list ,@locations) ,@(remove-from-plist initargs :modules :repositories :locations)))))
+
+(defclass location ()
+  ((distributor :accessor location-distributor :initarg :distributor)
+   (schema :accessor location-schema :initarg :schema)
+   (url-form :accessor location-url-form :initarg :url-form)
+   (url-fn :accessor location-url-fn :initarg :url-fn)))
+
+(defmethod print-object ((o distributor) stream)
+  (format stream "~@<#D(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
+          (append (list :locations (append (iter (for (schema uf) in (distributor-url-forms o))
+                                                 (collect (make-instance 'location :distributor (name o) :schema schema :url-form (list* schema (list 'repo) uf))))
+                                           (distributor-locations o)))
+                  (list :modules (list 'quote (mapcar #'name (distributor-modules o)))))))
+
+(defmethod initialize-instance :after ((o distributor) &rest rest)
+  (declare (ignore rest))
+  (dolist (loc (distributor-locations o))
+    (setf (location-distributor loc) o)))
+
+(defmethod print-object ((o location) stream &aux (wrapped-p (eq (car (location-url-form o)) 'url)))
+  (format stream "~@<#L(~;~A ~@<(~;~A (~A)~{ ~S~}~;)~:@>~;)~:@>" (symbol-name (xform-if-not #'symbolp #'name (location-distributor o))) (location-schema o)
+          (caadr (location-url-form o)) (cddr (location-url-form o))))
+
+(defun location-reader (stream &optional sharp char)
+  (declare (ignore sharp char))
+  (destructuring-bind (distributor (schema (repovar) &rest url-form) &rest initargs &key &allow-other-keys) (read stream nil nil t)
+    `(make-instance 'location :distributor ',distributor :schema ',schema :url-form ',(list* 'url (list repovar) url-form)
+                    :url-fn (lambda (,repovar) (list ,@url-form))
+                    ,@(remove-from-plist initargs :distributor :schema :url-form :url-fn))))
 
 (defclass module (registered depobj)
   ((distributor :accessor module-distributor :initarg :distributor)
@@ -340,6 +363,7 @@
     (set-dispatch-macro-character #\# #\R 'repository-reader *readtable*)
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
+    (set-dispatch-macro-character #\# #\L 'location-reader *readtable*)
     (load stream)
     (map-modules #'postprocess-module)
     (minimise-dependencies)
