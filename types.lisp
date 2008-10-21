@@ -374,7 +374,7 @@
 (defun serialize-perspective (&optional stream (perspective *perspective*))
   (let ((*print-case* :downcase)
         (*package* #.*package*))
-    (format stream "~&;;;~%;;; Distributors~%;;;")
+    (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
     (iter (for (nil d) in-hashtable (distributors perspective)) (print d stream))
     (format stream "~%~%;;;~%;;; Modules~%;;;")
     (iter (for (nil m) in-hashtable (modules perspective)) (print m stream))

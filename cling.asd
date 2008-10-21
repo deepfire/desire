@@ -1,3 +1,5 @@
+;;; -*- Mode: Lisp -*-
+
 (defpackage :cling.system
   (:use :cl :asdf))
 
