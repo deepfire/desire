@@ -92,6 +92,9 @@
                                        (apply #'define-module-repositories ,module ,type :distributor ',dist-name :umbrella ,umbrella-name (alexandria::sans (rest ,module-spec) :systems))
                                        (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
 
+(defun mark-non-leaf (depkey dep) (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
+(defun mark-maybe-leaf (depeekey depee) (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee))
+
 (defmacro define-module-dependencies (&body body)
   `(iter (for (module-name . dependencies) in '(,@body))
          (for module = (module module-name))
