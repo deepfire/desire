@@ -357,7 +357,13 @@
     (format stream "~%~%;;;~%;;; Applications~%;;;")
     (iter (for (nil a) in-hashtable (applications perspective)) (print a stream))))
 
-(defun test-core (&optional (path-from "/tmp/essential") (path-to "/tmp/essential2") (force-essential nil))
+(defun test-core-1 (&optional (path-from "/mnt/little/git/cling/definitions.lisp") (path-to "/tmp/essential") (force-essential nil))
+  (load path-from)
+  (let ((*force-modules-essential* force-essential))
+    (with-output-to-file (f path-to)
+      (serialize-perspective f))))
+
+(defun test-core-2 (&optional (path-from "/tmp/essential") (path-to "/tmp/essential2") (force-essential nil))
   (setf *perspectives* (make-hash-table :test 'equal)
         *perspective* (make-instance 'gateway-perspective :name 'root))
   (load-perspective path-from)
