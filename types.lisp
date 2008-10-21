@@ -93,7 +93,7 @@
    (url-form :accessor location-url-form :initarg :url-form)
    (url-fn :accessor location-url-fn :initarg :url-fn)))
 
-(defclass local-location (location)
+(defclass locality (location)
   ((git-pool :accessor location-git-pool :initarg :git-pool)
    (darcs-pool :accessor location-darcs-pool :initarg :darcs-pool)
    (svn-pool :accessor location-svn-pool :initarg :svn-pool)
