@@ -297,14 +297,6 @@
               (remote-cvs-repository (list :umbrella umbrella :method  method :distributor (name distributor) :cvs-module cvs-module))
               (remote-repository (list :umbrella umbrella :method method :distributor (name distributor)))))))
 
-(defun repository-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
-  (destructuring-bind (type (name ltype rtype) &rest initargs &key distributor master &allow-other-keys) (read stream nil nil t)
-    `(or (repo '(,name ,ltype ,rtype)) (make-instance ',type :module (module ',name)
-                                                      ,@(when distributor `(:distributor (distributor ',distributor)))
-                                                      ,@(when master `(:master (repo ',master)))
-                                                      ,@(remove-from-plist initargs :distributor :master)))))
-
 ;; (defmethod initialize-instance :after ((o repository) &key module &allow-other-keys)
 ;;   (push o (module-repositories module)))
 
@@ -371,7 +363,6 @@
         (*package* #.*package*))
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
-    (set-dispatch-macro-character #\# #\W 'repository-reader *readtable*)
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
     (set-dispatch-macro-character #\# #\R 'remote-location-reader *readtable*)
