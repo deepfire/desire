@@ -91,25 +91,25 @@
 
 (defclass distributor (registered)
   ((locations :accessor distributor-locations :initarg :locations)
-   (modules :accessor distributor-modules :initarg :modules)
-   (repositories :accessor distributor-repositories :initarg :repositories)
    (url-forms :accessor distributor-url-forms :initarg :url-forms)
    (url-fns :accessor distributor-url-fns :initarg :url-fns))
   (:default-initargs
    :registrator #'(setf distributor) :url-forms nil
-   :locations nil :modules nil :repositories nil))
+   :locations nil :modules nil))
 
 (defun distributor-reader (stream &optional sharp char)
   (declare (ignore sharp char))
   (destructuring-bind (name &rest initargs &key locations &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (make-instance 'distributor :name ',name :locations (list ,@locations) ,@(remove-from-plist initargs :modules :repositories :locations)))))
+         (make-instance 'distributor :name ',name :locations (list ,@locations) ,@(remove-from-plist initargs :repositories :locations)))))
 
-(defclass location () ())
+(defclass location ()
+  ((modules :accessor location-modules :initarg :modules))
+  (:default-initargs :modules nil))
 
 (defclass remote-location (location)
   ((distributor :accessor location-distributor :initarg :distributor)
-   (schema :accessor location-schema :initarg :schema)
+   (type :accessor location-type :initarg :type)
    (url-form :accessor location-url-form :initarg :url-form)
    (url-fn :accessor location-url-fn :initarg :url-fn)))
 
@@ -121,12 +121,7 @@
    (lockdir :accessor location-lockdir :initarg :lockdir :documentation "Learn how to get rid of that.")))
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o))
-          (remove nil
-           (list (list :locations (append (iter (for (schema uf) in (distributor-url-forms o))
-                                                (collect (make-instance 'remote-location :distributor (name o) :schema schema :url-form (list* schema (list 'repo) uf))))
-                                          (distributor-locations o)))
-                 (list :modules (mapcar #'name (distributor-modules o)))))))
+  (format stream "~@<#D(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o)) (list :locations (distributor-locations o))))
 
 (defmethod initialize-instance :after ((o distributor) &rest rest)
   (declare (ignore rest))
@@ -134,20 +129,22 @@
     (setf (location-distributor loc) o)))
 
 (defmethod print-object ((o remote-location) stream &aux (wrapped-p (eq (car (location-url-form o)) 'url)))
-  (format stream "~@<#R(~;~A ~@<(~;~A (~A)~{ ~S~}~;)~:@>~;)~:@>" (symbol-name (xform-if-not #'symbolp #'name (location-distributor o))) (location-schema o)
+  (format stream "~@<#R(~;~A ~@<(~;~A (~A)~{ ~S~}~;)~:@>~;)~:@>" (symbol-name (xform-if-not #'symbolp #'name (location-distributor o))) (location-type o)
           (caadr (location-url-form o)) (cddr (location-url-form o))))
 
 (defun remote-location-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (distributor (schema (repovar) &rest url-form) &rest initargs &key &allow-other-keys) (read stream nil nil t)
-    `(make-instance 'remote-location :distributor ',distributor :schema ',schema :url-form ',(list* 'url (list repovar) url-form)
+  (destructuring-bind (distributor (type (repovar) &rest url-form) &rest initargs &key &allow-other-keys) (read stream nil nil t)
+    `(make-instance 'remote-location :distributor ',distributor :type ',type :url-form ',(list* 'url (list repovar) url-form)
                     :url-fn (lambda (,repovar) (list ,@url-form))
-                    ,@(remove-from-plist initargs :distributor :schema :url-form :url-fn))))
+                    ,@(remove-from-plist initargs :distributor :type :url-form :url-fn))))
 
 (defclass module (registered depobj)
   ((distributor :accessor module-distributor :initarg :distributor)
    (depends-on :accessor module-depends-on :initarg :depends-on)
    (systems :accessor module-systems :initarg :systems)
+   (origin-repository :accessor module-origin-repository :initarg :origin-repository)
+   (local-repository :accessor module-local-repository :initarg :local-repository)
    (essential-p :accessor module-essential-p :initarg :essential-p))
   (:default-initargs
    :registrator #'(setf module)    
@@ -262,6 +259,7 @@
 (defclass site-repository (local-repository) ())
 (defclass user-repository (local-repository) ())
 
+(defclass origin-repository (repository) ())
 (defclass derived-repository (local-repository)
   ((master :accessor repo-master :initarg :master)
    (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
@@ -269,8 +267,8 @@
 (defclass local-git-repository (local-repository git-repository) ())
 (defclass site-derived-git-repository (site-repository derived-repository local-git-repository) ())
 (defclass user-derived-git-repository (user-repository derived-repository local-git-repository) ())
-(defclass site-origin-git-repository (site-repository local-git-repository) ())
-(defclass user-origin-git-repository (user-repository local-git-repository) ())
+(defclass site-origin-git-repository (site-repository origin-repository local-git-repository) ())
+(defclass user-origin-git-repository (user-repository origin-repository local-git-repository) ())
 (defclass local-darcs-repository (derived-repository darcs-repository) ())
 (defclass local-svn-repository (derived-repository svn-repository) ())
 (defclass local-cvs-repository (derived-repository cvs-repository) ())
@@ -363,7 +361,7 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun postprocess-module (o)
+(defun relink-module-dependencies (o)
   "Leaf processing, dependency relinking."
   (labels ((mark-non-leaf (depkey dep)
              (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
@@ -377,10 +375,12 @@
           (error "~@<Deserialisation failure: can't find ~S's dependency ~S~:@>" o depname))
         (depsolver:depend o dep)
         (mark-maybe-leaf depname dep)))
-    (setf (module-depends-on o) nil)))
+    (setf (module-depends-on o) nil)
+    t))
 
 (defun load-perspective (stream)
   (let ((*readtable* (copy-readtable))
+        (*read-eval* nil)
         (*package* #.*package*))
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
@@ -388,9 +388,33 @@
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
     (set-dispatch-macro-character #\# #\R 'remote-location-reader *readtable*)
     (load stream)
-    (map-modules #'postprocess-module)
-    (minimise-dependencies)
-    t))
+    (map-modules #'relink-module-dependencies)
+    (minimise-dependencies)))
+
+(defvar *locality*)
+
+(defun define-locality (&rest keys &key git-pool &allow-other-keys)
+  "Define the default locality.
+   {GIT,DARCS,CVS,SVN}-POOL specify the corresponding repository pool roots."
+  (unless git-pool
+    (error "~@<GIT-POOL must be specified for a useful locality~:@>"))
+  (setf *locality* (apply #'make-instance 'locality keys)))
+
+(defun identify-with-distributor (id)
+  "Recognize ID's modules as locally hosted by
+   creating a corresponding local origin repository."
+  (iter (for module in (distributor-modules (distributor id)))
+        (for local-origin = (make-instance 'local-git-origin-repository :module module))
+        (with-slots (origin-repository local-repository) module
+          (setf (values origin-repository local-repository) (values local-origin local-origin)))))
+
+(defun subscribe-to-distributor (id)
+  "Mark ID's modules as remotely hosted and build up 
+   repository import chains."
+  (iter (for module in (distributor-modules (distributor id)))
+        (for origin = (make-instance 'local-git-origin-repository :module module))
+        (with-slots (origin-repository local-repository) module
+          (setf (values origin-repository local-repository) (values local-origin local-origin)))))
 
 (defun serialize-perspective (&optional stream (perspective *perspective*))
   (let ((*print-case* :downcase)

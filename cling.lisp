@@ -89,7 +89,9 @@
                          :url-forms (list ,@(iter (for (method (repo) . body) in (rest (find :url-schemas definitions :key #'first)))
                                                   (collect `(list ',method ',body))))
                          :url-fns (list ,@(iter (for (method (repo) . body) in (rest (find :url-schemas definitions :key #'first)))
-                                                (collect `(list ',method (lambda (,repo) (list ,@body)))))))
+                                                (collect `(list ',method (lambda (,repo) (list ,@body))))))
+                         :locations (list ,@(iter (for (type . repo-specs) in (rest (find :modules definitions :key #'first)))
+                                                  (collect `(make-instance 'remote-location :type ',type )))))
           ,@(iter (for (op . op-body) in definitions)
              (appending (ecase op
                           (:url-schemas
