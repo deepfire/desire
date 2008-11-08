@@ -113,18 +113,45 @@
   ((modules :accessor location-modules :initarg :modules))
   (:default-initargs :modules nil))
 
-(defclass remote-location (location)
+(defclass remote (location)
   ((distributor :accessor location-distributor :initarg :distributor)
-   (type :accessor location-type :initarg :type)
-   (url-form :accessor location-url-form :initarg :url-form)
-   (url-fn :accessor location-url-fn :initarg :url-fn)))
+   (path-form :accessor location-path-form :initarg :path-form)
+   (path-fn :accessor location-path-fn :initarg :path-fn)))
+
+(defclass native-remote (remote) ())
+(defclass http-remote (remote) ())
+(defclass rsync-remote (remote) ())
 
 (defclass locality (location)
-  ((git-pool :accessor location-git-pool :initarg :git-pool)
-   (darcs-pool :accessor location-darcs-pool :initarg :darcs-pool)
-   (svn-pool :accessor location-svn-pool :initarg :svn-pool)
-   (cvs-pool :accessor location-cvs-pool :initarg :cvs-pool)
-   (lockdir :accessor location-lockdir :initarg :lockdir :documentation "Learn how to get rid of that.")))
+  ((path :accessor locality-path :initarg :path)))
+
+(defclass git () ())
+(defclass darcs () ())
+(defclass cvs () ())
+(defclass svn () ())
+
+(defclass git-native-remote (git native-remote) ())
+(defclass git-http-remote (git http-remote) ())
+(defclass darcs-http-remote (darcs http-remote) ())
+(defclass svn-rsync-remote (svn rsync-remote) ())
+(defclass cvs-rsync-remote (cvs rsync-remote) ())
+
+(defgeneric schema (location)
+  (:method ((git-native-remote o)) "git")
+  (:method ((http-remote o)) "http")
+  (:method ((rsync-remote o)) "rsync"))
+
+(defun url (location name)
+  (declare (type location location) (type symbol name))
+  (concatenate 'simple-base-string
+               (schema location) "://" (down-case-name (location-distributor location))
+               (funcall (location-path-fn location) name)))
+
+(defclass git-locality (git-location locality) ())
+(defclass darcs-locality (darcs-location locality) ())
+(defclass cvs-locality (cvs-location locality)
+  ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir)))
+(defclass svn-locality (svn-location locality) ())
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#D(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o)) (list :locations (distributor-locations o))))
@@ -134,27 +161,32 @@
   (dolist (loc (distributor-locations o))
     (setf (location-distributor loc) o)))
 
-(defmethod print-object ((o remote-location) stream &aux (wrapped-p (eq (car (location-url-form o)) 'url)))
-  (format stream "~@<#R(~;~A ~@<(~;~A (~A)~{ ~S~}~;)~:@>~;)~:@>" (symbol-name (xform-if-not #'symbolp #'name (location-distributor o))) (location-type o)
-          (caadr (location-url-form o)) (cddr (location-url-form o))))
+(defmethod print-object ((o remote) stream &aux (wrapped-p (eq (car (location-path-form o)) 'url)))
+  (destructuring-bind ((form-binding) . form-body) (location-path-form o)
+   (format stream "~@<#R(~;~A ~A ~@<(~;(~A)~{ ~S~}~;)~:@>~;) ~{ ~<~S ~S~:@>~}~:@>"
+           (symbol-name (type-of o)) (symbol-name (xform-if-not #'symbolp #'name (location-distributor o))) form-binding form-body
+           (list :modules (mapcar #'down-case-name (location-modules o))))))
 
-(defun remote-location-reader (stream &optional sharp char)
+(defun remote-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (distributor (type (repovar) &rest url-form) &rest initargs &key &allow-other-keys) (read stream nil nil t)
-    `(make-instance 'remote-location :distributor ',distributor :type ',type :url-form ',(list* 'url (list repovar) url-form)
-                    :url-fn (lambda (,repovar) (list ,@url-form))
-                    ,@(remove-from-plist initargs :distributor :type :url-form :url-fn))))
+  (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules &allow-other-keys) (read stream nil nil)
+    `(make-instance ',type :distributor ',distributor :type ',type :path-form ',(list* 'url (list repovar) path-form) :modules ',modules
+                    :path-fn (lambda (,repovar) (list ,@path-form))
+                    ,@(remove-from-plist initargs :distributor :type :modules :path-form :path-fn))))
 
 (defclass module (registered depobj)
-  ((distributor :accessor module-distributor :initarg :distributor)
+  ((preferred-distributor :accessor module-preferred-distributor :initarg :preferred-distributor)
+   (preferred-remote :accessor module-preferred-remote :initarg :preferred-remote)
+   (alternate-remotes :accessor module-alternate-remotes :initarg :alternate-remotes)
+   (mirror-locality :accessor module-mirror-locality :initarg :mirror-locality)
+   (other-localities :accessor module-other-localities :initarg :other-localities)
    (depends-on :accessor module-depends-on :initarg :depends-on)
    (systems :accessor module-systems :initarg :systems)
-   (origin-repository :accessor module-origin-repository :initarg :origin-repository)
-   (local-repository :accessor module-local-repository :initarg :local-repository)
    (essential-p :accessor module-essential-p :initarg :essential-p))
   (:default-initargs
    :registrator #'(setf module)    
-   :distributor nil :depends-on nil :systems nil :repositories nil :essential-p nil))
+   :preferred-distributor nil :preferred-remote nil :alternate-remotes nil :mirror-locality nil :other-localities nil
+   :depends-on nil :systems nil :essential-p nil))
 
 (defvar *force-modules-essential* nil)
 
@@ -235,11 +267,11 @@
 
 ;; override the NAMED slot reader
 (defmethod name ((o repository))
-  (list (name (repo-module o)) (if (typep o 'remote-repository) 'remote 'local) (etypecase o
-                                                                                  (git-repository 'git)
-                                                                                  (darcs-repository 'darcs)
-                                                                                  (cvs-repository 'cvs)
-                                                                                  (svn-repository 'svn))))
+  (list (name (repo-module o)) (if (typep o 'remote) 'remote 'local) (etypecase o
+                                                                       (git-repository 'git)
+                                                                       (darcs-repository 'darcs)
+                                                                       (cvs-repository 'cvs)
+                                                                       (svn-repository 'svn))))
 
 (defclass git-repository (repository) ())
 (defclass darcs-repository (repository) ())
