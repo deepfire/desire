@@ -103,40 +103,57 @@
 ;;; Distributor name is its hostname.
 ;;;
 (defclass distributor (registered)
-  ((locations :accessor distributor-locations :initarg :locations)
-   (url-forms :accessor distributor-url-forms :initarg :url-forms)
-   (url-fns :accessor distributor-url-fns :initarg :url-fns))
+  ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified.")
+   (url-forms :accessor distributor-url-forms :initarg :url-forms :documentation "Transitory.")
+   (url-fns :accessor distributor-url-fns :initarg :url-fns :documentation "Transitory."))
   (:default-initargs
    :registrator #'(setf distributor) :url-forms nil :url-fns nil
-   :locations nil))
+   :remotes nil))
 
 (defun distributor-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key locations &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (make-instance 'distributor :name ',name :locations (list ,@locations) ,@(remove-from-plist initargs :repositories :locations)))))
+         (make-instance 'distributor :name ',name :remotes (list ,@remotes) ,@(remove-from-plist initargs :repositories :remotes)))))
 
-(defclass location ()
-  ((modules :accessor location-modules :initarg :modules))
+(defun distributor-remote (distributor value &key (key #'name))
+  (find value (distributor-remotes distributor) :key key))
+
+(defun distributor-remote-if (distributor fn)
+  (find-if fn (distributor-remotes distributor)))
+
+(defun compute-distributor-modules (distributor)
+  "Compute the set of module names published by DISTRIBUTOR."
+  (remove-duplicates (mappend #'location-modules (distributor-remotes distributor))))
+
+(defclass rcs-type-mixin () ((type :reader rcs-type :initarg :type)))
+
+;;; exhaustive partition of RCS-TYPE-MIXIN
+(defclass git (rcs-type-mixin)   () (:default-initargs :type 'git))
+(defclass darcs (rcs-type-mixin) () (:default-initargs :type 'darcs))
+(defclass cvs (rcs-type-mixin)   () (:default-initargs :type 'cvs))
+(defclass svn (rcs-type-mixin)   () (:default-initargs :type 'svn))
+
+(defclass location (named)
+  ((modules :accessor location-modules :initarg :modules :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs :modules nil))
 
-(defclass remote (location)
-  ((distributor :accessor location-distributor :initarg :distributor)
-   (path-form :accessor location-path-form :initarg :path-form)
-   (path-fn :accessor location-path-fn :initarg :path-fn)))
+;;; exhaustive partition of LOCATION
+(defclass locality (location)
+  ((path :accessor locality-path :initarg :path :documentation "Specified.")
+   (scan-p :accessor locality-scan-p :initarg :scan-p :documentation "Specified.")))
+(defclass remote (location registered)
+  ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
+   (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
+   (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
+  (:default-initargs :registrator #'(setf remote)))
 
+;;; exhaustive partition of REMOTE
 (defclass native-remote (remote) ())
 (defclass http-remote (remote) ())
 (defclass rsync-remote (remote) ())
 
-(defclass locality (location)
-  ((path :accessor locality-path :initarg :path)))
-
-(defclass git () ())
-(defclass darcs () ())
-(defclass cvs () ())
-(defclass svn () ())
-
+;;; most specific, exhaustive partition of REMOTE
 (defclass git-native-remote (git native-remote) ())
 (defclass git-http-remote (git http-remote) ())
 (defclass darcs-http-remote (darcs http-remote) ())
@@ -144,34 +161,57 @@
 (defclass cvs-rsync-remote (cvs rsync-remote) ())
 
 (defgeneric schema (location)
-  (:method ((git-native-remote o)) "git")
-  (:method ((http-remote o)) "http")
-  (:method ((rsync-remote o)) "rsync"))
+  (:method ((o git-native-remote)) "git")
+  (:method ((o http-remote)) "http")
+  (:method ((o rsync-remote)) "rsync"))
 
-(defun url (location name)
-  (declare (type location location) (type symbol name))
+(defun url (remote name)
+  (declare (type remote remote) (type symbol name))
   (concatenate 'simple-base-string
-               (schema location) "://" (down-case-name (location-distributor location))
-               (funcall (location-path-fn location) name)))
+               (schema remote) "://" (down-case-name (remote-distributor remote))
+               (funcall (remote-path-fn remote) name)))
 
-(defclass git-locality (git-location locality) ())
-(defclass darcs-locality (darcs-location locality) ())
-(defclass cvs-locality (cvs-location locality)
+;;; most specific, exhaustive partition of LOCALITY
+(defclass git-locality (git locality) ())
+(defclass darcs-locality (darcs locality) ())
+(defclass cvs-locality (cvs locality)
   ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir)))
-(defclass svn-locality (svn-location locality) ())
+(defclass svn-locality (svn locality) ())
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o)) (list :locations (distributor-locations o))))
+  (format stream "~@<#D(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o)) (list :remotes (distributor-remotes o))))
 
 (defmethod initialize-instance :after ((o distributor) &rest rest)
   (declare (ignore rest))
-  (dolist (loc (distributor-locations o))
-    (setf (location-distributor loc) o)))
+  (dolist (loc (distributor-remotes o))
+    (setf (remote-distributor loc) o)))
 
-(defmethod print-object ((o remote) stream &aux (wrapped-p (eq (car (location-path-form o)) 'url)))
-  (destructuring-bind ((form-binding) . form-body) (location-path-form o)
-   (format stream "~@<#R(~;~A ~A ~@<(~;(~A)~{ ~S~}~;)~:@>~;) ~{ ~<~S ~S~:@>~}~:@>"
-           (symbol-name (type-of o)) (symbol-name (xform-if-not #'symbolp #'name (location-distributor o))) form-binding form-body
+(defun init-time-collate-remote-name (remote distributor-name &optional specified-name &aux (rcs-type (rcs-type remote)))
+  "Provide a mechanism for init-time name collation for REMOTE with DISTRIBUTOR-NAME,
+   and optional SPECIFIED-NAME.
+
+   Collation rules are considered in order, as follows:
+      - SPECIFIED-NAME wins,
+      - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME,
+      - if REMOTE is the only remote of its RCS type in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME-RCS-TYPE."
+  (let ((distributor (distributor distributor-name)))
+    (cond (specified-name (if (null (distributor-remote distributor specified-name))
+                              specified-name
+                              (error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
+          ((and (typep remote 'git) (null (distributor-remote-if (rcurry #'typep 'git) distributor))) distributor-name)
+          (t (if-let* ((default-name (format-symbol (symbol-package distributor-name) "~A-~A" distributor-name rcs-type))
+                       (non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
+                      default-name
+                      (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
+                             rcs-type distributor-name))))))
+
+(defmethod initialize-instance :before ((o remote) &key distributor name &allow-other-keys)
+  (setf (name o) (init-time-collate-remote-name o distributor name)))
+
+(defmethod print-object ((o remote) stream)
+  (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
+   (format stream "~@<#R(~;~A ~A ~@<(~;(~A)~{ ~S~}~;)~:@>~{ ~<~S ~S~:@>~}~;)~:@>"
+           (symbol-name (type-of o)) (symbol-name (xform-if-not #'symbolp #'name (remote-distributor o))) form-binding form-body
            (list :modules (mapcar #'down-case-name (location-modules o))))))
 
 (defun remote-reader (stream &optional sharp char)
@@ -181,27 +221,55 @@
                     :path-fn (lambda (,repovar) (list ,@path-form))
                     ,@(remove-from-plist initargs :distributor :type :modules :path-form :path-fn))))
 
+(defmethod initialize-instance :after ((o locality) &key path master-mirror-p &allow-other-keys)
+  (unless path
+    (error "~@<Useless locality definition: no PATH specified.~:@>"))
+  (when master-mirror-p
+    (setf (master-mirror (rcs-type o)) o)))
+
+(defun define-locality (rcs-type &rest keys &key path &allow-other-keys)
+  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, in which case an error is signalled.
+   Additionally, register it as a master mirror if MASTER-MIRROR-P is specified."
+  (setf (locality path) (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) keys)))
+
+(defun locality-master-mirror-p (o)
+  (eq o (master-mirror (rcs-type o))))
+
+(defmethod print-object ((o locality) stream)
+  (format stream "~@<#L(~;~A ~A~<~{ ~S ~S~}~:@>~;)~:@>"
+          (symbol-name (type-of o)) (locality-path o)
+          (append (when (locality-master-mirror-p o) (list :master-mirror-p t))
+                  (when (locality-scan-p o) (list :scan-p t)))))
+
+(defun locality-reader (stream &optional sharp char)
+  (declare (ignore sharp char))
+  (destructuring-bind (type path &rest initargs &key &allow-other-keys) (read stream nil nil)
+    `(make-instance ',type :path ,path ,@(remove-from-plist initargs :path :modules))))
+
 (defclass module (registered depobj)
-  ((preferred-distributor :accessor module-preferred-distributor :initarg :preferred-distributor)
-   (preferred-remote :accessor module-preferred-remote :initarg :preferred-remote)
-   (alternate-remotes :accessor module-alternate-remotes :initarg :alternate-remotes)
-   (mirror-locality :accessor module-mirror-locality :initarg :mirror-locality)
-   (other-localities :accessor module-other-localities :initarg :other-localities)
-   (depends-on :accessor module-depends-on :initarg :depends-on)
-   (systems :accessor module-systems :initarg :systems)
-   (essential-p :accessor module-essential-p :initarg :essential-p))
+  ((depends-on :accessor module-depends-on :initarg :depends-on :documentation "Specified.")
+   (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
+   (master-mirror-locality :accessor module-master-mirror-locality :initarg :master-mirror-locality :documentation "Policy-decided.")
+   (remotes :accessor module-remotes :initarg :remotes :documentation "Cache.")
+   (localities :accessor module-localities :initarg :localities :documentation "Cache.")
+   (systems :accessor module-systems :initarg :systems :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf module)    
-   :preferred-distributor nil :preferred-remote nil :alternate-remotes nil :mirror-locality nil :other-localities nil
+   :remotes nil :master-mirror-locality nil :localities nil
    :depends-on nil :systems nil :essential-p nil))
+
+;;; most specific, exhaustive partition of MODULE
+(defclass origin-module (module) ())
+(defclass imported-module (module)
+  ((preferred-remote :accessor module-preferred-remote :initarg :preferred-remote :documentation "Policy-decided."))
+  (:default-initargs :preferred-remote nil))
 
 (defvar *force-modules-essential* nil)
 
 (defmethod print-object ((o module) stream)
   (declare (special *force-modules-essential*))
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o))
-          (remove nil (list (list :distributor (name (module-distributor o)))
-                            (when-let (deps (remove-duplicates (append (module-depends-on o) (map-dependencies #'name o))))
+          (remove nil (list (when-let (deps (remove-duplicates (append (module-depends-on o) (map-dependencies #'name o))))
                               (list :depends-on deps))
                             (when-let (systems (module-systems o))
                               (list :systems (and (module-systems o) (mapcar #'name systems))))
@@ -216,13 +284,10 @@
                         ,@(when depends-on `(:depends-on '(,@depends-on)))
                         ,@(remove-from-plist initargs :distributor :systems :depends-on)))))
 
-(defmethod initialize-instance :after ((o module) &key distributor &allow-other-keys)
-  (push o (distributor-modules distributor)))
-
 (defclass system (registered)
-  ((module :accessor system-module :initarg :module)
-   (applications :accessor system-applications :initarg :applications)
-   (relativity :accessor system-relativity :initarg :relativity))
+  ((module :accessor system-module :initarg :module :documentation "Specified.")
+   (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
+   (applications :accessor system-applications :initarg :applications :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf system)
    :module nil :applications nil :relativity nil))
@@ -243,10 +308,10 @@
   (push o (module-systems module)))
 
 (defclass application (registered)
-  ((system :accessor app-system :initarg :system)
-   (package :accessor app-package :initarg :package)
-   (function :accessor app-function :initarg :function)
-   (default-parameters :accessor app-default-parameters :initarg :default-parameters))
+  ((system :accessor app-system :initarg :system :documentation "Specified.")
+   (package :accessor app-package :initarg :package :documentation "Specified.")
+   (function :accessor app-function :initarg :function :documentation "Specified.")
+   (default-parameters :accessor app-default-parameters :initarg :default-parameters :documentation "Specified."))
   (:default-initargs
    :registrator #'(setf app)))
 
@@ -328,29 +393,6 @@
               ((subtypep type 'cvs-repository) 'cvs)
               (t (error "~@<malformed repository type specifier ~S~:@>" type)))))
 
-(defmethod fully-qualified-name ((o repository))
-  (cons (name (repo-module o)) (coerce-repo-type-to-mnemonic (type-of o))))
-
-(defgeneric repo-pool-root (repo)
-  (:method ((o local-git-repository)) (git-pool (module-perspective (repo-module o))))
-  (:method ((o local-darcs-repository)) (darcs-pool (module-perspective (repo-module o))))
-  (:method ((o local-svn-repository)) (svn-pool (module-perspective (repo-module o))))
-  (:method ((o local-cvs-repository)) (cvs-pool (module-perspective (repo-module o)))))
-
-(defgeneric path (repo)
-  (:method ((o local-repository))
-    (make-pathname :directory (append (pathname-directory (repo-pool-root o)) (list (format nil "~(~A~)" (name (repo-module o))))))))
-
-(defgeneric url (o)
-  (:method ((o local-repository))
-    (format nil "file://~A" (namestring (path o))))
-  (:method ((o remote-repository))
-    (with-output-to-string (s)
-           (format s "~(~A~)://" (repo-method o))
-           (iter (for x in (distributor-repo-url (repo-method o) (repo-distributor o) o))
-                 (princ x s)
-                 (princ #\/ s)))))
-
 (defmethod print-object ((o repository) stream)
   (with-slots (master last-update-stamp umbrella method distributor cvs-module) o
     (format stream "~@<#R(~;~S ~S~{ ~S~}~;)~@:>"
@@ -360,12 +402,6 @@
               (local-repository)
               (remote-cvs-repository (list :umbrella umbrella :method  method :distributor (name distributor) :cvs-module cvs-module))
               (remote-repository (list :umbrella umbrella :method method :distributor (name distributor)))))))
-
-;; (defmethod initialize-instance :after ((o repository) &key module &allow-other-keys)
-;;   (push o (module-repositories module)))
-
-(defmethod initialize-instance :after ((o remote-repository) &key distributor &allow-other-keys)
-  (push o (distributor-repositories distributor)))
 
 (defmethod initialize-instance :after ((o remote-cvs-repository) &key cvs-module &allow-other-keys)
   (setf (repo-cvs-module o) (or cvs-module (name (repo-module o)))))
@@ -435,35 +471,16 @@
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
-    (set-dispatch-macro-character #\# #\R 'remote-location-reader *readtable*)
+    (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
+    (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
     (load stream)
     (map-modules #'relink-module-dependencies)
     (minimise-dependencies)))
 
-(defvar *locality*)
-
-(defun define-locality (&rest keys &key git-pool &allow-other-keys)
-  "Define the default locality.
-   {GIT,DARCS,CVS,SVN}-POOL specify the corresponding repository pool roots."
-  (unless git-pool
-    (error "~@<GIT-POOL must be specified for a useful locality~:@>"))
-  (setf *locality* (apply #'make-instance 'locality keys)))
-
-(defun identify-with-distributor (id)
-  "Recognize ID's modules as locally hosted by
-   creating a corresponding local origin repository."
-  (iter (for module in (distributor-modules (distributor id)))
-        (for local-origin = (make-instance 'local-git-origin-repository :module module))
-        (with-slots (origin-repository local-repository) module
-          (setf (values origin-repository local-repository) (values local-origin local-origin)))))
-
-(defun subscribe-to-distributor (id)
-  "Mark ID's modules as remotely hosted and build up 
-   repository import chains."
-  (iter (for module in (distributor-modules (distributor id)))
-        (for origin = (make-instance 'local-git-origin-repository :module module))
-        (with-slots (origin-repository local-repository) module
-          (setf (values origin-repository local-repository) (values local-origin local-origin)))))
+(defun identify-with-distributor (distributor-name locality)
+  "Recognize DISTRIBUTOR-NAME's modules as locally hosted in LOCALITY."
+  (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
+        (change-class (module module-name) 'origin-module :master-mirror-locality locality)))
 
 (defun serialize-perspective (&optional stream (perspective *perspective*))
   (let ((*print-case* :downcase)
