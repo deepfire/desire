@@ -1,0 +1,18 @@
+maps:
+        distributor     domain-name * set-of-remotes i-> set-of-modules i-> set-of-module-paths @-> set-of-module-urls
+        remote          set-of-published-modules * path-pattern @-> set-of-module-paths
+        locality        set-of-existing-modules * path @-> set-of-module-paths
+                        --- detection of existing
+                        --- desires
+        desire          distributor * set-of-modules i-> set-of-remotes
+                        --- wildcard desires
+                        --- desire periodicity
+        modules         preferred-remote
+                        --- robust defaulting
+                        mirror-locality
+                        --- site-wide
+                        #branches --- how 
+
+                        
+computable:
+        module          all-remotes, all-modules
