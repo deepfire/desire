@@ -188,11 +188,6 @@
   (when master-mirror-p
     (setf (master-mirror (rcs-type o)) o)))
 
-(defun define-locality (rcs-type &rest keys &key path &allow-other-keys)
-  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, in which case an error is signalled.
-   Additionally, register it as a master mirror if MASTER-MIRROR-P is specified."
-  (setf (locality path) (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) keys)))
-
 (defun locality-master-mirror-p (o)
   (eq o (master-mirror (rcs-type o))))
 
@@ -339,7 +334,12 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun load-definitions (stream)
+(defun define-locality (rcs-type &rest keys &key path &allow-other-keys)
+  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, in which case an error is signalled.
+   Additionally, register it as a master mirror if MASTER-MIRROR-P is specified."
+  (setf (locality path) (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) keys)))
+
+(defun read-definitions (stream)
   "Unserialise global definitions from STREAM."
   (let ((*readtable* (copy-readtable))
         (*read-eval* nil)
@@ -381,7 +381,7 @@
       (serialize-definitions f))))
 
 (defun test-core-2 (&optional (path-from "/tmp/essential") (path-to "/tmp/essential2") (force-essential nil))
-  (load-definitions path-from)
+  (read-definitions path-from)
   (let ((*force-modules-essential* force-essential))
     (with-output-to-file (f path-to)
       (serialize-definitions f))))

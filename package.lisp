@@ -6,7 +6,7 @@
    #:distributor #:location #:remote #:locality #:module #:origin-module #:imported-module #:system #:application
    #:git #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-modules #:map-systems #:map-applications
-   #:serialize-definitions #:load-definitions
+   #:serialize-definitions #:read-definitions
    #:*default-world-readable* #:*desires* #:*force-modules-essential*
    #:desire
    ;; cling.lisp
