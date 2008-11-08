@@ -20,6 +20,16 @@
 
 (in-package :cling)
 
+;;;
+;;; Globals
+;;;
+(defvar *perspectives*)
+(defvar *perspective* nil)
+(defvar *remotes*)        ;; map remote names to remotes
+(defvar *localities*)     ;; map paths to localities
+(defvar *master-mirrors*) ;; map RCS type to localities
+(defvar *desires*)        ;; list of import descriptions
+
 (defclass named ()
   ((name :accessor name :initarg :name)))
 
@@ -39,9 +49,6 @@
 
 (defun down-case-name (x)
   (string-downcase (string (name x))))
-
-(defvar *perspectives*)
-(defvar *perspective* nil)
 
 (defclass perspective (registered)
   ((distributors :accessor distributors :initarg :distributors)
@@ -374,13 +381,17 @@
     (string (string-upcase name))))
 
 (define-container-hash-accessor *perspectives* perspective :name-transform-fn coerce-to-name)
-(define-container-hash-accessor *perspective* distributor :container-transform distributors :name-transform-fn coerce-to-name :coercer t :mapper t)
-(define-container-hash-accessor *perspective* module :container-transform modules      :name-transform-fn coerce-to-name :coercer t :mapper t)
-(define-container-hash-accessor *perspective* repo   :container-transform repositories :name-transform-fn coerce-to-name :type repository :mapper t :compound-name-p t)
-(define-container-hash-accessor *perspective* repo*  :container-transform repositories :name-transform-fn coerce-to-name :type repository :compound-name-p t
-                                                     :spread-compound-name-p t)
-(define-container-hash-accessor *perspective* system :container-transform systems      :name-transform-fn coerce-to-name :coercer t :mapper t)
-(define-container-hash-accessor *perspective* app    :container-transform applications :name-transform-fn coerce-to-name :type application)
+(define-container-hash-accessor *perspective* distributor  :container-transform distributors :name-transform-fn coerce-to-name :coercer t :mapper t)
+(define-container-hash-accessor *perspective* module       :container-transform modules      :name-transform-fn coerce-to-name :coercer t :mapper t)
+(define-container-hash-accessor *perspective* repo         :container-transform repositories :name-transform-fn coerce-to-name :type repository :mapper t
+                                                           :compound-name-p t)
+(define-container-hash-accessor *perspective* repo*        :container-transform repositories :name-transform-fn coerce-to-name :type repository
+                                                           :compound-name-p t :spread-compound-name-p t)
+(define-container-hash-accessor *perspective* system       :container-transform systems      :name-transform-fn coerce-to-name :coercer t :mapper t)
+(define-container-hash-accessor *perspective* app          :container-transform applications :name-transform-fn coerce-to-name :type application)
+(define-container-hash-accessor *remotes*     remote       :type remote   :mapper map-remotes    :when-exists :error)
+(define-container-hash-accessor *localities*  locality     :type locality :mapper map-localities :when-exists :error)
+(define-container-hash-accessor *master-mirrors* master-mirror :type locality)
 
 (defun minimise-dependencies (&aux (loops (make-hash-table :test #'equal)))
   (labels ((maybe-remove-nonleaf (name leaf)
