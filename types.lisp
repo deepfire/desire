@@ -308,7 +308,21 @@
 (define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :when-exists :error)
 (define-container-hash-accessor *master-mirrors* master-mirror :type locality)
 
+(defun reestablish-module-dependencies (module)
+  "Rebuild MODULE's part of the dependency graph, and clear
+   the transitory DEPENDS-ON slot representation."
+  (iter (for depname = (pop (module-depends-on module))) (while depname)
+        (for dep = (module depname))
+        (setf (nonleaf depname) dep
+              (leaf (name module)) module) ;; might be reversed later
+        (depend module dep)))
+
+(defun module-dependencies (module)
+  "Produce a minimal list of MODULE dependency names."
+  (map-dependencies #'name module))
+
 (defun minimise-dependencies (leaves &aux (loops (make-hash-table :test #'equal)))
+  "Minimise the dependency graph specified by potential leaf set LEAVES."
   (labels ((maybe-remove-nonleaf (name leaf)
              (unless (satisfied-p leaf)
                (remhash name leaves)))
@@ -325,24 +339,8 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun relink-module-dependencies (nonleaves leaves o)
-  "Leaf processing, dependency relinking."
-  (labels ((mark-non-leaf (depkey dep)
-             (setf (gethash (coerce-to-name depkey) nonleaves) dep))
-           (mark-maybe-leaf (depeekey depee)
-             (setf (gethash (coerce-to-name depeekey) leaves) depee)))
-    (when (module-depends-on o)
-      (mark-non-leaf (name o) o))
-    (dolist (depname (module-depends-on o))
-      (let ((dep (module depname :if-does-not-exist :continue)))
-        (unless dep
-          (error "~@<Deserialisation failure: can't find ~S's dependency ~S~:@>" o depname))
-        (depsolver:depend o dep)
-        (mark-maybe-leaf depname dep)))
-    (setf (module-depends-on o) nil)
-    t))
-
 (defun load-definitions (stream)
+  "Unserialise global definitions from STREAM."
   (let ((*readtable* (copy-readtable))
         (*read-eval* nil)
         (*package* #.*package*))
@@ -353,7 +351,7 @@
     (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
     (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
     (load stream)
-    (map-modules (curry #'relink-module-dependencies *nonleaves* *leaves*))
+    (mapc #'reestablish-module-dependencies *modules*)
     (minimise-dependencies *leaves*)))
 
 (defun identify-with-distributor (distributor-name locality)
@@ -362,6 +360,7 @@
         (change-class (module module-name) 'origin-module :master-mirror-locality locality)))
 
 (defun serialize-definitions (&optional stream)
+  "Serialise global definitions to STREAM."
   (let ((*print-case* :downcase)
         (*package* #.*package*))
     (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
