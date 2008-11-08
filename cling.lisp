@@ -20,16 +20,6 @@
 
 (in-package :cling)
 
-(defun module-direct-dependencies (os &aux (o (coerce-to-module os)))
-  (iter (for (nil (dep . nil)) in-hashtable (depsolver::%depobj-dep# o))
-        (collect dep)))
-
-(defun module-full-dependencies (os &optional stack &aux (o (coerce-to-module os)))
-  (unless (member o stack)
-    (cons o
-          (iter (for dep in (module-direct-dependencies o))
-                (unioning (module-full-dependencies dep (cons o stack)))))))
-
 (defun system-spec (o)
   (cons (name o) (when-let ((rel (system-relativity o))) (list :relativity rel))))
 

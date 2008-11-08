@@ -312,9 +312,17 @@
               (leaf (name module)) module) ;; might be reversed later
         (depend module dep)))
 
-(defun module-dependencies (module)
-  "Produce a minimal list of MODULE dependency names."
+(defun module-dependencies (module &aux (module (coerce-to-module module)))
+  "Produce a minimal list of MODULE dependency names, which is a subset
+   of its direct dependencies."
   (map-dependencies #'name module))
+
+(defun module-full-dependencies (module &optional stack &aux (module (coerce-to-module module)))
+  "Compute the complete set of MODULE dependencies."
+  (unless (member o stack)
+    (cons (name module)
+          (iter (for dep in (module-dependencies module))
+                (unioning (module-full-dependencies dep (cons module stack)))))))
 
 (defun minimise-dependencies (leaves &aux (loops (make-hash-table :test #'equal)))
   "Minimise the dependency graph specified by potential leaf set LEAVES."
