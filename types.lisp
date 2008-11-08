@@ -37,6 +37,9 @@
 (defun downstring (x)
   (string-downcase (string x)))
 
+(defun down-case-name (x)
+  (string-downcase (string (name x))))
+
 (defvar *perspectives*)
 (defvar *perspective* nil)
 
