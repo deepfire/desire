@@ -23,12 +23,22 @@
 ;;;
 ;;; Globals
 ;;;
-(defvar *perspectives*)
-(defvar *perspective* nil)
-(defvar *remotes*)        ;; map remote names to remotes
-(defvar *localities*)     ;; map paths to localities
-(defvar *master-mirrors*) ;; map RCS type to localities
-(defvar *desires*)        ;; list of import descriptions
+(defvar *distributors*   (make-hash-table :test #'equal) "Map distributor names to remotes.")
+(defvar *remotes*        (make-hash-table :test #'equal) "Map remote names to remotes.")
+(defvar *localities*     (make-hash-table :test #'equal) "Map paths to localities.")
+(defvar *modules*        (make-hash-table :test #'equal) "Map module names to modules.")
+(defvar *leaves*         (make-hash-table :test #'equal) "Map module names to leaf modules.")
+(defvar *nonleaves*      (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
+(defvar *systems*        (make-hash-table :test #'equal) "Map system names to remotes.")
+(defvar *apps*           (make-hash-table :test #'equal) "Map application names to remotes.")
+(defvar *master-mirrors* (make-hash-table :test #'equal) "Map RCS type to localities.")
+
+;;;
+;;; Knobs
+;;;
+(defvar *desires*                 nil "List of import descriptions.")
+(defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
+(defvar *force-modules-essential* nil "Force all modules to be essential.")
 
 (defclass named ()
   ((name :accessor name :initarg :name)))
@@ -50,55 +60,6 @@
 (defun down-case-name (x)
   (string-downcase (string (name x))))
 
-(defclass perspective (registered)
-  ((distributors :accessor distributors :initarg :distributors)
-   (modules :accessor modules :initarg :modules)
-   (repositories :accessor repositories :initarg :repositories)
-   (systems :accessor systems :initarg :systems)
-   (applications :accessor applications :initarg :applications)
-   (leaves :accessor leaves :initarg :leaves)
-   (nonleaves :accessor nonleaves :initarg :nonleaves)
-   (git-pool :accessor git-pool :initarg :git-pool)
-   (default-world-readable :accessor default-world-readable :initarg :default-world-readable))
-  (:default-initargs
-   :registrator #'(setf perspective)
-   :distributors (make-hash-table :test 'equal)
-   :modules (make-hash-table :test 'equal)
-   :repositories (make-hash-table :test 'equal)
-   :systems (make-hash-table :test 'equal)
-   :applications (make-hash-table :test 'equal)
-   :leaves (make-hash-table :test 'equal)
-   :nonleaves (make-hash-table :test 'equal)
-   :default-world-readable t))
-
-(defclass gateway-perspective (perspective)
-  ((darcs-pool :accessor darcs-pool :initarg :darcs-pool)
-   (svn-pool :accessor svn-pool :initarg :svn-pool)
-   (cvs-pool :accessor cvs-pool :initarg :cvs-pool)
-   (lockdir :accessor lockdir :initarg :lockdir :documentation "Learn how to get rid of that.")))
-
-(defmethod print-object ((o gateway-perspective) stream)
-  (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, darcs: ~S, svn: ~S, cvs: ~S, cvslock: ~S>~:@>"
-          (type-of o) (default-world-readable o) (slot-value* o 'git-pool) (slot-value* o 'darcs-pool) (slot-value* o 'svn-pool) (slot-value* o 'cvs-pool) (slot-value* o 'lockdir)))
-
-(defclass user-perspective (perspective)
-  ((home :accessor home :initarg :home))
-  (:default-initargs
-   :home (user-homedir-pathname)))
-
-(defmethod print-object ((o user-perspective) stream)
-  (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S, home: ~S>~:@>"
-          (type-of o) (default-world-readable o) (slot-value* o 'git-pool) (home o)))
-
-(defclass local-perspective (perspective) ())
-
-(defmethod print-object ((o local-perspective) stream)
-  (format stream "~@<#<~S default ~:[non-~;~]world-readable, git: ~S>~:@>"
-          (type-of o) (default-world-readable o) (slot-value* o 'git-pool)))
-
-(defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
-  (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
-
 ;;;
 ;;; Distributor name is its hostname.
 ;;;
@@ -114,7 +75,7 @@
   (declare (ignore sharp char))
   (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (make-instance 'distributor :name ',name :remotes (list ,@remotes) ,@(remove-from-plist initargs :repositories :remotes)))))
+         (make-instance 'distributor :name ',name :remotes (list ,@remotes) ,@(remove-from-plist initargs :remotes)))))
 
 (defun distributor-remote (distributor value &key (key #'name))
   (find value (distributor-remotes distributor) :key key))
@@ -264,8 +225,6 @@
   ((preferred-remote :accessor module-preferred-remote :initarg :preferred-remote :documentation "Policy-decided."))
   (:default-initargs :preferred-remote nil))
 
-(defvar *force-modules-essential* nil)
-
 (defmethod print-object ((o module) stream)
   (declare (special *force-modules-essential*))
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o))
@@ -330,84 +289,7 @@
   (push o (system-applications system)))
 
 ;;;
-;;; Repository headbang
-;;;
-
-(defclass repository (registered)
-  ((module :accessor repo-module :initarg :module))
-  (:default-initargs :registrator #'(setf repo)))
-
-;; override the NAMED slot reader
-(defmethod name ((o repository))
-  (list (name (repo-module o)) (if (typep o 'remote) 'remote 'local) (etypecase o
-                                                                       (git-repository 'git)
-                                                                       (darcs-repository 'darcs)
-                                                                       (cvs-repository 'cvs)
-                                                                       (svn-repository 'svn))))
-
-(defclass git-repository (repository) ())
-(defclass darcs-repository (repository) ())
-(defclass svn-repository (repository) ())
-(defclass cvs-repository (repository) ())
-
-(defclass local-repository (repository) 
-  ((last-time-identity :accessor last-time-identity :initarg nil)))
-(defclass remote-repository (repository)
-  ((umbrella :accessor repo-umbrella :initarg :umbrella)
-   (method :accessor repo-method :initarg :method)
-   (distributor :accessor repo-distributor :initarg :distributor))
-  (:default-initargs :umbrella nil))
-
-(defclass remote-git-repository (remote-repository git-repository) () (:default-initargs :method 'git))
-(defclass remote-git-http-repository (remote-git-repository) () (:default-initargs :method 'http))
-(defclass remote-darcs-repository (remote-repository darcs-repository) () (:default-initargs :method 'http))
-(defclass remote-svn-repository (remote-repository svn-repository) () (:default-initargs :method 'rsync))
-(defclass remote-cvs-repository (remote-repository cvs-repository) 
-  ((cvs-module :accessor repo-cvs-module :initarg :cvs-module))
-  (:default-initargs :method 'rsync))
-
-(defclass site-repository (local-repository) ())
-(defclass user-repository (local-repository) ())
-
-(defclass origin-repository (repository) ())
-(defclass derived-repository (local-repository)
-  ((master :accessor repo-master :initarg :master)
-   (last-update-stamp :accessor repo-last-update-stamp :initform 0)))
-
-(defclass local-git-repository (local-repository git-repository) ())
-(defclass site-derived-git-repository (site-repository derived-repository local-git-repository) ())
-(defclass user-derived-git-repository (user-repository derived-repository local-git-repository) ())
-(defclass site-origin-git-repository (site-repository origin-repository local-git-repository) ())
-(defclass user-origin-git-repository (user-repository origin-repository local-git-repository) ())
-(defclass local-darcs-repository (derived-repository darcs-repository) ())
-(defclass local-svn-repository (derived-repository svn-repository) ())
-(defclass local-cvs-repository (derived-repository cvs-repository) ())
-
-(defun coerce-repo-type-to-mnemonic (type)
-  (list (cond ((subtypep type 'local-repository) 'local)
-              ((subtypep type 'remote-repository) 'remote)
-              (t (error "~@<malformed repository type specifier ~S~:@>" type)))
-        (cond ((subtypep type 'git-repository) 'git)
-              ((subtypep type 'darcs-repository) 'darcs)
-              ((subtypep type 'svn-repository) 'svn)
-              ((subtypep type 'cvs-repository) 'cvs)
-              (t (error "~@<malformed repository type specifier ~S~:@>" type)))))
-
-(defmethod print-object ((o repository) stream)
-  (with-slots (master last-update-stamp umbrella method distributor cvs-module) o
-    (format stream "~@<#R(~;~S ~S~{ ~S~}~;)~@:>"
-            (type-of o) (name o)
-            (etypecase o
-              (derived-repository (list :master (name master) :last-update-stamp last-update-stamp))
-              (local-repository)
-              (remote-cvs-repository (list :umbrella umbrella :method  method :distributor (name distributor) :cvs-module cvs-module))
-              (remote-repository (list :umbrella umbrella :method method :distributor (name distributor)))))))
-
-(defmethod initialize-instance :after ((o remote-cvs-repository) &key cvs-module &allow-other-keys)
-  (setf (repo-cvs-module o) (or cvs-module (name (repo-module o)))))
-
-;;;
-;;; Root, accessors and coercers: PERSPECTIVE, MODULE, REPO, SYSTEM and APP; COERCE-TO-MODULE and COERCE-TO-SYSTEM.
+;;; Accessors, mappers and coercers.
 ;;;
 
 (defun coerce-to-name (name)
@@ -416,23 +298,20 @@
     (symbol (string-upcase (symbol-name name)))
     (string (string-upcase name))))
 
-(define-container-hash-accessor *perspectives* perspective :name-transform-fn coerce-to-name)
-(define-container-hash-accessor *perspective* distributor  :container-transform distributors :name-transform-fn coerce-to-name :coercer t :mapper t)
-(define-container-hash-accessor *perspective* module       :container-transform modules      :name-transform-fn coerce-to-name :coercer t :mapper t)
-(define-container-hash-accessor *perspective* repo         :container-transform repositories :name-transform-fn coerce-to-name :type repository :mapper t
-                                                           :compound-name-p t)
-(define-container-hash-accessor *perspective* repo*        :container-transform repositories :name-transform-fn coerce-to-name :type repository
-                                                           :compound-name-p t :spread-compound-name-p t)
-(define-container-hash-accessor *perspective* system       :container-transform systems      :name-transform-fn coerce-to-name :coercer t :mapper t)
-(define-container-hash-accessor *perspective* app          :container-transform applications :name-transform-fn coerce-to-name :type application)
-(define-container-hash-accessor *remotes*     remote       :type remote   :mapper map-remotes    :when-exists :error)
-(define-container-hash-accessor *localities*  locality     :type locality :mapper map-localities :when-exists :error)
+(define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-name :coercer t :mapper map-distributors)
+(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-name :coercer t :mapper map-modules)
+(define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-name :type module :mapper map-leaves)
+(define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-name :type module :mapper map-nonleaves)
+(define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-name :coercer t :mapper map-systems)
+(define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-name :coercer t :mapper map-app :type application)
+(define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-name :coercer t :mapper map-remotes :type remote :when-exists :error)
+(define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :when-exists :error)
 (define-container-hash-accessor *master-mirrors* master-mirror :type locality)
 
-(defun minimise-dependencies (&aux (loops (make-hash-table :test #'equal)))
+(defun minimise-dependencies (leaves &aux (loops (make-hash-table :test #'equal)))
   (labels ((maybe-remove-nonleaf (name leaf)
              (unless (satisfied-p leaf)
-               (remhash name (leaves *perspective*))))
+               (remhash name leaves)))
            (minimise (current &optional acc-deps)
              (cond ((member current acc-deps) ;; is there a dependency loop?
                     (push (first acc-deps) (gethash current loops))
@@ -441,17 +320,17 @@
                     (dolist (overdep (intersection (cdr acc-deps) (mapcar #'cadr (hash-table-alist (depsolver::%depobj-dep# current)))))
                       (undepend current overdep))
                     (mapc (rcurry #'minimise (cons current acc-deps)) (mapcar #'cdr (hash-table-alist (depsolver::%depobj-rdep# current))))))))
-    (maphash #'maybe-remove-nonleaf (leaves *perspective*))
-    (maphash-values #'minimise (leaves *perspective*))
+    (maphash #'maybe-remove-nonleaf leaves)
+    (maphash-values #'minimise leaves)
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun relink-module-dependencies (o)
+(defun relink-module-dependencies (nonleaves leaves o)
   "Leaf processing, dependency relinking."
   (labels ((mark-non-leaf (depkey dep)
-             (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
+             (setf (gethash (coerce-to-name depkey) nonleaves) dep))
            (mark-maybe-leaf (depeekey depee)
-             (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee)))
+             (setf (gethash (coerce-to-name depeekey) leaves) depee)))
     (when (module-depends-on o)
       (mark-non-leaf (name o) o))
     (dolist (depname (module-depends-on o))
@@ -463,7 +342,7 @@
     (setf (module-depends-on o) nil)
     t))
 
-(defun load-perspective (stream)
+(defun load-definitions (stream)
   (let ((*readtable* (copy-readtable))
         (*read-eval* nil)
         (*package* #.*package*))
@@ -474,36 +353,36 @@
     (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
     (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
     (load stream)
-    (map-modules #'relink-module-dependencies)
-    (minimise-dependencies)))
+    (map-modules (curry #'relink-module-dependencies *nonleaves* *leaves*))
+    (minimise-dependencies *leaves*)))
 
 (defun identify-with-distributor (distributor-name locality)
   "Recognize DISTRIBUTOR-NAME's modules as locally hosted in LOCALITY."
   (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
         (change-class (module module-name) 'origin-module :master-mirror-locality locality)))
 
-(defun serialize-perspective (&optional stream (perspective *perspective*))
+(defun serialize-definitions (&optional stream)
   (let ((*print-case* :downcase)
         (*package* #.*package*))
     (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
-    (iter (for (nil d) in-hashtable (distributors perspective)) (print d stream))
+    (iter (for (nil d) in-hashtable *distributors*) (print d stream))
     (format stream "~%~%;;;~%;;; Modules~%;;;")
-    (iter (for (nil m) in-hashtable (modules perspective)) (print m stream))
+    (iter (for (nil m) in-hashtable *modules*) (print m stream))
     (format stream "~%~%;;;~%;;; Systems~%;;;")
-    (iter (for (nil s) in-hashtable (systems perspective)) (print s stream))
+    (iter (for (nil s) in-hashtable *systems*) (print s stream))
     (format stream "~%~%;;;~%;;; Applications~%;;;")
-    (iter (for (nil a) in-hashtable (applications perspective)) (print a stream))))
+    (iter (for (nil a) in-hashtable *apps*) (print a stream))
+    (format stream "~%~%;;;~%;;; Desires~%;;;")
+    (print *desires* stream)))
 
 (defun test-core-1 (&optional (path-from "/mnt/little/git/cling/definitions.lisp") (path-to "/tmp/essential") (force-essential nil))
   (load path-from)
   (let ((*force-modules-essential* force-essential))
     (with-output-to-file (f path-to)
-      (serialize-perspective f))))
+      (serialize-definitions f))))
 
 (defun test-core-2 (&optional (path-from "/tmp/essential") (path-to "/tmp/essential2") (force-essential nil))
-  (setf *perspectives* (make-hash-table :test 'equal)
-        *perspective* (make-instance 'gateway-perspective :name 'root))
-  (load-perspective path-from)
+  (load-definitions path-from)
   (let ((*force-modules-essential* force-essential))
     (with-output-to-file (f path-to)
-      (serialize-perspective f))))
+      (serialize-definitions f))))

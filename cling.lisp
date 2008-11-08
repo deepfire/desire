@@ -37,52 +37,6 @@
   (appendf (module-systems module)
            (mapcar (compose (curry #'apply (curry #'make-instance 'system :module module :name)) #'ensure-list) system-specs)))
 
-(defun repository-import-chain (type)
-  (ecase type
-    (local    (values '(site-origin-git-repository)))
-    (git      (values '(site-derived-git-repository) '(remote-git-repository)))
-    (git-http (values '(site-derived-git-repository) '(remote-git-http-repository)))
-    (darcs    (values '(site-derived-git-repository local-darcs-repository) '(remote-darcs-repository)))
-    (svn      (values '(site-derived-git-repository local-svn-repository) '(remote-svn-repository)))
-    (cvs      (values '(site-derived-git-repository local-cvs-repository) '(remote-cvs-repository)))))
-
-(defun repository-derivation-chain (type)
-  (ecase type
-    (gateway-perspective (values '(site-derived-git-repository) '(remote-git-repository)))
-    (user-perspective    (values '(user-derived-git-repository) '(remote-git-repository)))
-    (local-perspective   (values '(site-origin-git-repository))))) ;; behavior is desired, but semantics are skewed...
-
-(defun arrange-module-repositories (module locals remotes)
-  (iter (for (derived master) on (append locals remotes))
-        (while master)
-        (setf (repo-master derived) master))
-;;   (setf (module-master-repository module) (first locals))
-  )
-
-(defun define-module-repositories (module type &rest remote-initargs)
-  (multiple-value-bind (locals remotes) (repository-import-chain type)
-    (arrange-module-repositories
-     module
-     (mapcar (rcurry #'make-instance :module module) locals)
-     (mapcar (rcurry (curry #'apply #'make-instance) (list* :module module :distributor (module-distributor module) remote-initargs)) remotes))))
-
-(defun derive-perspective (from type distributor &rest perspective-initargs)
-  (lret ((new-perspective (apply #'make-instance type :name type perspective-initargs)))
-    (ensure-directories-exist (git-pool new-perspective))
-    (let ((*perspective* new-perspective))
-      (multiple-value-bind (locals remotes) (repository-derivation-chain type)
-        (iter (for (nil origin-module) in-hashtable (modules from))
-              (let ((module (make-instance 'module :perspective new-perspective :name (name origin-module))))
-                (arrange-module-repositories module (mapcar (rcurry #'make-instance :module module) locals) (mapcar (rcurry #'make-instance :module module :distributor distributor) remotes))
-                (define-module-systems module (mapcar #'system-spec (module-systems origin-module))))))
-      ;; should be copy-deps elsewhere...
-      (iter (for (name module) in-hashtable (modules from))
-            (iter (for dep in (module-direct-dependencies module))
-                  (depend (module name) (module (name dep))))))))
-
-(defun switch-perspective (type distributor &rest perspective-initargs)
-  (setf *perspective* (apply #'derive-perspective *perspective* type distributor perspective-initargs)))
-
 (defmacro defdistributor (dist-name &rest definitions)
   `(progn
           (make-instance 'distributor :name ',dist-name
@@ -110,40 +64,8 @@
                                                                                       (for module-prespec = (ensure-cons module-preprespec))
                                                                                       (collect (list module-prespec type umbrella-name)))))))))
                                      (let ((,module (or (module (first ,module-spec) :if-does-not-exist :continue)
-                                                        (make-instance 'module :distributor (distributor ',dist-name) :perspective *perspective* :name (car ,module-spec)))))
-                                       (apply #'define-module-repositories ,module ,type :distributor ',dist-name :umbrella ,umbrella-name (alexandria::sans (rest ,module-spec) :systems))
+                                                        (make-instance 'module :distributor (distributor ',dist-name) :name (car ,module-spec)))))
                                        (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
-
-(defun mark-non-leaf (depkey dep) (setf (gethash (coerce-to-name depkey) (nonleaves *perspective*)) dep))
-(defun mark-maybe-leaf (depeekey depee) (setf (gethash (coerce-to-name depeekey) (leaves *perspective*)) depee))
-
-(defmacro define-module-dependencies (&body body)
-  `(iter (for (module-name . dependencies) in '(,@body))
-         (for module = (module module-name))
-         (mark-non-leaf module-name module)
-         (dolist (dep dependencies)
-           (mark-maybe-leaf dep (module dep))
-           (depend module (module dep)))))
-
-(defun print-dependencies ()
-  (labels ((module-deps (dep)
-             (iter (for (nil (depdep . color)) in-hashtable (depsolver::%depobj-dep# dep))
-                   (collect (name depdep)))))
-    (iter (for (name nonleaf) in-hashtable (nonleaves *perspective*))
-          (collect (cons name (module-deps nonleaf))))))
-
-(defun read-refs (o)
-  (declare (type git-repository o))
-  (with-input-from-external-program (str 'git (list "peek-remote" (url o)))
-    (let ((*read-base* 16) (unreadable (make-unreadable-object)))
-      (iter (for ref = (read str nil unreadable))
-            (for branch-name = (read-line str nil unreadable))
-            (until (or (eq ref unreadable) (eq branch-name unreadable)))
-            (collect (cons (cond ((first-iteration-p) (list :head))
-                                 ((string= branch-name "heads/" :start1 5 :end1 11) (list :branch (subseq branch-name 11)))
-                                 ((string= branch-name "tags/" :start1 5 :end1 10) (list :tag (subseq branch-name 10)))
-                                 (t (error "~@<unexpected output from git peek-remote~:@>")))
-                           ref))))))
 
 (defun clone (to from)
   (declare (type local-git-repository to) (type remote-git-repository from))
@@ -214,7 +136,7 @@
   (let ((preexisting (probe-file (path to))))
     (call-next-method)
     (unless preexisting ;; new shiny repository
-      (when (default-world-readable *perspective*)
+      (when *default-world-readable*
         (setf (world-readable-p to) t)))
     (update-configuration to)))
 
