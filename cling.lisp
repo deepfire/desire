@@ -67,6 +67,15 @@
                                                         (make-instance 'module :distributor (distributor ',dist-name) :name (car ,module-spec)))))
                                        (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
 
+(defmacro define-module-dependencies (&body body)
+  `(iter (for (module-name . dependencies) in '(,@body))
+         (for module = (module module-name))
+         (setf (nonleaf module-name) module)
+         (dolist (dep dependencies)
+           (setf (leaf dep) (module dep))
+           (mark-maybe-leaf dep (module dep))
+           (depend module (module dep)))))
+
 ;; (defun clone (to from)
 ;;   (declare (type local-git-repository to) (type remote-git-repository from))
 ;;   (with-changed-directory (namestring (ensure-directories-exist (path to)))
