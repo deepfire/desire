@@ -92,13 +92,16 @@
 (defmethod initialize-instance :after ((o user-perspective) &key git-pool &allow-other-keys)
   (setf (git-pool o) (or git-pool (namestring (make-pathname :directory (append (pathname-directory (home o)) (list "{asdf}")))))))
 
+;;;
+;;; Distributor name is its hostname.
+;;;
 (defclass distributor (registered)
   ((locations :accessor distributor-locations :initarg :locations)
    (url-forms :accessor distributor-url-forms :initarg :url-forms)
    (url-fns :accessor distributor-url-fns :initarg :url-fns))
   (:default-initargs
-   :registrator #'(setf distributor) :url-forms nil
-   :locations nil :modules nil))
+   :registrator #'(setf distributor) :url-forms nil :url-fns nil
+   :locations nil))
 
 (defun distributor-reader (stream &optional sharp char)
   (declare (ignore sharp char))
