@@ -20,24 +20,28 @@
 
 (in-package :cling)
 
-(setf *perspectives* (make-hash-table :test 'equal)
-      *perspective* (make-instance 'gateway-perspective :name 'root))
+;; (setf *perspectives* (make-hash-table :test 'equal)
+;;       *perspective* (make-instance 'gateway-perspective :name 'root))
+
+(reinit-definitions)
 
 (defdistributor feelingofgreen.ru
-  (:url-schemas (git (repo) "git.feelingofgreen.ru" (downstring (name (repo-module repo)))))
+  (:url-schemas (git (mod) "git.feelingofgreen.ru" (downstring (name mod))))
   (:modules
-   (local
-    pergamum semi-precious cling clung)))
+   (git
+    pergamum semi-precious cling clung
+    bintype elf cl-io-mod captured-stream dwarf climb cl-git humint climock standrei custom-harness regvaldefs assem
+        ieee-latex clxs sb-x86-portio clim-file-selector)))
 
 (defdistributor common-lisp.net
-  (:url-schemas (rsync (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)))
-                (http (repo) "common-lisp.net" "project" (downstring (repo-umbrella repo)) "darcs" (downstring (name (repo-module repo)))))
+  (:url-schemas (rsync (mod) "common-lisp.net" "project" (downstring (module-umbrella mod)))
+                (http (mod) "common-lisp.net" "project" (downstring (module-umbrella mod)) "darcs" (downstring (name mod))))
   (:modules
    (darcs
     alexandria iterate)))
 
 (defdistributor sanityinc.com
-  (:url-schemas (git (repo) "git.sanityinc.com" (format nil "~A" (downstring (name (repo-module repo))))))
+  (:url-schemas (git (mod) "git.sanityinc.com" (format nil "~A" (downstring (name mod)))))
   (:modules
    (git (darcs-to-git (darcs-to-git :systems nil)))))
 
@@ -47,4 +51,4 @@
   (cling pergamum semi-precious)
   (clung cling))
 
-(minimise-dependencies)
+(minimise-dependencies *leaves*)
