@@ -4,7 +4,7 @@
   (:export
    ;; types.lisp
    #:distributor #:location #:remote #:locality #:module #:origin-module #:imported-module #:system #:application
-   #:git #:darcs #:cvs #:svn #:rsync #:http
+   #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-modules #:map-systems #:map-applications
    #:module-dependencies #:module-full-dependencies
    #:serialize-definitions #:read-definitions

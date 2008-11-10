@@ -97,6 +97,7 @@
 
 ;;; exhaustive partition of RCS-TYPE-MIXIN
 (defclass git (rcs-type-mixin)   () (:default-initargs :type 'git))
+(defclass hg (rcs-type-mixin)    () (:default-initargs :type 'hg))
 (defclass darcs (rcs-type-mixin) () (:default-initargs :type 'darcs))
 (defclass cvs (rcs-type-mixin)   () (:default-initargs :type 'cvs))
 (defclass svn (rcs-type-mixin)   () (:default-initargs :type 'svn))
@@ -123,6 +124,7 @@
 ;;; most specific, exhaustive partition of REMOTE
 (defclass git-native-remote (git native-remote) ())
 (defclass git-http-remote (git http-remote) ())
+(defclass hg-http-remote (hg http-remote) ())
 (defclass darcs-http-remote (darcs http-remote) ())
 (defclass svn-rsync-remote (svn rsync-remote) ())
 (defclass cvs-rsync-remote (cvs rsync-remote) ())
@@ -140,6 +142,7 @@
 
 ;;; most specific, exhaustive partition of LOCALITY
 (defclass git-locality (git locality) ())
+(defclass hg-locality (hg locality) ())
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality)
   ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir)))
