@@ -48,11 +48,11 @@
            (make-instance 'distributor :name ',dist-name))
          ,@(iter (for (type . module-specs) in mod-specs)
                  (multiple-value-bind (location-type form-spec-type) (collate type)
-                   (destructuring-bind ((repovar) . body) (rest (find form-spec-type path-forms :key #'car))
+                   (destructuring-bind ((repovar &key name) . body) (rest (find form-spec-type path-forms :key #'car))
                      (appending `((if-let* ((extension (find '((,repovar) ,@body) (distributor-remotes (distributor ',dist-name))
                                                             :test #'equal :key #'remote-path-form)))
                                            extension
-                                           (make-instance ',location-type
+                                           (make-instance ',location-type ,@(when name `(:name ',name))
                                                           :distributor (distributor ',dist-name)
                                                           :path-form '((,repovar) ,@body)
                                                           :path-fn (lambda (,repovar) (list ,@body))
