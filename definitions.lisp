@@ -20,8 +20,6 @@
 
 (in-package :cling)
 
-;; (setf *perspectives* (make-hash-table :test 'equal)
-;;       *perspective* (make-instance 'gateway-perspective :name 'root))
 
 (reinit-definitions)
 
@@ -29,9 +27,7 @@
   (:url-schemas (git (mod) "git.feelingofgreen.ru" (downstring (name mod))))
   (:modules
    (git
-    pergamum semi-precious cling clung
-    bintype elf cl-io-mod captured-stream dwarf climb cl-git humint climock standrei custom-harness regvaldefs assem
-        ieee-latex clxs sb-x86-portio clim-file-selector)))
+    pergamum semi-precious cling clung)))
 
 (defdistributor common-lisp.net
   (:url-schemas (rsync (mod) "common-lisp.net" "project" (downstring (module-umbrella mod)))

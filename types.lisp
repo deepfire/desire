@@ -33,6 +33,11 @@
 (defvar *apps*           (make-hash-table :test #'equal) "Map application names to remotes.")
 (defvar *master-mirrors* (make-hash-table :test #'equal) "Map RCS type to localities.")
 
+(defun reinit-definitions ()
+  "Empty all global definitions."
+  (dolist (var '(*distributors* *remotes* *localities* *modules* *leaves* *nonleaves* *systems* *apps* *master-mirrors*))
+    (setf (symbol-value var) (make-hash-table :test #'equal))))
+
 ;;;
 ;;; Knobs
 ;;;
@@ -64,28 +69,29 @@
 ;;; Distributor name is its hostname.
 ;;;
 (defclass distributor (registered)
-  ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified.")
-   (url-forms :accessor distributor-url-forms :initarg :url-forms :documentation "Transitory.")
-   (url-fns :accessor distributor-url-fns :initarg :url-fns :documentation "Transitory."))
+  ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified."))
   (:default-initargs
-   :registrator #'(setf distributor) :url-forms nil :url-fns nil
-   :remotes nil))
+   :registrator #'(setf distributor) :remotes nil))
+
+(defmethod print-object ((o distributor) stream)
+  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>" (symbol-name (name o)) :remotes (distributor-remotes o)))
 
 (defun distributor-reader (stream &optional sharp char)
   (declare (ignore sharp char))
   (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (make-instance 'distributor :name ',name :remotes (list ,@remotes) ,@(remove-from-plist initargs :remotes)))))
+         (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
+           ,@remotes))))
 
 (defun distributor-remote (distributor value &key (key #'name))
-  (find value (distributor-remotes distributor) :key key))
+  (find value (distributor-remotes (coerce-to-distributor distributor)) :key key))
 
-(defun distributor-remote-if (distributor fn)
-  (find-if fn (distributor-remotes distributor)))
+(defun distributor-remote-if (fn distributor)
+  (find-if fn (distributor-remotes (coerce-to-distributor distributor))))
 
 (defun compute-distributor-modules (distributor)
   "Compute the set of module names published by DISTRIBUTOR."
-  (remove-duplicates (mappend #'location-modules (distributor-remotes distributor))))
+  (remove-duplicates (mappend #'location-modules (distributor-remotes (coerce-to-distributor distributor)))))
 
 (defclass rcs-type-mixin () ((type :reader rcs-type :initarg :type)))
 
@@ -139,15 +145,23 @@
   ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir)))
 (defclass svn-locality (svn locality) ())
 
-(defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o)) (list :remotes (distributor-remotes o))))
+(defun default-remote-name (distributor-name rcs-type)
+  "Compute a default name for remote with RCS-TYPE in DISTRIBUTOR."
+  (if (eq rcs-type 'git)
+      distributor-name
+      (format-symbol (symbol-package distributor-name) "~A~:[-~A~;~]" distributor-name (eq rcs-type 'git) rcs-type)))
 
-(defmethod initialize-instance :after ((o distributor) &rest rest)
-  (declare (ignore rest))
-  (dolist (loc (distributor-remotes o))
-    (setf (remote-distributor loc) o)))
+(defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
+  (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
+    (let ((*print-case* :downcase))
+      (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~@<~S ~A~:@>~}~;)~:@>"
+              (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
+              (append (unless (equal default-remote-name (name o))
+                        (format t "FAIL: ~S ~S~%" default-remote-name (name o))
+                        (list :name (name o)))
+                      (list :modules (mapcar #'downstring (location-modules o))))))))
 
-(defun init-time-collate-remote-name (remote distributor-name &optional specified-name &aux (rcs-type (rcs-type remote)))
+(defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with DISTRIBUTOR-NAME,
    and optional SPECIFIED-NAME.
 
@@ -155,32 +169,29 @@
       - SPECIFIED-NAME wins,
       - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME,
       - if REMOTE is the only remote of its RCS type in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME-RCS-TYPE."
-  (let ((distributor (distributor distributor-name)))
+  (let ((distributor-name (name distributor)))
     (cond (specified-name (if (null (distributor-remote distributor specified-name))
                               specified-name
                               (error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
-          ((and (typep remote 'git) (null (distributor-remote-if (rcurry #'typep 'git) distributor))) distributor-name)
-          (t (if-let* ((default-name (format-symbol (symbol-package distributor-name) "~A-~A" distributor-name rcs-type))
+          (t (if-let* ((default-name (default-remote-name distributor-name rcs-type))
                        (non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
                       default-name
                       (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
                              rcs-type distributor-name))))))
 
-(defmethod initialize-instance :before ((o remote) &key distributor name &allow-other-keys)
-  (setf (name o) (init-time-collate-remote-name o distributor name)))
+(defmethod initialize-instance :before ((o remote) &key distributor type name &allow-other-keys)
+  (setf (name o) (init-time-collate-remote-name distributor type name)))
 
-(defmethod print-object ((o remote) stream)
-  (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
-   (format stream "~@<#R(~;~A ~A ~@<(~;(~A)~{ ~S~}~;)~:@>~{ ~<~S ~S~:@>~}~;)~:@>"
-           (symbol-name (type-of o)) (symbol-name (xform-if-not #'symbolp #'name (remote-distributor o))) form-binding form-body
-           (list :modules (mapcar #'down-case-name (location-modules o))))))
+(defmethod initialize-instance :after ((o remote) &key distributor &allow-other-keys)
+  (appendf (distributor-remotes distributor) (list o)))
 
 (defun remote-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules &allow-other-keys) (read stream nil nil)
-    `(make-instance ',type :distributor ',distributor :type ',type :path-form ',(list* 'url (list repovar) path-form) :modules ',modules
-                    :path-fn (lambda (,repovar) (list ,@path-form))
-                    ,@(remove-from-plist initargs :distributor :type :modules :path-form :path-fn))))
+  (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules name &allow-other-keys) (read stream nil nil)
+    `(make-instance ',type :distributor (distributor ',distributor) :modules ',modules
+                    :path-form ',(list* (list repovar) path-form) :path-fn (lambda (,repovar) (list ,@path-form))
+                    ,@(when name `(:name ',name))
+                    ,@(remove-from-plist initargs :name :distributor :type :modules :path-form :path-fn))))
 
 (defmethod initialize-instance :after ((o locality) &key path master-mirror-p &allow-other-keys)
   (unless path
@@ -203,7 +214,8 @@
     `(make-instance ',type :path ,path ,@(remove-from-plist initargs :path :modules))))
 
 (defclass module (registered depobj)
-  ((depends-on :accessor module-depends-on :initarg :depends-on :documentation "Specified.")
+  ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
+   (depends-on :accessor module-depends-on :initarg :depends-on :documentation "Specified.")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (master-mirror-locality :accessor module-master-mirror-locality :initarg :master-mirror-locality :documentation "Policy-decided.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache.")
@@ -220,23 +232,38 @@
   ((preferred-remote :accessor module-preferred-remote :initarg :preferred-remote :documentation "Policy-decided."))
   (:default-initargs :preferred-remote nil))
 
+(defun module-system-implied-p (module &aux (system (first (module-systems module))))
+  "Determine if SYSTEM's existence is deducible and omitted from definitions."
+  (and system (null (system-relativity system))
+       (= 1 (length (module-systems module)))))
+
 (defmethod print-object ((o module) stream)
   (declare (special *force-modules-essential*))
-  (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (symbol-name (name o))
-          (remove nil (list (when-let (deps (remove-duplicates (append (module-depends-on o) (map-dependencies #'name o))))
+  (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
+                                                          (symbol-name (name o))
+                                                          (list (symbol-name (name o)) (module-umbrella o)))
+          (remove nil (list (when-let (deps (module-dependencies o))
                               (list :depends-on deps))
-                            (when-let (systems (module-systems o))
-                              (list :systems (and (module-systems o) (mapcar #'name systems))))
+                            (let ((systems (module-systems o)))
+                              (unless (module-system-implied-p o)
+                               (list :systems (and (module-systems o) (mapcar #'name systems)))))
                             (when (or (module-essential-p o) *force-modules-essential*)
                               (list :essential-p t))))))
 
+(defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
+  (when (module name :if-does-not-exist :continue)
+    (break))
+  (call-next-method))
+
 (defun module-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key distributor depends-on &allow-other-keys) (read stream nil nil t)
-    `(or (module ',name :if-does-not-exist :continue)
-         (make-instance 'module :name ',name :distributor (distributor ',distributor)
-                        ,@(when depends-on `(:depends-on '(,@depends-on)))
-                        ,@(remove-from-plist initargs :distributor :systems :depends-on)))))
+  (destructuring-bind (name &rest initargs &key depends-on (systems nil systems-specified-p) &allow-other-keys) (read stream nil nil t)
+    (declare (ignore systems))
+    (destructuring-bind (name umbrella) (if (consp name) name (list name name))
+     `(or (module ',name :if-does-not-exist :continue)
+          (prog1 (make-instance 'module :name ',name :umbrella ',umbrella ,@(when depends-on `(:depends-on '(,@depends-on)))
+                                ,@(remove-from-plist initargs :systems :depends-on))
+                 ,@(unless systems-specified-p `((make-instance 'system :name ',name :module (module ',name)))))))))
 
 (defclass system (registered)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
@@ -250,16 +277,16 @@
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
           (append (list :module (name (system-module o)))
                   (and (system-relativity o) (list :relativity (system-relativity o)))
-                  (and (system-applications o) (list :applications (mapcar #'name (system-applications o)))))))
+                  (and (system-applications o) (list :applications (system-applications o))))))
 
 (defun system-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key module &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key module relativity &allow-other-keys) (read stream nil nil t)
     `(or (system ',name :if-does-not-exist :continue)
-         (make-instance 'system :name ',name :module (module ',module) ,@(remove-from-plist initargs :module :applications)))))
+         (make-instance 'system :name ',name :module (module ',module) :relativity ',relativity ,@(remove-from-plist initargs :module :applications :relativity)))))
 
 (defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
-  (push o (module-systems module)))
+  (appendf (module-systems module) (list o)))
 
 (defclass application (registered)
   ((system :accessor app-system :initarg :system :documentation "Specified.")
@@ -267,21 +294,22 @@
    (function :accessor app-function :initarg :function :documentation "Specified.")
    (default-parameters :accessor app-default-parameters :initarg :default-parameters :documentation "Specified."))
   (:default-initargs
-   :registrator #'(setf app)))
+   :registrator #'(setf app) :system nil :package nil :function nil :default-parameters nil))
 
 (defmethod print-object ((o application) stream)
-  (format stream "~@<#A(~;~A~{ ~A~}~;)~:@>" (symbol-name (name o))
-          (list :system (name (app-system o)) :package (string (app-package o)) :function (string (app-function o))
+  (format stream "~@<#A(~;~A~{ ~S ~S~}~;)~:@>" (symbol-name (name o))
+          (list :system (name (app-system o)) :package (app-package o) :function (app-function o)
                 :default-parameters (app-default-parameters o))))
 
 (defun application-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key system &allow-other-keys) (read stream nil nil t)
-    `(or (application ',name :if-does-not-exist :continue)
-         (make-instance 'application :name ',name :system (system ',system) ,@(remove-from-plist initargs :system)))))
+  (destructuring-bind (name &rest initargs &key system package function default-parameters &allow-other-keys) (read stream nil nil t)
+    `(or (app ',name :if-does-not-exist :continue)
+         (make-instance 'application :name ',name :system (system ',system) :package ',package :function ',function :default-parameters ',default-parameters
+                        ,@(remove-from-plist initargs :system :package :function :default-parameters)))))
 
 (defmethod initialize-instance :after ((o application) &key system &allow-other-keys)
-  (push o (system-applications system)))
+  (appendf (system-applications system) (list o)))
 
 ;;;
 ;;; Accessors, mappers and coercers.
@@ -294,9 +322,9 @@
     (string (string-upcase name))))
 
 (define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-name :coercer t :mapper map-distributors)
-(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-name :coercer t :mapper map-modules)
-(define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-name :type module :mapper map-leaves)
-(define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-name :type module :mapper map-nonleaves)
+(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-name :coercer t :mapper map-modules :when-exists :error)
+(define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-name :type module :mapper map-leaves :when-exists :continue)
+(define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-name :type module :mapper map-nonleaves :when-exists :continue)
 (define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-name :coercer t :mapper map-systems)
 (define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-name :coercer t :mapper map-app :type application)
 (define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-name :coercer t :mapper map-remotes :type remote :when-exists :error)
@@ -319,7 +347,7 @@
 
 (defun module-full-dependencies (module &optional stack &aux (module (coerce-to-module module)))
   "Compute the complete set of MODULE dependencies."
-  (unless (member o stack)
+  (unless (member module stack)
     (cons (name module)
           (iter (for dep in (module-dependencies module))
                 (unioning (module-full-dependencies dep (cons module stack)))))))
@@ -331,7 +359,7 @@
                (remhash name leaves)))
            (minimise (current &optional acc-deps)
              (cond ((member current acc-deps) ;; is there a dependency loop?
-                    (push (first acc-deps) (gethash current loops))
+                    (appendf (gethash current loops) (list (first acc-deps)))
                     (undepend current (first acc-deps)))
                    (t
                     (dolist (overdep (intersection (cdr acc-deps) (mapcar #'cadr (hash-table-alist (depsolver::%depobj-dep# current)))))
@@ -359,7 +387,7 @@
     (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
     (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
     (load stream)
-    (mapc #'reestablish-module-dependencies *modules*)
+    (maphash-values #'reestablish-module-dependencies *modules*)
     (minimise-dependencies *leaves*)))
 
 (defun identify-with-distributor (distributor-name locality)
@@ -376,20 +404,25 @@
     (format stream "~%~%;;;~%;;; Modules~%;;;")
     (iter (for (nil m) in-hashtable *modules*) (print m stream))
     (format stream "~%~%;;;~%;;; Systems~%;;;")
-    (iter (for (nil s) in-hashtable *systems*) (print s stream))
+    (iter (for (nil s) in-hashtable *systems*) (unless (module-system-implied-p (system-module s)) (print s stream)))
     (format stream "~%~%;;;~%;;; Applications~%;;;")
     (iter (for (nil a) in-hashtable *apps*) (print a stream))
     (format stream "~%~%;;;~%;;; Desires~%;;;")
     (print *desires* stream)))
 
-(defun test-core-1 (&optional (path-from "/mnt/little/git/cling/definitions.lisp") (path-to "/tmp/essential") (force-essential nil))
-  (load path-from)
+(defun test-core (&optional (pathes-from (list "/mnt/little/git/cling/definitions.lisp"
+                                               "/mnt/little/git/clung/definitions.lisp"))
+                  (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2") (force-essential nil))
   (let ((*force-modules-essential* force-essential))
-    (with-output-to-file (f path-to)
-      (serialize-definitions f))))
-
-(defun test-core-2 (&optional (path-from "/tmp/essential") (path-to "/tmp/essential2") (force-essential nil))
-  (read-definitions path-from)
-  (let ((*force-modules-essential* force-essential))
-    (with-output-to-file (f path-to)
+    (reinit-definitions)
+    (mapcar #'load pathes-from)
+    (with-output-to-file (f path-int-0)
+      (serialize-definitions f))
+    (reinit-definitions)
+    (read-definitions path-int-0)
+    (with-output-to-file (f path-int-1)
+      (serialize-definitions f))
+    (reinit-definitions)
+    (read-definitions path-int-1)
+    (with-output-to-file (f path-int-2)
       (serialize-definitions f))))

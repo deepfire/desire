@@ -28,34 +28,46 @@
            (mapcar (compose (curry #'apply (curry #'make-instance 'system :module module :name)) #'ensure-list) system-specs)))
 
 (defmacro defdistributor (dist-name &rest definitions)
-  `(progn
-          (make-instance 'distributor :name ',dist-name
-                         :url-forms (list ,@(iter (for (method (repo) . body) in (rest (find :url-schemas definitions :key #'first)))
-                                                  (collect `(list ',method ',body))))
-                         :url-fns (list ,@(iter (for (method (repo) . body) in (rest (find :url-schemas definitions :key #'first)))
-                                                (collect `(list ',method (lambda (,repo) (list ,@body))))))
-                         :locations (list ,@(iter (for (type . repo-specs) in (rest (find :modules definitions :key #'first)))
-                                                  (collect `(make-instance 'remote-location :type ',type )))))
-          ,@(iter (for (op . op-body) in definitions)
-             (appending (ecase op
-                          (:url-schemas
-                           (iter (for (method (repo) . body) in op-body)
-                                 (collect (with-gensyms (m d)
-                                            `(defmethod distributor-repo-url ((,m (eql ',method)) (,d (eql ',dist-name)) ,repo)
-                                               (declare (ignorable ,m ,d))
-                                               (list ,@body))))))
-                          (:modules
-                           (with-gensyms (module module-spec type umbrella-name)
-                             `((iter (for (,module-spec ,type ,umbrella-name) in
-                                          ',(iter (for (type . repo-specs) in op-body)
-                                                  (appending (iter (for repo-spec in repo-specs)
-                                                                   (appending (destructuring-bind (umbrella-name . module-specs) (if (consp repo-spec) repo-spec (list repo-spec repo-spec))
-                                                                                (iter (for module-preprespec in module-specs)
-                                                                                      (for module-prespec = (ensure-cons module-preprespec))
-                                                                                      (collect (list module-prespec type umbrella-name)))))))))
-                                     (let ((,module (or (module (first ,module-spec) :if-does-not-exist :continue)
-                                                        (make-instance 'module :distributor (distributor ',dist-name) :name (car ,module-spec)))))
-                                       (define-module-systems ,module (getf (rest ,module-spec) :systems (list (first ,module-spec))))))))))))))
+  (flet ((collate (method)
+           (case method
+             (git (values 'git-native-remote 'git))
+             (git-http (values 'git-http-remote 'http))
+             (darcs (values 'darcs-http-remote 'http))
+             (cvs (values 'cvs-rsync-remote 'rsync))
+             (svn (values 'svn-rsync-remote 'rsync)))))
+    (let* ((path-forms (rest (find :url-schemas definitions :key #'first)))
+           (mod-specs (iter (for (type . mod-specs) in (rest (find :modules definitions :key #'first)))
+                            (collect (cons type (iter (for mod-spec in mod-specs)
+                                                      (appending
+                                                       (destructuring-bind (umbrella-name . module-specs)
+                                                           (if (consp mod-spec) mod-spec (list mod-spec mod-spec))
+                                                         (iter (for module-spec in module-specs)
+                                                               (collect (list* umbrella-name (ensure-cons module-spec))))))))))))
+      `(progn
+         (unless (distributor ',dist-name :if-does-not-exist :continue)
+           (make-instance 'distributor :name ',dist-name))
+         ,@(iter (for (type . module-specs) in mod-specs)
+                 (multiple-value-bind (location-type form-spec-type) (collate type)
+                   (destructuring-bind ((repovar) . body) (rest (find form-spec-type path-forms :key #'car))
+                     (appending `((if-let* ((extension (find '((,repovar) ,@body) (distributor-remotes (distributor ',dist-name))
+                                                            :test #'equal :key #'remote-path-form)))
+                                           extension
+                                           (make-instance ',location-type
+                                                          :distributor (distributor ',dist-name)
+                                                          :path-form '((,repovar) ,@body)
+                                                          :path-fn (lambda (,repovar) (list ,@body))
+                                                          :modules ',(mapcar #'cadr module-specs))))))))
+         ,@(iter (for (umbrella modname . args) in (mappend #'rest mod-specs))
+                 (destructuring-bind (&rest rest &key (systems (list modname)) &allow-other-keys) args
+                   (when-let ((unhandled (remove-from-plist rest :systems)))
+                     (warn "Unhandled module parameters: ~S~%" unhandled))
+                   (appending (cons `(unless (module ',modname :if-does-not-exist :continue)
+                                         (make-instance 'module :name ',modname :umbrella ',umbrella))
+                                    (iter (for system in systems)
+                                          (destructuring-bind (name &rest rest &key relativity &allow-other-keys) (ensure-cons system)
+                                            (collect `(make-instance 'system :name ',name :module (module ',modname)
+                                                                     ,@(when relativity `(:relativity ',relativity))
+                                                                     ,@(remove-from-plist rest :relativity)))))))))))))
 
 (defmacro define-module-dependencies (&body body)
   `(iter (for (module-name . dependencies) in '(,@body))
@@ -63,7 +75,6 @@
          (setf (nonleaf module-name) module)
          (dolist (dep dependencies)
            (setf (leaf dep) (module dep))
-           (mark-maybe-leaf dep (module dep))
            (depend module (module dep)))))
 
 ;; (defun clone (to from)
