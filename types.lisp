@@ -123,15 +123,20 @@
 ;;; exhaustive partition of LOCATION
 (defclass locality (location)
   ((path :accessor locality-path :initarg :path :documentation "Specified.")
-   (scan-p :accessor locality-scan-p :initarg :scan-p :documentation "Specified.")))
+   (scan-p :accessor locality-scan-p :initarg :scan-p :documentation "Specified."))
+  (:default-initargs
+   :scan-p nil))
 (defclass remote (location registered)
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
    (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
    (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
   (:default-initargs :registrator #'(setf remote)))
 
+;;; intermediate types
+(defclass git-remote (git remote) ())
+
 ;;; most specific, exhaustive partition of REMOTE
-(defclass git-native-remote (git-native remote) ())
+(defclass git-native-remote (git-native git-remote) ())
 (defclass git-http-remote (git-http remote) ())
 (defclass hg-http-remote (hg-http remote) ())
 (defclass darcs-http-remote (darcs-http remote) ())
@@ -210,13 +215,13 @@
     (setf (master-mirror (rcs-type o)) o)))
 
 (defun locality-master-mirror-p (o)
-  (eq o (master-mirror (rcs-type o))))
+  (eq o (master-mirror (rcs-type o) :if-does-not-exist :continue)))
 
 (defmethod print-object ((o locality) stream)
-  (format stream "~@<#L(~;~A ~A~<~{ ~S ~S~}~:@>~;)~:@>"
+  (format stream "~@<#L(~;~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
           (symbol-name (type-of o)) (locality-path o)
-          (append (when (locality-master-mirror-p o) (list :master-mirror-p t))
-                  (when (locality-scan-p o) (list :scan-p t)))))
+          (append (when (locality-master-mirror-p o) (list (list :master-mirror-p t)))
+                  (when (locality-scan-p o) (list (list :scan-p t))))))
 
 (defun locality-reader (stream &optional sharp char)
   (declare (ignore sharp char))
