@@ -10,6 +10,7 @@
   :components ((:file "package")
                (:file "filesystem-utils" :depends-on ("package"))
                (:file "types" :depends-on ("package"))
+               (:file "legacy-format" :depends-on ("types"))
 ;;                (:file "filesystem" :depends-on ("filesystem-utils" "types"))
 ;;                (:file "asdf" :depends-on ("types" "filesystem"))
                (:file "cling" :depends-on ("types" ;; "asdf"
