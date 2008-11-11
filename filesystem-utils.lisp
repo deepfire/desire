@@ -42,6 +42,9 @@
   (:report (lambda (cond stream)
              (format stream "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
 
+(defun subdir (pathname sub)
+  (merge-pathnames (make-pathname :directory `(:relative ,sub)) pathname))
+
 (defun find-executable (name &key (paths *executable-search-path*) critical &aux (realname (string-downcase (symbol-name name))))
   (iter (for path in paths)
         (for exec-path = (merge-pathnames path (make-pathname :name realname #+win32 #+win32 :type "exe")))

@@ -93,6 +93,11 @@
 ;;         (setf (world-readable-p to) t)))
 ;;     (update-configuration to)))
 
+(defmethod fetch ((to git-locality) (from git-remote) (m module))
+  (let ((repo-path (namestring (subdir (pathname (locality-path to)) (down-case-name m)))))
+    (with-changed-directory repo-path
+      (git "fetch"))))
+
 ;; (defmethod fetch ((to local-git-repository) (from remote-git-repository) &aux (path (namestring (path to))) (url (url from)))
 ;;   (if (probe-file path)
 ;;       (with-changed-directory path
