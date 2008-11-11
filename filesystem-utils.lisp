@@ -30,6 +30,14 @@
 (defun executable (name)
   (or (gethash name *executables*) (error "~@<Executable ~S isn't known.~@:>" name)))
 
+;;; SB-EXECUTABLE?
+(define-condition external-program-failure (serious-condition)
+  ((program :accessor cond-program :initarg :program)
+   (parameters :accessor cond-parameters :initarg :parameters)
+   (status :accessor cond-status :initarg :status))
+  (:report (lambda (cond stream)
+             (format stream "~@<running ~A~{ ~A~} failed with exit status ~S~:@>" (cond-program cond) (cond-parameters cond) (cond-status cond)))))
+
 (define-condition executable-not-found (warning)
   ((name :accessor cond-name :initarg :name)
    (search-path :accessor cond-search-path :initarg :search-path))
@@ -42,9 +50,6 @@
   (:report (lambda (cond stream)
              (format stream "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
 
-(defun subdir (pathname sub)
-  (merge-pathnames (make-pathname :directory `(:relative ,sub)) pathname))
-
 (defun find-executable (name &key (paths *executable-search-path*) critical &aux (realname (string-downcase (symbol-name name))))
   (iter (for path in paths)
         (for exec-path = (merge-pathnames path (make-pathname :name realname #+win32 #+win32 :type "exe")))
@@ -54,15 +59,11 @@
                      (error 'required-executable-not-found :name realname :search-path paths)
                      (warn 'executable-not-found :name realname :search-path paths)))))
 
-(define-condition external-program-failure (serious-condition)
-  ((program :accessor cond-program :initarg :program)
-   (parameters :accessor cond-parameters :initarg :parameters)
-   (status :accessor cond-status :initarg :status))
-  (:report (lambda (cond stream)
-             (format stream "~@<running ~A~{ ~A~} failed with exit status ~S~:@>" (cond-program cond) (cond-parameters cond) (cond-status cond)))))
-
 (defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output t) &aux (pathname (executable name)))
-  "Run an external program at PATHNAME with PARAMETERS. Return a value associated with the exit code, by the means of VALID-EXIT-CODES, or signal a condition of type EXTERNAL-PROGRAM-FAILURE."
+  "Run an external program at PATHNAME with PARAMETERS. 
+   Return a value associated with the exit code, by the means of 
+   VALID-EXIT-CODES, or signal a condition of type
+   EXTERNAL-PROGRAM-FAILURE."
   (let ((exit-code (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output))))
     (cdr (or (assoc exit-code valid-exit-codes)
              (signal 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
@@ -111,21 +112,6 @@
                      :test-function (lambda (cond) (typep cond 'about-to-purge))))
       (error 'about-to-purge :directory pathname)))
   (rm "-rf" pathname))
-
-(defun change-directory (pathname)
-  "Change both Lisp's *DEFAULT-PATHNAME-DEFAULTS* and the underlying OS's idea of the current directory."
-  (declare (type pathname pathname))
-  (setf *default-pathname-defaults* pathname)
-  (zerop (sb-posix:chdir (namestring pathname))))
-
-(defmacro with-changed-directory (dir &body body)
-  (with-gensyms (old)
-    (once-only (dir)
-      `(let ((,old (sb-posix:getcwd))
-             (*default-pathname-defaults* (parse-namestring ,dir)))
-         (sb-posix:chdir ,dir)
-         (unwind-protect (progn ,@body)
-           (sb-posix:chdir ,old))))))
 
 (defmacro do-directory-pathnames ((var (&rest directory-components)) &body body)
   `(dolist (,var (directory (make-pathname :directory '(,@directory-components) :name :wild)))
