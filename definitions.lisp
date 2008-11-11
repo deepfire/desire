@@ -23,23 +23,22 @@
 
 (reinit-definitions)
 
-(defdistributor feelingofgreen.ru
-  (:url-schemas (git (mod) "git.feelingofgreen.ru" (downstring (name mod))))
+(defdistributor git.feelingofgreen.ru
+  (:url-schemas (git-native (mod) "git.feelingofgreen.ru" (downstring (name mod))))
   (:modules
-   (git
+   (git-native
     pergamum semi-precious cling clung)))
 
 (defdistributor common-lisp.net
-  (:url-schemas (rsync (mod) "common-lisp.net" "project" (downstring (module-umbrella mod)))
-                (http (mod) "common-lisp.net" "project" (downstring (module-umbrella mod)) "darcs" (downstring (name mod))))
+  (:url-schemas (darcs-http (mod) "common-lisp.net" "project" (downstring (module-umbrella mod)) "darcs" (downstring (name mod))))
   (:modules
-   (darcs
+   (darcs-http
     alexandria iterate)))
 
-(defdistributor sanityinc.com
-  (:url-schemas (git (mod) "git.sanityinc.com" (format nil "~A" (downstring (name mod)))))
+(defdistributor git.sanityinc.com
+  (:url-schemas (git-native (mod) "git.sanityinc.com" (format nil "~A" (downstring (name mod)))))
   (:modules
-   (git (darcs-to-git (darcs-to-git :systems nil)))))
+   (git-native (darcs-to-git (darcs-to-git :systems nil)))))
 
 (define-module-dependencies
   (pergamum alexandria iterate)

@@ -93,14 +93,28 @@
   "Compute the set of module names published by DISTRIBUTOR."
   (remove-duplicates (mappend #'location-modules (distributor-remotes (coerce-to-distributor distributor)))))
 
-(defclass rcs-type-mixin () ((type :reader rcs-type :initarg :type)))
+(defclass rcs-type-mixin () ((rcs-type :reader rcs-type :initarg :rcs-type)))
 
 ;;; exhaustive partition of RCS-TYPE-MIXIN
-(defclass git (rcs-type-mixin)   () (:default-initargs :type 'git))
-(defclass hg (rcs-type-mixin)    () (:default-initargs :type 'hg))
-(defclass darcs (rcs-type-mixin) () (:default-initargs :type 'darcs))
-(defclass cvs (rcs-type-mixin)   () (:default-initargs :type 'cvs))
-(defclass svn (rcs-type-mixin)   () (:default-initargs :type 'svn))
+(defclass git (rcs-type-mixin)   () (:default-initargs :rcs-type 'git))
+(defclass hg (rcs-type-mixin)    () (:default-initargs :rcs-type 'hg))
+(defclass darcs (rcs-type-mixin) () (:default-initargs :rcs-type 'darcs))
+(defclass cvs (rcs-type-mixin)   () (:default-initargs :rcs-type 'cvs))
+(defclass svn (rcs-type-mixin)   () (:default-initargs :rcs-type 'svn))
+
+(defclass transport-mixin () ((transport :reader transport :initarg :transport)))
+
+;;; non-exhaustive partition of TRANSPORT-MIXIN
+(defclass http (transport-mixin) () (:default-initargs :transport 'http))
+(defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync :rcs-type 'rsync))
+
+;;; exhaustive partition of type product of RCS-TYPE and TRANSPORT-MIXIN
+(defclass git-native (git) () (:default-initargs :transport 'git))
+(defclass git-http (git http) ())
+(defclass hg-http (hg http) ())
+(defclass darcs-http (darcs http) ())
+(defclass cvs-rsync (cvs rsync) ())
+(defclass svn-rsync (svn rsync) ())
 
 (defclass location (named)
   ((modules :accessor location-modules :initarg :modules :documentation "Specified or maybe cached, for LOCALITYs."))
@@ -116,28 +130,21 @@
    (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
   (:default-initargs :registrator #'(setf remote)))
 
-;;; exhaustive partition of REMOTE
-(defclass native-remote (remote) ())
-(defclass http-remote (remote) ())
-(defclass rsync-remote (remote) ())
-
 ;;; most specific, exhaustive partition of REMOTE
-(defclass git-native-remote (git native-remote) ())
-(defclass git-http-remote (git http-remote) ())
-(defclass hg-http-remote (hg http-remote) ())
-(defclass darcs-http-remote (darcs http-remote) ())
-(defclass svn-rsync-remote (svn rsync-remote) ())
-(defclass cvs-rsync-remote (cvs rsync-remote) ())
+(defclass git-native-remote (git-native remote) ())
+(defclass git-http-remote (git-http remote) ())
+(defclass hg-http-remote (hg-http remote) ())
+(defclass darcs-http-remote (darcs-http remote) ())
+(defclass rsync-remote (rsync remote) ())
 
-(defgeneric schema (location)
-  (:method ((o git-native-remote)) "git")
-  (:method ((o http-remote)) "http")
-  (:method ((o rsync-remote)) "rsync"))
+(defmethod rcs-type ((o transport-mixin))
+  "Blanket for undecided ones. Painful ambiguity, also. Must be documented to ward off the hurt."
+  (transport o))
 
 (defun url (remote name)
   (declare (type remote remote) (type symbol name))
   (concatenate 'simple-base-string
-               (schema remote) "://" (down-case-name (remote-distributor remote))
+               (downstring (transport remote)) "://" (down-case-name (remote-distributor remote))
                (funcall (remote-path-fn remote) name)))
 
 ;;; most specific, exhaustive partition of LOCALITY
@@ -149,7 +156,7 @@
 (defclass svn-locality (svn locality) ())
 
 (defun default-remote-name (distributor-name rcs-type)
-  "Compute a default name for remote with RCS-TYPE in DISTRIBUTOR."
+  "Compute a default name for remote with RCS-TYPE in DISTRIBUTOR-NAME."
   (if (eq rcs-type 'git)
       distributor-name
       (format-symbol (symbol-package distributor-name) "~A~:[-~A~;~]" distributor-name (eq rcs-type 'git) rcs-type)))
@@ -157,17 +164,17 @@
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
   (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
     (let ((*print-case* :downcase))
-      (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~@<~S ~A~:@>~}~;)~:@>"
+      (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
               (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
               (append (unless (equal default-remote-name (name o))
-                        (format t "FAIL: ~S ~S~%" default-remote-name (name o))
-                        (list :name (name o)))
-                      (list :modules (mapcar #'downstring (location-modules o))))))))
+                       (list (list :name (name o))))
+                      (list (list :modules (mapcar #'downstring (location-modules o)))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with DISTRIBUTOR-NAME,
    and optional SPECIFIED-NAME.
 
+   XXX: not so true anymore, with introduction of RSYNC-REMOTE
    Collation rules are considered in order, as follows:
       - SPECIFIED-NAME wins,
       - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME,
@@ -182,8 +189,8 @@
                       (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
                              rcs-type distributor-name))))))
 
-(defmethod initialize-instance :before ((o remote) &key distributor type name &allow-other-keys)
-  (setf (name o) (init-time-collate-remote-name distributor type name)))
+(defmethod initialize-instance :before ((o remote) &key distributor rcs-type name &allow-other-keys)
+  (setf (name o) (init-time-collate-remote-name distributor rcs-type name)))
 
 (defmethod initialize-instance :after ((o remote) &key distributor &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o)))
@@ -402,25 +409,29 @@
   "Serialise global definitions to STREAM."
   (let ((*print-case* :downcase)
         (*package* #.*package*))
-    (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
-    (iter (for (nil d) in-hashtable *distributors*) (print d stream))
-    (format stream "~%~%;;;~%;;; Modules~%;;;")
-    (iter (for (nil m) in-hashtable *modules*) (print m stream))
-    (format stream "~%~%;;;~%;;; Systems~%;;;")
-    (iter (for (nil s) in-hashtable *systems*) (unless (module-system-implied-p (system-module s)) (print s stream)))
-    (format stream "~%~%;;;~%;;; Applications~%;;;")
-    (iter (for (nil a) in-hashtable *apps*) (print a stream))
-    (format stream "~%~%;;;~%;;; Desires~%;;;")
-    (print *desires* stream)))
+    (flet ((sorted-hash-table-entries (hash-table)
+             (sort (hash-table-values hash-table) #'string< :key (compose #'string #'name))))
+      (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
+      (iter (for d in (sorted-hash-table-entries *distributors*)) (print d stream))
+      (format stream "~%~%;;;~%;;; Modules~%;;;")
+      (iter (for m in (sorted-hash-table-entries *modules*)) (print m stream))
+      (format stream "~%~%;;;~%;;; Systems~%;;;")
+      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (module-system-implied-p (system-module s)) (print s stream)))
+      (format stream "~%~%;;;~%;;; Applications~%;;;")
+      (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream))
+      (format stream "~%~%;;;~%;;; Desires~%;;;")
+      (print *desires* stream))))
 
-(defun test-core (&optional (pathes-from (list "/mnt/little/git/cling/definitions.lisp"
-                                               "/mnt/little/git/clung/definitions.lisp"))
+(defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/cling/definitions.lisp"
+                                                              "/mnt/little/git/clung/definitions.lisp"))
                   (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2") (force-essential nil))
   (let ((*force-modules-essential* force-essential))
     (reinit-definitions)
     (mapcar #'load pathes-from)
     (with-output-to-file (f path-int-0)
       (serialize-definitions f))
+    (when bail-out-early
+      (return-from test-core))
     (reinit-definitions)
     (read-definitions path-int-0)
     (with-output-to-file (f path-int-1)

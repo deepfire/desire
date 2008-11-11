@@ -29,45 +29,60 @@
 
 (defmacro defdistributor (dist-name &rest definitions)
   (flet ((collate (method)
-           (case method
-             (git (values 'git-native-remote 'git))
-             (git-http (values 'git-http-remote 'http))
-             (darcs (values 'darcs-http-remote 'http))
-             (cvs (values 'cvs-rsync-remote 'rsync))
-             (svn (values 'svn-rsync-remote 'rsync)))))
+           (ecase method
+             (git-native (values 'git-native-remote 'git))
+             (git-http (values 'git-http-remote 'git))
+             (hg-http (values 'hg-http-remote 'hg))
+             (darcs-http (values 'darcs-http-remote 'darcs))
+             ;; XXX:
+             ;; The story below sums up as follows:
+             ;; - we want to be able to mix the unified transport type and differentiable RCS types
+             ;; - both cvs and svn have unified transport -- rsync, yet obviously differentiate on the latter
+             (rsync (values 'rsync-remote 'rsync))
+             ((cvs-rsync svn-rsync) (values 'rsync-remote 'rsync)))))
     (let* ((path-forms (rest (find :url-schemas definitions :key #'first)))
-           (mod-specs (iter (for (type . mod-specs) in (rest (find :modules definitions :key #'first)))
-                            (collect (cons type (iter (for mod-spec in mod-specs)
-                                                      (appending
-                                                       (destructuring-bind (umbrella-name . module-specs)
-                                                           (if (consp mod-spec) mod-spec (list mod-spec mod-spec))
-                                                         (iter (for module-spec in module-specs)
-                                                               (collect (list* umbrella-name (ensure-cons module-spec))))))))))))
-      `(progn
-         (unless (distributor ',dist-name :if-does-not-exist :continue)
-           (make-instance 'distributor :name ',dist-name))
-         ,@(iter (for (type . module-specs) in mod-specs)
-                 (multiple-value-bind (location-type form-spec-type) (collate type)
-                   (destructuring-bind ((repovar &key name) . body) (rest (find form-spec-type path-forms :key #'car))
-                     (appending `((if-let* ((extension (find '((,repovar) ,@body) (distributor-remotes (distributor ',dist-name))
-                                                            :test #'equal :key #'remote-path-form)))
-                                           extension
-                                           (make-instance ',location-type ,@(when name `(:name ',name))
+           (mod-specs (iter (for (rcs-proto . mod-specs) in (rest (find :modules definitions :key #'first)))
+                            (collect (cons rcs-proto (iter (for mod-spec in mod-specs)
+                                                           (appending
+                                                            (destructuring-bind (umbrella-spec . module-specs) ;; attach an umbrella spec to each module spec
+                                                                (if (consp mod-spec) mod-spec (list mod-spec mod-spec))
+                                                              (iter (for module-spec in module-specs)
+                                                                    (collect (list* umbrella-spec (ensure-cons module-spec))))))))))))
+      (with-gensyms (remote-var)
+        `(progn
+           (unless (distributor ',dist-name :if-does-not-exist :continue)
+             (make-instance 'distributor :name ',dist-name))
+           ,@(iter (for (remote-type-spec . remote-path-spec) in path-forms)
+                   (for (values remote-type nil) = (collate remote-type-spec))
+                   (destructuring-bind ((repovar &key name) &rest body) remote-path-spec
+                     (appending `((if-let* ((,remote-var (find '((,repovar) ,@body) (distributor-remotes (distributor ',dist-name))
+                                                               :test #'equal :key #'remote-path-form)))
+                                           (warn "~@<skipping redefinition of remote with path form ~S~:@>" '((,repovar) ,@body))
+                                           (make-instance ',remote-type ,@(when name `(:name ',name))
                                                           :distributor (distributor ',dist-name)
                                                           :path-form '((,repovar) ,@body)
-                                                          :path-fn (lambda (,repovar) (list ,@body))
-                                                          :modules ',(mapcar #'cadr module-specs))))))))
-         ,@(iter (for (umbrella modname . args) in (mappend #'rest mod-specs))
-                 (destructuring-bind (&rest rest &key (systems (list modname)) &allow-other-keys) args
-                   (when-let ((unhandled (remove-from-plist rest :systems)))
-                     (warn "Unhandled module parameters: ~S~%" unhandled))
-                   (appending (cons `(unless (module ',modname :if-does-not-exist :continue)
-                                         (make-instance 'module :name ',modname :umbrella ',umbrella))
-                                    (iter (for system in systems)
-                                          (destructuring-bind (name &rest rest &key relativity &allow-other-keys) (ensure-cons system)
-                                            (collect `(make-instance 'system :name ',name :module (module ',modname)
-                                                                     ,@(when relativity `(:relativity ',relativity))
-                                                                     ,@(remove-from-plist rest :relativity)))))))))))))
+                                                          :path-fn (lambda (,repovar) (list ,@body))))))))
+           ;; collate the default remote name for the module
+           ,@(iter (for (rcs-proto-spec . module-spec-list) in mod-specs)
+                   (for (rcs-proto . params) = (ensure-cons rcs-proto-spec)) ;; destructure the protocol-level module groupings
+                   (for (values nil rcs-type) = (collate rcs-proto))
+                   (for default-remote-name-from-protocol-grouping = (or (getf params :remote) (default-remote-name dist-name rcs-type)))
+                   (appending
+                    (iter (for (umbrella-spec modname . args) in module-spec-list) ;; destructure the umbrella-level module groupings
+                          (destructuring-bind (&rest rest &key (systems (list modname)) &allow-other-keys) args
+                            (when-let ((unhandled (remove-from-plist rest :systems)))
+                              (warn "Unhandled module parameters: ~S~%" unhandled))
+                            (destructuring-bind (umbrella &key (remote default-remote-name-from-protocol-grouping)) (ensure-cons umbrella-spec)
+                              (appending (list* `(if-let ((remote (find ',remote (distributor-remotes (distributor ',dist-name)) :key #'name)))
+                                                         (push ',modname (location-modules remote))
+                                                         (error "~@<Unable to find remote ~S in distributor ~S~:@>" ',remote (distributor ',dist-name)))
+                                                `(unless (module ',modname :if-does-not-exist :continue)
+                                                   (make-instance 'module :name ',modname :umbrella ',umbrella))
+                                                (iter (for system in systems)
+                                                      (destructuring-bind (name &rest rest &key relativity &allow-other-keys) (ensure-cons system)
+                                                        (collect `(make-instance 'system :name ',name :module (module ',modname)
+                                                                                 ,@(when relativity `(:relativity ',relativity))
+                                                                                 ,@(remove-from-plist rest :relativity)))))))))))))))))
 
 (defmacro define-module-dependencies (&body body)
   `(iter (for (module-name . dependencies) in '(,@body))

@@ -90,7 +90,6 @@
 (progn
   (define-external-program false)
   (define-external-program darcs)
-  (define-external-program hg)
   (define-external-program rsync)
   (define-external-program git-cvsimport)
   (define-external-program git-svn)
