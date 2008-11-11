@@ -1,0 +1,308 @@
+;;; -*- Mode: Lisp -*-
+;;;
+;;; Distributors
+;;;
+#D(ANONGIT.FREEDESKTOP.ORG
+   :remotes
+   (#R(GIT-NATIVE-REMOTE ANONGIT.FREEDESKTOP.ORG
+       ((mod) "anongit.freedesktop.org" "git" "xorg" "lib"
+        (downstring (name mod)))
+       :modules (libpciaccess)))) 
+#D(B9.COM
+   :remotes
+   (#R(GIT-NATIVE-REMOTE B9.COM
+       ((mod) "b9.com" (format nil "~A.git" (downstring (name mod))))
+       :modules (rt clsql cl-base64 md5 puri)))) 
+#D(COMMON-LISP.NET
+   :remotes
+   (#R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "project" (downstring (module-umbrella mod))
+        "darcs" (downstring (name mod)))
+       :modules
+       (cffi lw-compat closer-mop clbuild plexippus-xpath climplayer
+        bordeaux-threads iterate alexandria))
+    #R(RSYNC-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "project" (downstring (module-umbrella mod)))
+       :modules
+       (graphic-forms cl-irc usocket trivial-gray-streams cl+ssl cljl cl-store
+        ecl stamp linedit eclipse beirc slime climacs gsharp closure
+        closure-common cxml zip mcclim flexichain))
+    #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "project" "clbuild" (downstring (name mod)))
+       :name common-lisp.net-clbuild
+       :modules
+       (chipz ironclad ltk net-telent-date parse-number psgraph rfc2388
+        split-sequence trivial-sockets salza skippy))
+    #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "~crhodes" (downstring (name mod)))
+       :name common-lisp.net-krystof :modules (clx))
+    #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "~loliveira" "darcs" (downstring (name mod)))
+       :name common-lisp.net-luis :modules (babel trivial-features))
+    #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "~dlichteblau" "inofficial"
+        (downstring (name mod)))
+       :name common-lisp.net-lichtblauware :modules (mel-base))
+    #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "~loliveira" "ediware" (downstring (name mod)))
+       :name common-lisp.net-luis-ediware
+       :modules
+       (url-rewrite hunchentoot html-template flexi-streams drakma cl-who
+        cl-ppcre cl-interpol cl-gd cl-fad chunga cl-unicode capi-overview
+        cl-dongle cl-wbxml documentation-template fm-plugin-tools html-extract
+        lw-add-ons lw-doc lw-win midgets odd-streams rdnzl regex-plugin
+        cl-webdav))
+    #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "common-lisp.net" "project" "clbuild" "mirror"
+        (downstring (name mod)))
+       :name common-lisp.net-clbuild-mirror :modules nil))) 
+#D(GIT.FEELINGOFGREEN.RU
+   :remotes
+   (#R(GIT-NATIVE-REMOTE GIT.FEELINGOFGREEN.RU
+       ((mod) "git.feelingofgreen.ru" (downstring (name mod)))
+       :modules
+       (pestilence newlib mclinux common-db mcdust-one x86-win32 x86-linux
+        winnt-lptaccess mcdbio giveio mdb libmdb doc bin dot-gitignore
+        clim-file-selector sb-x86-portio clxs ieee-latex assem regvaldefs
+        custom-harness standrei climock humint cl-git climb dwarf
+        captured-stream cl-io-mod elf bintype clung cling semi-precious
+        pergamum)))) 
+#D(GIT.SANITYINC.COM
+   :remotes
+   (#R(GIT-NATIVE-REMOTE GIT.SANITYINC.COM
+       ((mod) "git.sanityinc.com" (format nil "~A" (downstring (name mod))))
+       :modules (darcs-to-git)))) 
+#D(GIT.TUXEE.NET
+   :remotes
+   (#R(GIT-NATIVE-REMOTE GIT.TUXEE.NET
+       ((mod) "git.tuxee.net" (downstring (name mod))) :modules (cl-vectors)))) 
+#D(GIT.XACH.COM
+   :remotes
+   (#R(GIT-NATIVE-REMOTE GIT.XACH.COM
+       ((mod) "git.xach.com" (format nil "~A.git" (downstring (name mod))))
+       :modules (zpb-ttf vecto zpng salza2)))) 
+#D(REPO.OR.CZ
+   :remotes
+   (#R(GIT-NATIVE-REMOTE REPO.OR.CZ
+       ((mod) "repo.or.cz" (format nil "~A.git" (downstring (name mod))))
+       :modules (closure-html darcs2git git)))) 
+#D(RVW.DOC.GOLD.AC.UK
+   :remotes
+   (#R(DARCS-HTTP-REMOTE RVW.DOC.GOLD.AC.UK
+       ((mod) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (downstring (name mod)))
+       :modules (spatial-trees midi)))) 
+#D(SBCL.BOINKOR.NET
+   :remotes
+   (#R(GIT-NATIVE-REMOTE SBCL.BOINKOR.NET
+       ((mod) "sbcl.boinkor.net" (downstring (name mod))) :modules (sbcl)))) 
+#D(SVN.BERLIOS.DE
+   :remotes
+   (#R(RSYNC-REMOTE SVN.BERLIOS.DE
+       ((mod) "svn.berlios.de" (format nil "~A_svn" (downstring (name mod))))
+       :modules nil))) 
+#D(SVN.SOURCEFORGE.NET
+   :remotes
+   (#R(RSYNC-REMOTE SVN.SOURCEFORGE.NET
+       ((mod) (format nil "~A.svn.sourceforge.net" (downstring (name mod)))
+        "svn" (downstring (name mod)))
+       :modules (lispbuilder)))) 
+#D(WWW.FRACTALCONCEPT.COM
+   :remotes
+   (#R(RSYNC-REMOTE WWW.FRACTALCONCEPT.COM
+       ((mod) "www.fractalconcept.com:8000" "public" "open-source"
+        (downstring (name mod)))
+       :modules (cl-typesetting cl-pdf)))) 
+#D(WWW.LICHTEBLAU.COM
+   :remotes
+   (#R(GIT-HTTP-REMOTE WWW.LICHTEBLAU.COM
+       ((mod) "www.lichteblau.com" "git"
+        (format nil "~A.git" (downstring (name mod))))
+       :modules (clim-alerts cxml-stp cxml-rng)))) 
+#D(WWW.PPS.JUSSIEU.FR
+   :remotes
+   (#R(DARCS-HTTP-REMOTE WWW.PPS.JUSSIEU.FR
+       ((mod) "www.pps.jussieu.fr" "~jch" "software" "repos"
+        (downstring (name mod)))
+       :modules (cl-yacc)))) 
+#D(YDIRSON.FREE.FR
+   :remotes
+   (#R(GIT-HTTP-REMOTE YDIRSON.FREE.FR
+       ((mod) "ydirson.free.fr" "soft" "git"
+        (format nil "~A.git" (downstring (name mod))))
+       :modules (cvsps)))) 
+
+;;;
+;;; Modules
+;;;
+#M(ALEXANDRIA) 
+#M(ASSEM) 
+#M(BABEL :depends-on (trivial-features)) 
+#M(BEIRC :depends-on (mcclim cl-irc cl-ppcre cl-fad)) 
+#M(BIN) 
+#M(BINTYPE :depends-on (pergamum)) 
+#M(BORDEAUX-THREADS) 
+#M(CAPI-OVERVIEW) 
+#M(CAPTURED-STREAM) 
+#M(CFFI :depends-on (babel)) 
+#M(CHIPZ) 
+#M(CHUNGA :depends-on (flexi-streams)) 
+#M((CL+SSL cl-plus-ssl) :depends-on (cffi flexi-streams)) 
+#M(CL-BASE64) 
+#M(CL-DONGLE) 
+#M(CL-FAD) 
+#M(CL-GD) 
+#M(CL-GIT :depends-on (git pergamum cffi)) 
+#M(CL-INTERPOL) 
+#M(CL-IO-MOD :depends-on (bintype)) 
+#M(CL-IRC :depends-on (usocket flexi-streams)) 
+#M(CL-PDF :depends-on (iterate)) 
+#M(CL-PPCRE) 
+#M(CL-STORE) 
+#M(CL-TYPESETTING :depends-on (cl-pdf)) 
+#M(CL-UNICODE) 
+#M(CL-VECTORS :depends-on (zpb-ttf)) 
+#M(CL-WBXML) 
+#M(CL-WEBDAV :depends-on (hunchentoot cxml cl-fad)) 
+#M(CL-WHO) 
+#M(CL-YACC) 
+#M(CLBUILD :systems nil) 
+#M(CLIM-ALERTS :depends-on (mel-base closure cxml-stp drakma net-telent-date)) 
+#M(CLIM-FILE-SELECTOR) 
+#M(CLIMACS :depends-on (mcclim)) 
+#M(CLIMB) 
+#M(CLIMOCK :depends-on (humint spatial-trees)) 
+#M(CLIMPLAYER :depends-on (mcclim cl-ppcre split-sequence)) 
+#M(CLING :depends-on (semi-precious)) 
+#M((CLJL cl-jpeg)) 
+#M((CLOSER-MOP closer) :depends-on (lw-compat)) 
+#M(CLOSURE
+   :depends-on
+   (mcclim cxml closure-html bordeaux-threads trivial-sockets zip skippy)) 
+#M((CLOSURE-COMMON cxml) :depends-on (trivial-gray-streams)) 
+#M(CLOSURE-HTML :depends-on (closure-common flexi-streams)) 
+#M(CLSQL :depends-on (md5 cffi)) 
+#M(CLUNG :depends-on (cling)) 
+#M(CLX) 
+#M(CLXS) 
+#M(COMMON-DB
+   :depends-on
+   (sb-x86-portio libpciaccess elf semi-precious mcclim clim-file-selector)
+   :systems (common-db common-db-gui)) 
+#M(CUSTOM-HARNESS) 
+#M(CVSPS :systems nil) 
+#M(CXML :depends-on (closure-common puri)) 
+#M(CXML-RNG :depends-on (cxml cl-ppcre cl-yacc parse-number cl-base64)) 
+#M(CXML-STP :depends-on (alexandria plexippus-xpath)) 
+#M(DARCS-TO-GIT :systems nil) 
+#M(DARCS2GIT) 
+#M(DOC) 
+#M(DOCUMENTATION-TEMPLATE) 
+#M(DOT-GITIGNORE) 
+#M(DRAKMA :depends-on (puri cl-base64 chunga usocket cl+ssl)) 
+#M(DWARF :depends-on (bintype)) 
+#M(ECL :systems nil) 
+#M(ECLIPSE) 
+#M(ELF :depends-on (bintype)) 
+#M(FLEXI-STREAMS :depends-on (trivial-gray-streams)) 
+#M(FLEXICHAIN) 
+#M(FM-PLUGIN-TOOLS) 
+#M(GIT :systems nil) 
+#M(GIVEIO) 
+#M(GRAPHIC-FORMS :depends-on (cffi closer-mop)
+   :systems (binary-data graphic-forms-uitoolkit macro-utilities)) 
+#M(GSHARP :depends-on (mcclim midi cxml)) 
+#M(HTML-EXTRACT) 
+#M(HTML-TEMPLATE) 
+#M(HUMINT :depends-on (semi-precious flexichain lispbuilder)) 
+#M(HUNCHENTOOT
+   :depends-on
+   (cl-who chunga cl-base64 cl-ppcre cl+ssl md5 rfc2388 url-rewrite)) 
+#M(IEEE-LATEX) 
+#M(IRONCLAD) 
+#M(ITERATE) 
+#M(LIBMDB) 
+#M(LIBPCIACCESS :systems nil) 
+#M(LINEDIT) 
+#M(LISPBUILDER :depends-on (cffi)
+   :systems (lispbuilder-sdl lispbuilder-sdl-image lispbuilder-sdl-ttf)) 
+#M(LTK) 
+#M(LW-ADD-ONS) 
+#M((LW-COMPAT closer)) 
+#M(LW-DOC) 
+#M(LW-WIN) 
+#M(MCCLIM :depends-on (spatial-trees flexichain slime clx graphic-forms)
+   :systems (clim-examples clim-listener clouseau mcclim)) 
+#M(MCDBIO) 
+#M(MCDUST-ONE) 
+#M(MCLINUX) 
+#M(MD5) 
+#M(MDB) 
+#M(MEL-BASE :depends-on (cl+ssl)) 
+#M(MIDGETS) 
+#M(MIDI) 
+#M(NET-TELENT-DATE) 
+#M(NEWLIB) 
+#M(ODD-STREAMS) 
+#M(PARSE-NUMBER) 
+#M(PERGAMUM :depends-on (alexandria iterate)) 
+#M(PESTILENCE) 
+#M(PLEXIPPUS-XPATH :depends-on (cxml parse-number cl-ppcre cl-yacc)) 
+#M(PSGRAPH) 
+#M(PURI) 
+#M(RDNZL) 
+#M(REGEX-PLUGIN) 
+#M(REGVALDEFS) 
+#M(RFC2388) 
+#M(RT) 
+#M(SALZA) 
+#M(SALZA2) 
+#M(SB-X86-PORTIO) 
+#M(SBCL :systems nil) 
+#M(SEMI-PRECIOUS :depends-on (pergamum)) 
+#M(SKIPPY) 
+#M(SLIME) 
+#M(SPATIAL-TREES) 
+#M(SPLIT-SEQUENCE) 
+#M(STAMP :depends-on (mel-base)) 
+#M(STANDREI :depends-on (climock)) 
+#M(TRIVIAL-FEATURES :depends-on (rt cffi babel alexandria)) 
+#M((TRIVIAL-GRAY-STREAMS cl-plus-ssl)) 
+#M(TRIVIAL-SOCKETS) 
+#M(URL-REWRITE) 
+#M(USOCKET :depends-on (split-sequence)) 
+#M(VECTO :depends-on (cl-vectors zpng)) 
+#M(WINNT-LPTACCESS) 
+#M(X86-LINUX) 
+#M(X86-WIN32) 
+#M(ZIP :depends-on (salza2 flexi-streams)) 
+#M(ZPB-TTF) 
+#M(ZPNG :depends-on (salza2)) 
+
+;;;
+;;; Systems
+;;;
+#S(BINARY-DATA :module graphic-forms :relativity
+   ("src" "external-libraries" "practicals-1.0.3" "Chapter24")) 
+#S(CLIM-EXAMPLES :module mcclim) 
+#S(CLIM-LISTENER :module mcclim) 
+#S(CLOUSEAU :module mcclim) 
+#S(COMMON-DB :module common-db) 
+#S(COMMON-DB-GUI :module common-db) 
+#S(GRAPHIC-FORMS-UITOOLKIT :module graphic-forms) 
+#S(LISPBUILDER-SDL :module lispbuilder) 
+#S(LISPBUILDER-SDL-IMAGE :module lispbuilder) 
+#S(LISPBUILDER-SDL-TTF :module lispbuilder) 
+#S(MACRO-UTILITIES :module graphic-forms :relativity
+   ("src" "external-libraries" "practicals-1.0.3" "Chapter08")) 
+#S(MCCLIM :module mcclim) 
+
+;;;
+;;; Applications
+;;;
+#A(CLIMACS :system climacs :package climacs :function climacs-rv
+   :default-parameters nil) 
+
+;;;
+;;; Desires
+;;;
+nil 
