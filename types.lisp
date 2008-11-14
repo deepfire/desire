@@ -105,11 +105,12 @@
 (defclass transport-mixin () ((transport :reader transport :initarg :transport)))
 
 ;;; non-exhaustive partition of TRANSPORT-MIXIN
+(defclass git-native-transport (transport-mixin) () (:default-initargs :transport 'git))
 (defclass http (transport-mixin) () (:default-initargs :transport 'http))
 (defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync :rcs-type 'rsync))
 
 ;;; exhaustive partition of type product of RCS-TYPE and TRANSPORT-MIXIN
-(defclass git-native (git) () (:default-initargs :transport 'git))
+(defclass git-native (git git-native-transport) ())
 (defclass git-http (git http) ())
 (defclass hg-http (hg http) ())
 (defclass darcs-http (darcs http) ())
@@ -149,13 +150,13 @@
   "Blanket for undecided ones. Painful ambiguity, also. Must be documented to ward off the hurt."
   (transport o))
 
-(defun url (remote name)
-  (declare (type remote remote) (type symbol name))
+(defun url (remote module-spec &aux (module (coerce-to-module module-spec)))
+  (declare (type remote remote) (type (or symbol module) module-spec))
   (concatenate 'simple-base-string
                (downstring (transport remote)) "://" (down-case-name (remote-distributor remote))
                (when-let ((port (remote-distributor-port remote)))
                  (format nil ":~D" port))
-               (funcall (remote-path-fn remote) name)))
+               (flatten-path-list (funcall (remote-path-fn remote) module) t)))
 
 ;;; most specific, exhaustive partition of LOCALITY
 (defclass git-locality (git locality) ())
