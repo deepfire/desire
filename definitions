@@ -5,46 +5,47 @@
 #D(ANONGIT.FREEDESKTOP.ORG
    :remotes
    (#R(GIT-NATIVE-REMOTE ANONGIT.FREEDESKTOP.ORG
-       ((mod) "anongit.freedesktop.org" "git" "xorg" "lib"
-        (downstring (name mod)))
+       ((mod) "git" "xorg" "lib" (downstring (name mod)))
        :modules (libpciaccess)))) 
 #D(B9.COM
    :remotes
    (#R(GIT-NATIVE-REMOTE B9.COM
-       ((mod) "b9.com" (format nil "~A.git" (downstring (name mod))))
+       ((mod) (format nil "~A.git" (downstring (name mod))))
        :modules (rt clsql cl-base64 md5 puri)))) 
 #D(COMMON-LISP.NET
    :remotes
    (#R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "project" (downstring (module-umbrella mod))
-        "darcs" (downstring (name mod)))
+       ((mod) "project" (downstring (module-umbrella mod)) "darcs"
+        (downstring (name mod)))
        :modules
        (cffi lw-compat closer-mop clbuild plexippus-xpath climplayer
         bordeaux-threads iterate alexandria))
-    #R(RSYNC-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "project" (downstring (module-umbrella mod)))
+    #R(CVS-RSYNC-REMOTE COMMON-LISP.NET
+       ((mod) "project" (downstring (module-umbrella mod)))
        :modules
-       (graphic-forms cl-irc usocket trivial-gray-streams cl+ssl cljl cl-store
-        ecl stamp linedit eclipse beirc slime climacs gsharp closure
-        closure-common cxml zip mcclim flexichain))
+       (trivial-gray-streams cl+ssl cljl cl-store ecl stamp linedit eclipse
+        beirc slime climacs gsharp closure closure-common cxml zip mcclim
+        flexichain))
+    #R(SVN-RSYNC-REMOTE COMMON-LISP.NET
+       ((mod) "project" (downstring (module-umbrella mod)))
+       :modules (graphic-forms cl-irc usocket))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "project" "clbuild" (downstring (name mod)))
+       ((mod) "project" "clbuild" (downstring (name mod)))
        :name common-lisp.net-clbuild
        :modules
        (chipz ironclad ltk net-telent-date parse-number psgraph rfc2388
         split-sequence trivial-sockets salza skippy))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "~crhodes" (downstring (name mod)))
-       :name common-lisp.net-krystof :modules (clx))
+       ((mod) "~crhodes" (downstring (name mod))) :name common-lisp.net-krystof
+       :modules (clx))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "~loliveira" "darcs" (downstring (name mod)))
+       ((mod) "~loliveira" "darcs" (downstring (name mod)))
        :name common-lisp.net-luis :modules (babel trivial-features))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "~dlichteblau" "inofficial"
-        (downstring (name mod)))
+       ((mod) "~dlichteblau" "inofficial" (downstring (name mod)))
        :name common-lisp.net-lichtblauware :modules (mel-base))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "~loliveira" "ediware" (downstring (name mod)))
+       ((mod) "~loliveira" "ediware" (downstring (name mod)))
        :name common-lisp.net-luis-ediware
        :modules
        (url-rewrite hunchentoot html-template flexi-streams drakma cl-who
@@ -53,13 +54,11 @@
         lw-add-ons lw-doc lw-win midgets odd-streams rdnzl regex-plugin
         cl-webdav))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "common-lisp.net" "project" "clbuild" "mirror"
-        (downstring (name mod)))
+       ((mod) "project" "clbuild" "mirror" (downstring (name mod)))
        :name common-lisp.net-clbuild-mirror :modules nil))) 
 #D(GIT.FEELINGOFGREEN.RU
    :remotes
-   (#R(GIT-NATIVE-REMOTE GIT.FEELINGOFGREEN.RU
-       ((mod) "git.feelingofgreen.ru" (downstring (name mod)))
+   (#R(GIT-NATIVE-REMOTE GIT.FEELINGOFGREEN.RU ((mod) (downstring (name mod)))
        :modules
        (pestilence newlib mclinux common-db mcdust-one x86-win32 x86-linux
         winnt-lptaccess mcdbio giveio mdb libmdb doc bin dot-gitignore
@@ -70,65 +69,60 @@
 #D(GIT.SANITYINC.COM
    :remotes
    (#R(GIT-NATIVE-REMOTE GIT.SANITYINC.COM
-       ((mod) "git.sanityinc.com" (format nil "~A" (downstring (name mod))))
+       ((mod) (format nil "~A" (downstring (name mod))))
        :modules (darcs-to-git)))) 
 #D(GIT.TUXEE.NET
    :remotes
-   (#R(GIT-NATIVE-REMOTE GIT.TUXEE.NET
-       ((mod) "git.tuxee.net" (downstring (name mod))) :modules (cl-vectors)))) 
+   (#R(GIT-NATIVE-REMOTE GIT.TUXEE.NET ((mod) (downstring (name mod)))
+       :modules (cl-vectors)))) 
 #D(GIT.XACH.COM
    :remotes
    (#R(GIT-NATIVE-REMOTE GIT.XACH.COM
-       ((mod) "git.xach.com" (format nil "~A.git" (downstring (name mod))))
+       ((mod) (format nil "~A.git" (downstring (name mod))))
        :modules (zpb-ttf vecto zpng salza2)))) 
 #D(REPO.OR.CZ
    :remotes
    (#R(GIT-NATIVE-REMOTE REPO.OR.CZ
-       ((mod) "repo.or.cz" (format nil "~A.git" (downstring (name mod))))
+       ((mod) (format nil "~A.git" (downstring (name mod))))
        :modules (closure-html darcs2git git)))) 
 #D(RVW.DOC.GOLD.AC.UK
    :remotes
    (#R(DARCS-HTTP-REMOTE RVW.DOC.GOLD.AC.UK
-       ((mod) "rvw.doc.gold.ac.uk" "sullivan" "darcs" (downstring (name mod)))
+       ((mod) "sullivan" "darcs" (downstring (name mod)))
        :modules (spatial-trees midi)))) 
 #D(SBCL.BOINKOR.NET
    :remotes
-   (#R(GIT-NATIVE-REMOTE SBCL.BOINKOR.NET
-       ((mod) "sbcl.boinkor.net" (downstring (name mod))) :modules (sbcl)))) 
+   (#R(GIT-NATIVE-REMOTE SBCL.BOINKOR.NET ((mod) (downstring (name mod)))
+       :modules (sbcl)))) 
 #D(SVN.BERLIOS.DE
    :remotes
-   (#R(RSYNC-REMOTE SVN.BERLIOS.DE
-       ((mod) "svn.berlios.de" (format nil "~A_svn" (downstring (name mod))))
-       :modules nil))) 
+   (#R(SVN-RSYNC-REMOTE SVN.BERLIOS.DE
+       ((mod) (format nil "~A_svn" (downstring (name mod)))) :modules nil))) 
 #D(SVN.SOURCEFORGE.NET
    :remotes
-   (#R(RSYNC-REMOTE SVN.SOURCEFORGE.NET
+   (#R(SVN-RSYNC-REMOTE SVN.SOURCEFORGE.NET
        ((mod) (format nil "~A.svn.sourceforge.net" (downstring (name mod)))
         "svn" (downstring (name mod)))
        :modules (lispbuilder)))) 
 #D(WWW.FRACTALCONCEPT.COM
    :remotes
-   (#R(RSYNC-REMOTE WWW.FRACTALCONCEPT.COM
-       ((mod) "www.fractalconcept.com:8000" "public" "open-source"
-        (downstring (name mod)))
-       :modules (cl-typesetting cl-pdf)))) 
+   (#R(SVN-RSYNC-REMOTE WWW.FRACTALCONCEPT.COM
+       ((mod) "public" "open-source" (downstring (name mod)))
+       :distributor-port 8000 :modules (cl-typesetting cl-pdf)))) 
 #D(WWW.LICHTEBLAU.COM
    :remotes
    (#R(GIT-HTTP-REMOTE WWW.LICHTEBLAU.COM
-       ((mod) "www.lichteblau.com" "git"
-        (format nil "~A.git" (downstring (name mod))))
+       ((mod) "git" (format nil "~A.git" (downstring (name mod))))
        :modules (clim-alerts cxml-stp cxml-rng)))) 
 #D(WWW.PPS.JUSSIEU.FR
    :remotes
    (#R(DARCS-HTTP-REMOTE WWW.PPS.JUSSIEU.FR
-       ((mod) "www.pps.jussieu.fr" "~jch" "software" "repos"
-        (downstring (name mod)))
+       ((mod) "~jch" "software" "repos" (downstring (name mod)))
        :modules (cl-yacc)))) 
 #D(YDIRSON.FREE.FR
    :remotes
    (#R(GIT-HTTP-REMOTE YDIRSON.FREE.FR
-       ((mod) "ydirson.free.fr" "soft" "git"
-        (format nil "~A.git" (downstring (name mod))))
+       ((mod) "soft" "git" (format nil "~A.git" (downstring (name mod))))
        :modules (cvsps)))) 
 
 ;;;
