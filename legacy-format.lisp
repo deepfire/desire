@@ -48,14 +48,15 @@
              (make-instance 'distributor :name ',dist-name))
            ,@(iter (for (remote-type-spec . remote-path-spec) in path-forms)
                    (for (values remote-type nil) = (collate remote-type-spec))
-                   (destructuring-bind ((repovar &key name) &rest body) remote-path-spec
+                   (destructuring-bind ((repovar &rest params &key name &allow-other-keys) &rest body) remote-path-spec
                      (appending `((if-let* ((,remote-var (find '((,repovar) ,@body) (distributor-remotes (distributor ',dist-name))
                                                                :test #'equal :key #'remote-path-form)))
                                            (warn "~@<skipping redefinition of remote with path form ~S~:@>" '((,repovar) ,@body))
                                            (make-instance ',remote-type ,@(when name `(:name ',name))
                                                           :distributor (distributor ',dist-name)
                                                           :path-form '((,repovar) ,@body)
-                                                          :path-fn (lambda (,repovar) (list ,@body))))))))
+                                                          :path-fn (lambda (,repovar) (list ,@body))
+                                                          ,@(remove-from-plist params :name)))))))
            ;; collate the default remote name for the module
            ,@(iter (for (rcs-proto-spec . module-spec-list) in mod-specs)
                    (for (rcs-proto . params) = (ensure-cons rcs-proto-spec)) ;; destructure the protocol-level module groupings

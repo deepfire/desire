@@ -128,9 +128,12 @@
    :scan-p nil))
 (defclass remote (location registered)
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
+   (distributor-port :accessor remote-distributor-port :type (or null (integer 0)) :initarg :distributor-port :documentation "Specified, rarely.")
    (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
    (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
-  (:default-initargs :registrator #'(setf remote)))
+  (:default-initargs
+   :registrator #'(setf remote)
+   :distributor-port nil))
 
 ;;; intermediate types
 (defclass git-remote (git remote) ())
@@ -150,6 +153,8 @@
   (declare (type remote remote) (type symbol name))
   (concatenate 'simple-base-string
                (downstring (transport remote)) "://" (down-case-name (remote-distributor remote))
+               (when-let ((port (remote-distributor-port remote)))
+                 (format nil ":~D" port))
                (funcall (remote-path-fn remote) name)))
 
 ;;; most specific, exhaustive partition of LOCALITY
@@ -172,8 +177,10 @@
       (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
               (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
               (append (unless (equal default-remote-name (name o))
-                       (list (list :name (name o))))
-                      (list (list :modules (mapcar #'downstring (location-modules o)))))))))
+                        (list `(:name ,(name o))))
+                      (when-let ((port (remote-distributor-port o)))
+                        (list `(:distributor-port ,port)))
+                      (list `(:modules ,(mapcar #'downstring (location-modules o)))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with DISTRIBUTOR-NAME,
