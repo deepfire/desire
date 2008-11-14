@@ -108,7 +108,7 @@
 ;;; non-exhaustive partition of TRANSPORT-MIXIN
 (defclass git-native-transport (transport-mixin) () (:default-initargs :transport 'git))
 (defclass http (transport-mixin) () (:default-initargs :transport 'http))
-(defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync :rcs-type 'rsync))
+(defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync))
 
 ;;; exhaustive partition of type product of RCS-TYPE and TRANSPORT-MIXIN
 (defclass git-native (git git-native-transport) ())
@@ -122,7 +122,7 @@
   ((modules :accessor location-modules :initarg :modules :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs
    :registrator #'(setf locality)
-    :modules nil))
+   :modules nil))
 
 ;;; exhaustive partition of LOCATION
 (defclass locality (location)
@@ -147,11 +147,8 @@
 (defclass git-http-remote (git-http remote) ())
 (defclass hg-http-remote (hg-http remote) ())
 (defclass darcs-http-remote (darcs-http remote) ())
-(defclass rsync-remote (rsync remote) ())
-
-(defmethod rcs-type ((o transport-mixin))
-  "Blanket for undecided ones. Painful ambiguity, also. Must be documented to ward off the hurt."
-  (transport o))
+(defclass cvs-rsync-remote (cvs-rsync remote) ())
+(defclass svn-rsync-remote (svn-rsync remote) ())
 
 (defun url (remote module-spec &aux (module (coerce-to-module module-spec)))
   (declare (type remote remote) (type (or symbol module) module-spec))
@@ -190,7 +187,6 @@
   "Provide a mechanism for init-time name collation for REMOTE with DISTRIBUTOR-NAME,
    and optional SPECIFIED-NAME.
 
-   XXX: not so true anymore, with introduction of RSYNC-REMOTE
    Collation rules are considered in order, as follows:
       - SPECIFIED-NAME wins,
       - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME,

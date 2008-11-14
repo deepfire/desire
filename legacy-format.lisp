@@ -28,12 +28,8 @@
              (git-http (values 'git-http-remote 'git))
              (hg-http (values 'hg-http-remote 'hg))
              (darcs-http (values 'darcs-http-remote 'darcs))
-             ;; XXX:
-             ;; The story below sums up as follows:
-             ;; - we want to be able to mix the unified transport type and differentiable RCS types
-             ;; - both cvs and svn have unified transport -- rsync, yet obviously differentiate on the latter
-             (rsync (values 'rsync-remote 'rsync))
-             ((cvs-rsync svn-rsync) (values 'rsync-remote 'rsync)))))
+             (cvs-rsync (values 'cvs-rsync-remote 'cvs))
+             (svn-rsync (values 'svn-rsync-remote 'svn)))))
     (let* ((path-forms (rest (find :url-schemas definitions :key #'first)))
            (mod-specs (iter (for (rcs-proto . mod-specs) in (rest (find :modules definitions :key #'first)))
                             (collect (cons rcs-proto (iter (for mod-spec in mod-specs)
@@ -50,7 +46,8 @@
                    (for (values remote-type nil) = (collate remote-type-spec))
                    (destructuring-bind ((repovar &rest params &key name &allow-other-keys) &rest body) remote-path-spec
                      (appending `((if-let* ((,remote-var (find '((,repovar) ,@body) (distributor-remotes (distributor ',dist-name))
-                                                               :test #'equal :key #'remote-path-form)))
+                                                               :test #'equal :key #'remote-path-form))
+                                            (same-remote-type-p (eq ',remote-type (type-of ,remote-var))))
                                            (warn "~@<skipping redefinition of remote with path form ~S~:@>" '((,repovar) ,@body))
                                            (make-instance ',remote-type ,@(when name `(:name ',name))
                                                           :distributor (distributor ',dist-name)
