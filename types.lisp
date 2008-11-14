@@ -23,19 +23,20 @@
 ;;;
 ;;; Globals
 ;;;
-(defvar *distributors*   (make-hash-table :test #'equal) "Map distributor names to remotes.")
-(defvar *remotes*        (make-hash-table :test #'equal) "Map remote names to remotes.")
-(defvar *localities*     (make-hash-table :test #'equal) "Map paths to localities.")
-(defvar *modules*        (make-hash-table :test #'equal) "Map module names to modules.")
-(defvar *leaves*         (make-hash-table :test #'equal) "Map module names to leaf modules.")
-(defvar *nonleaves*      (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
-(defvar *systems*        (make-hash-table :test #'equal) "Map system names to remotes.")
-(defvar *apps*           (make-hash-table :test #'equal) "Map application names to remotes.")
-(defvar *master-mirrors* (make-hash-table :test #'equal) "Map RCS type to localities.")
+(defvar *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
+(defvar *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
+(defvar *localities*         (make-hash-table :test #'equal) "Map names to localities.")
+(defvar *localities-by-path* (make-hash-table :test #'equal) "Map paths to localities.")
+(defvar *modules*            (make-hash-table :test #'equal) "Map module names to modules.")
+(defvar *leaves*             (make-hash-table :test #'equal) "Map module names to leaf modules.")
+(defvar *nonleaves*          (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
+(defvar *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
+(defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
+(defvar *masters*            (make-hash-table :test #'equal) "Map RCS type to master localities.")
 
 (defun reinit-definitions ()
   "Empty all global definitions."
-  (dolist (var '(*distributors* *remotes* *localities* *modules* *leaves* *nonleaves* *systems* *apps* *master-mirrors*))
+  (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps* *masters*))
     (setf (symbol-value var) (make-hash-table :test #'equal))))
 
 ;;;
@@ -117,9 +118,11 @@
 (defclass cvs-rsync (cvs rsync) ())
 (defclass svn-rsync (svn rsync) ())
 
-(defclass location (named)
+(defclass location (registered)
   ((modules :accessor location-modules :initarg :modules :documentation "Specified or maybe cached, for LOCALITYs."))
-  (:default-initargs :modules nil))
+  (:default-initargs
+   :registrator #'(setf locality)
+    :modules nil))
 
 ;;; exhaustive partition of LOCATION
 (defclass locality (location)
@@ -216,37 +219,36 @@
                     ,@(when name `(:name ',name))
                     ,@(remove-from-plist initargs :name :distributor :type :modules :path-form :path-fn))))
 
-(defmethod initialize-instance :after ((o locality) &key path master-mirror-p &allow-other-keys)
-  (unless path
-    (error "~@<Useless locality definition: no PATH specified.~:@>"))
-  (when master-mirror-p
-    (setf (master-mirror (rcs-type o)) o)))
-
-(defun locality-master-mirror-p (o)
-  (eq o (master-mirror (rcs-type o) :if-does-not-exist :continue)))
+(defun locality-master-p (o)
+  (eq o (master (rcs-type o) :if-does-not-exist :continue)))
 
 (defmethod print-object ((o locality) stream)
-  (format stream "~@<#L(~;~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
-          (symbol-name (type-of o)) (locality-path o)
-          (append (when (locality-master-mirror-p o) (list (list :master-mirror-p t)))
+  (format stream "~@<#L(~;~A ~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
+          (symbol-name (type-of o)) (name o) (locality-path o)
+          (append (when (locality-master-p o) (list (list :master-p t)))
                   (when (locality-scan-p o) (list (list :scan-p t))))))
 
 (defun locality-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (type path &rest initargs &key &allow-other-keys) (read stream nil nil)
-    `(make-instance ',type :path ,path ,@(remove-from-plist initargs :path :modules))))
+  (destructuring-bind (type name path &rest initargs &key &allow-other-keys) (read stream nil nil)
+    `(make-instance ',type :name ',name :path ,path ,@(remove-from-plist initargs :path :modules))))
+
+(defmethod initialize-instance :after ((o locality) &key path &allow-other-keys)
+  (unless path
+    (error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
+  (setf (locality-by-path path) o))
 
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (depends-on :accessor module-depends-on :initarg :depends-on :documentation "Specified.")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
-   (master-mirror-locality :accessor module-master-mirror-locality :initarg :master-mirror-locality :documentation "Policy-decided.")
+   (master-locality :accessor module-master-locality :initarg :master-locality :documentation "Policy-decided.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache.")
    (localities :accessor module-localities :initarg :localities :documentation "Cache.")
    (systems :accessor module-systems :initarg :systems :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf module)    
-   :remotes nil :master-mirror-locality nil :localities nil
+   :remotes nil :master-locality nil :localities nil
    :depends-on nil :systems nil :essential-p nil))
 
 ;;; most specific, exhaustive partition of MODULE
@@ -352,7 +354,8 @@
 (define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-name :coercer t :mapper map-app :type application)
 (define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-name :coercer t :mapper map-remotes :type remote :when-exists :error)
 (define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :when-exists :error)
-(define-container-hash-accessor *master-mirrors* master-mirror :type locality)
+(define-container-hash-accessor *localities-by-path* locality-by-path :type locality :when-exists :error)
+(define-container-hash-accessor *masters*        master        :type locality)
 
 (defun reestablish-module-dependencies (module)
   "Rebuild MODULE's part of the dependency graph, and clear
@@ -393,10 +396,21 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
-(defun define-locality (rcs-type &rest keys &key path &allow-other-keys)
-  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, in which case an error is signalled.
-   Additionally, register it as a master mirror if MASTER-MIRROR-P is specified."
-  (setf (locality path) (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) keys)))
+(defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
+  "Define the set of master localities."
+  (when-let ((bad-paths (remove-if-not #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
+    ;; XXX: numeric
+    (error "~@<The specified paths ~S are not accessible.~:@>" bad-paths))
+  (let ((hostname (string-upcase (machine-instance))))
+    (setf (master 'git)   (make-instance 'git-locality   :name hostname :path git-path :scan-p t)
+          (master 'hg)    (make-instance 'hg-locality    :name (format-symbol t "~A-HG" hostname) :path hg-path)
+          (master 'darcs) (make-instance 'darcs-locality :name (format-symbol t "~A-DARCS" hostname) :path darcs-path)
+          (master 'cvs)   (make-instance 'cvs-locality   :name (format-symbol t "~A-CVS" hostname) :path cvs-path)
+          (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))))
+
+(defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
+  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, in which case an error is signalled."
+  (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) :name name (remove-from-plist keys :name)))
 
 (defun read-definitions (stream)
   "Unserialise global definitions from STREAM."
@@ -416,7 +430,7 @@
 (defun identify-with-distributor (distributor-name locality)
   "Recognize DISTRIBUTOR-NAME's modules as locally hosted in LOCALITY."
   (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
-        (change-class (module module-name) 'origin-module :master-mirror-locality locality)))
+        (change-class (module module-name) 'origin-module :master-locality locality)))
 
 (defun serialize-definitions (&optional stream)
   "Serialise global definitions to STREAM."
