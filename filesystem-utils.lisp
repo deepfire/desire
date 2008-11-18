@@ -59,12 +59,26 @@
                      (error 'required-executable-not-found :name realname :search-path paths)
                      (warn 'executable-not-found :name realname :search-path paths)))))
 
+(defvar *run-external-programs-dryly* nil
+  "Whether to substitute actual execution of external programs with
+   mere printing of their paths and parameters.")
+
+(defmacro with-dryly-ran-externals (&body body)
+  `(let ((*run-external-programs-dryly* t))
+     (declare (special *run-external-programs-dryly*))
+     ,@body))
+
 (defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output t) &aux (pathname (executable name)))
   "Run an external program at PATHNAME with PARAMETERS. 
    Return a value associated with the exit code, by the means of 
    VALID-EXIT-CODES, or signal a condition of type
    EXTERNAL-PROGRAM-FAILURE."
-  (let ((exit-code (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output))))
+  (declare (special *run-external-programs-dryly*))
+  (let ((exit-code (if *run-external-programs-dryly*
+                       (progn
+                         (format *error-output* "~S~{ ~S~}~%" pathname parameters)
+                         (caar valid-exit-codes))
+                       (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output)))))
     (cdr (or (assoc exit-code valid-exit-codes)
              (signal 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
 

@@ -10,6 +10,8 @@
    #:serialize-definitions #:read-definitions
    #:*default-world-readable* #:*desires* #:*force-modules-essential*
    #:desire
+   ;; filesystem-utils.lisp
+   #:with-dryly-ran-externals
    ;; cling.lisp
    #:app #:path #:url
    #:defdistributor #:define-module-dependencies #:define-application 
