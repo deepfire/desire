@@ -6,7 +6,7 @@
 (in-package :cling.system)
 
 (defsystem :cling
-  :depends-on (:alexandria :iterate :pergamum :semi-precious)
+  :depends-on (:alexandria :iterate :pergamum :semi-precious :cl-fad)
   :components ((:file "package")
                (:file "filesystem-utils" :depends-on ("package"))
                (:file "types" :depends-on ("package"))

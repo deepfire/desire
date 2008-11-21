@@ -1,5 +1,5 @@
 (defpackage cling
-  (:use :common-lisp :alexandria :pergamum :iterate :depsolver)
+  (:use :common-lisp :alexandria :pergamum :iterate :depsolver :cl-fad)
   (:shadow #:*modules*)
   (:export
    ;; types.lisp
