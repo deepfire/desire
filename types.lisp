@@ -49,6 +49,12 @@
 (defclass named ()
   ((name :accessor name :initarg :name)))
 
+(defun coerce-to-name (o)
+  (declare (type (or symbol named) o))
+  (if (symbolp o)
+      o
+      (name o)))
+
 (defclass registered (named)
   ((registrator :accessor registered-registrator :type function :initarg :registrator)))
 
@@ -336,19 +342,20 @@
 ;;; Accessors, mappers and coercers.
 ;;;
 
-(defun coerce-to-name (name)
-  (declare (type (or symbol string) name))
-  (typecase name
-    (symbol (string-upcase (symbol-name name)))
-    (string (string-upcase name))))
+(defun coerce-to-namestring (namespec)
+  (declare (type (or symbol string named) namespec))
+  (typecase namespec
+    (named (string (name namespec)))
+    (symbol (string-upcase (symbol-name namespec)))
+    (string (string-upcase namespec))))
 
-(define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-name :coercer t :mapper map-distributors)
-(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-name :coercer t :mapper map-modules :if-exists :error)
-(define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-name :type module :mapper map-leaves :if-exists :continue)
-(define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-name :type module :mapper map-nonleaves :if-exists :continue)
-(define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-name :coercer t :mapper map-systems)
-(define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-name :coercer t :mapper map-app :type application)
-(define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-name :coercer t :mapper map-remotes :type remote :if-exists :error)
+(define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors)
+(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error)
+(define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
+(define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
+(define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
+(define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-app :type application)
+(define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error)
 (define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :if-exists :error)
 (define-container-hash-accessor *localities-by-path* locality-by-path :type locality :if-exists :error)
 (define-container-hash-accessor *masters*        master        :type locality)
