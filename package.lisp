@@ -1,5 +1,6 @@
 (defpackage cling
-  (:use :common-lisp :alexandria :pergamum :iterate :depsolver :cl-fad)
+  (:use :common-lisp :alexandria :pergamum :iterate :depsolver)
+  (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
   (:export
    ;; types.lisp
@@ -9,7 +10,7 @@
    #:module-dependencies #:module-full-dependencies
    #:serialize-definitions #:read-definitions
    #:*default-world-readable* #:*desires* #:*force-modules-essential*
-   #:desire
+   #:add-desire #:module-desired-p #:module-desired-remote #:module-distributors #:module-distributor
    ;; filesystem-utils.lisp
    #:with-dryly-ran-externals
    ;; cling.lisp

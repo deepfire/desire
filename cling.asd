@@ -11,10 +11,11 @@
                (:file "filesystem-utils" :depends-on ("package"))
                (:file "types" :depends-on ("package"))
                (:file "legacy-format" :depends-on ("types"))
-;;                (:file "filesystem" :depends-on ("filesystem-utils" "types"))
+               (:file "filesystem" :depends-on ("filesystem-utils" "types"))
 ;;                (:file "asdf" :depends-on ("types" "filesystem"))
-               (:file "cling" :depends-on ("types" ;; "asdf"
-                                                    )
-                      )
+               (:file "gittage" :depends-on ("filesystem"))
+               (:file "cling" :depends-on ("gittage"))
+               
 ;;                (:file "application" :depends-on ("cling"))
                ))
+  

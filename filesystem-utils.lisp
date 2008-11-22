@@ -90,6 +90,10 @@
          (with-input-from-string (,stream-var (get-output-stream-string ,str))
            (return-from ,block (progn ,@body)))))))
 
+(defun external-program-output-as-string (name &rest params)
+  (with-output-to-string (str)
+    (run-external-program name params :output str)))
+
 (defvar *valid-exit-code-extension* nil)
 
 (defmacro define-external-program (name &key critical)

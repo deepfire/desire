@@ -23,16 +23,16 @@
 ;;;
 ;;; Globals
 ;;;
-(defvar *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
-(defvar *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
-(defvar *localities*         (make-hash-table :test #'equal) "Map names to localities.")
-(defvar *localities-by-path* (make-hash-table :test #'equal) "Map paths to localities.")
-(defvar *modules*            (make-hash-table :test #'equal) "Map module names to modules.")
-(defvar *leaves*             (make-hash-table :test #'equal) "Map module names to leaf modules.")
-(defvar *nonleaves*          (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
-(defvar *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
-(defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
-(defvar *masters*            (make-hash-table :test #'equal) "Map RCS type to master localities.")
+(defparameter *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
+(defparameter *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
+(defparameter *localities*         (make-hash-table :test #'equal) "Map names to localities.")
+(defparameter *localities-by-path* (make-hash-table :test #'equal) "Map paths to localities.")
+(defparameter *modules*            (make-hash-table :test #'equal) "Map module names to modules.")
+(defparameter *leaves*             (make-hash-table :test #'equal) "Map module names to leaf modules.")
+(defparameter *nonleaves*          (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
+(defparameter *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
+(defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
+(defparameter *masters*            (make-hash-table :test #'equal) "Map RCS type to master localities.")
 
 (defun reinit-definitions ()
   "Empty all global definitions."
@@ -89,6 +89,10 @@
     `(or (distributor ',name :if-does-not-exist :continue)
          (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
+
+(defmacro do-distributor-remotes ((var distributor) &body body)
+  `(iter (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
+         ,@body))
 
 (defun distributor-remote (distributor value &key (key #'name))
   (find value (distributor-remotes (coerce-to-distributor distributor)) :key key))
@@ -169,7 +173,8 @@
 (defclass hg-locality (hg locality) ())
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality)
-  ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir)))
+  ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir))
+  (:default-initargs :lockdir #p"/var/lock/"))
 (defclass svn-locality (svn locality) ())
 
 (defun default-remote-name (distributor-name rcs-type)
@@ -190,13 +195,15 @@
                       (list `(:modules ,(mapcar #'downstring (location-modules o)))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
-  "Provide a mechanism for init-time name collation for REMOTE with DISTRIBUTOR-NAME,
-   and optional SPECIFIED-NAME.
+  "Provide a mechanism for init-time name collation for REMOTE with 
+   DISTRIBUTOR-NAME, and optionally SPECIFIED-NAME.
 
    Collation rules are considered in order, as follows:
       - SPECIFIED-NAME wins,
-      - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME,
-      - if REMOTE is the only remote of its RCS type in DISTRIBUTOR-NAME, provide a default of DISTRIBUTOR-NAME-RCS-TYPE."
+      - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default
+        of DISTRIBUTOR-NAME,
+      - if REMOTE is the only remote of its RCS type in DISTRIBUTOR-NAME, 
+        provide a default of DISTRIBUTOR-NAME-RCS-TYPE."
   (let ((distributor-name (name distributor)))
     (cond (specified-name (if (null (distributor-remote distributor specified-name))
                               specified-name
@@ -245,9 +252,10 @@
    (depends-on :accessor module-depends-on :initarg :depends-on :documentation "Specified.")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (master-locality :accessor module-master-locality :initarg :master-locality :documentation "Policy-decided.")
-   (remotes :accessor module-remotes :initarg :remotes :documentation "Cache.")
-   (localities :accessor module-localities :initarg :localities :documentation "Cache.")
-   (systems :accessor module-systems :initarg :systems :documentation "Cache."))
+   (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
+   (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
+   (localities :accessor module-localities :initarg :localities :documentation "Cache. COMPUTE-MODULE-CACHES")
+   (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
    :registrator #'(setf module)    
    :remotes nil :master-locality nil :localities nil
@@ -270,7 +278,7 @@
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
           (remove nil (list (when-let (deps (module-dependencies o))
-                              (list :depends-on deps))
+                              (list :depends-on (mapcar #'name deps)))
                             (let ((systems (module-systems o)))
                               (unless (module-system-implied-p o)
                                (list :systems (and (module-systems o) (mapcar #'name systems)))))
@@ -349,13 +357,13 @@
     (symbol (string-upcase (symbol-name namespec)))
     (string (string-upcase namespec))))
 
-(define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors)
+(define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors :iterator do-distributors)
 (define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error)
 (define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
 (define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
 (define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
 (define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-app :type application)
-(define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error)
+(define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :if-exists :error)
 (define-container-hash-accessor *localities-by-path* locality-by-path :type locality :if-exists :error)
 (define-container-hash-accessor *masters*        master        :type locality)
@@ -370,9 +378,9 @@
         (depend module dep)))
 
 (defun module-dependencies (module &aux (module (coerce-to-module module)))
-  "Produce a minimal list of MODULE dependency names, which is a subset
+  "Produce a minimal list of MODULE dependencies, which is a subset
    of its direct dependencies."
-  (map-dependencies #'name module))
+  (map-dependencies #'identity module))
 
 (defun module-full-dependencies (module &optional stack &aux (module (coerce-to-module module)))
   "Compute the complete set of MODULE dependencies."
@@ -401,7 +409,7 @@
 
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
-  (when-let ((bad-paths (remove-if-not #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
+  (when-let ((bad-paths (remove-if #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
     ;; XXX: numeric
     (error "~@<The specified paths ~S are not accessible.~:@>" bad-paths))
   (let ((hostname (string-upcase (machine-instance))))
@@ -409,11 +417,101 @@
           (master 'hg)    (make-instance 'hg-locality    :name (format-symbol t "~A-HG" hostname) :path hg-path)
           (master 'darcs) (make-instance 'darcs-locality :name (format-symbol t "~A-DARCS" hostname) :path darcs-path)
           (master 'cvs)   (make-instance 'cvs-locality   :name (format-symbol t "~A-CVS" hostname) :path cvs-path)
-          (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))))
+          (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))
+    t))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
-  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, in which case an error is signalled."
+  "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
+   in which case an error is signalled."
   (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) :name name (remove-from-plist keys :name)))
+
+(defun distributor-related-desires (distributor-spec)
+  "Yield the names of modules currently desired from DISTRIBUTOR-SPEC."
+  (rest (find (coerce-to-name distributor-spec) *desires*)))
+
+(defun set-distributor-related-desires (new distributor-spec)
+  (setf (rest (find (coerce-to-name distributor-spec) *desires*)) new))
+
+(defsetf distributor-related-desires set-distributor-related-desires)
+
+(defun add-desire (distributor &optional (module-spec :everything) &aux (distributor (coerce-to-distributor distributor)))
+  "Add MODULE-SPEC (which is either a list of module specifications or an
+   :EVERYTHING wildcard) to the list of modules desired from DISTRIBUTOR."
+  (check-type module-spec (or (eql :everything) list))
+  (unionf (distributor-related-desires distributor)
+          (if (eq module-spec :everything)
+              (compute-distributor-modules distributor)
+              (mapcar #'coerce-to-name module-spec))))
+
+(defun remote-provides-module-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
+  "See whether REMOTE provides the MODULE."
+  (not (null (find (name module) (location-modules remote)))))
+
+(defun distributor-provides-module-p (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
+  "See whether DISTRIBUTOR provides MODULE via any of its remotes, returning
+   one, if so."
+  (do-distributor-remotes (remote distributor)
+    (when (remote-provides-module-p remote module)
+      (return remote))))
+
+(defun module-distributors (module)
+  "Those distributors providing MODULE, by definition."
+  (do-distributors (distributor)
+    (when (distributor-provides-module-p distributor module)
+      (collect distributor))))
+
+(defun module-desired-p (module &aux (module (coerce-to-module module)))
+  "See whether MODULE is desired. Return the desired distributor, if so."
+  (iter (for (distributor-name . desires) in *desires*)
+        (when (member (name module) desires)
+          (return (distributor distributor-name)))))
+
+(defun module-distributor (module)
+  "Find out the only distributor providing MODULE, or is specified
+   to be a desired distributor for it, if there is ambiguity."
+  (if-let* ((distributors (module-distributors module))
+            (unambiguous-p (= 1 (length distributors))))
+           (first distributors)
+           (module-desired-p module)))
+
+(defun module-desired-remote (module)
+  "Find the remote providing MODULE among those of its desired distributor, 
+   if any."
+  (when-let ((distributor (module-desired-p module)))
+    (distributor-provides-module-p distributor module)))
+
+(defun module-remote (module)
+  "Find out the only remote providing MODULE, or is specified
+   to be in a desired distributor for MODULE, if there is ambiguity."
+  (when-let ((distributor (module-distributor module)))
+    (distributor-provides-module-p distributor module)))
+
+(defun module-desire-satisfaction (module &optional (locality (master 'git)))
+  "Compute both the LOCALITY and remote to act as agents in satisfaction of
+   desire for MODULE."
+  (if-let ((remote (module-remote module)))
+          (values locality remote)
+          (error "~@<It is not known to me how to satisfy the desire for module ~S.~:@>" module)))
+
+(defun compute-module-caches (module)
+  "Regarding MODULE, return remotes providing it, localities storing 
+   (or desiring to store) it and systems it provides, as values."
+  (values
+   (do-remotes (remote)
+     (when (remote-provides-module-p remote module)
+       (collect remote)))
+   (remove-duplicates
+    (xform (module-desired-p module)
+           (curry #'cons (master 'git))
+           (module-scan-positive-localities module)))
+   (remove-if #'null (map-systems (compose #'module #'system-module)))))
+
+(defun update-module-caches (module)
+  "Update MODULE's locality, remote and system caches.
+
+   The user must never need this."
+  (setf (values (module-remotes module) (module-localities module) (module-systems module))
+        (compute-module-caches module)))
 
 (defun read-definitions (stream)
   "Unserialise global definitions from STREAM."

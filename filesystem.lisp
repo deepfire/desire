@@ -20,45 +20,9 @@
 
 (in-package :cling)
 
-(defmacro within-repository ((repo &rest pathname-elements) &body body)
-  `(with-changed-directory (namestring (make-pathname :directory (append (pathname-directory (path ,repo)) (list ,@pathname-elements))))
+(defun module-locality-path (module &optional (locality (master 'git)))
+  (subdirectory (locality-path locality) (downstring (coerce-to-name module))))
+
+(defmacro within-module-repository ((dir module locality) &body body)
+  `(within-directory (,dir (module-locality-path ,module ,locality))
      ,@body))
-
-(defun repository-bare-p (repo)
-  (within-repository (repo)
-    (null (probe-file ".git"))))
-
-(defun (setf repository-bare-p) (val repo)
-  (within-repository (repo)
-    (if val
-        (error "not implemented")
-        (progn
-          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
-            (sb-posix:mkdir ".git" #o755)
-            (dolist (filename git-files)
-              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
-          (git "config" "--replace-all" "core.bare" "false")
-          (git "checkout" "master")
-          (git "reset" "--hard")
-          nil))))
-
-(defun world-readable-p (repo)
-  (within-repository (repo ".git")
-    (not (null (probe-file "git-daemon-export-ok")))))
-
-(defun (setf world-readable-p) (val repo)
-  (within-repository (repo ".git")
-    (if val
-        (with-open-file (s "git-daemon-export-ok" :if-does-not-exist :create) t)
-        (and (delete-file "git-daemon-export-ok") nil))))
-
-(defun repo-var (repo var)
-  (declare (type git-repository repo) (type symbol var))
-  (within-repository (repo)
-    (multiple-value-bind (status output) (run-external-program 'git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :capture-output t)
-      (or status (string-right-trim '(#\Return #\Newline) output)))))
-
-(defun (setf repo-var) (val repo var)
-  (declare (type git-repository repo) (type symbol var) (type string val))
-  (within-repository (repo)
-    (run-external-program 'git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
