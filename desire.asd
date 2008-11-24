@@ -10,12 +10,10 @@
   :components ((:file "package")
                (:file "filesystem-utils" :depends-on ("package"))
                (:file "types" :depends-on ("package"))
-               (:file "legacy-format" :depends-on ("types"))
                (:file "filesystem" :depends-on ("filesystem-utils" "types"))
 ;;                (:file "asdf" :depends-on ("types" "filesystem"))
                (:file "gittage" :depends-on ("filesystem"))
                (:file "desire" :depends-on ("gittage"))
-               
 ;;                (:file "application" :depends-on ("desire"))
                ))
   
