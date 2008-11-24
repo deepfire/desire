@@ -77,7 +77,7 @@ stopped."
             finally (return (values subseqs right))))))
 
 (defun module-bare-p (module &optional (locality (master 'git)))
-  (null (directory-exists-p (subdirectory (module-locality-path module locality) ".git"))))
+  (null (directory-exists-p (subdirectory* (module-locality-path module locality) ".git"))))
 
 (defun (setf module-bare-p) (val module &optional (locality (master 'git)))
   (within-module-repository (dir module locality)
@@ -94,10 +94,10 @@ stopped."
           nil))))
 
 (defun world-readable-p (module &optional (locality (master 'git)))
-  (file-exists-p (subfile (module-locality-path module locality) ".git" "git-daemon-export-ok")))
+  (file-exists-p (subfile* (module-locality-path module locality) ".git" "git-daemon-export-ok")))
 
 (defun (setf world-readable-p) (val module &optional (locality (master 'git)))
-  (let ((path (subfile (module-locality-path module locality) ".git" "git-daemon-export-ok")))
+  (let ((path (subfile* (module-locality-path module locality) ".git" "git-daemon-export-ok")))
     (if val
         (with-open-file (s path :if-does-not-exist :create) t)
         (and (delete-file path) nil))))

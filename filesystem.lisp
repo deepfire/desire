@@ -21,7 +21,7 @@
 (in-package :desire)
 
 (defun module-locality-path (module &optional (locality (master 'git)))
-  (subdirectory (locality-path locality) (downstring (coerce-to-name module))))
+  (subdirectory* (locality-path locality) (downstring (coerce-to-name module))))
 
 (defmacro within-module-repository ((dir module locality) &body body)
   `(within-directory (,dir (module-locality-path ,module ,locality))

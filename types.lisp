@@ -407,7 +407,11 @@
 
 (defun cvs-locality-lock-path (cvs-locality)
   "Provide the fixed definition of lock directory for CVS repositories."
-  (subdirectory (locality-path cvs-locality) ".cvs-locks"))
+  (subdirectory* (locality-path cvs-locality) ".cvs-locks"))
+
+(defun git-locality-asdf-registry-path (git-locality)
+  "Provide the fixed definition of ASDF registry directory."
+  (subdirectory* (locality-path git-locality) ".asdf-registry"))
 
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
