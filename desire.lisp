@@ -145,6 +145,9 @@
     (within-directory (git-repo-dir git-repo-dir)
       (git-svn "fetch"))))
 
+(defmethod fetch :after (locality remote (module module))
+  (setf (world-readable-p module) *default-world-readable*))
+
 (defun satisfy-single-module-desire (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
   "Satisfy the desire for MODULE."
   (multiple-value-call #'fetch (single-module-desire-satisfaction module locality) module))
