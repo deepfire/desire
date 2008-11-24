@@ -38,9 +38,12 @@
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~crhodes" (downstring (name mod))) :name common-lisp.net-krystof
        :modules (clx))
+    #R(GIT-HTTP-REMOTE COMMON-LISP.NET
+       ((mod) "~loliveira" "git" (downstring (name mod)))
+       :name common-lisp.net-luis :modules (texinfo-docstrings))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~loliveira" "darcs" (downstring (name mod)))
-       :name common-lisp.net-luis :modules (babel trivial-features))
+       :name common-lisp.net-luis-darcs :modules (babel trivial-features))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~dlichteblau" "inofficial" (downstring (name mod)))
        :name common-lisp.net-lichtblauware :modules (mel-base))
@@ -259,6 +262,7 @@
 #M(SPLIT-SEQUENCE) 
 #M(STAMP :depends-on (mel-base)) 
 #M(STANDREI :depends-on (climock)) 
+#M(TEXINFO-DOCSTRINGS) 
 #M(TRIVIAL-FEATURES :depends-on (rt cffi babel alexandria)) 
 #M((TRIVIAL-GRAY-STREAMS cl-plus-ssl)) 
 #M(TRIVIAL-SOCKETS) 
