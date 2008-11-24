@@ -102,7 +102,7 @@
 
 (defun compute-distributor-modules (distributor)
   "Compute the set of module names published by DISTRIBUTOR."
-  (remove-duplicates (mappend #'location-modules (distributor-remotes (coerce-to-distributor distributor)))))
+  (remove-duplicates (mapcan #'location-modules (distributor-remotes (coerce-to-distributor distributor)))))
 
 (defclass rcs-type-mixin () ((rcs-type :reader rcs-type :initarg :rcs-type)))
 
@@ -172,9 +172,7 @@
 (defclass git-locality (git locality) ())
 (defclass hg-locality (hg locality) ())
 (defclass darcs-locality (darcs locality) ())
-(defclass cvs-locality (cvs locality)
-  ((lockdir :accessor cvs-locality-lockdir :initarg :lockdir))
-  (:default-initargs :lockdir #p"/var/lock/"))
+(defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
 
 (defun default-remote-name (distributor-name rcs-type)
@@ -407,6 +405,10 @@
     (iter (for (dependent deplist) in-hashtable loops)
           (mapc (curry #'depend dependent) deplist))))
 
+(defun cvs-locality-lock-path (cvs-locality)
+  "Provide the fixed definition of lock directory for CVS repositories."
+  (subdirectory (locality-path cvs-locality) ".cvs-locks"))
+
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
   (when-let ((bad-paths (remove-if #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
@@ -418,6 +420,7 @@
           (master 'darcs) (make-instance 'darcs-locality :name (format-symbol t "~A-DARCS" hostname) :path darcs-path)
           (master 'cvs)   (make-instance 'cvs-locality   :name (format-symbol t "~A-CVS" hostname) :path cvs-path)
           (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))
+    (ensure-directories-exist (cvs-locality-lock-path (master 'cvs)))
     t))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
@@ -486,12 +489,49 @@
   (when-let ((distributor (module-distributor module)))
     (distributor-provides-module-p distributor module)))
 
-(defun module-desire-satisfaction (module &optional (locality (master 'git)))
+(defun single-module-desire-satisfaction (module &optional (locality (master 'git)))
   "Compute both the LOCALITY and remote to act as agents in satisfaction of
    desire for MODULE."
   (if-let ((remote (module-remote module)))
           (values locality remote)
           (error "~@<It is not known to me how to satisfy the desire for module ~S.~:@>" module)))
+
+(defun substitute-desires (in with)
+  "Substitute some of module->distributor maps in IN with those in WITH.
+
+   IN must be compounded (one specification per distributor), whereas WITH
+   is allowed to be spread, with many specifications per distributor."
+  (lret ((new-desires (copy-tree in)))
+    (iter (for (new-dist . modules) in with)
+          (iter (for module in modules)
+                (for olddistspec = (find module new-desires :key (compose (curry #'find module) #'rest)))
+                (unless (eq new-dist (car olddistspec))
+                  (when olddistspec
+                    (removef (rest olddistspec) module))
+                  (let ((new-home (or (find new-dist new-desires :key #'car)
+                                      (car (push (list new-dist) new-desires)))))
+                    (push module (rest new-home))))))))
+
+(defun desire-satisfaction (&rest desires)
+  "Produce a list of locality-remote pairs, as satisfaction for DESIRES.
+
+   When individual parameters are symbols, they are interpreted as module
+   names, and are intepreted in the context of the global *DESIRES*.
+
+   When they are lists, their first element is interpreted as the source
+   distributor, from which the rest of the list is supposed to be imported.
+
+   These two forms can be mixed."
+  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-distributor m)) m))) desires)))
+    (iter (for (distributor-name . modules) in interpreted-desires)
+          (for distributor = (distributor distributor-name))
+          (when-let ((missing (remove-if (curry #'distributor-provides-module-p distributor) modules)))
+            (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
+    (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
+           (desired-list (mapcan #'rest interpreted-desires))
+           (full-list (remove-duplicates (append desired-list (mapcan #'module-full-dependencies desired-list)))))
+      (iter (for module in full-list)
+            (collect (multiple-value-call #'list (single-module-desire-satisfaction module) (module module)))))))
 
 (defun compute-module-caches (module)
   "Regarding MODULE, return remotes providing it, localities storing 

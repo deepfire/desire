@@ -130,8 +130,8 @@
          (cvs-repo-dir (subdirectory (locality-path cvs-locality) name))
          (git-repo-dir (subdirectory (locality-path git-locality) name)))
     (rsync "-ravPz" (format nil "~A/cvsroot/" (url remote module)) (namestring cvs-repo-dir))
-    (format t "ensuring lockdir at ~S~%" (subdirectory (cvs-locality-lockdir cvs-locality) (downstring (module-umbrella module))))
-    (ensure-directories-exist (subdirectory (cvs-locality-lockdir cvs-locality) (downstring (module-umbrella module))))
+    (with-output-to-file (stream (subfile cvs-repo-dir "CVSROOT" "config"))
+      (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name ;; *REPO-CVS-MODULE*
                    )))
 
@@ -145,10 +145,34 @@
     (within-directory (git-repo-dir git-repo-dir)
       (git-svn "fetch"))))
 
-(defun satisfy-module-desire (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
+(defun satisfy-single-module-desire (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
   "Satisfy the desire for MODULE."
-  (mapcar (rcurry #'satisfy-module-desire locality) (module-dependencies module))
-  (multiple-value-call #'fetch (module-desire-satisfaction module locality) module))
+  (multiple-value-call #'fetch (single-module-desire-satisfaction module locality) module))
+
+(defun satisfy-module-desire (module &optional (locality (master 'git)) (loops (make-hash-table)) &aux (module (coerce-to-module module)))
+  "Satisfy the desire for MODULE, and its dependencies."
+  (sb-posix:putenv "PAGER=cat")
+  (sb-posix:putenv "GIT_PAGER=cat")
+  (when (gethash (name module) loops)
+    (return-from satisfy-module-desire))
+  (setf (gethash (name module) loops) t)
+  (mapcar (rcurry #'satisfy-module-desire locality loops) (module-dependencies module))
+  (satisfy-single-module-desire module locality))
+
+(defun desire (&rest desires)
+  "Satisfy module DESIRES and return the list of names of updated modules.
+
+   When individual parameters are symbols, they are interpreted as module
+   names, and are intepreted in the context of the global *DESIRES*.
+
+   When they are lists, their first element is interpreted as the source
+   distributor, from which the rest of the list is supposed to be imported.
+
+   These two forms can be mixed."
+  (let* ((satisfaction (apply #'desire-satisfaction desires))
+         (to-update (mapcar (compose #'name #'third) satisfaction)))
+    (format t "Will try updating following modules:~{ ~S~}~%" to-update)
+    (remove nil (mapcar #'and-p (mapcar (curry #'apply #'fetch) satisfaction) to-update))))
 
 ;; (defgeneric fetch-desired-p (repo)
 ;;   (:method ((o derived-repository))

@@ -10,7 +10,8 @@
    #:module-dependencies #:module-full-dependencies
    #:serialize-definitions #:read-definitions
    #:*default-world-readable* #:*desires* #:*force-modules-essential*
-   #:add-desire #:module-desired-p #:module-desired-remote #:module-distributors #:module-distributor
+   #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
+   #:add-desire #:desire-satisfaction #:desire
    ;; filesystem-utils.lisp
    #:with-dryly-ran-externals
    ;; cling.lisp
