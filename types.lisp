@@ -154,7 +154,7 @@
 
 ;;; most specific, exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
-(defclass git-http-remote (git-http remote) ())
+(defclass git-http-remote (git-http git-remote) ())
 (defclass hg-http-remote (hg-http remote) ())
 (defclass darcs-http-remote (darcs-http remote) ())
 (defclass cvs-rsync-remote (cvs-rsync remote) ())
