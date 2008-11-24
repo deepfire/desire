@@ -24,7 +24,7 @@
        ((mod) "project" (downstring (module-umbrella mod)))
        :modules
        (trivial-gray-streams cl+ssl cljl cl-store ecl stamp linedit eclipse
-        beirc slime climacs gsharp closure closure-common cxml zip mcclim
+        beirc slime climacs gsharp closure closure-common zip mcclim
         flexichain))
     #R(SVN-RSYNC-REMOTE COMMON-LISP.NET
        ((mod) "project" (downstring (module-umbrella mod)))
@@ -67,7 +67,7 @@
         winnt-lptaccess mcdbio giveio mdb libmdb doc bin dot-gitignore
         clim-file-selector sb-x86-portio clxs ieee-latex assem regvaldefs
         custom-harness standrei climock humint cl-git climb dwarf
-        captured-stream cl-io-mod elf bintype clung desire semi-precious
+        captured-stream cl-io-elf cl-io-mod bintype clung desire semi-precious
         pergamum)))) 
 #D(GIT.SANITYINC.COM
    :remotes
@@ -87,7 +87,7 @@
    :remotes
    (#R(GIT-NATIVE-REMOTE REPO.OR.CZ
        ((mod) (format nil "~A.git" (downstring (name mod))))
-       :modules (closure-html darcs2git git)))) 
+       :modules (closure-html cxml darcs2git git)))) 
 #D(RVW.DOC.GOLD.AC.UK
    :remotes
    (#R(DARCS-HTTP-REMOTE RVW.DOC.GOLD.AC.UK
@@ -151,6 +151,7 @@
 #M(CL-GD) 
 #M(CL-GIT :depends-on (git pergamum cffi)) 
 #M(CL-INTERPOL) 
+#M(CL-IO-ELF :depends-on (bintype)) 
 #M(CL-IO-MOD :depends-on (bintype)) 
 #M(CL-IRC :depends-on (usocket flexi-streams)) 
 #M(CL-PDF :depends-on (iterate)) 
@@ -186,7 +187,7 @@
 #M(CLXS) 
 #M(COMMON-DB
    :depends-on
-   (sb-x86-portio libpciaccess elf semi-precious mcclim clim-file-selector)
+   (sb-x86-portio libpciaccess cl-io-elf semi-precious mcclim clim-file-selector)
    :systems (common-db common-db-gui)) 
 #M(CUSTOM-HARNESS) 
 #M(CVSPS :systems nil) 
@@ -202,7 +203,6 @@
 #M(DWARF :depends-on (bintype)) 
 #M(ECL :systems nil) 
 #M(ECLIPSE) 
-#M(ELF :depends-on (bintype)) 
 #M(FLEXI-STREAMS :depends-on (trivial-gray-streams)) 
 #M(FLEXICHAIN) 
 #M(FM-PLUGIN-TOOLS) 
@@ -267,6 +267,7 @@
 #M(SPLIT-SEQUENCE) 
 #M(STAMP :depends-on (mel-base)) 
 #M(STANDREI :depends-on (climock)) 
+#M(SWANK) 
 #M(TEXINFO-DOCSTRINGS) 
 #M(TRIVIAL-FEATURES :depends-on (rt cffi babel alexandria)) 
 #M((TRIVIAL-GRAY-STREAMS cl-plus-ssl)) 
