@@ -116,7 +116,7 @@
    :remotes
    (#R(GIT-HTTP-REMOTE WWW.LICHTEBLAU.COM
        ((mod) "git" (format nil "~A.git" (downstring (name mod))))
-       :modules (clim-alerts cxml-stp cxml-rng)))) 
+       :modules (atdoc cl-xmpp clim-alerts cloak-build cxml-stp cxml-rng ldapvi specializable)))) 
 #D(WWW.PPS.JUSSIEU.FR
    :remotes
    (#R(DARCS-HTTP-REMOTE WWW.PPS.JUSSIEU.FR
@@ -133,6 +133,7 @@
 ;;;
 #M(ALEXANDRIA) 
 #M(ASSEM) 
+#M(ATDOC :depends-on (cxml split-sequence swank))
 #M(BABEL :depends-on (trivial-features)) 
 #M(BEIRC :depends-on (mcclim cl-irc cl-ppcre cl-fad)) 
 #M(BIN) 
@@ -161,6 +162,7 @@
 #M(CL-WBXML) 
 #M(CL-WEBDAV :depends-on (hunchentoot cxml cl-fad)) 
 #M(CL-WHO) 
+#M(CL-XMPP) 
 #M(CL-YACC) 
 #M(CLBUILD :systems nil) 
 #M(CLIM-ALERTS :depends-on (mel-base closure cxml-stp drakma net-telent-date)) 
@@ -169,6 +171,7 @@
 #M(CLIMB) 
 #M(CLIMOCK :depends-on (humint spatial-trees)) 
 #M(CLIMPLAYER :depends-on (mcclim cl-ppcre split-sequence)) 
+#M(CLOAK-BUILD) 
 #M(DESIRE :depends-on (semi-precious)) 
 #M((CLJL cl-jpeg)) 
 #M((CLOSER-MOP closer) :depends-on (lw-compat)) 
@@ -217,6 +220,7 @@
 #M(IEEE-LATEX) 
 #M(IRONCLAD) 
 #M(ITERATE) 
+#M(LDAPVI) 
 #M(LIBMDB) 
 #M(LIBPCIACCESS :systems nil) 
 #M(LINEDIT) 
@@ -259,6 +263,7 @@
 #M(SKIPPY) 
 #M(SLIME) 
 #M(SPATIAL-TREES) 
+#M(SPECIALIZABLE) 
 #M(SPLIT-SEQUENCE) 
 #M(STAMP :depends-on (mel-base)) 
 #M(STANDREI :depends-on (climock)) 
