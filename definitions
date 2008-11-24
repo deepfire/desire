@@ -67,7 +67,7 @@
         winnt-lptaccess mcdbio giveio mdb libmdb doc bin dot-gitignore
         clim-file-selector sb-x86-portio clxs ieee-latex assem regvaldefs
         custom-harness standrei climock humint cl-git climb dwarf
-        captured-stream cl-io-mod elf bintype clung cling semi-precious
+        captured-stream cl-io-mod elf bintype clung desire semi-precious
         pergamum)))) 
 #D(GIT.SANITYINC.COM
    :remotes
@@ -169,7 +169,7 @@
 #M(CLIMB) 
 #M(CLIMOCK :depends-on (humint spatial-trees)) 
 #M(CLIMPLAYER :depends-on (mcclim cl-ppcre split-sequence)) 
-#M(CLING :depends-on (semi-precious)) 
+#M(DESIRE :depends-on (semi-precious)) 
 #M((CLJL cl-jpeg)) 
 #M((CLOSER-MOP closer) :depends-on (lw-compat)) 
 #M(CLOSURE
@@ -178,7 +178,7 @@
 #M((CLOSURE-COMMON cxml) :depends-on (trivial-gray-streams)) 
 #M(CLOSURE-HTML :depends-on (closure-common flexi-streams)) 
 #M(CLSQL :depends-on (md5 cffi)) 
-#M(CLUNG :depends-on (cling)) 
+#M(CLUNG :depends-on (desire)) 
 #M(CLX) 
 #M(CLXS) 
 #M(COMMON-DB
