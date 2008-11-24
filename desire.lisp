@@ -1,4 +1,4 @@
-;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CLING; Base: 10 -*-
+;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 ;;;
 ;;;  (c) copyright 2007-2008 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
@@ -18,7 +18,7 @@
 ;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
-(in-package :cling)
+(in-package :desire)
 
 ;; (defun clone (to from)
 ;;   (declare (type local-git-repository to) (type remote-git-repository from))
@@ -207,13 +207,13 @@
 ;;              (error "~@<modules remained unloadable after update: ~S~:@>" still-unloadable))
 ;;             (t)))))
 
-;; (defun cling (os &key skip-loadable &aux (o (coerce-to-module os)))
+;; (defun desire (os &key skip-loadable &aux (o (coerce-to-module os)))
 ;;   (update o :skip-loadable skip-loadable)
 ;;   (load-system o))
 
-;; (defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".clingrc")) (try-load-clung t))
+;; (defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".desirerc")) (try-load-clung t))
 ;;   (format t "loading user run control file ~S~%" runcontrol)
-;;   (let ((*package* (find-package :cling)))
+;;   (let ((*package* (find-package :desire)))
 ;;     (when (probe-file runcontrol)
 ;;       (load runcontrol)))
 ;; ;;   (when (and try-load-clung (loadable-p (module 'clung)))

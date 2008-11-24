@@ -1,4 +1,4 @@
-;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CLING; Base: 10 -*-
+;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 ;;;
 ;;;  (c) copyright 2007-2008 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
@@ -18,7 +18,7 @@
 ;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
-(in-package :cling)
+(in-package :desire)
 
 ;;;
 ;;; Globals
@@ -590,7 +590,7 @@
       (format stream "~%~%;;;~%;;; Desires~%;;;")
       (print *desires* stream))))
 
-(defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/cling/definitions.lisp"
+(defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/desire/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
                   (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2") (force-essential nil))
   (let ((*force-modules-essential* force-essential))

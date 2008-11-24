@@ -1,4 +1,6 @@
-(defpackage cling
+;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
+
+(defpackage desire
   (:use :common-lisp :alexandria :pergamum :iterate :depsolver)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
@@ -14,13 +16,13 @@
    #:add-desire #:desire-satisfaction #:desire
    ;; filesystem-utils.lisp
    #:with-dryly-ran-externals
-   ;; cling.lisp
+   ;; desire.lisp
    #:app #:path #:url
    #:defdistributor #:define-module-dependencies #:define-application 
-   #:fetch #:update #:load-system #:cling #:purge-fasls #:run
+   #:fetch #:update #:load-system #:desire #:purge-fasls #:run
    #:loadable-p #:ensure-loadable #:world-readable-p
    #:init))
 
-(in-package :cling)
+(in-package :desire)
 
 (require :sb-posix)

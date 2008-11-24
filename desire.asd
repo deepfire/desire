@@ -1,11 +1,11 @@
-;;; -*- Mode: Lisp -*-
+;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
-(defpackage :cling.system
+(defpackage :desire.system
   (:use :cl :asdf))
 
-(in-package :cling.system)
+(in-package :desire.system)
 
-(defsystem :cling
+(defsystem :desire
   :depends-on (:alexandria :iterate :pergamum :semi-precious :cl-fad)
   :components ((:file "package")
                (:file "filesystem-utils" :depends-on ("package"))
@@ -14,8 +14,8 @@
                (:file "filesystem" :depends-on ("filesystem-utils" "types"))
 ;;                (:file "asdf" :depends-on ("types" "filesystem"))
                (:file "gittage" :depends-on ("filesystem"))
-               (:file "cling" :depends-on ("gittage"))
+               (:file "desire" :depends-on ("gittage"))
                
-;;                (:file "application" :depends-on ("cling"))
+;;                (:file "application" :depends-on ("desire"))
                ))
   

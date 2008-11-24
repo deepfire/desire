@@ -1,4 +1,4 @@
-;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CLING; Base: 10 -*-
+;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 ;;;
 ;;;  (c) copyright 2007-2008 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
@@ -18,7 +18,7 @@
 ;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
-(in-package :cling)
+(in-package :desire)
 
 
 (reinit-definitions)
@@ -27,7 +27,7 @@
   (:url-schemas (git-native (mod) (downstring (name mod))))
   (:modules
    (git-native
-    pergamum semi-precious cling clung)))
+    pergamum semi-precious desire clung)))
 
 (defdistributor common-lisp.net
   (:url-schemas (darcs-http (mod) "project" (downstring (module-umbrella mod)) "darcs" (downstring (name mod))))
@@ -43,7 +43,7 @@
 (define-module-dependencies
   (pergamum alexandria iterate)
   (semi-precious alexandria pergamum)
-  (cling pergamum semi-precious)
-  (clung cling))
+  (desire pergamum semi-precious)
+  (clung desire))
 
 (minimise-dependencies *leaves*)
