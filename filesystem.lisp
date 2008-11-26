@@ -20,9 +20,9 @@
 
 (in-package :desire)
 
-(defun module-locality-path (module &optional (locality (master 'git)))
-  (subdirectory* (locality-path locality) (downstring (coerce-to-name module))))
-
 (defmacro within-module-repository ((dir module locality) &body body)
-  `(within-directory (,dir (module-locality-path ,module ,locality))
+  `(within-directory (,dir (module-path ,module ,locality))
      ,@body))
+
+(defun module-purge-fasls (module &optional (locality (master 'git)))
+  (mapc #'delete-file (directory (subfile (module-path module locality) '(:wild-inferiors :wild) :type "fasl"))))

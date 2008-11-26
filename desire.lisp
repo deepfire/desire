@@ -20,14 +20,6 @@
 
 (in-package :desire)
 
-;; (defun clone (to from)
-;;   (declare (type local-git-repository to) (type remote-git-repository from))
-;;   (with-changed-directory (namestring (ensure-directories-exist (path to)))
-;;     (git "init"))
-;;   (setf (repo-var to 'remote.origin.url) (url from)
-;;         (repo-var to 'remote.origin.fetch) "+refs/heads/*:refs/heads/*")
-;;   #| sync local/remote HEADs |#)
-
 ;;;
 ;;; Remote update-ness:
 ;;;
@@ -54,14 +46,6 @@
 ;;   (:method ((o local-svn-repository))
 ;;     (make-pathname :directory '(:relative "db") :name "current")))
 
-;; (defgeneric fetch (to from))
-
-;; (define-condition repository-fetch-failed (simple-warning)
-;;   ((from :accessor cond-from :type repository :initarg :from)
-;;    (to :accessor cond-to :type repository :initarg :to))
-;;   (:report (lambda (cond stream)
-;;              (format stream "~@<failed to fetch from ~S to ~S~:@>" (cond-from cond) (cond-to cond)))))
-
 ;;;   (multiple-value-bind (primary backups) (url from)
 ;;;     (with-condition-restart-binding ((external-program-failure continue))
 ;;;       (iter (for url in (cons primary backups))
@@ -77,21 +61,9 @@
 ;;     (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (warn 'repository-fetch-failed :from from :to to) (return-from fetch))))
 ;;       (call-next-method))))
 
-;; (defgeneric update-configuration (repository)
-;;   (:method ((o repository)) t)
-;;   (:method ((o local-git-repository))
-;;     (let ((gitignore (make-pathname :directory (pathname-directory (path o)) :name ".gitignore")))
-;;       (unless (probe-file gitignore)
-;;         (with-open-file (s gitignore :direction :output :if-does-not-exist :create)
-;;           (format s ".gitignore~%*~~~%*.o~%*.fasl~%"))))))
-
-;;; How do we name localities?
-;;; define-master-locality (proto) git->hostname, *->hostname-*
-;;; define-locality (proto name)
-
-(defmethod fetch ((to git-locality) (from git-locality) module &aux (name (down-case-name module)))
-  (let ((from-repo-dir (subdirectory* (locality-path from) name))
-        (to-repo-dir (subdirectory* (locality-path to) name)))
+(defmethod fetch ((to git-locality) (from git-locality) module)
+  (let ((from-repo-dir (module-path module from))
+        (to-repo-dir (module-path module to)))
     (unless (directory-exists-p to-repo-dir)
       (within-directory (dir to-repo-dir :if-exists :error :if-does-not-exist :create)
         (git "init-db")
@@ -99,8 +71,8 @@
     (within-directory (dir to-repo-dir)
       (git "fetch" (down-case-name from)))))
 
-(defmethod fetch ((locality git-locality) (remote git-remote) module &aux (name (down-case-name module)))
-  (let ((repo-dir (subdirectory* (locality-path locality) name)))
+(defmethod fetch ((locality git-locality) (remote git-remote) module)
+  (let ((repo-dir (module-path module locality)))
     (unless (directory-exists-p repo-dir)
       (within-directory (dir repo-dir :if-exists :error :if-does-not-exist :create)
         (git "init-db")))
@@ -108,14 +80,14 @@
     (within-directory (dir repo-dir)
       (git "fetch" (down-case-name remote)))))
 
-(defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module &aux (name (down-case-name module)))
-  (let ((hg-repo-dir (subdirectory* (locality-path (master 'hg)) name))
-        (git-repo-dir (subdirectory* (locality-path git-locality) name)))
+(defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
+  (let ((hg-repo-dir (module-path module (master 'hg)))
+        (git-repo-dir (module-path module git-locality)))
     ))
 
-(defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module &aux (name (down-case-name module)))
-  (let ((darcs-repo-dir (subdirectory* (locality-path (master 'darcs)) name))
-        (git-repo-dir (subdirectory* (locality-path git-locality) name))
+(defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module)
+  (let ((darcs-repo-dir (module-path module (master 'darcs)))
+        (git-repo-dir (module-path module git-locality))
         (url (url remote module)))
     (if (directory-exists-p darcs-repo-dir)
         (darcs "pull" "--all" "--repodir" (namestring darcs-repo-dir) url)
@@ -127,17 +99,17 @@
 
 (defmethod fetch ((git-locality git-locality) (remote cvs-rsync-remote) module &aux (name (down-case-name module)))
   (let* ((cvs-locality (master 'cvs))
-         (cvs-repo-dir (subdirectory* (locality-path cvs-locality) name))
-         (git-repo-dir (subdirectory* (locality-path git-locality) name)))
+         (cvs-repo-dir (module-path module cvs-locality))
+         (git-repo-dir (module-path module git-locality)))
     (rsync "-ravPz" (format nil "~A/cvsroot/" (url remote module)) (namestring cvs-repo-dir))
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config"))
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name ;; *REPO-CVS-MODULE*
                    )))
 
-(defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module &aux (name (down-case-name module)))
-  (let ((svn-repo-dir (subdirectory* (locality-path (master 'svn)) name))
-        (git-repo-dir (subdirectory* (locality-path git-locality) name)))
+(defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)
+  (let ((svn-repo-dir (module-path module (master 'svn)))
+        (git-repo-dir (module-path module git-locality)))
     (rsync "-ravPz" (url remote module) (namestring svn-repo-dir))
     (unless (directory-exists-p git-repo-dir)
       (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create :if-exists :error)
@@ -145,22 +117,9 @@
     (within-directory (git-repo-dir git-repo-dir)
       (git-svn "fetch"))))
 
-(defmethod fetch :after (locality remote (module module))
-  (setf (world-readable-p module) *default-world-readable*))
-
-(defun satisfy-single-module-desire (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
-  "Satisfy the desire for MODULE."
-  (multiple-value-call #'fetch (single-module-desire-satisfaction module locality) module))
-
-(defun satisfy-module-desire (module &optional (locality (master 'git)) (loops (make-hash-table)) &aux (module (coerce-to-module module)))
-  "Satisfy the desire for MODULE, and its dependencies."
-  (sb-posix:putenv "PAGER=cat")
-  (sb-posix:putenv "GIT_PAGER=cat")
-  (when (gethash (name module) loops)
-    (return-from satisfy-module-desire))
-  (setf (gethash (name module) loops) t)
-  (mapcar (rcurry #'satisfy-module-desire locality loops) (module-dependencies module))
-  (satisfy-single-module-desire module locality))
+(defmethod fetch :after ((git-locality git-locality) remote module)
+  (setf (module-world-readable-p module) *default-world-readable*)
+  (ensure-module-systems-loadable module git-locality))
 
 (defun desire (&rest desires)
   "Satisfy module DESIRES and return the list of names of updated modules.
@@ -172,10 +131,13 @@
    distributor, from which the rest of the list is supposed to be imported.
 
    These two forms can be mixed."
+  (sb-posix:putenv "PAGER=cat")
+  (sb-posix:putenv "GIT_PAGER=cat")
   (let* ((satisfaction (apply #'desire-satisfaction desires))
-         (to-update (mapcar (compose #'name #'third) satisfaction)))
-    (format t "Will try updating following modules:~{ ~S~}~%" to-update)
-    (remove nil (mapcar #'and-p (mapcar (curry #'apply #'fetch) satisfaction) to-update))))
+         (to-update (mapcar #'third satisfaction))
+         (names (mapcar #'name to-update)))
+    (format t "Will try updating following modules:~{ ~S~}~%" names)
+    (mapcar #'name (remove nil (mapcar #'and-p (mapcar (curry #'apply #'fetch) satisfaction) to-update)))))
 
 ;; (defgeneric fetch-desired-p (repo)
 ;;   (:method ((o derived-repository))
@@ -183,18 +145,6 @@
 ;;         (etypecase (repo-master o)
 ;;           (local-repository (> (time-identity (repo-master o)) (time-identity o)))
 ;;           (remote-repository t)))))
-
-;; (defgeneric fetch-chain (repo)
-;;   (:method (o) t)
-;;   (:method ((o derived-repository))
-;;     (fetch-chain (repo-master o))
-;;     (if (fetch-desired-p o)
-;;         (fetch o (repo-master o))
-;;         (format t "fetch not desired for ~S~%" o))))
-
-;; (defun update-single (os &aux (o (coerce-to-module os)))
-;;   (fetch-chain (module-master-repository o))
-;;   (ensure-loadable o))
 
 ;; (defun update (os &key skip-loadable (check-success t) &aux (o (coerce-to-module os)))
 ;;   (let* ((full-set (module-full-dependencies o))
@@ -209,16 +159,3 @@
 ;;             (still-unloadable
 ;;              (error "~@<modules remained unloadable after update: ~S~:@>" still-unloadable))
 ;;             (t)))))
-
-;; (defun desire (os &key skip-loadable &aux (o (coerce-to-module os)))
-;;   (update o :skip-loadable skip-loadable)
-;;   (load-system o))
-
-;; (defun init (&key (runcontrol (make-pathname :directory (pathname-directory (user-homedir-pathname)) :name ".desirerc")) (try-load-clung t))
-;;   (format t "loading user run control file ~S~%" runcontrol)
-;;   (let ((*package* (find-package :desire)))
-;;     (when (probe-file runcontrol)
-;;       (load runcontrol)))
-;; ;;   (when (and try-load-clung (loadable-p (module 'clung)))
-;; ;;     (require :clung))
-;;   )

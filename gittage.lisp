@@ -77,7 +77,8 @@ stopped."
             finally (return (values subseqs right))))))
 
 (defun module-bare-p (module &optional (locality (master 'git)))
-  (null (directory-exists-p (subdirectory* (module-locality-path module locality) ".git"))))
+  "See, whether or not MODULE within LOCALITY has its source checked out."
+  (null (directory-exists-p (subdirectory* (module-path module locality) ".git"))))
 
 (defun (setf module-bare-p) (val module &optional (locality (master 'git)))
   (within-module-repository (dir module locality)
@@ -93,11 +94,13 @@ stopped."
           (git "reset" "--hard")
           nil))))
 
-(defun world-readable-p (module &optional (locality (master 'git)))
-  (file-exists-p (subfile* (module-locality-path module locality) ".git" "git-daemon-export-ok")))
+(defun module-world-readable-p (module &optional (locality (master 'git)))
+  "See, whether or not MODULE within LOCALITY is allowed to be exported
+   for the purposes of git-daemon."
+  (file-exists-p (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
 
-(defun (setf world-readable-p) (val module &optional (locality (master 'git)))
-  (let ((path (subfile* (module-locality-path module locality) ".git" "git-daemon-export-ok")))
+(defun (setf module-world-readable-p) (val module &optional (locality (master 'git)))
+  (let ((path (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
     (if val
         (with-open-file (s path :if-does-not-exist :create) t)
         (and (delete-file path) nil))))
@@ -121,7 +124,7 @@ stopped."
 
 (defun module-add-gitremote (module remote &aux (locality (master 'git)))
   (check-type remote git-remote)
-  (within-directory (dir (module-locality-path module locality))
+  (within-directory (dir (module-path module locality))
     (git "remote" "add" (down-case-name remote) (url remote module))))
 
 (defun ensure-module-gitremote (module remote &aux (locality (master 'git)))

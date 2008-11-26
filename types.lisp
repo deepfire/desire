@@ -44,7 +44,6 @@
 ;;;
 (defvar *desires*                 nil "List of import descriptions.")
 (defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
-(defvar *force-modules-essential* nil "Force all modules to be essential.")
 
 (defclass named ()
   ((name :accessor name :initarg :name)))
@@ -267,11 +266,12 @@
 
 (defun module-system-implied-p (module &aux (system (first (module-systems module))))
   "Determine if SYSTEM's existence is deducible and omitted from definitions."
-  (and system (null (system-relativity system))
-       (= 1 (length (module-systems module)))))
+  (and system
+       (eq (name system) (name module))
+       (null (system-relativity system))
+       (endp (rest (module-systems module)))))
 
 (defmethod print-object ((o module) stream)
-  (declare (special *force-modules-essential*))
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
@@ -280,7 +280,7 @@
                             (let ((systems (module-systems o)))
                               (unless (module-system-implied-p o)
                                (list :systems (and (module-systems o) (mapcar #'name systems)))))
-                            (when (or (module-essential-p o) *force-modules-essential*)
+                            (when (module-essential-p o)
                               (list :essential-p t))))))
 
 (defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
@@ -360,7 +360,7 @@
 (define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
 (define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
 (define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
-(define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-app :type application)
+(define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-apps :type application)
 (define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :if-exists :error)
 (define-container-hash-accessor *localities-by-path* locality-by-path :type locality :if-exists :error)
@@ -406,12 +406,18 @@
           (mapc (curry #'depend dependent) deplist))))
 
 (defun cvs-locality-lock-path (cvs-locality)
-  "Provide the fixed definition of lock directory for CVS repositories."
+  "Provide the fixed definition of lock directory for CVS repositories,
+   within CVS-LOCALITY."
   (subdirectory* (locality-path cvs-locality) ".cvs-locks"))
 
 (defun git-locality-asdf-registry-path (git-locality)
-  "Provide the fixed definition of ASDF registry directory."
+  "Provide the fixed definition of ASDF registry directory,
+   within GIT-LOCALITY."
   (subdirectory* (locality-path git-locality) ".asdf-registry"))
+
+(defun module-path (module &optional (locality (master 'git)))
+  "Return MODULE's path in LOCALITY, which defaults to master Git locality."
+  (subdirectory* (locality-path locality) (downstring (coerce-to-name module))))
 
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
@@ -424,6 +430,7 @@
           (master 'darcs) (make-instance 'darcs-locality :name (format-symbol t "~A-DARCS" hostname) :path darcs-path)
           (master 'cvs)   (make-instance 'cvs-locality   :name (format-symbol t "~A-CVS" hostname) :path cvs-path)
           (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))
+    (pushnew (ensure-directories-exist (git-locality-asdf-registry-path (master 'git))) asdf:*central-registry* :test #'equal)
     (ensure-directories-exist (cvs-locality-lock-path (master 'cvs)))
     t))
 
@@ -596,19 +603,18 @@
 
 (defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/desire/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
-                  (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2") (force-essential nil))
-  (let ((*force-modules-essential* force-essential))
-    (reinit-definitions)
-    (mapcar #'load pathes-from)
-    (with-output-to-file (f path-int-0)
-      (serialize-definitions f))
-    (when bail-out-early
-      (return-from test-core))
-    (reinit-definitions)
-    (read-definitions path-int-0)
-    (with-output-to-file (f path-int-1)
-      (serialize-definitions f))
-    (reinit-definitions)
-    (read-definitions path-int-1)
-    (with-output-to-file (f path-int-2)
-      (serialize-definitions f))))
+                  (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2"))
+  (reinit-definitions)
+  (mapcar #'load pathes-from)
+  (with-output-to-file (f path-int-0)
+    (serialize-definitions f))
+  (when bail-out-early
+    (return-from test-core))
+  (reinit-definitions)
+  (read-definitions path-int-0)
+  (with-output-to-file (f path-int-1)
+    (serialize-definitions f))
+  (reinit-definitions)
+  (read-definitions path-int-1)
+  (with-output-to-file (f path-int-2)
+    (serialize-definitions f)))

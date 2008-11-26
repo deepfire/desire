@@ -6,22 +6,27 @@
   (:shadow #:*modules*)
   (:export
    ;; types.lisp
-   #:distributor #:location #:remote #:locality #:module #:origin-module #:imported-module #:system #:application
+   #:distributor #:location #:remote #:locality #:master #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
-   #:map-distributors #:map-locations #:map-modules #:map-systems #:map-applications
-   #:module-dependencies #:module-full-dependencies
+   #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:serialize-definitions #:read-definitions
-   #:*default-world-readable* #:*desires* #:*force-modules-essential*
+   #:module-dependencies #:module-full-dependencies
    #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
    #:add-desire #:desire-satisfaction #:desire
+   #:*default-world-readable* #:*desires*
    ;; filesystem-utils.lisp
    #:with-dryly-ran-externals
+   ;; filesystem.lisp
+   #:within-module-repository
+   ;; asdf.lisp
+   #:system-loadable-p #:system-definition-path #:ensure-system-loadable #:ensure-module-systems-loadable
+   ;; gittage.lisp
+   #:module-bare-p #:module-world-readable-p
+   #:repo-var #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
    ;; desire.lisp
-   #:app #:path #:url
-   #:defdistributor #:define-module-dependencies #:define-application 
-   #:fetch #:update #:load-system #:desire #:purge-fasls #:run
-   #:loadable-p #:ensure-loadable #:world-readable-p
-   #:init))
+   #:define-application 
+   #:fetch #:desire
+   #:purge-module-fasls))
 
 (in-package :desire)
 
