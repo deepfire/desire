@@ -68,18 +68,18 @@
      (declare (special *run-external-programs-dryly*))
      ,@body))
 
-(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output t) &aux (pathname (executable name)))
+(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output t) (environment '("HOME=/tmp"))
+                             &aux (pathname (executable name)))
   "Run an external program at PATHNAME with PARAMETERS. 
    Return a value associated with the exit code, by the means of 
    VALID-EXIT-CODES, or signal a condition of type
    EXTERNAL-PROGRAM-FAILURE."
   (declare (special *run-external-programs-dryly*))
-  (let* ((sb-impl::*default-external-format* :latin-1)
-         (exit-code (if *run-external-programs-dryly*
+  (let* ((exit-code (if *run-external-programs-dryly*
                         (progn
                           (format *error-output* "~S~{ ~S~}~%" pathname parameters)
                           (caar valid-exit-codes))
-                        (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output :environment nil)))))
+                        (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output :environment environment)))))
     (cdr (or (assoc exit-code valid-exit-codes)
              (signal 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
 
