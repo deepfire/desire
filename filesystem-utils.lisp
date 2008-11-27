@@ -74,11 +74,12 @@
    VALID-EXIT-CODES, or signal a condition of type
    EXTERNAL-PROGRAM-FAILURE."
   (declare (special *run-external-programs-dryly*))
-  (let ((exit-code (if *run-external-programs-dryly*
-                       (progn
-                         (format *error-output* "~S~{ ~S~}~%" pathname parameters)
-                         (caar valid-exit-codes))
-                       (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output)))))
+  (let* ((sb-impl::*default-external-format* :latin-1)
+         (exit-code (if *run-external-programs-dryly*
+                        (progn
+                          (format *error-output* "~S~{ ~S~}~%" pathname parameters)
+                          (caar valid-exit-codes))
+                        (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output :environment nil)))))
     (cdr (or (assoc exit-code valid-exit-codes)
              (signal 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
 
