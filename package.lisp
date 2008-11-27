@@ -11,6 +11,7 @@
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes
    #:serialize-definitions #:read-definitions
+   #:remote-disabled-p
    #:module-dependencies #:module-full-dependencies
    #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
    #:add-desire #:desire-satisfaction #:desire

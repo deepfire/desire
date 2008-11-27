@@ -143,9 +143,11 @@
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
    (distributor-port :accessor remote-distributor-port :type (or null (integer 0)) :initarg :distributor-port :documentation "Specified, rarely.")
    (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
+   (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Specified.")
    (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf remote)
+   :disabled-p nil
    :distributor-port nil))
 
 ;;; intermediate types
@@ -189,6 +191,8 @@
                         (list `(:name ,(name o))))
                       (when-let ((port (remote-distributor-port o)))
                         (list `(:distributor-port ,port)))
+                      (when-let ((port (remote-disabled-p o)))
+                        (list `(:disabled-p t)))
                       (list `(:modules ,(mapcar #'downstring (location-modules o)))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
@@ -459,7 +463,8 @@
 
 (defun remote-provides-module-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
   "See whether REMOTE provides the MODULE."
-  (not (null (find (name module) (location-modules remote)))))
+  (not (or (null (find (name module) (location-modules remote)))
+           (remote-disabled-p remote))))
 
 (defun distributor-provides-module-p (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
   "See whether DISTRIBUTOR provides MODULE via any of its remotes, returning
