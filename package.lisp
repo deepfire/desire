@@ -9,7 +9,7 @@
    #:distributor #:location #:remote #:locality #:master #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
-   #:do-distributors #:do-modules #:do-remotes
+   #:do-distributors #:do-remotes
    #:serialize-definitions #:read-definitions
    #:module-dependencies #:module-full-dependencies
    #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
