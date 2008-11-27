@@ -32,7 +32,7 @@
     "lib" "obj"   ;; ECL/win32
     )) 
 
-(defun purge-module-fasls (module &optional (locality (master 'git)))
+(defun purge-module-binaries (module &optional (locality (master 'git)))
   "Purge MODULE's files with type among one of *PURGEWORTH-BINARIES* in
    LOCALITY."
   (dolist (type *purgeworth-binaries*)
