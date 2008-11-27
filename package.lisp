@@ -9,6 +9,7 @@
    #:distributor #:location #:remote #:locality #:master #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
+   #:do-distributors #:do-modules #:do-remotes
    #:serialize-definitions #:read-definitions
    #:module-dependencies #:module-full-dependencies
    #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
@@ -26,7 +27,7 @@
    ;; desire.lisp
    #:define-application 
    #:fetch #:desire
-   #:purge-module-fasls))
+   #:purge-module-binaries))
 
 (in-package :desire)
 
