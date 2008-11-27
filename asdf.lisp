@@ -34,8 +34,8 @@
 
 (defun system-loadable-p (system &optional (locality (master 'git)) &aux (name (coerce-to-name system)))
   "See whether SYSTEM is loadable by the means of ASDF."
-  (and (asdf:find-system name nil)
-       (not (symlink-dead-p (nth-value 1 (system-definition-path system locality))))))
+  (and (not (symlink-dead-p (nth-value 1 (system-definition-path system locality))))
+       (asdf:find-system name nil)))
 
 (defun ensure-system-loadable (system &optional (locality (master 'git)))
   (unless (system-loadable-p system)
