@@ -24,13 +24,21 @@
   (let* ((system (coerce-to-system system))
          (name (down-case-name system)))
     (values
-     (subfile (locality-path locality) (append (list name) (system-relativity system) (list name)) :type "asd")
+     (subfile (locality-path locality) (append (list (down-case-name (system-module system))) (system-relativity system) (list name)) :type "asd")
      (subfile (git-locality-asdf-registry-path locality) (list name) :type "asd"))))
 
 (defun symlink-dead-p (symlink)
   (if-let ((destination (file-exists-p symlink)))
     (pathname-match-p symlink destination)
     t))
+
+(define-condition module-systems-unloadable-error (error)
+  ((module :accessor module-system-unloadable-error-module :initarg :module)
+   (systems :accessor module-system-unloadable-error-systems :initarg :system))
+  (:report (lambda (stream cond)
+             (format stream "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>"
+                     (module-system-unloadable-error-module cond)
+                     (module-system-unloadable-error-systems cond)))))
 
 (defun system-loadable-p (system &optional (locality (master 'git)) &aux (name (coerce-to-name system)))
   "See whether SYSTEM is loadable by the means of ASDF."
@@ -45,5 +53,10 @@
       (ensure-directories-exist system-asd-symlink)
       (sb-posix:symlink system-asd system-asd-symlink))))
 
-(defun ensure-module-systems-loadable (module &optional (locality (master 'git)))
-  (mapc (rcurry #'ensure-system-loadable locality) (module-systems (coerce-to-module module))))
+(defun module-systems-loadable-p (module  &optional (locality (master 'git)))
+  (every (rcurry #'system-loadable-p locality) (module-systems (coerce-to-module module))))
+
+(defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
+  (mapc (rcurry #'ensure-system-loadable locality) (module-systems module))
+  (unless (module-systems-loadable-p module)
+    (error 'module-system-unloadable-error module (remove-if #'system-loadable-p (module-systems module)))))
