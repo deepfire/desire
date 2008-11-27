@@ -500,12 +500,20 @@
   (when-let ((distributor (module-distributor module)))
     (distributor-provides-module-p distributor module)))
 
+(define-condition desire-condition (condition) ())
+(define-condition desire-error (desire-condition error) ())
+
+(define-condition insatiable-desire (desire-error)
+  ((desire :accessor condition-desire :initarg :desire))
+  (:report (lambda (cond stream)
+             (format stream "~@<It is not known to me how to satisfy the desire for ~S.~:@>" (condition-desire cond)))))
+
 (defun single-module-desire-satisfaction (module &optional (locality (master 'git)))
   "Compute both the LOCALITY and remote to act as agents in satisfaction of
    desire for MODULE."
   (if-let ((remote (module-remote module)))
           (values locality remote)
-          (error "~@<It is not known to me how to satisfy the desire for module ~S.~:@>" module)))
+          (error 'insatiable-desire :desire module)))
 
 (defun substitute-desires (in with)
   "Substitute some of module->distributor maps in IN with those in WITH.

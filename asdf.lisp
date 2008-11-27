@@ -32,7 +32,7 @@
     (pathname-match-p symlink destination)
     t))
 
-(define-condition module-systems-unloadable-error (error)
+(define-condition module-systems-unloadable-error (desire-error)
   ((module :accessor module-system-unloadable-error-module :initarg :module)
    (systems :accessor module-system-unloadable-error-systems :initarg :system))
   (:report (lambda (stream cond)
