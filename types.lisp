@@ -555,7 +555,8 @@
            (desired-list (mapcan #'rest interpreted-desires))
            (full-list (remove-duplicates (append desired-list (mapcan #'module-full-dependencies desired-list)))))
       (iter (for module in full-list)
-            (collect (multiple-value-call #'list (single-module-desire-satisfaction module) (module module)))))))
+            (with-ignore-restart (skip-this-module ())
+              (collect (multiple-value-call #'list (single-module-desire-satisfaction module) (module module))))))))
 
 (defun compute-module-caches (module)
   "Regarding MODULE, return remotes providing it, localities storing 
