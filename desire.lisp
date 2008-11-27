@@ -132,8 +132,6 @@
    distributor, from which the rest of the list is supposed to be imported.
 
    These two forms can be mixed."
-  (sb-posix:putenv "PAGER=cat")
-  (sb-posix:putenv "GIT_PAGER=cat")
   (let* ((satisfaction (apply #'desire-satisfaction desires))
          (to-update (mapcar #'third satisfaction))
          (names (mapcar #'name to-update)))
