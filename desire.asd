@@ -8,9 +8,11 @@
 (defsystem :desire
   :depends-on (:alexandria :iterate :pergamum :semi-precious :cl-fad)
   :components ((:file "package")
+               ;; Tier #
+               (:file "dependencies" :depends-on ("package"))
                ;; Tier 0
-               (:file "filesystem-utils" :depends-on ("package"))
-               (:file "types" :depends-on ("package"))
+               (:file "filesystem-utils" :depends-on ("dependencies"))
+               (:file "types" :depends-on ("dependencies"))
                ;; Tier 1
                (:file "filesystem" :depends-on ("filesystem-utils" "types"))
                ;; Tier 2
