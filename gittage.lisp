@@ -131,3 +131,13 @@ stopped."
   (check-type remote git-remote)
   (unless (member (name remote) (module-gitremotes module locality))
     (module-add-gitremote module remote)))
+
+(defun ensure-darcs-safe-boredom (module &optional (locality (master 'darcs)))
+  (when-let* ((boring-file (subfile (module-path module locality) '(".boring")))
+              (missed-boredom (xform (file-exists-p boring-file)
+                                     (when-let* ((exists-p (file-exists-p boring-file))
+                                                 (boring-contents (file-as-string boring-file)))
+                                       (curry #'remove-if (lambda (x) (search x boring-contents))))
+                                     '("\\.dfsl$" "\\.ppcf$" "\\.x86f$" "\\.fasl$" "\\.fas$" "\\.lib$" "\\.o$" "\\.obj$"))))
+    (with-output-to-file (stream boring-file :if-exists :append)
+      (format stream "~&~{~A~%~}" missed-boredom))))
