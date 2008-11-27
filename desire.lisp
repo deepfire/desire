@@ -92,7 +92,7 @@
     (if (directory-exists-p darcs-repo-dir)
         (darcs "pull" "--all" "--repodir" (namestring darcs-repo-dir) url)
         (darcs "get" url (namestring darcs-repo-dir)))
-    (ensure-darcs-safe-boredom module (master 'darcs))
+    (purge-module-binaries module (master 'darcs))
     (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create)
       (darcs-to-git (namestring darcs-repo-dir)))
     (when (module-bare-p module git-locality)
