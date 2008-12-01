@@ -537,7 +537,8 @@
                     (push module (rest new-home))))))))
 
 (defun desire-satisfaction (&rest desires)
-  "Produce a list of locality-remote pairs, as satisfaction for DESIRES.
+  "Produce a list of locality-remote pairs, as satisfaction for DESIRES,
+   and a list of interpreted directly desired modules, as values.
 
    When individual parameters are symbols, they are interpreted as module
    names, and are intepreted in the context of the global *DESIRES*.
@@ -554,9 +555,11 @@
     (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
            (desired-list (mapcan #'rest interpreted-desires))
            (full-list (remove-duplicates (append desired-list (mapcan #'module-full-dependencies desired-list)))))
-      (iter (for module in full-list)
-            (with-ignore-restart (skip-this-module ())
-              (collect (multiple-value-call #'list (single-module-desire-satisfaction module) (module module))))))))
+      (values
+       (iter (for module in full-list)
+             (with-ignore-restart (skip-this-module ())
+               (collect (multiple-value-call #'list (single-module-desire-satisfaction module) (module module)))))
+       (mapcar #'module desired-list)))))
 
 (defun compute-module-caches (module)
   "Regarding MODULE, return remotes providing it, localities storing 
