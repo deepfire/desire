@@ -13,8 +13,8 @@
    #:serialize-definitions #:read-definitions
    #:remote-disabled-p
    #:module-dependencies #:module-full-dependencies
-   #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
-   #:add-desire #:desire-satisfaction #:desire
+   #:module-present-p #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
+   #:add-desire #:desire-satisfaction #:desire #:desire*
    #:*default-world-readable* #:*desires*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
    ;; filesystem-utils.lisp

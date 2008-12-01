@@ -37,3 +37,7 @@
    LOCALITY."
   (dolist (type *purgeworth-binaries*)
     (mapc #'delete-file (directory (subfile (module-path module locality) '(:wild-inferiors :wild) :type type)))))
+
+(defun module-present-p (module &optional (locality (master 'git)))
+  "See, whether MODULE is present in git LOCALITY."
+  (directory-exists-p (subdirectory* (module-path module locality) ".git")))
