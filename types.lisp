@@ -438,6 +438,15 @@
     (ensure-directories-exist (cvs-locality-lock-path (master 'cvs)))
     t))
 
+(defun define-master-localities-in (path &key (git-subdir "git") (hg-subdir "hg") (darcs-subdir "darcs") (cvs-subdir "cvs") (svn-subdir "svn"))
+  "A shortcut for master locality set definition in PATH."
+  (define-master-localities
+    (subdirectory* path git-subdir)
+    (subdirectory* path hg-subdir)
+    (subdirectory* path darcs-subdir)
+    (subdirectory* path cvs-subdir)
+    (subdirectory* path svn-subdir)))
+
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
    in which case an error is signalled."

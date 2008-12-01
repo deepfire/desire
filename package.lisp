@@ -11,6 +11,7 @@
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes
    #:serialize-definitions #:read-definitions
+   #:define-master-localities #:define-master-localities-in
    #:remote-disabled-p
    #:module-dependencies #:module-full-dependencies
    #:module-present-p #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
