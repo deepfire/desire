@@ -34,8 +34,8 @@
 
 (define-condition module-systems-unloadable-error (desire-error)
   ((module :accessor module-system-unloadable-error-module :initarg :module)
-   (systems :accessor module-system-unloadable-error-systems :initarg :system))
-  (:report (lambda (stream cond)
+   (systems :accessor module-system-unloadable-error-systems :initarg :systems))
+  (:report (lambda (cond stream)
              (format stream "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>"
                      (module-system-unloadable-error-module cond)
                      (module-system-unloadable-error-systems cond)))))
@@ -59,4 +59,4 @@
 (defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
   (mapc (rcurry #'ensure-system-loadable locality) (module-systems module))
   (unless (module-systems-loadable-p module)
-    (error 'module-system-unloadable-error module (remove-if #'system-loadable-p (module-systems module)))))
+    (error 'module-systems-unloadable-error :module module :systems (remove-if #'system-loadable-p (module-systems module)))))
