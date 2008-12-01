@@ -40,9 +40,4 @@
                                desire::*apps*
                                desire::*masters*)
     (read-definitions *definitions-path*)
-    (define-master-localities
-        (subdirectory* test-root "git")
-        (subdirectory* test-root "hg")
-        (subdirectory* test-root "darcs")
-        (subdirectory* test-root "cvs")
-        (subdirectory* test-root "svn"))))
+    (apply #'define-master-localities (mapcar (curry #'subdirectory* test-root) '("git" "hg" "darcs" "cvs" "svn")))))
