@@ -59,4 +59,5 @@
 (defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
   (mapc (rcurry #'ensure-system-loadable locality) (module-systems module))
   (unless (module-systems-loadable-p module)
-    (error 'module-systems-unloadable-error :module module :systems (remove-if #'system-loadable-p (module-systems module)))))
+    (with-ignore-restart (accept-failure ())
+      (error 'module-systems-unloadable-error :module module :systems (remove-if #'system-loadable-p (module-systems module))))))
