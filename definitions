@@ -37,7 +37,7 @@
         split-sequence trivial-sockets salza skippy))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~crhodes" (downstring (name mod))) :name common-lisp.net-krystof
-       :modules (clx))
+       :modules (clx vclos spatial-trees midi))
     #R(GIT-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~loliveira" "git" (downstring (name mod)))
        :name common-lisp.net-luis :modules (texinfo-docstrings))
@@ -92,7 +92,7 @@
    :remotes
    (#R(DARCS-HTTP-REMOTE RVW.DOC.GOLD.AC.UK
        ((mod) "sullivan" "darcs" (downstring (name mod)))
-       :modules (spatial-trees midi)))) 
+       :modules (spatial-trees midi) :disabled-p t))) 
 #D(SBCL.BOINKOR.NET
    :remotes
    (#R(GIT-NATIVE-REMOTE SBCL.BOINKOR.NET ((mod) (downstring (name mod)))
@@ -261,7 +261,7 @@
 #M(SBCL :systems nil) 
 #M(SEMI-PRECIOUS :depends-on (pergamum)) 
 #M(SKIPPY) 
-#M(SLIME) 
+#M(SLIME :systems (swank)) 
 #M(SPATIAL-TREES) 
 #M(SPECIALIZABLE) 
 #M(SPLIT-SEQUENCE) 
