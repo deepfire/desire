@@ -132,7 +132,7 @@
 ;;; Modules
 ;;;
 #M(ALEXANDRIA) 
-#M(ASSEM) 
+#M(ASSEM :depends-on (custom-harness semi-precious)) 
 #M(ATDOC :depends-on (cxml split-sequence swank))
 #M(BABEL :depends-on (trivial-features)) 
 #M(BEIRC :depends-on (mcclim cl-irc cl-ppcre cl-fad)) 
@@ -187,7 +187,7 @@
 #M(CLXS) 
 #M(COMMON-DB
    :depends-on
-   (sb-x86-portio libpciaccess cl-io-elf semi-precious mcclim clim-file-selector)
+   (assem sb-x86-portio libpciaccess regvaldefs cl-io-elf mcclim clim-file-selector)
    :systems (common-db common-db-gui)) 
 #M(CUSTOM-HARNESS) 
 #M(CVSPS :systems nil) 
