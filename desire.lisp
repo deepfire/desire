@@ -119,24 +119,59 @@
       (git-svn "fetch"))))
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
-  (setf (module-world-readable-p module) *default-world-readable*)
-  (ensure-module-systems-loadable module git-locality))
+  (setf (module-world-readable-p module) *default-world-readable*))
 
-(defun desire (&rest desires)
+(defun desire (desires &key update-depended skip-present)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
-   When individual parameters are symbols, they are interpreted as module
+   Desire satisfaction means:
+    - for specified missing modules, retrieval,
+    - for specified present modules, update, unless SKIP-PRESENT is
+      non-nil,
+    - for depended-upon modules, retrieval, when missing, and update
+      when UPDATE-DEPENDED is non-nil.
+
+   In all cases, all systems present in the set union of specified and
+   depended upon modules are ensured to be loadable.
+
+   When individual desires are symbols, they are interpreted as module
    names, and are intepreted in the context of the global *DESIRES*.
 
    When they are lists, their first element is interpreted as the source
    distributor, from which the rest of the list is supposed to be imported.
 
-   These two forms can be mixed."
-  (let* ((satisfaction (apply #'desire-satisfaction desires))
-         (to-update (mapcar #'third satisfaction))
-         (names (mapcar #'name to-update)))
-    (format t "Will try updating following modules:~{ ~S~}~%" names)
-    (mapcar #'name (remove nil (mapcar #'and-p (mapcar (curry #'apply #'fetch) satisfaction) to-update)))))
+   These two forms can be mixed in the list of desires.
+
+   Defined keywords:
+    - SKIP-PRESENT - whether to skip updating specified modules which are 
+      already present, defaults to nil.
+    - UPDATE-DEPENDED - whether to update depended upon modules which are 
+      already present, defaults to nil."
+  (multiple-value-bind (full-satisfaction directly-desired) (apply #'desire-satisfaction desires)
+    (let* ((full (mapcar #'third full-satisfaction))
+           (depended (set-difference full directly-desired)))
+      (multiple-value-bind (specified-present specified-missing) (unzip #'module-present-p directly-desired)
+        (multiple-value-bind (depended-present depended-missing) (unzip #'module-present-p depended)
+          (let* ((present-unloadable (remove-if #'module-systems-loadable-p (union specified-present depended-present)))
+                 (missing (union specified-missing depended-missing))
+                 (to-fetch (union missing
+                                  (union (unless skip-present specified-present)
+                                         (when update-depended depended-present))))
+                 (select-satisfaction (mapcar (rcurry #'find full-satisfaction :key #'third) to-fetch)))
+            (when depended-missing
+              (format t "~&The following extra modules will be installed:~% ~{ ~(~S~)~}" (mapcar #'name depended-missing)))
+            (when missing
+              (format t "~&The following NEW modules will be installed:~% ~{ ~(~S~)~}" (mapcar #'name missing)))
+            (when present-unloadable
+              (format t "~&The following modules are present, but have unloadable systems which will be made loadable:~% ~{ ~(~A~)~}" (mapcar #'name present-unloadable)))
+            (mapc (curry #'apply #'fetch) select-satisfaction)
+            (mapc #'ensure-module-systems-loadable (union missing present-unloadable))))))))
+
+(defun desire* (&rest desires)
+  "A spread interface function for DESIRE.
+
+   Updates present specified modules and skips present depended ones."
+  (desire desires))
 
 ;; (defgeneric fetch-desired-p (repo)
 ;;   (:method ((o derived-repository))
