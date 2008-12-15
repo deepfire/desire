@@ -300,7 +300,10 @@
      `(or (module ',name :if-does-not-exist :continue)
           (prog1 (make-instance 'module :name ',name :umbrella ',umbrella ,@(when depends-on `(:depends-on '(,@depends-on)))
                                 ,@(remove-from-plist initargs :systems :depends-on))
-                 ,@(unless systems-specified-p `((make-instance 'system :name ',name :module (module ',name)))))))))
+                 ,@(unless systems-specified-p `((make-instance 'asdf-system :name ',name :module (module ',name)))))))))
+
+(defclass asdf () ())
+(defclass mudballs () ())
 
 (defclass system (registered)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
@@ -309,6 +312,9 @@
   (:default-initargs
    :registrator #'(setf system)
    :module nil :applications nil :relativity nil))
+
+(defclass asdf-system (asdf system) ())
+(defclass mudballs-system (mudballs system) ())
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
@@ -320,7 +326,7 @@
   (declare (ignore sharp char))
   (destructuring-bind (name &rest initargs &key module relativity &allow-other-keys) (read stream nil nil t)
     `(or (system ',name :if-does-not-exist :continue)
-         (make-instance 'system :name ',name :module (module ',module) :relativity ',relativity ,@(remove-from-plist initargs :module :applications :relativity)))))
+         (make-instance 'asdf-system :name ',name :module (module ',module) :relativity ',relativity ,@(remove-from-plist initargs :module :applications :relativity)))))
 
 (defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
   (appendf (module-systems module) (list o)))
@@ -591,31 +597,6 @@
                                       (car (push (list new-dist) new-desires)))))
                     (push module (rest new-home))))))))
 
-(defun desire-satisfaction (&rest desires)
-  "Produce a list of locality-remote pairs, as satisfaction for DESIRES,
-   and a list of interpreted directly desired modules, as values.
-
-   When individual parameters are symbols, they are interpreted as module
-   names, and are intepreted in the context of the global *DESIRES*.
-
-   When they are lists, their first element is interpreted as the source
-   distributor, from which the rest of the list is supposed to be imported.
-
-   These two forms can be mixed."
-  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-distributor m)) m))) desires)))
-    (iter (for (distributor-name . modules) in interpreted-desires)
-          (for distributor = (distributor distributor-name))
-          (when-let ((missing (remove-if (curry #'distributor-provides-module-p distributor) modules)))
-            (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
-    (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
-           (desired-list (mapcan #'rest interpreted-desires))
-           (full-list (remove-duplicates (append desired-list (mapcan #'module-full-dependencies desired-list)))))
-      (values
-       (iter (for module in full-list)
-             (with-ignore-restart (skip-this-module ())
-               (collect (multiple-value-call #'list (single-module-desire-satisfaction module) (module module)))))
-       (mapcar #'module desired-list)))))
-
 (defun compute-module-caches (module)
   "Regarding MODULE, return remotes providing it, localities storing 
    (or desiring to store) it and systems it provides, as values."
@@ -641,7 +622,7 @@
   (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
         (change-class (module module-name) 'origin-module :master-locality locality)))
 
-(defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/desire/definitions.lisp"
+(defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/dese/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
                   (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2"))
   (reinit-definitions)
