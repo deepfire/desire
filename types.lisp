@@ -423,6 +423,38 @@
   "Return MODULE's path in LOCALITY, which defaults to master Git locality."
   (subdirectory* (locality-path locality) (downstring (coerce-to-name module))))
 
+(defun read-definitions (stream)
+  "Unserialise global definitions from STREAM."
+  (let ((*readtable* (copy-readtable))
+        (*read-eval* nil)
+        (*package* #.*package*))
+    (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
+    (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
+    (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
+    (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
+    (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
+    (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
+    (load stream)
+    (maphash-values #'reestablish-module-dependencies *modules*)
+    (minimise-dependencies *leaves*)))
+
+(defun serialize-definitions (&optional stream)
+  "Serialise global definitions to STREAM."
+  (let ((*print-case* :downcase)
+        (*package* #.*package*))
+    (flet ((sorted-hash-table-entries (hash-table)
+             (sort (hash-table-values hash-table) #'string< :key (compose #'string #'name))))
+      (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
+      (iter (for d in (sorted-hash-table-entries *distributors*)) (print d stream))
+      (format stream "~%~%;;;~%;;; Modules~%;;;")
+      (iter (for m in (sorted-hash-table-entries *modules*)) (print m stream))
+      (format stream "~%~%;;;~%;;; Systems~%;;;")
+      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (module-system-implied-p (system-module s)) (print s stream)))
+      (format stream "~%~%;;;~%;;; Applications~%;;;")
+      (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream))
+      (format stream "~%~%;;;~%;;; Desires~%;;;")
+      (print *desires* stream))))
+
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
   (when-let ((bad-paths (remove-if #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
@@ -445,7 +477,13 @@
     (subdirectory* path hg-subdir)
     (subdirectory* path darcs-subdir)
     (subdirectory* path cvs-subdir)
-    (subdirectory* path svn-subdir)))
+    (subdirectory* path svn-subdir))
+  (let ((definitions-path (subfile* (subdirectory* path git-subdir) "definitions")))
+    (if (file-exists-p definitions-path)
+        (with-open-file (definitions definitions-path)
+          (read-definitions definitions))
+        (with-output-to-file (definitions definitions-path)
+          (serialize-definitions definitions)))))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
@@ -590,42 +628,10 @@
   (setf (values (module-remotes module) (module-localities module) (module-systems module))
         (compute-module-caches module)))
 
-(defun read-definitions (stream)
-  "Unserialise global definitions from STREAM."
-  (let ((*readtable* (copy-readtable))
-        (*read-eval* nil)
-        (*package* #.*package*))
-    (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
-    (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
-    (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
-    (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
-    (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
-    (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
-    (load stream)
-    (maphash-values #'reestablish-module-dependencies *modules*)
-    (minimise-dependencies *leaves*)))
-
 (defun identify-with-distributor (distributor-name locality)
   "Recognize DISTRIBUTOR-NAME's modules as locally hosted in LOCALITY."
   (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
         (change-class (module module-name) 'origin-module :master-locality locality)))
-
-(defun serialize-definitions (&optional stream)
-  "Serialise global definitions to STREAM."
-  (let ((*print-case* :downcase)
-        (*package* #.*package*))
-    (flet ((sorted-hash-table-entries (hash-table)
-             (sort (hash-table-values hash-table) #'string< :key (compose #'string #'name))))
-      (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
-      (iter (for d in (sorted-hash-table-entries *distributors*)) (print d stream))
-      (format stream "~%~%;;;~%;;; Modules~%;;;")
-      (iter (for m in (sorted-hash-table-entries *modules*)) (print m stream))
-      (format stream "~%~%;;;~%;;; Systems~%;;;")
-      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (module-system-implied-p (system-module s)) (print s stream)))
-      (format stream "~%~%;;;~%;;; Applications~%;;;")
-      (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream))
-      (format stream "~%~%;;;~%;;; Desires~%;;;")
-      (print *desires* stream))))
 
 (defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/desire/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
