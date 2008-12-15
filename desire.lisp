@@ -182,6 +182,8 @@
               (format t "~&The following NEW modules will be installed:~% ~{ ~(~S~)~}" (mapcar #'name missing)))
             (when present-unloadable
               (format t "~&The following modules are present, but have unloadable systems which will be made loadable:~% ~{ ~(~A~)~}" (mapcar #'name present-unloadable)))
+            (terpri)
+            (finish-output)
             (mapc (curry #'apply #'fetch) select-satisfaction)
             (mapc #'ensure-module-systems-loadable (union missing present-unloadable))))))))
 
