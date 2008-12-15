@@ -55,23 +55,9 @@
 ;;;               (return-from fetch-module t))
 ;;;             (finally (warn 'module-fetch-failed :module o)))))
 
-;; (defmethod fetch :around (to from)
-;;   (format t "fetching: ~S => ~S~%" from to)
-;;   (with-condition-restart-binding ((external-program-failure resignal))
-;;     (restart-bind ((resignal (lambda (cond) (declare (ignore cond)) (warn 'repository-fetch-failed :from from :to to) (return-from fetch))))
-;;       (call-next-method))))
+(defgeneric fetch-remote (locality remote module))
 
-(defmethod fetch ((to git-locality) (from git-locality) module)
-  (let ((from-repo-dir (module-path module from))
-        (to-repo-dir (module-path module to)))
-    (unless (directory-exists-p to-repo-dir)
-      (within-directory (dir to-repo-dir :if-exists :error :if-does-not-exist :create)
-        (git "init-db")
-        (git "remote" "add" (down-case-name from) (namestring from-repo-dir))))
-    (within-directory (dir to-repo-dir)
-      (git "fetch" (down-case-name from)))))
-
-(defmethod fetch ((locality git-locality) (remote git-remote) module)
+(defmethod fetch-remote ((locality git-locality) (remote git) module)
   (let ((repo-dir (module-path module locality)))
     (unless (directory-exists-p repo-dir)
       (within-directory (dir repo-dir :if-exists :error :if-does-not-exist :create)
@@ -80,18 +66,50 @@
     (within-directory (dir repo-dir)
       (git "fetch" (down-case-name remote)))))
 
+(defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
+  (let ((darcs-repo-dir (module-path module (master 'darcs)))
+        (url (url remote module)))
+    (if (directory-exists-p darcs-repo-dir)
+        (darcs "pull" "--all" "--repodir" (namestring darcs-repo-dir) url)
+        (darcs "get" url (namestring darcs-repo-dir)))))
+
+(defmethod fetch-remote ((git-locality git-locality) (remote cvs-rsync-remote) module)
+  (let* ((cvs-locality (master 'cvs))
+         (cvs-repo-dir (module-path module cvs-locality)))
+    (rsync "-ravPz" (format nil "~A/cvsroot/" (url remote module)) (namestring cvs-repo-dir))))
+
+(defmethod fetch-remote ((git-locality git-locality) (remote svn-rsync-remote) module)
+  (let ((svn-repo-dir (module-path module (master 'svn))))
+    (rsync "-ravPz" (url remote module) (namestring svn-repo-dir))))
+
+(defmethod fetch-remote :around (locality remote module)
+  (with-error-resignaling (external-program-failure
+                           ((nil) 'fetch-failure :remote remote :module module))
+    (call-next-method)))
+
+(defmethod fetch :around (locality remote module)
+  (with-condition-printing (t fetch-failure)
+    (call-next-method)))
+
+(defmethod fetch ((locality locality) (remote remote) module)
+  (fetch-remote locality remote module))
+
+(defmethod fetch ((to git-locality) (from git-locality) module)
+  (fetch-remote to from module))
+
+(defmethod fetch ((locality git-locality) (remote git-remote) module)
+  (call-next-method))
+
 (defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
+  (call-next-method)
   (let ((hg-repo-dir (module-path module (master 'hg)))
         (git-repo-dir (module-path module git-locality)))
     ))
 
 (defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module)
+  (call-next-method)
   (let ((darcs-repo-dir (module-path module (master 'darcs)))
-        (git-repo-dir (module-path module git-locality))
-        (url (url remote module)))
-    (if (directory-exists-p darcs-repo-dir)
-        (darcs "pull" "--all" "--repodir" (namestring darcs-repo-dir) url)
-        (darcs "get" url (namestring darcs-repo-dir)))
+        (git-repo-dir (module-path module git-locality)))
     (purge-module-binaries module)
     (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create)
       (darcs-to-git (namestring darcs-repo-dir)))
@@ -99,19 +117,19 @@
       (setf (module-bare-p module git-locality) nil))))
 
 (defmethod fetch ((git-locality git-locality) (remote cvs-rsync-remote) module &aux (name (down-case-name module)))
+  (call-next-method)
   (let* ((cvs-locality (master 'cvs))
          (cvs-repo-dir (module-path module cvs-locality))
          (git-repo-dir (module-path module git-locality)))
-    (rsync "-ravPz" (format nil "~A/cvsroot/" (url remote module)) (namestring cvs-repo-dir))
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config"))
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name ;; *REPO-CVS-MODULE*
                    )))
 
 (defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)
+  (call-next-method)
   (let ((svn-repo-dir (module-path module (master 'svn)))
         (git-repo-dir (module-path module git-locality)))
-    (rsync "-ravPz" (url remote module) (namestring svn-repo-dir))
     (unless (directory-exists-p git-repo-dir)
       (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create :if-exists :error)
         (git-svn "init" (format nil "file:/~A" (namestring svn-repo-dir))))) ;; gratuitious SVN complication

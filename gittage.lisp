@@ -67,12 +67,10 @@
     (let ((output (external-program-output-as-string 'git "remote")))
       (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
 
-(defun module-add-gitremote (module remote &aux (locality (master 'git)))
-  (check-type remote git-remote)
+(defun module-add-gitremote (module gitremote &aux (locality (master 'git)))
   (within-directory (dir (module-path module locality))
-    (git "remote" "add" (down-case-name remote) (url remote module))))
+    (git "remote" "add" (down-case-name gitremote) (url gitremote module))))
 
-(defun ensure-module-gitremote (module remote &aux (locality (master 'git)))
-  (check-type remote git-remote)
-  (unless (member (name remote) (module-gitremotes module locality))
-    (module-add-gitremote module remote)))
+(defun ensure-module-gitremote (module gitremote &aux (locality (master 'git)))
+  (unless (member (name gitremote) (module-gitremotes module locality))
+    (module-add-gitremote module gitremote)))

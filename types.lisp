@@ -554,11 +554,18 @@
 
 (define-condition desire-condition (condition) ())
 (define-condition desire-error (desire-condition error) ())
+(define-condition remote-error (desire-error)
+  ((remote :accessor condition-remote :initarg :remote)))
 
-(define-condition insatiable-desire (desire-error)
+(define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))
-  (:report (lambda (cond stream)
-             (format stream "~@<It is not known to me how to satisfy the desire for ~S.~:@>" (condition-desire cond)))))
+  (:report (desire)
+           "~@<It is not known to me how to satisfy the desire for ~S.~:@>" desire))
+
+(define-reported-condition fetch-failure (remote-error)
+  ((module :accessor condition-module :initarg :module))
+  (:report (remote module)
+           "~@<An attempt to fetch module ~S from ~S has failed.~:@>" (name module) remote))
 
 (defun single-module-desire-satisfaction (module &optional (locality (master 'git)))
   "Compute both the LOCALITY and remote to act as agents in satisfaction of
