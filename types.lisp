@@ -461,6 +461,7 @@
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
   (setf *root-of-all-desires* (parse-namestring path))
+  (reinit-definitions)
   (define-master-localities-in path)
   (if (file-exists-p (definitions-path))
       (load-definitions)
