@@ -150,13 +150,13 @@
             (collect depname into unknown-names))
           (finally (return (values known-systems unknown-names))))))
 
+(defun fetch-anyway (module-name)
+  (cons module-name nil))
 
 (defun desire-do-one-step (desires skip-present &optional unknown-sys-dep-acc unknown-sys-enc-acc)
   (declare (special *locality*) (optimize (debug 3)))
   (flet ((next-unsatisfied-module ()
            (car (find nil desires :key #'cdr)))
-         (fetch-anyway (module-name)
-           (cons module-name nil))
          (fetch-if-missing (module-name)
            (cons module-name (not (module-present-p (module module-name) *locality*))))
          ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
