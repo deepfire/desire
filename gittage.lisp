@@ -21,35 +21,6 @@
 (in-package :desire)
 
 
-(defun module-bare-p (module &optional (locality (master 'git)))
-  "See, whether or not MODULE within LOCALITY has its source checked out."
-  (null (directory-exists-p (subdirectory* (module-path module locality) ".git"))))
-
-(defun (setf module-bare-p) (val module &optional (locality (master 'git)))
-  (within-module-repository (dir module locality)
-    (if val
-        (error "not implemented")
-        (progn
-          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
-            (sb-posix:mkdir ".git" #o755)
-            (dolist (filename git-files)
-              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
-          (git "config" "--replace-all" "core.bare" "false")
-          (git "checkout" "master")
-          (git "reset" "--hard")
-          nil))))
-
-(defun module-world-readable-p (module &optional (locality (master 'git)))
-  "See, whether or not MODULE within LOCALITY is allowed to be exported
-   for the purposes of git-daemon."
-  (file-exists-p (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
-
-(defun (setf module-world-readable-p) (val module &optional (locality (master 'git)))
-  (let ((path (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
-    (if val
-        (with-open-file (s path :if-does-not-exist :create) t)
-        (and (delete-file path) nil))))
-
 (defun repo-var (module var &optional (locality (master 'git)))
   (declare (type git-locality locality) (type symbol var))
   (within-module-repository (dir module locality)
@@ -74,3 +45,35 @@
 (defun ensure-module-gitremote (module gitremote &aux (locality (master 'git)))
   (unless (member (name gitremote) (module-gitremotes module locality))
     (module-add-gitremote module gitremote)))
+
+(defun ensure-module-master-branch-from-remote (module locality &optional (remote-name (first (module-gitremotes module locality))))
+  (within-directory (dir (module-path module locality))
+    (git "checkout" "-b" "master" (concatenate 'string (downstring remote-name) "/master"))))
+
+(defun module-bare-p (module &optional (locality (master 'git)))
+  "See, whether or not MODULE within LOCALITY has its source checked out."
+  (null (directory-exists-p (subdirectory* (module-path module locality) ".git"))))
+
+(defun (setf module-bare-p) (val module &optional (locality (master 'git)))
+  (within-module-repository (dir module locality)
+    (if val
+        (error "not implemented")
+        (progn
+          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
+            (sb-posix:mkdir ".git" #o755)
+            (dolist (filename git-files)
+              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
+          (setf (repo-var module 'core.bar locality) "false")
+          (git "reset" "--hard")
+          nil))))
+
+(defun module-world-readable-p (module &optional (locality (master 'git)))
+  "See, whether or not MODULE within LOCALITY is allowed to be exported
+   for the purposes of git-daemon."
+  (file-exists-p (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
+
+(defun (setf module-world-readable-p) (val module &optional (locality (master 'git)))
+  (let ((path (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
+    (if val
+        (with-open-file (s path :if-does-not-exist :create) t)
+        (and (delete-file path) nil))))

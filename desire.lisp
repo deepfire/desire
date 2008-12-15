@@ -64,7 +64,8 @@
         (git "init-db")))
     (ensure-module-gitremote module remote)
     (within-directory (dir repo-dir)
-      (git "fetch" (down-case-name remote)))))
+      (git "fetch" (down-case-name remote)))
+    (ensure-module-master-branch-from-remote module locality)))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
   (let ((darcs-repo-dir (module-path module (master 'darcs)))
