@@ -30,7 +30,7 @@
        ((mod) "project" (downstring (module-umbrella mod)))
        :modules (graphic-forms cl-irc usocket))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
-       ((mod) "project" "clbuild" (downstring (name mod)))
+       ((mod) "project" "clbuild" "mirror" (downstring (name mod)))
        :name common-lisp.net-clbuild
        :modules
        (chipz ironclad ltk net-telent-date parse-number psgraph rfc2388
