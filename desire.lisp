@@ -84,7 +84,7 @@
 
 (defmethod fetch-remote :around (locality remote module)
   (with-error-resignaling (external-program-failure
-                           ((nil) 'fetch-failure :remote remote :module module))
+                           ((cond) 'fetch-failure :remote remote :module module :execution-error (format nil "~A" cond)))
     (call-next-method)))
 
 (defmethod fetch :around (locality remote module)

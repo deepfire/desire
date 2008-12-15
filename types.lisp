@@ -563,9 +563,10 @@
            "~@<It is not known to me how to satisfy the desire for ~S.~:@>" desire))
 
 (define-reported-condition fetch-failure (remote-error)
-  ((module :accessor condition-module :initarg :module))
-  (:report (remote module)
-           "~@<An attempt to fetch module ~S from ~S has failed.~:@>" (name module) remote))
+  ((module :accessor condition-module :initarg :module)
+   (execution-error :accessor condition-execution-error :initarg :execution-error))
+  (:report (remote module execution-error)
+           "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (name module) remote execution-error))
 
 (defun single-module-desire-satisfaction (module &optional (locality (master 'git)))
   "Compute both the LOCALITY and remote to act as agents in satisfaction of
