@@ -299,7 +299,7 @@
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
      `(or (module ',name :if-does-not-exist :continue)
           (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
-                                ,@(remove-from-plist initargs :systems-on))
+                                ,@(remove-from-plist initargs :systems))
                  ,@(unless systems-specified-p `((make-instance 'asdf-system :name ',name :module (module ',name)))))))))
 
 (defclass asdf () ())
