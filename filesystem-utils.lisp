@@ -35,7 +35,7 @@
   ((program :accessor cond-program :initarg :program)
    (parameters :accessor cond-parameters :initarg :parameters)
    (status :accessor cond-status :initarg :status)
-   (output :accessor cond-status :initarg :output))
+   (output :accessor cond-output :initarg :output))
   (:report (program parameters status output)
            "~@<running ~A~{ ~A~} failed with exit status ~S~:[~;, output:~@:_~:*~@<...~;~A~:@>~]~%~:@>" program parameters status output))
 
@@ -107,6 +107,12 @@
 
 (defmacro with-valid-exit-codes ((&rest bindings) &body body)
   `(let ((*valid-exit-code-extension* (list ,@(mapcar (curry #'cons 'cons) bindings))))
+     ,@body))
+
+(defmacro exit-code-bind ((&rest bindings) &body body)
+  `(handler-bind ((external-program-failure (lambda (cond)
+                                              (case (cond-status cond)
+                                                ,@bindings))))
      ,@body))
 
 (define-external-program git :critical t)
