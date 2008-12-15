@@ -33,6 +33,13 @@
   (within-module-repository (dir module locality)
     (run-external-program 'git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
 
+(defun module-gitbranches (module &optional (locality (master 'git)))
+  (within-module-repository (dir module locality)
+    (let ((output (external-program-output-as-string 'git "branch")))
+      (remove '* (mapcar (compose #'intern #'string-upcase) 
+                         (mapcan (curry #'split-sequence #\Space)
+                                 (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))))
+
 (defun module-gitremotes (module &optional (locality (master 'git)))
   (within-module-repository (dir module locality)
     (let ((output (external-program-output-as-string 'git "remote")))
@@ -66,6 +73,13 @@
           (setf (repo-var module 'core.bar locality) "false")
           (git "reset" "--hard")
           nil))))
+
+(defun module-present-p (module &optional (locality (master 'git)))
+  (let ((repo (module-path module locality)))
+    (and (directory-exists-p repo)
+         (directory-exists-p (subdirectory* repo ".git"))
+         (within-directory (repo repo)
+           (not (null (module-gitbranches module locality)))))))
 
 (defun module-world-readable-p (module &optional (locality (master 'git)))
   "See, whether or not MODULE within LOCALITY is allowed to be exported
