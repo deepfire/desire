@@ -218,11 +218,9 @@
            (*locality* (master 'git))
            (desired-list (mapcan #'rest interpreted-desires)))
       (declare (special *locality*))
-      (format t "Satisfying:~%")
-      (finish-output)
+      (format t "Satisfying desire for ~D module~:*~P:~%" (length desired-list)) (finish-output)
       (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present)
-      (format t "All done.~%")
-      (finish-output))))
+      (format t "All done.~%") (finish-output))))
 
 (defun desire* (&rest desires)
   "A spread interface function for DESIRE.
