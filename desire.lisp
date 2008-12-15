@@ -124,8 +124,8 @@
          (git-repo-dir (module-path module git-locality)))
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config"))
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
-    (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name ;; *REPO-CVS-MODULE*
-                   )))
+    (exit-code-bind ((9 (error 'repository-not-clean-during-fetch :module module :locality git-locality)))
+      (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name))))
 
 (defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)
   (call-next-method)

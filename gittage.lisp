@@ -21,9 +21,9 @@
 (in-package :desire)
 
 
-(define-reported-condition repository-has-changes (repository-error) ()
+(define-reported-condition repository-not-clean-during-fetch (repository-error) ()
   (:report (locality module)
-           "~@<repository for ~S in ~S has uncommitted changes~:@>" module locality))
+           "~@<repository for ~S in ~S has uncommitted changes during fetch~:@>" module locality))
 
 (defun repo-var (module var &optional (locality (master 'git)))
   (declare (type git-locality locality) (type symbol var))
