@@ -21,6 +21,10 @@
 (in-package :desire)
 
 
+(define-reported-condition repository-has-changes (repository-error) ()
+  (:report (locality module)
+           "~@<repository for ~S in ~S has uncommitted changes~:@>" module locality))
+
 (defun repo-var (module var &optional (locality (master 'git)))
   (declare (type git-locality locality) (type symbol var))
   (within-module-repository (dir module locality)

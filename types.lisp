@@ -530,6 +530,9 @@
 
 (define-condition desire-condition (condition) ())
 (define-condition desire-error (desire-condition error) ())
+(define-condition repository-error (desire-error)
+  ((locality :accessor condition-locality :initarg :locality)
+   (module :accessor condition-module :initarg :module)))
 (define-condition remote-error (desire-error)
   ((remote :accessor condition-remote :initarg :remote)))
 
