@@ -81,7 +81,7 @@
                           (caar valid-exit-codes))
                         (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output :environment environment)))))
     (cdr (or (assoc exit-code valid-exit-codes)
-             (signal 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
+             (error 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
 
 (defmacro with-input-from-external-program ((stream-var name params) &body body)
   (with-gensyms (block str)
