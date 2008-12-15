@@ -15,7 +15,7 @@
    #:remote-disabled-p
    #:module-dependencies #:module-full-dependencies
    #:module-present-p #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
-   #:add-desire #:desire-satisfaction #:desire #:desire*
+   #:add-desire #:desire #:desire*
    #:*default-world-readable* #:*desires*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
    ;; filesystem-utils.lisp

@@ -150,37 +150,50 @@
             (collect depname into unknown-names))
           (finally (return (values known-systems unknown-names))))))
 
-(defun desire-do-one-step (desires git-locality)
+
+(defun desire-do-one-step (desires skip-present &optional unknown-sys-dep-acc unknown-sys-enc-acc)
+  (declare (special *locality*) (optimize (debug 3)))
   (flet ((next-unsatisfied-module ()
-           (find nil desires :key #'cdr))
-         (moddep (m) (assoc m desires))
+           (car (find nil desires :key #'cdr)))
+         (fetch-anyway (module-name)
+           (cons module-name nil))
+         (fetch-if-missing (module-name)
+           (cons module-name (not (module-present-p (module module-name) *locality*))))
+         ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
          (module-dependencies (m)
-           (iter (for system-file in (directory (merge-pathnames (make-pathname :directory (module-path m) :name :wild :type "asd")
+           (iter (for system-file in (directory (merge-pathnames (make-pathname :directory (pathname-directory (module-path m)) :name :wild :type "asd")
                                                                  (make-pathname :directory '(:relative :wild-inferiors)))))
                  (if-let* ((system (system (pathname-name system-file) :if-does-not-exist :continue)))
                           (multiple-value-bind (sysdeps unknown-sysdeps) (system-dependencies system)
                             (ensure-system-loadable system)
-                            (warn "Ignoring unknown systems:~{ ~S~}" unknown-sysdeps)
-                            (remove-duplicates (mapcar #'system-module sysdeps)))
-                          (warn "Noticed unknown system: ~(~A~)" (pathname-name system-file))))))
-    (when-let ((an-unsatisfied-desire (module (next-unsatisfied-module))))
-      (multiple-value-call #'fetch (single-module-desire-satisfaction an-unsatisfied-desire git-locality) an-unsatisfied-desire)
-      (ensure-module-systems-loadable an-unsatisfied-desire git-locality)
-      (setf (cdr (moddep (name an-unsatisfied-desire))) t)
-      (iter (for dep in (mapcar #'name (module-dependencies an-unsatisfied-desire)))
-            (unless (moddep dep)
-              (push (cons dep nil) desires)))
-      (desire-do-one-step desires git-locality))))
+                            (when unknown-sysdeps
+                              (appending unknown-sysdeps into unknown-systems-depended-upon))
+                            (appending
+                             (remove-duplicates (mapcar (compose #'name #'system-module) sysdeps))
+                             into module-dependencies))
+                          (collect (intern (string-upcase (pathname-name system-file))) into unknown-system-encounters))
+                 (finally (return (values module-dependencies unknown-systems-depended-upon unknown-system-encounters))))))
+    (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
+      (let ((an-unsatisfied-module (module an-unsatisfied-name)))
+        (fetch *locality* (module-remote an-unsatisfied-module) an-unsatisfied-module)
+        (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds, or errors
+        (setf (desire-satisfied an-unsatisfied-name) t)
+        (multiple-value-bind (module-deps unknown-sys-dep unknown-sys-enc) (module-dependencies an-unsatisfied-module)
+          (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
+            (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
+            (format t "~&~S,~:[~; added ~:*~S,~] ~D left~%"
+                    an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
+            (finish-output))
+          (desire-do-one-step desires skip-present (union unknown-sys-dep unknown-sys-dep-acc) (union unknown-sys-enc unknown-sys-enc-acc))))
+      (values t unknown-sys-dep-acc unknown-sys-enc-acc))))
 
-(defun desire (desires)
+(defun desire (desires &key skip-present)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
    Desire satisfaction means:
     - for specified missing modules, retrieval,
     - for specified present modules, update, unless SKIP-PRESENT is
       non-nil,
-    - for depended-upon modules, retrieval, when missing, and update
-      when UPDATE-DEPENDED is non-nil.
 
    In all cases, all systems present in the set union of specified and
    depended upon modules are ensured to be loadable.
@@ -195,8 +208,6 @@
 
    Defined keywords:
     - SKIP-PRESENT - whether to skip updating specified modules which are 
-      already present, defaults to nil.
-    - UPDATE-DEPENDED - whether to update depended upon modules which are
       already present, defaults to nil."
   (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-distributor m)) m))) desires)))
     (iter (for (distributor-name . modules) in interpreted-desires)
@@ -204,8 +215,14 @@
           (when-let ((missing (remove-if (curry #'distributor-provides-module-p distributor) modules)))
             (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
+           (*locality* (master 'git))
            (desired-list (mapcan #'rest interpreted-desires)))
-      (desire-do-one-step (mapcar (compose (rcurry #'cons nil) #'name) desired-list) (master 'git)))))
+      (declare (special *locality*))
+      (format t "Satisfying:~%")
+      (finish-output)
+      (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present)
+      (format t "All done.~%")
+      (finish-output))))
 
 (defun desire* (&rest desires)
   "A spread interface function for DESIRE.

@@ -54,8 +54,9 @@
     (module-add-gitremote module gitremote)))
 
 (defun ensure-module-master-branch-from-remote (module locality &optional (remote-name (first (module-gitremotes module locality))))
-  (within-directory (dir (module-path module locality))
-    (git "checkout" "-b" "master" (concatenate 'string (downstring remote-name) "/master"))))
+  (unless (find 'master (module-gitbranches module locality))
+    (within-directory (dir (module-path module locality))
+      (git "checkout" "-b" "master" (concatenate 'string (downstring remote-name) "/master")))))
 
 (defun module-bare-p (module &optional (locality (master 'git)))
   "See, whether or not MODULE within LOCALITY has its source checked out."

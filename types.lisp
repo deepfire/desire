@@ -552,12 +552,6 @@
   (when-let ((distributor (module-desired-p module)))
     (distributor-provides-module-p distributor module)))
 
-(defun module-remote (module)
-  "Find out the only remote providing MODULE, or is specified
-   to be in a desired distributor for MODULE, if there is ambiguity."
-  (when-let ((distributor (module-distributor module)))
-    (distributor-provides-module-p distributor module)))
-
 (define-condition desire-condition (condition) ())
 (define-condition desire-error (desire-condition error) ())
 (define-condition remote-error (desire-error)
@@ -574,12 +568,14 @@
   (:report (remote module execution-error)
            "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (name module) remote execution-error))
 
-(defun single-module-desire-satisfaction (module &optional (locality (master 'git)))
-  "Compute both the LOCALITY and remote to act as agents in satisfaction of
-   desire for MODULE."
-  (if-let ((remote (module-remote module)))
-          (values locality remote)
-          (error 'insatiable-desire :desire module)))
+(defun module-remote (module &key (if-does-not-exist :error))
+  "Find out the only remote providing MODULE, or is specified
+   to be in a desired distributor for MODULE, if there is ambiguity."
+  (if-let ((distributor (module-distributor module)))
+    (distributor-provides-module-p distributor module)
+    (ecase if-does-not-exist
+      (:error (error 'insatiable-desire))
+      (:continue nil))))
 
 (defun substitute-desires (in with)
   "Substitute some of module->distributor maps in IN with those in WITH.
