@@ -28,4 +28,4 @@
   (apply (symbol-function (find-symbol (string (app-function o)) (app-package o))) (or parameters (app-default-parameters o))))
 
 (defmethod purge-fasls ((o application))
-  (mapc #'purge-fasls (module-full-dependencies (system-module (app-system o)))))
+  (mapc #'purge-fasls (system-module (app-system o))))

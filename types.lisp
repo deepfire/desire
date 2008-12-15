@@ -253,7 +253,6 @@
 
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
-   (depends-on :accessor module-depends-on :initarg :depends-on :documentation "Specified.")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (master-locality :accessor module-master-locality :initarg :master-locality :documentation "Policy-decided.")
    (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
@@ -263,7 +262,7 @@
   (:default-initargs
    :registrator #'(setf module)    
    :remotes nil :master-locality nil :localities nil
-   :depends-on nil :systems nil :essential-p nil))
+   :systems nil :essential-p nil))
 
 ;;; most specific, exhaustive partition of MODULE
 (defclass origin-module (module) ())
@@ -282,9 +281,7 @@
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
-          (remove nil (list (when-let (deps (module-dependencies o))
-                              (list :depends-on (mapcar #'name deps)))
-                            (let ((systems (module-systems o)))
+          (remove nil (list (let ((systems (module-systems o)))
                               (unless (module-system-implied-p o)
                                (list :systems (and (module-systems o) (mapcar #'name systems)))))
                             (when (module-essential-p o)
@@ -297,12 +294,12 @@
 
 (defun module-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key depends-on (systems nil systems-specified-p) &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) &allow-other-keys) (read stream nil nil t)
     (declare (ignore systems))
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
      `(or (module ',name :if-does-not-exist :continue)
-          (prog1 (make-instance 'module :name ',name :umbrella ',umbrella ,@(when depends-on `(:depends-on '(,@depends-on)))
-                                ,@(remove-from-plist initargs :systems :depends-on))
+          (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
+                                ,@(remove-from-plist initargs :systems-on))
                  ,@(unless systems-specified-p `((make-instance 'asdf-system :name ',name :module (module ',name)))))))))
 
 (defclass asdf () ())
@@ -379,45 +376,6 @@
 (define-container-hash-accessor *localities-by-path* locality-by-path :type locality :if-exists :error)
 (define-container-hash-accessor *masters*        master        :type locality)
 
-(defun reestablish-module-dependencies (module)
-  "Rebuild MODULE's part of the dependency graph, and clear
-   the transitory DEPENDS-ON slot representation."
-  (iter (for depname = (pop (module-depends-on module))) (while depname)
-        (for dep = (module depname))
-        (setf (nonleaf depname) dep
-              (leaf (name module)) module) ;; might be reversed later
-        (depend module dep)))
-
-(defun module-dependencies (module &aux (module (coerce-to-module module)))
-  "Produce a minimal list of MODULE dependencies, which is a subset
-   of its direct dependencies."
-  (map-dependencies #'identity module))
-
-(defun module-full-dependencies (module &optional stack &aux (module (coerce-to-module module)))
-  "Compute the complete set of MODULE dependencies."
-  (unless (member module stack)
-    (cons (name module)
-          (iter (for dep in (module-dependencies module))
-                (unioning (module-full-dependencies dep (cons module stack)))))))
-
-(defun minimise-dependencies (leaves &aux (loops (make-hash-table :test #'equal)))
-  "Minimise the dependency graph specified by potential leaf set LEAVES."
-  (labels ((maybe-remove-nonleaf (name leaf)
-             (unless (satisfied-p leaf)
-               (remhash name leaves)))
-           (minimise (current &optional acc-deps)
-             (cond ((member current acc-deps) ;; is there a dependency loop?
-                    (appendf (gethash current loops) (list (first acc-deps)))
-                    (undepend current (first acc-deps)))
-                   (t
-                    (dolist (overdep (intersection (cdr acc-deps) (mapcar #'cadr (hash-table-alist (depsolver::%depobj-dep# current)))))
-                      (undepend current overdep))
-                    (mapc (rcurry #'minimise (cons current acc-deps)) (mapcar #'cdr (hash-table-alist (depsolver::%depobj-rdep# current))))))))
-    (maphash #'maybe-remove-nonleaf leaves)
-    (maphash-values #'minimise leaves)
-    (iter (for (dependent deplist) in-hashtable loops)
-          (mapc (curry #'depend dependent) deplist))))
-
 (defun cvs-locality-lock-path (cvs-locality)
   "Provide the fixed definition of lock directory for CVS repositories,
    within CVS-LOCALITY."
@@ -443,9 +401,7 @@
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
     (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
     (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
-    (load stream)
-    (maphash-values #'reestablish-module-dependencies *modules*)
-    (minimise-dependencies *leaves*)))
+    (load stream)))
 
 (defun serialize-definitions (&optional stream)
   "Serialise global definitions to STREAM."
@@ -504,7 +460,7 @@
 
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
-  (setf *root-of-all-desires* path)
+  (setf *root-of-all-desires* (parse-namestring path))
   (define-master-localities-in path)
   (if (file-exists-p (definitions-path))
       (load-definitions)
