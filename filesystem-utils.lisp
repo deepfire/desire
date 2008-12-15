@@ -31,24 +31,25 @@
   (or (gethash name *executables*) (error "~@<Executable ~S isn't known.~@:>" name)))
 
 ;;; SB-EXECUTABLE?
-(define-condition external-program-failure (serious-condition)
+(define-reported-condition external-program-failure (serious-condition)
   ((program :accessor cond-program :initarg :program)
    (parameters :accessor cond-parameters :initarg :parameters)
-   (status :accessor cond-status :initarg :status))
-  (:report (lambda (cond stream)
-             (format stream "~@<running ~A~{ ~A~} failed with exit status ~S~:@>" (cond-program cond) (cond-parameters cond) (cond-status cond)))))
+   (status :accessor cond-status :initarg :status)
+   (output :accessor cond-status :initarg :output))
+  (:report (program parameters status output)
+           "~@<running ~A~{ ~A~} failed with exit status ~S~:[~;, output:~@:_~:*~@<...~;~A~:@>~]~%~:@>" program parameters status output))
 
-(define-condition executable-not-found (warning)
+(define-reported-condition executable-not-found (warning)
   ((name :accessor cond-name :initarg :name)
    (search-path :accessor cond-search-path :initarg :search-path))
-  (:report (lambda (cond stream)
-             (format stream "~@<an executable, named ~S, wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
+  (:report (name search-path)
+           "~@<an executable, named ~S, wasn't found in search path ~S~:@>" name search-path))
 
-(define-condition required-executable-not-found (error)
+(define-reported-condition required-executable-not-found (error)
   ((name :accessor cond-name :initarg :name)
    (search-path :accessor cond-search-path :initarg :search-path))
-  (:report (lambda (cond stream)
-             (format stream "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" (cond-name cond) (cond-search-path cond)))))
+  (:report (name search-path)
+           "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" name search-path))
 
 (defun find-executable (name &key (paths *executable-search-path*) critical &aux (realname (string-downcase (symbol-name name))))
   (iter (for path in paths)
@@ -68,20 +69,21 @@
      (declare (special *run-external-programs-dryly*))
      ,@body))
 
-(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output t) (environment '("HOME=/tmp"))
+(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output nil) (environment '("HOME=/tmp"))
                              &aux (pathname (executable name)))
   "Run an external program at PATHNAME with PARAMETERS. 
    Return a value associated with the exit code, by the means of 
    VALID-EXIT-CODES, or signal a condition of type
    EXTERNAL-PROGRAM-FAILURE."
   (declare (special *run-external-programs-dryly*))
-  (let* ((exit-code (if *run-external-programs-dryly*
+  (let* ((final-output (or output (make-string-output-stream)))
+         (exit-code (if *run-external-programs-dryly*
                         (progn
                           (format *error-output* "~S~{ ~S~}~%" pathname parameters)
                           (caar valid-exit-codes))
-                        (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output output :environment environment)))))
+                        (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output final-output :environment environment)))))
     (cdr (or (assoc exit-code valid-exit-codes)
-             (error 'external-program-failure :program pathname :parameters parameters :status exit-code)))))
+             (error 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output))))))
 
 (defmacro with-input-from-external-program ((stream-var name params) &body body)
   (with-gensyms (block str)
