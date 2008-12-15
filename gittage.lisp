@@ -76,6 +76,7 @@
           nil))))
 
 (defun module-present-p (module &optional (locality (master 'git)))
+  "See if MODULE repository and source code is available at LOCALITY."
   (let ((repo (module-path module locality)))
     (and (directory-exists-p repo)
          (directory-exists-p (subdirectory* repo ".git"))

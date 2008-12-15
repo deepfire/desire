@@ -10,8 +10,8 @@
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes
-   #:serialize-definitions #:read-definitions
-   #:define-master-localities #:define-master-localities-in
+   #:serialize-definitions #:read-definitions #:save-current-definitions #:load-definitions
+   #:init
    #:remote-disabled-p
    #:module-dependencies #:module-full-dependencies
    #:module-present-p #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
@@ -26,8 +26,8 @@
    #:system-loadable-p #:system-definition-path #:ensure-system-loadable #:module-systems-loadable-p
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
-   #:module-bare-p #:module-world-readable-p
-   #:repo-var #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
+   #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
+   #:module-bare-p #:module-present-p #:module-world-readable-p
    ;; desire.lisp
    #:define-application 
    #:fetch #:desire

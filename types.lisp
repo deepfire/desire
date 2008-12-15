@@ -23,6 +23,9 @@
 ;;;
 ;;; Globals
 ;;;
+(defvar *root-of-all-desires* nil
+  "The storage location for all source code, binaries and configuration files.")
+
 (defparameter *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
 (defparameter *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
 (defparameter *localities*         (make-hash-table :test #'equal) "Map names to localities.")
@@ -483,13 +486,29 @@
     (subdirectory* path hg-subdir)
     (subdirectory* path darcs-subdir)
     (subdirectory* path cvs-subdir)
-    (subdirectory* path svn-subdir))
-  (let ((definitions-path (subfile* (subdirectory* path git-subdir) "definitions")))
-    (if (file-exists-p definitions-path)
-        (with-open-file (definitions definitions-path)
-          (read-definitions definitions))
-        (with-output-to-file (definitions definitions-path)
-          (serialize-definitions definitions)))))
+    (subdirectory* path svn-subdir)))
+
+(defun definitions-path ()
+  "Return the path to the definitions used."
+  (subfile* *root-of-all-desires* "definitions"))
+
+(defun save-current-definitions (&optional (path (definitions-path)))
+  "Save current model of the world into static definitions."
+  (with-output-to-file (definitions path)
+    (serialize-definitions definitions)))
+
+(defun load-definitions ()
+  "Load definitions for the world from the current root of all desires."
+  (with-open-file (definitions (definitions-path))
+    (read-definitions definitions)))
+
+(defun init (path)
+  "Make Desire fully functional, with PATH chosen as storage location."
+  (setf *root-of-all-desires* path)
+  (define-master-localities-in path)
+  (if (file-exists-p (definitions-path))
+      (load-definitions)
+      (save-current-definitions)))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
