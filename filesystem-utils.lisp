@@ -97,16 +97,16 @@
   (with-output-to-string (str)
     (run-external-program name params :output str)))
 
-(defvar *valid-exit-code-extension* nil)
+(defvar *valid-exit-codes* nil)
 
 (defmacro define-external-program (name &key critical)
   `(progn
      (find-executable ',name ,@(when critical `(:critical t)))
      (defun ,name (&rest parameters)
-       (run-external-program ',name parameters :valid-exit-codes (acons 0 t *valid-exit-code-extension*)))))
+       (run-external-program ',name parameters :valid-exit-codes (acons 0 t *valid-exit-codes*)))))
 
 (defmacro with-valid-exit-codes ((&rest bindings) &body body)
-  `(let ((*valid-exit-code-extension* (list ,@(mapcar (curry #'cons 'cons) bindings))))
+  `(let ((*valid-exit-codes* (list ,@(mapcar (curry #'cons 'cons) bindings))))
      ,@body))
 
 (defmacro exit-code-bind ((&rest bindings) &body body)
