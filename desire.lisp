@@ -92,23 +92,20 @@
   (with-condition-printing (t fetch-failure)
     (call-next-method)))
 
-(defmethod fetch ((locality locality) (remote remote) module)
+(defmethod fetch :before ((locality locality) (remote remote) module)
   (fetch-remote locality remote module))
 
 (defmethod fetch ((to git-locality) (from git-locality) module)
   (fetch-remote to from module))
 
-(defmethod fetch ((locality git-locality) (remote git-remote) module)
-  (call-next-method))
+(defmethod fetch ((locality git-locality) (remote git-remote) module))
 
 (defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
-  (call-next-method)
   (let ((hg-repo-dir (module-path module (master 'hg)))
         (git-repo-dir (module-path module git-locality)))
     ))
 
 (defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module)
-  (call-next-method)
   (let ((darcs-repo-dir (module-path module (master 'darcs)))
         (git-repo-dir (module-path module git-locality)))
     (purge-module-binaries module)
@@ -118,7 +115,6 @@
       (setf (module-bare-p module git-locality) nil))))
 
 (defmethod fetch ((git-locality git-locality) (remote cvs-rsync-remote) module &aux (name (down-case-name module)))
-  (call-next-method)
   (let* ((cvs-locality (master 'cvs))
          (cvs-repo-dir (module-path module cvs-locality))
          (git-repo-dir (module-path module git-locality)))
@@ -128,7 +124,6 @@
       (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name))))
 
 (defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)
-  (call-next-method)
   (let ((svn-repo-dir (module-path module (master 'svn)))
         (git-repo-dir (module-path module git-locality)))
     (unless (directory-exists-p git-repo-dir)
