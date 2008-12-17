@@ -90,7 +90,14 @@
 
 (defmethod fetch :around (locality remote module)
   (with-condition-printing (t fetch-failure)
-    (call-next-method)))
+    (restart-bind ((retry (lambda () 
+                            (with-slots (locality module) *debug-condition*
+                              (within-module-repository (dir module locality)
+                                (git "gui")))
+                            (invoke-restart (find-restart 'retry)))
+                     :test-function (lambda (cond) (typep cond 'repository-not-clean-during-fetch))
+                     :report-function (formatter "Launch git gui to fix the issue, then retry the command.")))
+      (call-next-method))))
 
 (defmethod fetch :before ((locality locality) (remote remote) module)
   (fetch-remote locality remote module))
@@ -120,7 +127,7 @@
          (git-repo-dir (module-path module git-locality)))
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config"))
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
-    (exit-code-bind ((9 (error 'repository-not-clean-during-fetch :module module :locality git-locality)))
+    (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module module :locality git-locality))
       (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name))))
 
 (defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)

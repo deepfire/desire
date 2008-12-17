@@ -21,7 +21,7 @@
 (in-package :desire)
 
 
-(define-reported-condition repository-not-clean-during-fetch (repository-error) ()
+(define-reported-condition repository-not-clean-during-fetch (repository-error external-program-failure) ()
   (:report (locality module)
            "~@<repository for ~S in ~S has uncommitted changes during fetch~:@>" module locality))
 

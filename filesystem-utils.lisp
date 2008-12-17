@@ -69,7 +69,7 @@
      (declare (special *run-external-programs-dryly*))
      ,@body))
 
-(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) (output nil) (environment '("HOME=/tmp"))
+(defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) translated-error-exit-codes (output nil) (environment '("HOME=/tmp"))
                              &aux (pathname (executable name)))
   "Run an external program at PATHNAME with PARAMETERS. 
    Return a value associated with the exit code, by the means of 
@@ -83,7 +83,10 @@
                           (caar valid-exit-codes))
                         (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output final-output :environment environment)))))
     (cdr (or (assoc exit-code valid-exit-codes)
-             (error 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output))))))
+             (when-let ((error (assoc exit-code translated-error-exit-codes)))
+               (apply #'derror (list* :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output)
+                                      (cdr error))))
+             (derror 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output))))))
 
 (defmacro with-input-from-external-program ((stream-var name params) &body body)
   (with-gensyms (block str)
@@ -98,15 +101,33 @@
     (run-external-program name params :output str)))
 
 (defvar *valid-exit-codes* nil)
+(defvar *translated-error-exit-codes* nil)
 
-(defmacro define-external-program (name &key critical)
+(defmacro define-external-program (name &key critical may-want-display)
   `(progn
      (find-executable ',name ,@(when critical `(:critical t)))
      (defun ,name (&rest parameters)
-       (run-external-program ',name parameters :valid-exit-codes (acons 0 t *valid-exit-codes*)))))
+       (let (environment)
+         (with-retry-restarts ((retry () :report "Retry execution of the external program.")
+                               ,@(when may-want-display
+                                       `((retry (display)
+                                                :report "Retry execution of the external program with DISPLAY set."
+                                                :interactive (lambda ()
+                                                               (format *query-io* "Enter value for the DISPLAY variable: ")
+                                                               (finish-output *query-io*)
+                                                               (list (read-line *query-io*)))
+                                                (push (concatenate 'string "DISPLAY=" display) environment)))))
+           (apply #'run-external-program ',name parameters
+                  :valid-exit-codes (acons 0 t *valid-exit-codes*)
+                  :translated-error-exit-codes *translated-error-exit-codes*
+                  (when environment (list :environment environment))))))))
 
 (defmacro with-valid-exit-codes ((&rest bindings) &body body)
   `(let ((*valid-exit-codes* (list ,@(mapcar (curry #'cons 'cons) bindings))))
+     ,@body))
+
+(defmacro with-exit-code-to-error-translation ((&rest bindings) &body body)
+  `(let ((*translated-error-exit-codes* (list ,@(mapcar (curry #'cons 'list) bindings))))
      ,@body))
 
 (defmacro exit-code-bind ((&rest bindings) &body body)
@@ -115,7 +136,8 @@
                                                 ,@bindings))))
      ,@body))
 
-(define-external-program git :critical t)
+(define-external-program git :critical t :may-want-display t)
+(define-external-program gitk :may-want-display t)
 (define-external-program rm)
 #-win32
 (progn
@@ -124,8 +146,7 @@
   (define-external-program rsync)
   (define-external-program git-cvsimport)
   (define-external-program git-svn)
-  (define-external-program darcs-to-git)
-  (define-external-program gitk))
+  (define-external-program darcs-to-git))
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))
