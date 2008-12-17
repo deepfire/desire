@@ -91,11 +91,10 @@
 (defmethod fetch :around (locality remote module)
   (with-condition-printing (t fetch-failure)
     (restart-bind ((retry (lambda () 
-                            (with-slots (locality module) *debug-condition*
-                              (within-module-repository (dir module locality)
-                                (git "gui")))
+                            (within-module-repository (dir module locality)
+                              (git "gui"))
                             (invoke-restart (find-restart 'retry)))
-                     :test-function (lambda (cond) (typep cond 'repository-not-clean-during-fetch))
+                     :test-function (of-type 'repository-not-clean-during-fetch)
                      :report-function (formatter "Launch git gui to fix the issue, then retry the command.")))
       (call-next-method))))
 

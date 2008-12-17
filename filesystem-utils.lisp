@@ -84,9 +84,9 @@
                         (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output final-output :environment environment)))))
     (cdr (or (assoc exit-code valid-exit-codes)
              (when-let ((error (assoc exit-code translated-error-exit-codes)))
-               (apply #'derror (list* :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output)
-                                      (cdr error))))
-             (derror 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output))))))
+               (apply #'error (list* :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output)
+                                     (cdr error))))
+             (error 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output))))))
 
 (defmacro with-input-from-external-program ((stream-var name params) &body body)
   (with-gensyms (block str)
