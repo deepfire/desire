@@ -20,30 +20,42 @@
 
 (in-package :desire)
 
-(defun create-metafile (name metastore-directory &key (if-exists :continue))
+
+(defun metafile-path (name metastore-directory)
+  "Return the pathname of the metafile called NAME within METASTORE-DIRECTORY."
+  (subfile* metastore-directory (symbol-name name)))
+
+(defun create-metafile (name metastore-directory &key (if-exists :append))
   "Ensure that metafile called by NAME exists within METASTORE-DIRECTORY.
   
    The IF-EXISTS keyword is passed to OPEN."
-  (open (subfile* metastore-directory ".git" (symbol-name name)) :direction :probe :if-does-not-exist :create :if-exists if-exists))
+  (open (metafile-path name metastore-directory) :direction :probe :if-does-not-exist :create :if-exists if-exists))
 
 (defun ensure-metastore (directory &key required-metafiles)
-  "Ensure that a metastore exists at DIRECTORY."
-  (when-let* ((meta-missing-p (not (and (directory-exists-p (subdirectory* directory ".git"))
-                                        (every (compose #'file-exists-p
-                                                        (rcurry #'subfile* (namestring directory))
-                                                        #'symbol-name)
-                                               required-metafiles)))))
+  "Ensure that a metastore exists at DIRECTORY.
+
+   Returns T if the metastore was created, or updated; NIL otherwise."
+  (if-let ((meta-missing-p (not (and (directory-exists-p (subdirectory* directory ".git"))
+                                     (every (compose #'file-exists-p
+                                                     (rcurry #'metafile-path directory))
+                                            required-metafiles)))))
     (within-directory (meta-path directory :if-does-not-exist :create)
       (git "init")
       (open (subfile* directory ".git" "git-daemon-export-ok") :direction :probe :if-does-not-exist :create)
-      (mapcar #'create-metafile required-metafiles))))
+      (mapcar (rcurry #'create-metafile directory) required-metafiles)
+      t)
+    nil))
 
 (defmacro with-open-metafile ((stream name metastore-directory &rest open-options) &body body)
-  `(with-open-file (,stream (subfile* ,metastore-directory (symbol-name ,name)) ,@open-options)
+  `(with-open-file (,stream (metafile-path ,name ,metastore-directory) ,@open-options)
      ,@body))
 
-(defmacro with-output-to-metafile ((stream name metastore-directory &rest open-options) &body body)
-  `(with-open-file (,stream (subfile* ,metastore-directory (symbol-name ,name)) :if-does-not-exist :error ,@open-options)
+(defmacro with-output-to-new-metafile ((stream name metastore-directory &rest open-options) &body body)
+  `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :if-does-not-exist :error :if-exists :supersede ,@open-options)
+     ,@body))
+
+(defmacro appending-to-metafile ((stream name metastore-directory &rest open-options) &body body)
+  `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :if-does-not-exist :error :if-exists :append ,@open-options)
      ,@body))
 
 (defmacro within-meta ((meta-path) &body body)
