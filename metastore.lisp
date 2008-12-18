@@ -20,6 +20,12 @@
 
 (in-package :desire)
 
+(defun create-metafile (name metastore-directory &key (if-exists :continue))
+  "Ensure that metafile called by NAME exists within METASTORE-DIRECTORY.
+  
+   The IF-EXISTS keyword is passed to OPEN."
+  (open (subfile* metastore-directory ".git" (symbol-name name)) :direction :probe :if-does-not-exist :create :if-exists if-exists))
+
 (defun ensure-metastore (directory &key required-metafiles)
   "Ensure that a metastore exists at DIRECTORY."
   (when-let* ((meta-missing-p (not (and (directory-exists-p (subdirectory* directory ".git"))
@@ -30,14 +36,14 @@
     (within-directory (meta-path directory :if-does-not-exist :create)
       (git "init")
       (open (subfile* directory ".git" "git-daemon-export-ok") :direction :probe :if-does-not-exist :create)
-      (mapcar (compose (rcurry #'open :direction :probe :if-does-not-exist :create) #'symbol-name) required-metafiles))))
+      (mapcar #'create-metafile required-metafiles))))
 
 (defmacro with-open-metafile ((stream name metastore-directory &rest open-options) &body body)
   `(with-open-file (,stream (subfile* ,metastore-directory (symbol-name ,name)) ,@open-options)
      ,@body))
 
 (defmacro with-output-to-metafile ((stream name metastore-directory &rest open-options) &body body)
-  `(with-output-to-file (,stream (subfile* ,metastore-directory (symbol-name ,name)) ,@open-options)
+  `(with-open-file (,stream (subfile* ,metastore-directory (symbol-name ,name)) :if-does-not-exist :error ,@open-options)
      ,@body))
 
 (defmacro within-meta ((meta-path) &body body)
