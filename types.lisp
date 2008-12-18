@@ -254,14 +254,13 @@
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
-   (master-locality :accessor module-master-locality :initarg :master-locality :documentation "Policy-decided.")
    (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
    (localities :accessor module-localities :initarg :localities :documentation "Cache. COMPUTE-MODULE-CACHES")
    (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
    :registrator #'(setf module)    
-   :remotes nil :master-locality nil :localities nil
+   :remotes nil :localities nil
    :systems nil :essential-p nil))
 
 ;;; most specific, exhaustive partition of MODULE
@@ -591,10 +590,10 @@
   (setf (values (module-remotes module) (module-localities module) (module-systems module))
         (compute-module-caches module)))
 
-(defun identify-with-distributor (distributor-name locality)
+(defun identify-with-distributor (distributor-name)
   "Recognize DISTRIBUTOR-NAME's modules as locally hosted in LOCALITY."
   (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
-        (change-class (module module-name) 'origin-module :master-locality locality)))
+        (change-class (module module-name) 'origin-module)))
 
 (defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/dese/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
