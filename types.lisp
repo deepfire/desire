@@ -483,7 +483,9 @@
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
   (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
     (iter (for module in (scan-locality-for-modules (master 'git)))
-          (print (name module) metafile))))
+          (print (name module) metafile)))
+  (commit-metafile 'common-wishes (meta-path))
+  t)
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 

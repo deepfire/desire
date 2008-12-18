@@ -50,12 +50,12 @@
   `(within-directory (,(gensym) ,meta-path ,@options)
      ,@body))
 
-(defun commit-metafile (name metastore-directory &optional commit-message)
+(defun commit-metafile (name metastore-directory &optional (commit-message (format nil "Updated ~A" name)))
   "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY."
   (within-meta (metastore-directory)
     (git "add" (symbol-name name))
     (when (with-valid-exit-codes ((1 nil)) (git "status"))
-      (git "commit" "-m" (or (format nil "\"~A\"" commit-message) (format nil "\"Updated ~A\"" name))))))
+      (git "commit" "-m" (format nil "~A" commit-message)))))
 
 (defun ensure-metastore (directory &key required-metafiles)
   "Ensure that a metastore exists at DIRECTORY.
