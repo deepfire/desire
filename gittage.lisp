@@ -95,5 +95,5 @@
 (defun (setf module-world-readable-p) (val module &optional (locality (master 'git)))
   (let ((path (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
     (if val
-        (with-open-file (s path :if-does-not-exist :create) t)
+        (open path :direction :probe :if-does-not-exist :create)
         (and (delete-file path) nil))))

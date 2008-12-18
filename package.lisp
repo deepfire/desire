@@ -10,10 +10,10 @@
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes
-   #:serialize-definitions #:read-definitions #:save-current-definitions #:load-definitions
+   #:clear-definitions #:serialize-definitions #:read-definitions #:save-current-definitions #:load-definitions
    #:init
    #:remote-disabled-p
-   #:module-present-p #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
+   #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
    #:add-desire #:desire #:desire*
    #:*default-world-readable* #:*desires*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error

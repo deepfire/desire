@@ -37,7 +37,7 @@
 (defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 (defparameter *masters*            (make-hash-table :test #'equal) "Map RCS type to master localities.")
 
-(defun reinit-definitions ()
+(defun clear-definitions ()
   "Empty all global definitions."
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps* *masters*))
     (setf (symbol-value var) (make-hash-table :test #'equal))))
@@ -444,28 +444,27 @@
     (subdirectory* path cvs-subdir)
     (subdirectory* path svn-subdir)))
 
-(defun definitions-path ()
-  "Return the path to the definitions used."
-  (subfile* *root-of-all-desires* "definitions"))
+(defun meta-path ()
+  "Return the path to the meta directory."
+  (subdirectory* *root-of-all-desires* ".meta"))
 
-(defun save-current-definitions (&optional (path (definitions-path)))
-  "Save current model of the world into static definitions."
-  (with-output-to-file (definitions path)
+(defun save-current-definitions (&optional (metastore (meta-path)))
+  "Save current model of the world within METASTORE."
+  (with-output-to-metafile (definitions 'definitions metastore)
     (serialize-definitions definitions)))
 
-(defun load-definitions ()
-  "Load definitions for the world from the current root of all desires."
-  (with-open-file (definitions (definitions-path))
+(defun load-definitions (&optional (metastore (meta-path)))
+  "Load definitions of the world from METASTORE."
+  (with-open-metafile (definitions 'definitions metastore)
     (read-definitions definitions)))
 
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
   (setf *root-of-all-desires* (parse-namestring path))
-  (reinit-definitions)
+  (clear-definitions)
   (define-master-localities-in path)
-  (if (file-exists-p (definitions-path))
-      (load-definitions)
-      (save-current-definitions)))
+  (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes))
+  (load-definitions (meta-path)))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
@@ -600,17 +599,17 @@
 (defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/dese/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
                   (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2"))
-  (reinit-definitions)
+  (clear-definitions)
   (mapcar #'load pathes-from)
   (with-output-to-file (f path-int-0)
     (serialize-definitions f))
   (when bail-out-early
     (return-from test-core))
-  (reinit-definitions)
+  (clear-definitions)
   (read-definitions path-int-0)
   (with-output-to-file (f path-int-1)
     (serialize-definitions f))
-  (reinit-definitions)
+  (clear-definitions)
   (read-definitions path-int-1)
   (with-output-to-file (f path-int-2)
     (serialize-definitions f)))
