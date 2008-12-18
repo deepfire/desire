@@ -365,7 +365,7 @@
     (string (string-upcase namespec))))
 
 (define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors :iterator do-distributors)
-(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error)
+(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
 (define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
 (define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
 (define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
@@ -449,7 +449,7 @@
 
 (defun save-current-definitions (&optional (metastore (meta-path)))
   "Save current model of the world within METASTORE."
-  (with-output-to-metafile (definitions 'definitions metastore)
+  (with-output-to-new-metafile (definitions 'definitions metastore)
     (serialize-definitions definitions)))
 
 (defun load-definitions (&optional (metastore (meta-path)))
@@ -457,13 +457,33 @@
   (with-open-metafile (definitions 'definitions metastore)
     (read-definitions definitions)))
 
+(defun scan-locality-for-modules (&optional (locality (master 'git)))
+  "Scan LOCALITY for known modules and update those modules's idea
+   of where they are present.
+
+   Returns the list of found modules."
+  (do-modules (module)
+    (when (module-present-p module locality)
+      (pushnew locality (module-scan-positive-localities module))
+      (collect module))))
+
+(defun report (stream format-control &rest args)
+  (apply #'format stream format-control args)
+  (finish-output stream))
+
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
   (setf *root-of-all-desires* (parse-namestring path))
   (clear-definitions)
   (define-master-localities-in path)
-  (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes))
-  (load-definitions (meta-path)))
+  (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes))
+    (report t ";;; Ensured metastore at ~S~%" (meta-path)))
+  (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
+  (load-definitions (meta-path))
+  (report t ";;; Scanning for modules in ~S~%" (meta-path))
+  (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
+    (iter (for module in (scan-locality-for-modules (master 'git)))
+          (print (name module) metafile))))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 

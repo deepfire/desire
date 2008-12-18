@@ -21,6 +21,24 @@
 (in-package :desire)
 
 
+(defmacro within-module-repository ((dir module locality) &body body)
+  `(within-directory (,dir (module-path ,module ,locality))
+     ,@body))
+
+(defvar *purgeworth-binaries* 
+  '("dfsl"        ;; OpenMCL
+    "ppcf" "x86f" ;; CMUCL
+    "fasl"        ;; SBCL
+    "fas" "o"     ;; ECL
+    "lib" "obj"   ;; ECL/win32
+    )) 
+
+(defun purge-module-binaries (module &optional (locality (master 'git)))
+  "Purge MODULE's files with type among one of *PURGEWORTH-BINARIES* in
+   LOCALITY."
+  (dolist (type *purgeworth-binaries*)
+    (mapc #'delete-file (directory (subfile (module-path module locality) '(:wild-inferiors :wild) :type type)))))
+
 (define-reported-condition repository-not-clean-during-fetch (repository-error external-program-failure) ()
   (:report (locality module)
            "~@<repository for ~S in ~S has uncommitted changes during fetch~:@>" module locality))
