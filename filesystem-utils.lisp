@@ -108,6 +108,7 @@
      (find-executable ',name ,@(when critical `(:critical t)))
      (defun ,name (&rest parameters)
        (let (environment)
+         (declare (ignorable environment))
          (with-retry-restarts ((retry () :report "Retry execution of the external program.")
                                ,@(when may-want-display
                                        `((retry (display)
