@@ -25,6 +25,16 @@
   "Return the pathname of the metafile called NAME within METASTORE-DIRECTORY."
   (subfile* metastore-directory (symbol-name name)))
 
+(defun metafile-present-p (name metastore-directory)
+  "See if metafile called by NAME exists within METASTORE-DIRECTORY."
+  (file-exists-p (metafile-path name metastore-directory)))
+
+(defun metafile-empty-p (name metastore-directory &aux (path (metafile-path name metastore-directory)))
+  "See if metafile called by NAME within METASTORE-DIRECTORY is empty."
+  (or (not (file-exists-p path))
+      (with-open-file (stream path)
+        (zerop (file-length stream)))))
+
 (defun create-metafile (name metastore-directory &key (if-exists :append))
   "Ensure that metafile called by NAME exists within METASTORE-DIRECTORY.
   
