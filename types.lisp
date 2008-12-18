@@ -445,7 +445,7 @@
 
 (defun meta-path ()
   "Return the path to the meta directory."
-  (subdirectory* *root-of-all-desires* ".meta"))
+  (subdirectory* (locality-path (master 'git)) ".meta"))
 
 (defun save-current-definitions (&optional (metastore (meta-path)))
   "Save current model of the world within METASTORE."
@@ -471,13 +471,22 @@
   (apply #'format stream format-control args)
   (finish-output stream))
 
+(defun ensure-some-wishmasters (meta-path &optional (wishmasters '("git://git.feelingofgreen.ru/")))
+  (when (metafile-empty-p 'wishmasters meta-path)
+    (with-output-to-new-metafile (metafile 'wishmasters meta-path)
+      (dolist (wishmaster wishmasters)
+        (write-string wishmaster metafile) (terpri metafile)))
+    (commit-metafile 'wishmasters meta-path)
+    (report t ";;; Added wishmasters:~{ ~S~}~%" wishmasters)))
+
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
   (setf *root-of-all-desires* (parse-namestring path))
   (clear-definitions)
   (define-master-localities-in path)
-  (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes))
+  (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes wishmasters))
     (report t ";;; Ensured metastore at ~S~%" (meta-path)))
+  (ensure-some-wishmasters (meta-path))
   (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
   (load-definitions (meta-path))
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
