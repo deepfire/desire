@@ -251,6 +251,24 @@
     (error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
   (setf (locality-by-path path) o))
 
+(defun parse-git-remote-namestring (namestring)
+  "Given a git remote NAMESTRING, deduce the remote's type, host and path,
+   and return them as multiple values."
+  (let* ((colon-pos (or (position #\: namestring) (error "No colon in git remote namestring ~S." namestring)))
+         (typestr (subseq namestring 0 colon-pos))
+         (type (switch (typestr :test #'string=) ("http" 'git-http-remote) ("git" 'git-native-remote)
+                       (t (error "Bad URI type ~S in git remote namestring ~S." typestr namestring)))))
+    (unless (> (length namestring) (+ colon-pos 3))
+      (error "Git remote namestring ~S is too short." namestring))
+    (unless (and (char= (aref namestring (+ 1 colon-pos)) #\/)
+                 (char= (aref namestring (+ 2 colon-pos)) #\/))
+      (error "Git remote namestring ~S is malformed." namestring))
+    (let* ((slash3-pos (position #\/ namestring :start (+ 3 colon-pos)))
+           (host (intern (string-upcase (subseq namestring (+ 3 colon-pos) slash3-pos))))
+           (path (when-let ((rest (and slash3-pos (subseq namestring (1+ slash3-pos)))))
+                   (split-sequence #\/ rest :remove-empty-subseqs t))))
+      (values type host path))))
+
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
