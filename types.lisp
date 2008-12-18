@@ -269,6 +269,14 @@
                    (split-sequence #\/ rest :remove-empty-subseqs t))))
       (values type host path))))
 
+(defun git-remote-namestring (remote)
+  "Produce a namestring for a git REMOTE."
+  (declare (type git-remote remote))
+  (format nil "~A://~A/~{~A/~}"
+          (case (type-of remote) (git-native-remote "git") (git-http-remote "http"))
+          (down-case-name remote)
+          (butlast (rest (remote-path-form remote)))))
+
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
