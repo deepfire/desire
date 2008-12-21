@@ -546,6 +546,24 @@
           (print (name module) metafile)))
   (commit-metafile 'common-wishes meta-path))
 
+(defun required-tools-available-for-remote-type-p (type)
+  "See if required executables for fetching from remotes of TYPE are present."
+  (every #'find-executable
+         (case type
+           (git '(git))
+           (hg '(hg))
+           (darcs '(darcs-to-git))
+           (cvs '(rsync git-cvsimport))
+           (svn '(rsync git-svn)))))
+
+(defun determine-tools-and-update-remote-accessibility ()
+  "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
+  (let ((present (unzip #'required-tools-available-for-remote-type-p '(git hg darcs cvs svn))))
+    (unless (member 'git present)
+      (warn "~@<The git executable is not present. Desire is UNLIKELY to be of much use.~:@>"))
+    (do-remotes (r)
+      (setf (remote-disabled-p r) (not (member (rcs-type r) present))))))
+
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
   (setf *root-of-all-desires* (parse-namestring path))
@@ -556,6 +574,8 @@
   (ensure-some-wishmasters (meta-path))
   (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
   (load-definitions (meta-path))
+  (report t ";;; Determining available tools and deducing accessible remotes~%")
+  (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
   (set-common-wishes (update-module-locality-presence-cache (master 'git)) (meta-path))
   (ensure-present-module-systems-loadable (master 'git))

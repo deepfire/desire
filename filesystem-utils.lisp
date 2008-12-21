@@ -51,16 +51,14 @@
   (:report (name search-path)
            "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" name search-path))
 
-(defun find-executable (name &key (paths *executable-search-path*) critical &aux (realname (string-downcase (symbol-name name))))
+(defun find-executable (name &key (paths *executable-search-path*) &aux (realname (string-downcase (symbol-name name))))
   "See if executable with NAME is available in PATHS. When it is, associate NAME with that path and return the latter;
    otherwise, return NIL."
   (iter (for path in paths)
         (for exec-path = (merge-pathnames path (make-pathname :name realname #+win32 #+win32 :type "exe")))
         (when (probe-file exec-path) 
           (leave (setf (gethash name *executables*) exec-path)))
-        (finally (if critical
-                     (error 'required-executable-not-found :name realname :search-path paths)
-                     (warn 'executable-not-found :name realname :search-path paths)))))
+        (finally (warn 'executable-not-found :name realname :search-path paths))))
 
 (defvar *run-external-programs-dryly* nil
   "Whether to substitute actual execution of external programs with
@@ -105,9 +103,8 @@
 (defvar *valid-exit-codes* nil)
 (defvar *translated-error-exit-codes* nil)
 
-(defmacro define-external-program (name &key critical may-want-display)
+(defmacro define-external-program (name &key may-want-display)
   `(progn
-     (find-executable ',name ,@(when critical `(:critical t)))
      (defun ,name (&rest parameters)
        (let (environment)
          (declare (ignorable environment))
