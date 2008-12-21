@@ -533,10 +533,18 @@
     (report t ";;; Added wishmasters:~{ ~S~}~%" wishmasters)))
 
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
-  "Ensure that all modules present in LOCALITY have their systems loadable."
+  "Ensure that all modules present in LOCALITY have their systems loadable.
+   Return the list of present modules."
   (do-modules (module)
     (when (module-present-p module locality)
       (ensure-module-systems-loadable module locality))))
+
+(defun set-common-wishes (modules meta-path)
+  "Set META-PATH's exported name set to the set of names of MODULES."
+  (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
+    (iter (for module in modules)
+          (print (name module) metafile)))
+  (commit-metafile 'common-wishes meta-path))
 
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
@@ -549,10 +557,7 @@
   (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
   (load-definitions (meta-path))
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
-  (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
-    (iter (for module in (update-module-locality-presence-cache (master 'git)))
-          (print (name module) metafile)))
-  (commit-metafile 'common-wishes (meta-path))
+  (set-common-wishes (update-module-locality-presence-cache (master 'git)) (meta-path))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
