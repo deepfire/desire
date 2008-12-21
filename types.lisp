@@ -45,6 +45,7 @@
 ;;;
 ;;; Knobs
 ;;;
+(defvar *default-wishmaster*      'git.feelingofgreen.ru)
 (defvar *desires*                 nil "List of import descriptions.")
 (defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
 
@@ -524,7 +525,7 @@
   (apply #'format stream format-control args)
   (finish-output stream))
 
-(defun ensure-some-wishmasters (meta-path &optional (wishmasters '("git://git.feelingofgreen.ru/")))
+(defun ensure-some-wishmasters (meta-path &optional (wishmasters (list *default-wishmaster*)))
   (when (metafile-empty-p 'wishmasters meta-path)
     (with-output-to-new-metafile (metafile 'wishmasters meta-path)
       (dolist (wishmaster wishmasters)
