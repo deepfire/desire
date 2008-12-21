@@ -52,6 +52,8 @@
            "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" name search-path))
 
 (defun find-executable (name &key (paths *executable-search-path*) critical &aux (realname (string-downcase (symbol-name name))))
+  "See if executable with NAME is available in PATHS. When it is, associate NAME with that path and return the latter;
+   otherwise, return NIL."
   (iter (for path in paths)
         (for exec-path = (merge-pathnames path (make-pathname :name realname #+win32 #+win32 :type "exe")))
         (when (probe-file exec-path) 
