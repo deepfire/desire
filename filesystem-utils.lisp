@@ -139,7 +139,6 @@
 
 (define-external-program git :critical t :may-want-display t)
 (define-external-program gitk :may-want-display t)
-(define-external-program rm)
 #-win32
 (progn
   (define-external-program false)
@@ -160,7 +159,7 @@
                      :report-function (lambda (stream) (format stream "~@<Proceed with purging the directory.~:@>"))
                      :test-function (lambda (cond) (typep cond 'about-to-purge))))
       (error 'about-to-purge :directory pathname)))
-  (rm "-rf" pathname))
+  (cl-fad:delete-directory-and-files pathname))
 
 (defmacro do-directory-pathnames ((var (&rest directory-components)) &body body)
   `(dolist (,var (directory (make-pathname :directory '(,@directory-components) :name :wild)))
