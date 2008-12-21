@@ -112,13 +112,13 @@
    CHECK-WHEN-PRESENT-P determines if presence check is performed when MODULE's cache
    is positive."
   (with-slots (scan-positive-localities) module
-    (if-let ((hit (find locality scan-positive-localities))
-             (no-recheck (null check-when-present-p)))
+    (if-let ((cache-hit (find locality scan-positive-localities))
+             (no-cache-revalidation (null check-when-present-p)))
       t
-      (lret ((present-p (determine-module-presence module locality)))
-        (if present-p
+      (lret ((actually-present-p (determine-module-presence module locality)))
+        (if actually-present-p
             (push locality scan-positive-localities)
-            (removef locality scan-positive-localities))))))
+            (removef scan-positive-localities locality))))))
 
 (defun module-world-readable-p (module &optional (locality (master 'git)))
   "See, whether or not MODULE within LOCALITY is allowed to be exported
