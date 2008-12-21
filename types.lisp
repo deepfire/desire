@@ -471,9 +471,7 @@
       (format stream "~%~%;;;~%;;; Systems~%;;;")
       (iter (for s in (sorted-hash-table-entries *systems*)) (unless (system-implied-p s) (print s stream)))
       (format stream "~%~%;;;~%;;; Applications~%;;;")
-      (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream))
-      (format stream "~%~%;;;~%;;; Desires~%;;;")
-      (print *desires* stream))))
+      (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream)))))
 
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
