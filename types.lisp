@@ -185,18 +185,39 @@
       distributor-name
       (format-symbol (symbol-package distributor-name) "~A~:[-~A~;~]" distributor-name (eq rcs-type 'git) rcs-type)))
 
+(defun module-system-simple-p (module &aux (system (first (module-systems module))))
+  "Determine whether SYSTEM meets the requirements for a simple system."
+  (and system
+       (eq (name system) (name module))
+       (null (system-relativity system))
+       (endp (rest (module-systems module)))))
+
+(defun module-simple-p (module)
+  "Determine whether MODULE meets the requirements for a simple module."
+  (and (eq (name module) (module-umbrella module))
+       (not (module-essential-p module))
+       (or (null (module-systems module))
+           (module-system-simple-p module))))
+
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
   (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
     (let ((*print-case* :downcase))
       (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
               (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
-              (append (unless (equal default-remote-name (name o))
-                        (list `(:name ,(name o))))
-                      (when-let ((port (remote-distributor-port o)))
-                        (list `(:distributor-port ,port)))
-                      (when-let ((port (remote-disabled-p o)))
-                        (list `(:disabled-p t)))
-                      (list `(:modules ,(mapcar #'downstring (location-modules o)))))))))
+              (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
+                (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
+                  (append (unless (equal default-remote-name (name o))
+                            (list `(:name ,(name o))))
+                          (when-let ((port (remote-distributor-port o)))
+                            (list `(:distributor-port ,port)))
+                          (when-let ((port (remote-disabled-p o)))
+                            (list `(:disabled-p t)))
+                          (when complex
+                            (list `(:modules ,(mapcar #'downstring complex))))
+                          (when systemful
+                            (list `(:simple-modules ,(mapcar #'downstring systemful))))
+                          (when systemless
+                            (list `(:simple-systemless-modules ,(mapcar #'downstring systemless)))))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with 
@@ -224,13 +245,28 @@
 (defmethod initialize-instance :after ((o remote) &key distributor &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o)))
 
+(defun system-implied-p (system)
+  "See it the definition of SYSTEM is implied, and is therefore subject to omission. "
+  (module-system-simple-p (system-module system)))
+
+(defun emit-make-simple-module-form (name)
+  `(or (module ',name :if-does-not-exist :continue)
+       (make-instance 'module :name ',name :umbrella ',name)))
+
+(defun emit-make-simple-system-form (type name)
+  `(or (system ',name :if-does-not-exist :continue)
+       (make-instance ',type :name ',name :module (module ',name))))
+
 (defun remote-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules name &allow-other-keys) (read stream nil nil)
-    `(make-instance ',type :distributor (distributor ',distributor) :modules ',modules
-                    :path-form ',(list* (list repovar) path-form) :path-fn (lambda (,repovar) (list ,@path-form))
-                    ,@(when name `(:name ',name))
-                    ,@(remove-from-plist initargs :name :distributor :type :modules :path-form :path-fn))))
+  (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
+    `(prog1
+         (make-instance ',type :distributor (distributor ',distributor) :modules ',(append modules simple-modules simple-systemless-modules)
+                        :path-form ',(list* (list repovar) path-form) :path-fn (lambda (,repovar) (list ,@path-form))
+                        ,@(when name `(:name ',name))
+                        ,@(remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))
+       ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
+       ,@(mapcar (curry #'emit-make-simple-system-form 'asdf-system) simple-modules))))
 
 (defun locality-master-p (o)
   (eq o (master (rcs-type o) :if-does-not-exist :continue)))
@@ -295,20 +331,13 @@
   ((preferred-remote :accessor module-preferred-remote :initarg :preferred-remote :documentation "Policy-decided."))
   (:default-initargs :preferred-remote nil))
 
-(defun module-system-implied-p (module &aux (system (first (module-systems module))))
-  "Determine if SYSTEM's existence is deducible and omitted from definitions."
-  (and system
-       (eq (name system) (name module))
-       (null (system-relativity system))
-       (endp (rest (module-systems module)))))
-
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
           (remove nil (list (let ((systems (module-systems o)))
-                              (unless (module-system-implied-p o)
-                               (list :systems (and (module-systems o) (mapcar #'name systems)))))
+                              (unless (module-system-simple-p o)
+                                (list :systems (and (module-systems o) (mapcar #'name systems)))))
                             (when (module-essential-p o)
                               (list :essential-p t))))))
 
@@ -325,7 +354,8 @@
      `(or (module ',name :if-does-not-exist :continue)
           (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
                                 ,@(remove-from-plist initargs :systems))
-                 ,@(unless systems-specified-p `((make-instance 'asdf-system :name ',name :module (module ',name)))))))))
+            ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
+            ,@(unless systems-specified-p `(,(emit-make-simple-system-form 'asdf-system name))))))))
 
 (defclass asdf () ())
 (defclass mudballs () ())
@@ -437,9 +467,9 @@
       (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Distributors~%;;;")
       (iter (for d in (sorted-hash-table-entries *distributors*)) (print d stream))
       (format stream "~%~%;;;~%;;; Modules~%;;;")
-      (iter (for m in (sorted-hash-table-entries *modules*)) (print m stream))
+      (iter (for m in (sorted-hash-table-entries *modules*)) (unless (module-simple-p m) (print m stream)))
       (format stream "~%~%;;;~%;;; Systems~%;;;")
-      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (module-system-implied-p (system-module s)) (print s stream)))
+      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (system-implied-p s) (print s stream)))
       (format stream "~%~%;;;~%;;; Applications~%;;;")
       (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream))
       (format stream "~%~%;;;~%;;; Desires~%;;;")
@@ -505,6 +535,13 @@
     (commit-metafile 'wishmasters meta-path)
     (report t ";;; Added wishmasters:~{ ~S~}~%" wishmasters)))
 
+(defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
+  "Ensure that all modules present in LOCALITY have their systems loadable."
+  (do-modules (module)
+    (when (find locality (module-scan-positive-localities module))
+      (dolist (system (module-systems module))
+        (ensure-system-loadable system locality)))))
+
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
   (setf *root-of-all-desires* (parse-namestring path))
@@ -520,6 +557,7 @@
     (iter (for module in (scan-locality-for-modules (master 'git)))
           (print (name module) metafile)))
   (commit-metafile 'common-wishes (meta-path))
+  (ensure-present-module-systems-loadable (master 'git))
   t)
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
