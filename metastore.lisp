@@ -46,10 +46,14 @@
                                  ,@(remove-from-plist open-options :element-type))
      ,@body))
 
-(defmacro with-output-to-new-metafile ((stream name metastore-directory &rest open-options) &body body)
-  `(with-output-to-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character :if-does-not-exist :error
-                                 ,@(remove-from-plist open-options :element-type :if-does-not-exist :if-exists))
-     ,@body))
+(defmacro with-output-to-new-metafile ((stream name metastore-directory &rest open-options &key commit-p commit-message &allow-other-keys) &body body)
+  (once-only (name metastore-directory)
+    `(with-output-to-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character :if-does-not-exist :error
+                                   ,@(remove-from-plist open-options :element-type :if-does-not-exist :if-exists :commit-p :commit-message))
+       (prog1 (progn ,@body)
+         ,@(when commit-p
+             `((when ,commit-p
+                 (commit-metafile ',name ,metastore-directory ,@(maybecall commit-message #'list commit-message)))))))))
 
 (defmacro appending-to-metafile ((stream name metastore-directory &rest open-options) &body body)
   `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character :if-does-not-exist :error :if-exists :append

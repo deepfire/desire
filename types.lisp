@@ -502,9 +502,10 @@
   "Return the path to the meta directory."
   (subdirectory* (locality-path (master 'git)) ".meta"))
 
-(defun save-current-definitions (&optional (metastore (meta-path)))
-  "Save current model of the world within METASTORE."
-  (with-output-to-new-metafile (definitions 'definitions metastore)
+(defun save-current-definitions (&key (seal-p t) (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
+  "Save current model of the world within METASTORE.
+   When SEAL-P is non-NIL, the changes are committed."
+  (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
     (serialize-definitions definitions)))
 
 (defun load-definitions (&optional (metastore (meta-path)))
@@ -527,10 +528,9 @@
 
 (defun ensure-some-wishmasters (meta-path &optional (wishmasters (list *default-wishmaster*)))
   (when (metafile-empty-p 'wishmasters meta-path)
-    (with-output-to-new-metafile (metafile 'wishmasters meta-path)
+    (with-output-to-new-metafile (metafile 'wishmasters meta-path :commit-p t)
       (dolist (wishmaster wishmasters)
         (write-string wishmaster metafile) (terpri metafile)))
-    (commit-metafile 'wishmasters meta-path)
     (report t ";;; Added wishmasters:~{ ~S~}~%" wishmasters)))
 
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
@@ -540,12 +540,13 @@
     (when (module-present-p module locality)
       (ensure-module-systems-loadable module locality))))
 
-(defun set-common-wishes (modules meta-path)
+(defun set-common-wishes (modules &key seal-p (commit-message "Updated COMMON-WISHES") (meta-path (meta-path)))
   "Set META-PATH's exported name set to the set of names of MODULES."
   (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
     (iter (for module in modules)
           (print (name module) metafile)))
-  (commit-metafile 'common-wishes meta-path))
+  (when seal-p
+    (commit-metafile 'common-wishes meta-path commit-message)))
 
 (defun required-tools-available-for-remote-type-p (type)
   "See if required executables for fetching from remotes of TYPE are present."
@@ -578,7 +579,7 @@
   (report t ";;; Determining available tools and deducing accessible remotes~%")
   (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
-  (set-common-wishes (update-module-locality-presence-cache (master 'git)) (meta-path))
+  (set-common-wishes (update-module-locality-presence-cache (master 'git)) :meta-path (meta-path))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
