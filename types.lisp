@@ -511,14 +511,13 @@
   (with-open-metafile (definitions 'definitions metastore)
     (read-definitions definitions)))
 
-(defun scan-locality-for-modules (&optional (locality (master 'git)))
+(defun update-module-locality-presence-cache (&optional (locality (master 'git)))
   "Scan LOCALITY for known modules and update those modules's idea
    of where they are present.
 
    Returns the list of found modules."
   (do-modules (module)
-    (when (module-present-p module locality)
-      (pushnew locality (module-scan-positive-localities module))
+    (when (module-present-p module locality t)
       (collect module))))
 
 (defun report (stream format-control &rest args)
@@ -536,9 +535,8 @@
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
   "Ensure that all modules present in LOCALITY have their systems loadable."
   (do-modules (module)
-    (when (find locality (module-scan-positive-localities module))
-      (dolist (system (module-systems module))
-        (ensure-system-loadable system locality)))))
+    (when (module-present-p module locality)
+      (ensure-module-systems-loadable module locality))))
 
 (defun init (path)
   "Make Desire fully functional, with PATH chosen as storage location."
@@ -552,7 +550,7 @@
   (load-definitions (meta-path))
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
   (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
-    (iter (for module in (scan-locality-for-modules (master 'git)))
+    (iter (for module in (update-module-locality-presence-cache (master 'git)))
           (print (name module) metafile)))
   (commit-metafile 'common-wishes (meta-path))
   (ensure-present-module-systems-loadable (master 'git))

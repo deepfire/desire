@@ -97,13 +97,28 @@
           (git "reset" "--hard")
           nil))))
 
-(defun module-present-p (module &optional (locality (master 'git)))
+(defun determine-module-presence (module &optional (locality (master 'git)))
   "See if MODULE repository and source code is available at LOCALITY."
   (let ((repo (module-path module locality)))
     (and (directory-exists-p repo)
          (directory-exists-p (subdirectory* repo ".git"))
          (within-directory (repo repo)
            (not (null (module-gitbranches module locality)))))))
+
+(defun module-present-p (module &optional (locality (master 'git)) check-when-present-p)
+  "See if MODULE's presence cache is positive for LOCALITY, failing that check the
+   repository, and update the cache if it is found.
+
+   CHECK-WHEN-PRESENT-P determines if presence check is performed when MODULE's cache
+   is positive."
+  (with-slots (scan-positive-localities) module
+    (if-let ((hit (find locality scan-positive-localities))
+             (no-recheck (null check-when-present-p)))
+      t
+      (lret ((present-p (determine-module-presence module locality)))
+        (if present-p
+            (push locality scan-positive-localities)
+            (removef locality scan-positive-localities))))))
 
 (defun module-world-readable-p (module &optional (locality (master 'git)))
   "See, whether or not MODULE within LOCALITY is allowed to be exported
