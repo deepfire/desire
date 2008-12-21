@@ -58,6 +58,10 @@
       o
       (name o)))
 
+(defun sort-by-name (named-objects)
+  "Sort object of class NAMED, lexicographically."
+  (sort named-objects #'string< :key (compose #'symbol-name #'name)))
+
 (defclass registered (named)
   ((registrator :accessor registered-registrator :type function :initarg :registrator)))
 
@@ -579,7 +583,7 @@
   (report t ";;; Determining available tools and deducing accessible remotes~%")
   (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
-  (set-common-wishes (update-module-locality-presence-cache (master 'git)) :meta-path (meta-path))
+  (set-common-wishes (sort-by-name (update-module-locality-presence-cache (master 'git))) :meta-path (meta-path))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
