@@ -27,10 +27,13 @@
      (subfile (locality-path locality) (append (list (down-case-name (system-module system))) (system-relativity system) (list name)) :type "asd")
      (subfile (git-locality-asdf-registry-path locality) (list name) :type "asd"))))
 
-(defun symlink-dead-p (symlink)
-  (if-let ((destination (file-exists-p symlink)))
-    (pathname-match-p symlink destination)
-    t))
+(defun system-loadable-p (system)
+  "See whether SYSTEM is loadable by the means of ASDF."
+  (asdf:find-system (coerce-to-name system) nil))
+
+(defun ensure-system-loadable (system &optional (locality (master 'git)))
+  (unless (system-loadable-p system)
+    (multiple-value-call #'ensure-symlink (system-definition-path system locality))))
 
 (define-condition module-systems-unloadable-error (desire-error)
   ((module :accessor module-system-unloadable-error-module :initarg :module)
@@ -40,24 +43,11 @@
                      (module-system-unloadable-error-module cond)
                      (module-system-unloadable-error-systems cond)))))
 
-(defun system-loadable-p (system &optional (locality (master 'git)) &aux (name (coerce-to-name system)))
-  "See whether SYSTEM is loadable by the means of ASDF."
-  (and (not (symlink-dead-p (nth-value 1 (system-definition-path system locality))))
-       (asdf:find-system name nil)))
-
-(defun ensure-system-loadable (system &optional (locality (master 'git)))
-  (unless (system-loadable-p system)
-    (multiple-value-bind (system-asd system-asd-symlink) (system-definition-path system locality)
-      (when (probe-file system-asd-symlink)
-        (delete-file system-asd-symlink))
-      (ensure-directories-exist system-asd-symlink)
-      (sb-posix:symlink system-asd system-asd-symlink))))
-
-(defun module-systems-loadable-p (module  &optional (locality (master 'git)))
-  (every (rcurry #'system-loadable-p locality) (module-systems (coerce-to-module module))))
-
 (defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
+  "Try making MODULE's systems loadable, defaulting to LOCALITY.
+ 
+   Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
   (mapc (rcurry #'ensure-system-loadable locality) (module-systems module))
-  (unless (module-systems-loadable-p module)
-    (with-ignore-restart (accept-failure ())
+  (unless (every #'system-loadable-p (module-systems module))
+    (with-ignore-restart (continue () :report "Accept system unloadability.")
       (error 'module-systems-unloadable-error :module module :systems (remove-if #'system-loadable-p (module-systems module))))))

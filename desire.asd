@@ -18,9 +18,9 @@
                (:file "types" :depends-on ("metastore"))
                ;; Tier 3
                (:file "gittage" :depends-on ("types"))
-               (:file "asdf" :depends-on ("types"))
+               (:file "system-loadability" :depends-on ("types"))
                ;; Tier 4
-               (:file "desire" :depends-on ("metastore" "gittage" "asdf"))
+               (:file "desire" :depends-on ("metastore" "gittage" "system-loadability"))
 ;;                (:file "application" :depends-on ("desire"))
                ))
   

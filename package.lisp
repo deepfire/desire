@@ -22,7 +22,7 @@
    ;; filesystem.lisp
    #:within-module-repository
    ;; asdf.lisp
-   #:system-loadable-p #:system-definition-path #:ensure-system-loadable #:module-systems-loadable-p
+   #:system-loadable-p #:system-definition-path #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
    #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
