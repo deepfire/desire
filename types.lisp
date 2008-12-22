@@ -89,15 +89,18 @@
   (:default-initargs
    :registrator #'(setf distributor) :remotes nil))
 
+(defclass wishmaster (distributor) ())
+
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>" (symbol-name (name o))
+  (format stream "~@<#~A(~;~A ~@<~S ~S~:@>~;)~:@>"
+          (ecase (type-of o) (distributor #\D) (wishmaster #\W)) (symbol-name (name o))
           :remotes (xform *printing-wishmaster* (curry #'remove-if-not (of-type 'git)) (distributor-remotes o))))
 
 (defun distributor-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
+  (declare (ignore sharp))
   (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
+         (prog1 (make-instance ,(ecase char (#\D 'distributor) (#\W 'wishmaster)) :name ',name ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
 
 (defmacro do-distributor-remotes ((var distributor) &body body)
@@ -462,6 +465,7 @@
         (*read-eval* nil)
         (*package* #.*package*))
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
+    (set-dispatch-macro-character #\# #\W 'distributor-reader *readtable*)
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
