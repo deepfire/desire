@@ -330,9 +330,6 @@
 
 ;;; most specific, exhaustive partition of MODULE
 (defclass origin-module (module) ())
-(defclass imported-module (module)
-  ((preferred-remote :accessor module-preferred-remote :initarg :preferred-remote :documentation "Policy-decided."))
-  (:default-initargs :preferred-remote nil))
 
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
