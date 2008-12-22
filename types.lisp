@@ -44,6 +44,8 @@
 (defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 (defparameter *masters*            (make-hash-table :test #'equal) "Map RCS type to master localities.")
 
+(defvar *printing-wishmaster* nil)
+
 (defun clear-definitions ()
   "Empty all global definitions."
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps* *masters*))
@@ -88,7 +90,8 @@
    :registrator #'(setf distributor) :remotes nil))
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>" (symbol-name (name o)) :remotes (distributor-remotes o)))
+  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>" (symbol-name (name o))
+          :remotes (xform *printing-wishmaster* (curry #'remove-if-not (of-type 'git)) (distributor-remotes o))))
 
 (defun distributor-reader (stream &optional sharp char)
   (declare (ignore sharp char))
