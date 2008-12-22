@@ -510,7 +510,8 @@
   "Save current model of the world within METASTORE.
    When SEAL-P is non-NIL, the changes are committed."
   (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
-    (serialize-definitions definitions)))
+    (serialize-definitions definitions)
+    (terpri definitions)))
 
 (defun load-definitions (&optional (metastore (meta-path)))
   "Load definitions of the world from METASTORE."
