@@ -21,6 +21,13 @@
 (in-package :desire)
 
 ;;;
+;;; Knobs
+;;;
+(defvar *default-wishmaster*      'git.feelingofgreen.ru)
+(defvar *desires*                 nil "List of import descriptions.")
+(defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
+
+;;;
 ;;; Globals
 ;;;
 (defvar *root-of-all-desires* nil
@@ -41,13 +48,6 @@
   "Empty all global definitions."
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps* *masters*))
     (setf (symbol-value var) (make-hash-table :test #'equal))))
-
-;;;
-;;; Knobs
-;;;
-(defvar *default-wishmaster*      'git.feelingofgreen.ru)
-(defvar *desires*                 nil "List of import descriptions.")
-(defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
 
 (defclass named ()
   ((name :accessor name :initarg :name)))
