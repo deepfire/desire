@@ -29,11 +29,13 @@
 
 (defun system-loadable-p (system)
   "See whether SYSTEM is loadable by the means of ASDF."
-  (asdf:find-system (coerce-to-name system) nil))
+  (handler-case (asdf:find-system (coerce-to-name system) nil)
+    (asdf:missing-dependency () ;; CXML...
+      (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
+      t)))
 
 (defun ensure-system-loadable (system &optional (locality (master 'git)))
-  (unless (system-loadable-p system)
-    (multiple-value-call #'ensure-symlink (system-definition-path system locality))))
+  (multiple-value-call (order ensure-symlink 1 0) (system-definition-path system locality)))
 
 (define-condition module-systems-unloadable-error (desire-error)
   ((module :accessor module-system-unloadable-error-module :initarg :module)

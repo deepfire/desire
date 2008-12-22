@@ -190,19 +190,17 @@
       distributor-name
       (format-symbol (symbol-package distributor-name) "~A~:[-~A~;~]" distributor-name (eq rcs-type 'git) rcs-type)))
 
-(defun module-system-simple-p (module &aux (system (first (module-systems module))))
+(defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
-  (and system
-       (eq (name system) (name module))
-       (null (system-relativity system))
-       (endp (rest (module-systems module)))))
+  (null (system-relativity system)))
 
 (defun module-simple-p (module)
   "Determine whether MODULE meets the requirements for a simple module."
   (and (eq (name module) (module-umbrella module))
        (not (module-essential-p module))
        (or (null (module-systems module))
-           (module-system-simple-p module))))
+           (and (endp (rest (module-systems module)))
+                (system-simple-p (first (module-systems module)))))))
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
   (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
@@ -252,15 +250,15 @@
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject to omission. "
-  (module-system-simple-p (system-module system)))
+  (system-simple-p system))
 
 (defun emit-make-simple-module-form (name)
   `(or (module ',name :if-does-not-exist :continue)
        (make-instance 'module :name ',name :umbrella ',name)))
 
-(defun emit-make-simple-system-form (type name)
+(defun emit-make-simple-system-form (type module-name name)
   `(or (system ',name :if-does-not-exist :continue)
-       (make-instance ',type :name ',name :module (module ',name))))
+       (make-instance ',type :name ',name :module (module ',module-name))))
 
 (defun remote-reader (stream &optional sharp char)
   (declare (ignore sharp char))
@@ -271,7 +269,7 @@
                         ,@(when name `(:name ',name))
                         ,@(remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))
        ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
-       ,@(mapcar (curry #'emit-make-simple-system-form 'asdf-system) simple-modules))))
+       ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) simple-modules))))
 
 (defun locality-master-p (o)
   (eq o (master (rcs-type o) :if-does-not-exist :continue)))
@@ -340,11 +338,16 @@
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
-          (remove nil (list (let ((systems (module-systems o)))
-                              (unless (module-system-simple-p o)
-                                (list :systems (and (module-systems o) (mapcar #'name systems)))))
-                            (when (module-essential-p o)
-                              (list :essential-p t))))))
+          (remove nil (multiple-value-call #'list
+                        (destructuring-bind (first . other-systems) (module-systems o)
+                          (unless (and first (null other-systems) (system-simple-p first))
+                            (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
+                              (values (when simple
+                                        (list :systems (mapcar #'name simple)))
+                                      (when complex
+                                        (list :complex-systems (mapcar #'name complex)))))))
+                        (when (module-essential-p o)
+                          (list :essential-p t))))))
 
 (defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
   (when (module name :if-does-not-exist :continue)
@@ -353,14 +356,17 @@
 
 (defun module-reader (stream &optional sharp char)
   (declare (ignore sharp char))
-  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) &allow-other-keys) (read stream nil nil t)
-    (declare (ignore systems))
+  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
-     `(or (module ',name :if-does-not-exist :continue)
-          (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
-                                ,@(remove-from-plist initargs :systems))
-            ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
-            ,@(unless systems-specified-p `(,(emit-make-simple-system-form 'asdf-system name))))))))
+      `(or (module ',name :if-does-not-exist :continue)
+           (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
+                                 ,@(remove-from-plist initargs :systems :complex-systems))
+             ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
+             ,@(if systems-specified-p
+                   (mapcar (curry #'emit-make-simple-system-form 'asdf-system name) systems)
+                   ;; Existence of complex systems implies absence of simple systems, by default.
+                   (unless complex-systems
+                     `(,(emit-make-simple-system-form 'asdf-system name name)))))))))
 
 (defclass asdf () ())
 (defclass mudballs () ())
