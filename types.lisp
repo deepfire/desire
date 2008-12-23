@@ -557,17 +557,14 @@
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
   "Ensure that all modules present in LOCALITY have their systems loadable.
    Return the list of present modules."
-  (do-modules (module)
-    (when (module-present-p module locality)
-      (ensure-module-systems-loadable module locality))))
+  (do-present-modules (module locality)
+    (ensure-module-systems-loadable module locality)))
 
 (defun set-common-wishes (modules &key seal-p (commit-message "Updated COMMON-WISHES") (meta-path (meta-path)))
   "Set META-PATH's exported name set to the set of names of MODULES."
-  (with-output-to-new-metafile (metafile 'common-wishes (meta-path))
+  (with-output-to-new-metafile (metafile 'common-wishes (meta-path) :commit-p seal-p :commit-message commit-message)
     (iter (for module in modules)
-          (print (name module) metafile)))
-  (when seal-p
-    (commit-metafile 'common-wishes meta-path commit-message)))
+          (print (name module) metafile))))
 
 (defun required-tools-available-for-remote-type-p (type)
   "See if required executables for fetching from remotes of TYPE are present."
