@@ -105,26 +105,33 @@
          (within-directory (repo repo)
            (not (null (module-gitbranches module locality)))))))
 
-(defun module-present-p (module &optional (locality (master 'git)) check-when-present-p)
+(defun module-present-p (module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t))
   "See if MODULE's presence cache is positive for LOCALITY, failing that check the
-   repository, and update the cache if it is found.
+   repository, and update the cache, accordingly to the result.
 
    CHECK-WHEN-PRESENT-P determines if presence check is performed when MODULE's cache
-   is positive."
+   is positive.
+   CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
+   cache results."
   (with-slots (scan-positive-localities) module
-    (if-let ((cache-hit (find locality scan-positive-localities))
-             (no-cache-revalidation (null check-when-present-p)))
-      t
-      (lret ((actually-present-p (determine-module-presence module locality)))
-        (if actually-present-p
-            (push locality scan-positive-localities)
-            (removef scan-positive-localities locality))))))
+    (labels ((update-presence-in (locality &aux (presence (determine-module-presence module locality)))
+               (if presence
+                   (pushnew locality scan-positive-localities)
+                   (removef scan-positive-localities locality))
+               presence))
+      (if-let ((cache-hit (find locality scan-positive-localities)))
+        (if check-when-present-p
+            (update-presence-in locality)
+            t)
+        (if check-when-missing-p
+            (update-presence-in locality)
+            nil)))))
 
 (defmacro do-present-modules ((module &optional (locality '(master 'git))) &body body)
-  "Iterate the BODY over all modules present in LOCALITY, with MODULE specifying
+  "Iterate the BODY over all modules cached as present in LOCALITY, with MODULE specifying
    the driven variable binding."
   `(do-modules (,module)
-     (when (module-present-p ,locality)
+     (when (module-present-p ,locality nil nil)
        ,@body)))
 
 (defun module-world-readable-p (module &optional (locality (master 'git)))
