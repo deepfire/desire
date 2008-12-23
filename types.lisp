@@ -26,6 +26,7 @@
 (defvar *default-wishmaster*      'git.feelingofgreen.ru)
 (defvar *desires*                 nil "List of import descriptions.")
 (defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
+(defvar *self*                    nil "The well-known self, if any.")
 
 ;;;
 ;;; Globals
@@ -722,11 +723,6 @@
    The user must never need this."
   (setf (values (module-remotes module) (module-localities module) (module-systems module))
         (compute-module-caches module)))
-
-(defun identify-with-distributor (distributor-name)
-  "Recognize DISTRIBUTOR-NAME's modules as locally hosted in LOCALITY."
-  (iter (for module-name in (compute-distributor-modules (distributor distributor-name)))
-        (change-class (module module-name) 'origin-module)))
 
 (defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/dese/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
