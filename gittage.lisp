@@ -120,6 +120,13 @@
             (push locality scan-positive-localities)
             (removef scan-positive-localities locality))))))
 
+(defmacro do-present-modules ((module &optional (locality '(master 'git))) &body body)
+  "Iterate the BODY over all modules present in LOCALITY, with MODULE specifying
+   the driven variable binding."
+  `(do-modules (,module)
+     (when (module-present-p ,locality)
+       ,@body)))
+
 (defun module-world-readable-p (module &optional (locality (master 'git)))
   "See, whether or not MODULE within LOCALITY is allowed to be exported
    for the purposes of git-daemon."

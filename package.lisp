@@ -26,7 +26,7 @@
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
    #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
-   #:module-bare-p #:module-present-p #:module-world-readable-p
+   #:module-bare-p #:module-present-p #:do-present-modules #:module-world-readable-p
    ;; desire.lisp
    #:define-application 
    #:fetch #:desire
