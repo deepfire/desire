@@ -217,20 +217,22 @@
     (let ((*print-case* :downcase))
       (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
               (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
-              (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
-                (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
-                  (append (unless (equal default-remote-name (name o))
-                            (list `(:name ,(name o))))
-                          (when-let ((port (remote-distributor-port o)))
-                            (list `(:distributor-port ,port)))
-                          (when-let ((port (remote-disabled-p o)))
-                            (list `(:disabled-p t)))
-                          (when complex
-                            (list `(:modules ,(mapcar #'downstring complex))))
-                          (when systemful
-                            (list `(:simple-modules ,(mapcar #'downstring systemful))))
-                          (when systemless
-                            (list `(:simple-systemless-modules ,(mapcar #'downstring systemless)))))))))))
+              (if *printing-wishmaster*
+                  (list :converted-modules (mapcar #'downstring (git-remote-converted-modules o)))
+                  (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
+                    (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
+                      (append (unless (equal default-remote-name (name o))
+                                (list `(:name ,(name o))))
+                              (when-let ((port (remote-distributor-port o)))
+                                (list `(:distributor-port ,port)))
+                              (when-let ((port (remote-disabled-p o)))
+                                (list `(:disabled-p t)))
+                              (when complex
+                                (list `(:modules ,(mapcar #'downstring complex))))
+                              (when systemful
+                                (list `(:simple-modules ,(mapcar #'downstring systemful))))
+                              (when systemless
+                                (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with 
