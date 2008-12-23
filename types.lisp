@@ -166,7 +166,10 @@
    :distributor-port nil))
 
 ;;; intermediate types
-(defclass git-remote (git remote) ())
+(defclass git-remote (git remote)
+  ((converted-modules :accessor git-remote-converted-modules :initarg :converted-modules :documentation "Cache."))
+  (:default-initargs
+   :converted-modules nil))
 
 ;;; most specific, exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
@@ -582,8 +585,20 @@
     (do-remotes (r)
       (setf (remote-disabled-p r) (not (member (rcs-type r) present))))))
 
-(defun init (path)
-  "Make Desire fully functional, with PATH chosen as storage location."
+(defmacro do-distributor-modules ((module-var distributor) &body body)
+  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
+  (with-gensyms (remote module-name)
+    `(do-distributor-remotes (,remote ,distributor)
+       (iter (for ,module-name in (location-modules ,remote))
+             (for ,module-var = (module ,module-name))
+             ,@body))))
+
+(defun init (path &key as-distributor)
+  "Make Desire fully functional, with PATH chosen as storage location.
+
+   AS-DISTRIBUTOR, when specified, will be interpreted as a name of an already
+   defined, well known distributor, whose modules will be designated as
+   originating locally."
   (setf *root-of-all-desires* (parse-namestring path))
   (clear-definitions)
   (define-master-localities-in path)
@@ -595,7 +610,14 @@
   (report t ";;; Determining available tools and deducing accessible remotes~%")
   (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
-  (set-common-wishes (sort-by-name (update-module-locality-presence-cache (master 'git))) :meta-path (meta-path))
+  (let ((present-git-modules (update-module-locality-presence-cache (master 'git)))
+        marred-modules)
+    (when as-distributor
+      (setf *self* (distributor as-distributor)
+            marred-modules (compute-distributor-modules *self*))
+      (when ((missing (set-difference marred-modules present-git-modules)))
+        (error "~@<Modules ~S are missing from *SELF*, who we pretend to be.~:@>" missing)))
+    (setf (git-remote-converted-modules (master 'git)) (set-difference present-git-modules marred-modules)))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
