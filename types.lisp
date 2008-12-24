@@ -303,7 +303,7 @@
   (setf (locality-by-path path) o))
 
 (defun parse-git-remote-namestring (namestring)
-  "Given a git remote NAMESTRING, deduce the remote's type, host and path,
+  "Given a git remote NAMESTRING, deduce the remote's type, host, port and path,
    and return them as multiple values."
   (let* ((colon-pos (or (position #\: namestring) (error "No colon in git remote namestring ~S." namestring)))
          (typestr (subseq namestring 0 colon-pos))
@@ -314,11 +314,13 @@
     (unless (and (char= (aref namestring (+ 1 colon-pos)) #\/)
                  (char= (aref namestring (+ 2 colon-pos)) #\/))
       (error "Git remote namestring ~S is malformed." namestring))
-    (let* ((slash3-pos (position #\/ namestring :start (+ 3 colon-pos)))
-           (host (intern (string-upcase (subseq namestring (+ 3 colon-pos) slash3-pos))))
-           (path (when-let ((rest (and slash3-pos (subseq namestring (1+ slash3-pos)))))
+    (let* ((maybe-slash3-pos (position #\/ namestring :start (+ 3 colon-pos)))
+           (maybe-colon2-pos (position #\: namestring :start (+ 4 colon-pos) :end maybe-slash3-pos))
+           (host (intern (string-upcase (subseq namestring (+ 3 colon-pos) (or maybe-colon2-pos maybe-slash3-pos)))))
+           (port (when maybe-colon2-pos (parse-integer namestring :start (1+ maybe-colon2-pos) :end maybe-slash3-pos)))
+           (path (when-let ((rest (and maybe-slash3-pos (subseq namestring (1+ maybe-slash3-pos)))))
                    (split-sequence #\/ rest :remove-empty-subseqs t))))
-      (values type host path))))
+      (values type host port path))))
 
 (defun git-remote-namestring (remote)
   "Produce a namestring for a git REMOTE."
