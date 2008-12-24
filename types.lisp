@@ -156,7 +156,7 @@
    :scan-p nil))
 (defclass remote (location registered)
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
-   (distributor-port :accessor remote-distributor-port :type (or null (integer 0)) :initarg :distributor-port :documentation "Specified, rarely.")
+   (distributor-port :accessor remote-distributor-port :type (or null (integer 0 65536)) :initarg :distributor-port :documentation "Specified, rarely.")
    (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
    (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Specified.")
    (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
