@@ -220,7 +220,7 @@
       (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
               (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
               (if *printing-wishmaster*
-                  (list :converted-modules (mapcar #'downstring (git-remote-converted-modules o)))
+                  (list :converted-modules (mapcar (compose #'downstring #'name) (git-remote-converted-modules o)))
                   (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
                     (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
                       (append (unless (equal default-remote-name (name o))
