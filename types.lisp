@@ -337,6 +337,24 @@
           (down-case-name remote)
           (butlast (rest (remote-path-form remote)))))
 
+(defun required-tools-available-for-remote-type-p (type)
+  "See if required executables for fetching from remotes of TYPE are present."
+  (every #'find-executable
+         (case type
+           (git '(git))
+           (hg '(hg))
+           (darcs '(darcs-to-git))
+           (cvs '(rsync git-cvsimport))
+           (svn '(rsync git-svn)))))
+
+(defun determine-tools-and-update-remote-accessibility ()
+  "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
+  (let ((present (unzip #'required-tools-available-for-remote-type-p '(git hg darcs cvs svn))))
+    (unless (member 'git present)
+      (warn "~@<The git executable is not present. Desire is UNLIKELY to be of much use.~:@>"))
+    (do-remotes (r)
+      (setf (remote-disabled-p r) (not (member (rcs-type r) present))))))
+
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
@@ -385,6 +403,14 @@
                    ;; Existence of complex systems implies absence of simple systems, by default.
                    (unless complex-systems
                      `(,(emit-make-simple-system-form 'asdf-system name name)))))))))
+
+(defmacro do-distributor-modules ((module-var distributor) &body body)
+  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
+  (with-gensyms (remote module-name)
+    `(do-distributor-remotes (,remote ,distributor)
+       (iter (for ,module-name in (location-modules ,remote))
+             (for ,module-var = (module ,module-name))
+             ,@body))))
 
 (defclass asdf () ())
 (defclass mudballs () ())
@@ -552,16 +578,46 @@
     (when (module-present-p module locality t)
       (collect module))))
 
-(defun report (stream format-control &rest args)
-  (apply #'format stream format-control args)
-  (finish-output stream))
-
-(defun ensure-some-wishmasters (meta-path &optional (wishmasters (list *default-wishmaster*)))
+(defun ensure-some-wishmasters (meta-path &optional (wishmasters (list (distributor *default-wishmaster*))))
   (when (metafile-empty-p 'wishmasters meta-path)
     (with-output-to-new-metafile (metafile 'wishmasters meta-path :commit-p t)
       (dolist (wishmaster wishmasters)
-        (write-string wishmaster metafile) (terpri metafile)))
-    (report t ";;; Added wishmasters:~{ ~S~}~%" wishmasters)))
+        (write-string wishmaster metafile) (terpri metafile)))))
+
+(defun wishmaster-remote (wishmaster)
+  "Return the remote through which WISHMASTER exports converted modules."
+  (or (find (of-type 'git-remote) (distributor-remotes wishmaster))
+      (error "~@<Wishmaster ~S is improper: no remotes of type GIT-REMOTE.@:~>" (name wishmaster))))
+
+(defun distributor-release-git-modules (distributor)
+  "Return the list of release modules provided by DISTRIBUTOR via git."
+  (location-modules (wishmaster-remote distributor)))
+
+(defun wishmaster-converted-modules (wishmaster)
+  "Return the list of modules converted by WISHMASTER."
+  (git-remote-converted-modules (wishmaster-remote wishmaster)))
+
+(defun set-wishmaster-converted-modules (new wishmaster)
+  "Set the list of modules converted by WISHMASTER.
+   Carefully avoid mixing in modules available as released by WISHMASTER."
+  (setf (git-remote-converted-modules (wishmaster-remote wishmaster))
+        (if (typep wishmaster 'releasing-wishmaster)
+            (let ((release-modules (distributor-release-git-modules wishmaster)))
+              (when-let ((missing (set-difference release-modules new)))
+                (error "~@<Modules ~S are missing from distributor, which we pretend to be.~:@>" missing))
+              (set-difference new release-modules))
+            new)))
+
+(defsetf wishmaster-converted-modules set-wishmaster-converted-modules)
+
+(defun make-wishmaster (url)
+  "Produces a pure wishmaster accessible at URL."
+  (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
+    (lret ((path-form `((mod) ,@path (downstring (name mod))))
+           (wishmaster (make-instance 'pure-wishmaster :name hostname)))
+      (push (make-instance type :distributor wishmaster :distributor-port port 
+                           :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod path-form)))
+            (distributor-remotes wishmaster)))))
 
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
   "Ensure that all modules present in LOCALITY have their systems loadable.
@@ -569,63 +625,45 @@
   (do-present-modules (module locality)
     (ensure-module-systems-loadable module locality)))
 
-(defun set-common-wishes (modules &key seal-p (commit-message "Updated COMMON-WISHES") (meta-path (meta-path)))
-  "Set META-PATH's exported name set to the set of names of MODULES."
-  (with-output-to-new-metafile (metafile 'common-wishes (meta-path) :commit-p seal-p :commit-message commit-message)
-    (iter (for module in modules)
-          (print (name module) metafile))))
+(defun report (stream format-control &rest args)
+  (apply #'format stream format-control args)
+  (finish-output stream))
 
-(defun required-tools-available-for-remote-type-p (type)
-  "See if required executables for fetching from remotes of TYPE are present."
-  (every #'find-executable
-         (case type
-           (git '(git))
-           (hg '(hg))
-           (darcs '(darcs-to-git))
-           (cvs '(rsync git-cvsimport))
-           (svn '(rsync git-svn)))))
+(defun set-up-wishmaster (wishmaster-spec present-git-modules)
+  "PRESENT-GIT-MODULES are interpreted as a set of modules to be git-exported
+   by a potentially not yet present wishmaster specified by the WISHMASTER-SPEC,
+   which can be either a string representing an URL, or a symbol, naming a
+   well-known, defined distributor.
 
-(defun determine-tools-and-update-remote-accessibility ()
-  "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
-  (let ((present (unzip #'required-tools-available-for-remote-type-p '(git hg darcs cvs svn))))
-    (unless (member 'git present)
-      (warn "~@<The git executable is not present. Desire is UNLIKELY to be of much use.~:@>"))
-    (do-remotes (r)
-      (setf (remote-disabled-p r) (not (member (rcs-type r) present))))))
+   The value returned is the existing or created wishmaster."
+  (lret* ((distributor-p (etypecase wishmaster-spec (symbol t) (string nil)))
+         (wishmaster (funcall (fcase distributor-p (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor) #'make-wishmaster) wishmaster-spec)))
+    (setf (wishmaster-converted-modules wishmaster) present-git-modules)))
 
-(defmacro do-distributor-modules ((module-var distributor) &body body)
-  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
-  (with-gensyms (remote module-name)
-    `(do-distributor-remotes (,remote ,distributor)
-       (iter (for ,module-name in (location-modules ,remote))
-             (for ,module-var = (module ,module-name))
-             ,@body))))
-
-(defun init (path &key as-distributor)
+(defun init (path &key as-distributor as-wishmaster)
   "Make Desire fully functional, with PATH chosen as storage location.
 
-   AS-DISTRIBUTOR, when specified, will be interpreted as a name of an already
-   defined, well known distributor, whose modules will be designated as
-   originating locally."
+   AS-DISTRIBUTOR, when specified, will be interpreted as a name of an
+   already defined, well known distributor, whose modules will be designated 
+   as originating locally.
+   AS-WISHMASTER, when specified, will be interpreted as an externally 
+   accessible URL to a git repository, either native git, or http.
+   The AS-DISTRIBUTOR and AS-WISHMASTER keywords are mutually exclusive."
+  (when (and as-distributor as-wishmaster)
+    (error "~@<The AS-DISTRIBUTOR and AS-WISHMASTER keywords are mutually exclusive.~:@>"))
   (setf *root-of-all-desires* (parse-namestring path))
   (clear-definitions)
   (define-master-localities-in path)
   (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes wishmasters))
     (report t ";;; Ensured metastore at ~S~%" (meta-path)))
-  (ensure-some-wishmasters (meta-path))
   (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
   (load-definitions (meta-path))
   (report t ";;; Determining available tools and deducing accessible remotes~%")
   (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
-  (let ((present-git-modules (update-module-locality-presence-cache (master 'git)))
-        marred-modules)
-    (when as-distributor
-      (setf *self* (distributor as-distributor)
-            marred-modules (compute-distributor-modules *self*))
-      (when ((missing (set-difference marred-modules present-git-modules)))
-        (error "~@<Modules ~S are missing from *SELF*, who we pretend to be.~:@>" missing)))
-    (setf (git-remote-converted-modules (master 'git)) (set-difference present-git-modules marred-modules)))
+  (let ((present-git-modules (update-module-locality-presence-cache (master 'git))))
+    (when-let ((wishmaster-spec (or as-distributor as-wishmaster)))
+      (setf *self* (set-up-wishmaster wishmaster-spec present-git-modules))))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
