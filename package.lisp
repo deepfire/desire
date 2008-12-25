@@ -15,7 +15,7 @@
    #:remote-disabled-p
    #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
    #:add-desire #:desire #:desire*
-   #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self*
+   #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
    ;; filesystem-utils.lisp
    #:with-dryly-ran-externals

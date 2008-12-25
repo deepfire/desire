@@ -23,10 +23,11 @@
 ;;;
 ;;; Knobs
 ;;;
-(defvar *default-wishmaster*      'git.feelingofgreen.ru)
-(defvar *desires*                 nil "List of import descriptions.")
-(defvar *default-world-readable*  t   "Whether to publish GIT repositories by default.")
-(defvar *self*                    nil "The well-known self, if any.")
+(defvar *default-wishmaster*                       'git.feelingofgreen.ru)
+(defvar *desires*                                  nil "List of import descriptions.")
+(defvar *default-world-readable*                   t   "Whether to publish GIT repositories by default.")
+(defvar *self*                                     nil "The well-known self, if any.")
+(defvar *combined-remotes-prefer-native-over-http* t "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
 
 ;;;
 ;;; Globals
@@ -188,6 +189,7 @@
 ;;; most specific, exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
 (defclass git-http-remote (git-http git-remote) ())
+(defclass git-combined-remote (git-native git-http git-remote) ())
 (defclass hg-http-remote (hg-http remote) ())
 (defclass darcs-http-remote (darcs-http remote) ())
 (defclass cvs-rsync-remote (cvs-rsync remote) ())
@@ -207,6 +209,10 @@
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
+
+(defmethod transport ((o git-http-remote))
+  (if *combined-remotes-prefer-native-over-http*
+      'git 'http))
 
 (defun default-remote-name (distributor-name rcs-type)
   "Compute a default name for remote with RCS-TYPE in DISTRIBUTOR-NAME."
@@ -324,7 +330,7 @@
    and return them as multiple values."
   (let* ((colon-pos (or (position #\: namestring) (error "No colon in git remote namestring ~S." namestring)))
          (typestr (subseq namestring 0 colon-pos))
-         (type (switch (typestr :test #'string=) ("http" 'git-http-remote) ("git" 'git-native-remote)
+         (type (switch (typestr :test #'string=) ("http" 'git-http-remote) ("git" 'git-native-remote) ("git+http" 'git-combined-remote)
                        (t (error "Bad URI type ~S in git remote namestring ~S." typestr namestring)))))
     (unless (> (length namestring) (+ colon-pos 3))
       (error "Git remote namestring ~S is too short." namestring))
@@ -343,7 +349,7 @@
   "Produce a namestring for a git REMOTE."
   (declare (type git-remote remote))
   (format nil "~A://~A~:[~;:~D~]/~{~A/~}"
-          (case (type-of remote) (git-native-remote "git") (git-http-remote "http"))
+          (case (type-of remote) (git-native-remote "git") (git-http-remote "http") (git-combined-remote "git+http"))
           (down-case-name remote)
           (remote-distributor-port remote)
           (butlast (rest (remote-path-form remote)))))
