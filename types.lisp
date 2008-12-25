@@ -45,8 +45,6 @@
 (defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 (defparameter *masters*            (make-hash-table :test #'equal) "Map RCS type to master localities.")
 
-(defvar *printing-wishmaster* nil)
-
 (defun clear-definitions ()
   "Empty all global definitions."
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps* *masters*))
@@ -91,20 +89,34 @@
    :registrator #'(setf distributor) :remotes nil))
 (defclass wishmaster () ())
 
-(defclass releasing-wishmaster (distributor wishmaster) ())
-(defclass pure-wishmaster (distributor wishmaster) ())
+(defclass releasing-wishmaster (wishmaster distributor) ())
+(defclass pure-wishmaster (wishmaster distributor) ())
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#~A(~;~A ~@<~S ~S~:@>~;)~:@>"
-          (ecase (type-of o) (distributor #\D) (wishmaster #\W)) (symbol-name (name o))
-          :remotes (xform *printing-wishmaster* (curry #'remove-if-not (of-type 'git)) (distributor-remotes o))))
+  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>"
+          (symbol-name (name o)) :remotes (distributor-remotes o)))
 
-(defun distributor-reader (stream &optional sharp char)
-  (declare (ignore sharp))
+(defmethod print-object ((o wishmaster) stream)
+  (format stream "~@<#W(~;~S ~@<~(~S ~A~)~:@>~;)~:@>"
+          (if (typep o 'releasing-wishmaster)
+              (name o)
+              (git-remote-namestring (wishmaster-remote o)))
+          :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-remote o)))))
+
+(defun distributor-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (prog1 (make-instance ,(ecase char (#\D 'distributor) (#\W 'wishmaster)) :name ',name ,@(remove-from-plist initargs :remotes))
+         (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
+
+(defun wishmaster-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  (destructuring-bind (distributor &key converted-modules) (read stream nil nil)
+    `(lret ((wishmaster ,(if (stringp distributor)
+                             `(make-wishmaster ,distributor)
+                             `(distributor ',distributor))))
+       (setf (wishmaster-converted-modules wishmaster) (mapcar #'module ',converted-modules)))))
 
 (defmacro do-distributor-remotes ((var distributor) &body body)
   `(iter (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
@@ -215,26 +227,24 @@
                 (system-simple-p (first (module-systems module)))))))
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
-  (destructuring-bind ((form-binding) . form-body) (remote-path-form o)
+  (destructuring-bind ((form-binding) &rest form-body) (remote-path-form o)
     (let ((*print-case* :downcase))
       (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
               (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
-              (if *printing-wishmaster*
-                  (list :converted-modules (mapcar (compose #'downstring #'name) (git-remote-converted-modules o)))
-                  (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
-                    (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
-                      (append (unless (equal default-remote-name (name o))
-                                (list `(:name ,(name o))))
-                              (when-let ((port (remote-distributor-port o)))
-                                (list `(:distributor-port ,port)))
-                              (when-let ((port (remote-disabled-p o)))
-                                (list `(:disabled-p t)))
-                              (when complex
-                                (list `(:modules ,(mapcar #'downstring complex))))
-                              (when systemful
-                                (list `(:simple-modules ,(mapcar #'downstring systemful))))
-                              (when systemless
-                                (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))))))))))
+              (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
+                (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
+                  (append (unless (equal default-remote-name (name o))
+                            (list `(:name ,(name o))))
+                          (when-let ((port (remote-distributor-port o)))
+                            (list `(:distributor-port ,port)))
+                          (when-let ((port (remote-disabled-p o)))
+                            (list `(:disabled-p t)))
+                          (when complex
+                            (list `(:modules ,(mapcar #'downstring complex))))
+                          (when systemful
+                            (list `(:simple-modules ,(mapcar #'downstring systemful))))
+                          (when systemless
+                            (list `(:simple-systemless-modules ,(mapcar #'downstring systemless)))))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with 
@@ -279,8 +289,8 @@
    variable called REPO-VAR."
   `(lambda (,repo-var) (list ,@path-form)))
 
-(defun remote-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
+(defun remote-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
   (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
     `(prog1
          (make-instance ',type :distributor (distributor ',distributor) :modules ',(append modules simple-modules simple-systemless-modules)
@@ -299,8 +309,8 @@
           (append (when (locality-master-p o) (list (list :master-p t)))
                   (when (locality-scan-p o) (list (list :scan-p t))))))
 
-(defun locality-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
+(defun locality-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
   (destructuring-bind (type name path &rest initargs &key &allow-other-keys) (read stream nil nil)
     `(make-instance ',type :name ',name :path ,path ,@(remove-from-plist initargs :path :modules))))
 
@@ -332,9 +342,10 @@
 (defun git-remote-namestring (remote)
   "Produce a namestring for a git REMOTE."
   (declare (type git-remote remote))
-  (format nil "~A://~A/~{~A/~}"
+  (format nil "~A://~A~:[~;:~D~]/~{~A/~}"
           (case (type-of remote) (git-native-remote "git") (git-http-remote "http"))
           (down-case-name remote)
+          (remote-distributor-port remote)
           (butlast (rest (remote-path-form remote)))))
 
 (defun required-tools-available-for-remote-type-p (type)
@@ -375,7 +386,7 @@
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
           (remove nil (multiple-value-call #'list
-                        (destructuring-bind (first . other-systems) (module-systems o)
+                        (destructuring-bind (&optional first &rest other-systems) (module-systems o)
                           (unless (and first (null other-systems) (system-simple-p first))
                             (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
                               (values (when simple
@@ -390,8 +401,8 @@
     (break))
   (call-next-method))
 
-(defun module-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
+(defun module-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
       `(or (module ',name :if-does-not-exist :continue)
@@ -432,8 +443,8 @@
                   (and (system-relativity o) (list :relativity (system-relativity o)))
                   (and (system-applications o) (list :applications (system-applications o))))))
 
-(defun system-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
+(defun system-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key module relativity &allow-other-keys) (read stream nil nil t)
     `(or (system ',name :if-does-not-exist :continue)
          (make-instance 'asdf-system :name ',name :module (module ',module) :relativity ',relativity ,@(remove-from-plist initargs :module :applications :relativity)))))
@@ -454,8 +465,8 @@
           (list :system (name (app-system o)) :package (app-package o) :function (app-function o)
                 :default-parameters (app-default-parameters o))))
 
-(defun application-reader (stream &optional sharp char)
-  (declare (ignore sharp char))
+(defun application-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key system package function default-parameters &allow-other-keys) (read stream nil nil t)
     `(or (app ',name :if-does-not-exist :continue)
          (make-instance 'application :name ',name :system (system ',system) :package ',package :function ',function :default-parameters ',default-parameters
@@ -506,7 +517,7 @@
         (*read-eval* nil)
         (*package* #.*package*))
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
-    (set-dispatch-macro-character #\# #\W 'distributor-reader *readtable*)
+    (set-dispatch-macro-character #\# #\W 'wishmaster-reader *readtable*)
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
     (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
     (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
@@ -586,25 +597,25 @@
 
 (defun wishmaster-remote (wishmaster)
   "Return the remote through which WISHMASTER exports converted modules."
-  (or (find (of-type 'git-remote) (distributor-remotes wishmaster))
-      (error "~@<Wishmaster ~S is improper: no remotes of type GIT-REMOTE.@:~>" (name wishmaster))))
+  (or (find-if (of-type 'git-remote) (distributor-remotes wishmaster))
+      (error "~@<Wishmaster ~S is improper: no remotes of type GIT-REMOTE.~:@>" (name wishmaster))))
 
 (defun distributor-release-git-modules (distributor)
   "Return the list of release modules provided by DISTRIBUTOR via git."
-  (location-modules (wishmaster-remote distributor)))
+  (mapcar #'module (location-modules (wishmaster-remote distributor))))
 
 (defun wishmaster-converted-modules (wishmaster)
   "Return the list of modules converted by WISHMASTER."
   (git-remote-converted-modules (wishmaster-remote wishmaster)))
 
-(defun set-wishmaster-converted-modules (new wishmaster)
+(defun set-wishmaster-converted-modules (wishmaster new)
   "Set the list of modules converted by WISHMASTER.
    Carefully avoid mixing in modules available as released by WISHMASTER."
   (setf (git-remote-converted-modules (wishmaster-remote wishmaster))
         (if (typep wishmaster 'releasing-wishmaster)
             (let ((release-modules (distributor-release-git-modules wishmaster)))
               (when-let ((missing (set-difference release-modules new)))
-                (error "~@<Modules ~S are missing from distributor, which we pretend to be.~:@>" missing))
+                (error "~@<Modules ~S are missing from distributor ~S, which we pretend to be.~:@>" missing (name wishmaster)))
               (set-difference new release-modules))
             new)))
 
@@ -612,9 +623,8 @@
 
 (defun advertise-wishmaster-conversions (wishmaster &optional (metastore (meta-path)))
   "Advertise the set of modules converted by WISHMASTER at METASTORE."
-  (let ((*printing-wishmaster* t))
-    (with-output-to-new-metafile (common-wishes 'common-wishes metastore :commit-p t)
-      (print wishmaster common-wishes))))
+  (with-output-to-new-metafile (common-wishes 'common-wishes metastore :commit-p t)
+    (print wishmaster common-wishes)))
 
 (defun make-wishmaster (url)
   "Produces a pure wishmaster accessible at URL."
@@ -622,7 +632,7 @@
     (lret ((path-form `((mod) ,@path (downstring (name mod))))
            (wishmaster (make-instance 'pure-wishmaster :name hostname)))
       (push (make-instance type :distributor wishmaster :distributor-port port 
-                           :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod path-form)))
+                           :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod (rest path-form))))
             (distributor-remotes wishmaster)))))
 
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
