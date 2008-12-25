@@ -284,7 +284,7 @@
   (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
     `(prog1
          (make-instance ',type :distributor (distributor ',distributor) :modules ',(append modules simple-modules simple-systemless-modules)
-                        :path-form ',(list* (list repovar) path-form) :path-fn ,(path-form-to-path-fn-form repo-var path-form)
+                        :path-form ',(list* (list repovar) path-form) :path-fn ,(path-form-to-path-fn-form repovar path-form)
                         ,@(when name `(:name ',name))
                         ,@(remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))
        ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
