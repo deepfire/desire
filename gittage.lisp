@@ -114,11 +114,11 @@
    CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
    cache results."
   (with-slots (scan-positive-localities) module
-    (labels ((update-presence-in (locality &aux (presence (determine-module-presence module locality)))
-               (if presence
-                   (pushnew locality scan-positive-localities)
-                   (removef scan-positive-localities locality))
-               presence))
+    (labels ((update-presence-in (locality)
+               (lret ((presence (determine-module-presence module locality)))
+                 (if presence
+                     (pushnew locality scan-positive-localities)
+                     (removef scan-positive-localities locality)))))
       (if-let ((cache-hit (find locality scan-positive-localities)))
         (if check-when-present-p
             (update-presence-in locality)
@@ -131,7 +131,7 @@
   "Iterate the BODY over all modules cached as present in LOCALITY, with MODULE specifying
    the driven variable binding."
   `(do-modules (,module)
-     (when (module-present-p ,locality nil nil)
+     (when (module-present-p ,module ,locality nil nil)
        ,@body)))
 
 (defun module-world-readable-p (module &optional (locality (master 'git)))
