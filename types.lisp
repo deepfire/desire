@@ -667,17 +667,13 @@
   (apply #'format stream format-control args)
   (finish-output stream))
 
-(defun init (path &key as-distributor as-wishmaster)
+(defun init (path &key as)
   "Make Desire fully functional, with PATH chosen as storage location.
 
-   AS-DISTRIBUTOR, when specified, will be interpreted as a name of an
-   already defined, well known distributor, whose modules will be designated 
-   as originating locally.
-   AS-WISHMASTER, when specified, will be interpreted as an externally 
-   accessible URL to a git repository, either native git, or http.
-   The AS-DISTRIBUTOR and AS-WISHMASTER keywords are mutually exclusive."
-  (when (and as-distributor as-wishmaster)
-    (error "~@<The AS-DISTRIBUTOR and AS-WISHMASTER keywords are mutually exclusive.~:@>"))
+   AS, when specified, will be interpreted as a distributor specificetion,
+   that is, either a string, for an URL pointing to a Git remote of a 
+   non-well-known converting wishmaster, or a symbol, naming a well-known
+   distributor."
   (setf *root-of-all-desires* (parse-namestring path))
   (clear-definitions)
   (define-master-localities-in path)
@@ -689,8 +685,7 @@
   (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
   (let ((present-git-modules (update-module-locality-presence-cache (master 'git))))
-    (when-let* ((wishmaster-spec (or as-distributor as-wishmaster))
-                (wishmaster (ensure-wishmaster wishmaster-spec)))
+    (when-let ((wishmaster (and as (ensure-wishmaster as))))
       (setf *self* wishmaster
             (wishmaster-converted-modules wishmaster) present-git-modules)
       (advertise-wishmaster-conversions wishmaster (meta-path))))
