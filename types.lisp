@@ -610,6 +610,12 @@
 
 (defsetf wishmaster-converted-modules set-wishmaster-converted-modules)
 
+(defun advertise-wishmaster-conversions (wishmaster &optional (metastore (meta-path)))
+  "Advertise the set of modules converted by WISHMASTER at METASTORE."
+  (let ((*printing-wishmaster* t))
+    (with-output-to-new-metafile (common-wishes 'common-wishes metastore :commit-p t)
+      (print wishmaster common-wishes))))
+
 (defun make-wishmaster (url)
   "Produces a pure wishmaster accessible at URL."
   (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
@@ -663,7 +669,8 @@
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
   (let ((present-git-modules (update-module-locality-presence-cache (master 'git))))
     (when-let ((wishmaster-spec (or as-distributor as-wishmaster)))
-      (setf *self* (set-up-wishmaster wishmaster-spec present-git-modules))))
+      (setf *self* (set-up-wishmaster wishmaster-spec present-git-modules))
+      (advertise-wishmaster-conversions *self* (meta-path))))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
