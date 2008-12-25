@@ -89,8 +89,10 @@
   ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified."))
   (:default-initargs
    :registrator #'(setf distributor) :remotes nil))
+(defclass wishmaster () ())
 
-(defclass wishmaster (distributor) ())
+(defclass releasing-wishmaster (distributor wishmaster) ())
+(defclass pure-wishmaster (distributor wishmaster) ())
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#~A(~;~A ~@<~S ~S~:@>~;)~:@>"
