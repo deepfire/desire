@@ -111,12 +111,21 @@
          (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
 
+(defun ensure-wishmaster (wishmaster-spec)
+  "When WISHMASTER-SPEC is a symbol, find the distributor it names,
+   and mark it as being a releasing wishmaster.
+   When WISHMASTER-SPEC is a string, it is interpreted as an URL to
+   a Git remote of a non-well-known pure-wishmaster, and is used
+   to ensure its existence.
+   In both cases the wishmaster object is returned.
+   In other cases, a type error is signalled."
+  (funcall (fcase (etypecase wishmaster-spec (symbol t) (string nil))
+                  (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor) #'ensure-pure-wishmaster) wishmaster-spec))
+
 (defun wishmaster-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (distributor &key converted-modules) (read stream nil nil)
-    `(lret ((wishmaster ,(if (stringp distributor)
-                             `(make-wishmaster ,distributor)
-                             `(distributor ',distributor))))
+    `(lret ((wishmaster (ensure-wishmaster ,(quote-if-non-self-evaluating distributor))))
        (setf (wishmaster-converted-modules wishmaster) (mapcar #'module ',converted-modules)))))
 
 (defmacro do-distributor-remotes ((var distributor) &body body)
@@ -344,6 +353,22 @@
            (path (when-let ((rest (and maybe-slash3-pos (subseq namestring (1+ maybe-slash3-pos)))))
                    (split-sequence #\/ rest :remove-empty-subseqs t))))
       (values type host port path))))
+
+(defun make-pure-wishmaster (type hostname port path)
+  "Produces a pure wishmaster with Git remote of TYPE, accessible at 
+   HOSTNAME, PORT and PATH."
+  (lret ((path-form `((mod) ,@path (downstring (name mod))))
+         (wishmaster (make-instance 'pure-wishmaster :name hostname)))
+    (push (make-instance type :distributor wishmaster :distributor-port port 
+                         :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod (rest path-form))))
+          (distributor-remotes wishmaster))))
+
+(defun ensure-pure-wishmaster (url)
+  "URL is interpreted as a specification of a Git remote of a non-well known
+   pure wishmaster, which is either found or created."
+  (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
+    (or (distributor hostname :if-does-not-exist :continue)
+        (make-pure-wishmaster type hostname port path))))
 
 (defun git-remote-namestring (remote)
   "Produce a namestring for a git REMOTE."
@@ -632,15 +657,6 @@
   (with-output-to-new-metafile (common-wishes 'common-wishes metastore :commit-p t)
     (print wishmaster common-wishes)))
 
-(defun make-wishmaster (url)
-  "Produces a pure wishmaster accessible at URL."
-  (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
-    (lret ((path-form `((mod) ,@path (downstring (name mod))))
-           (wishmaster (make-instance 'pure-wishmaster :name hostname)))
-      (push (make-instance type :distributor wishmaster :distributor-port port 
-                           :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod (rest path-form))))
-            (distributor-remotes wishmaster)))))
-
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
   "Ensure that all modules present in LOCALITY have their systems loadable.
    Return the list of present modules."
@@ -650,17 +666,6 @@
 (defun report (stream format-control &rest args)
   (apply #'format stream format-control args)
   (finish-output stream))
-
-(defun set-up-wishmaster (wishmaster-spec present-git-modules)
-  "PRESENT-GIT-MODULES are interpreted as a set of modules to be git-exported
-   by a potentially not yet present wishmaster specified by the WISHMASTER-SPEC,
-   which can be either a string representing an URL, or a symbol, naming a
-   well-known, defined distributor.
-
-   The value returned is the existing or created wishmaster."
-  (lret* ((distributor-p (etypecase wishmaster-spec (symbol t) (string nil)))
-         (wishmaster (funcall (fcase distributor-p (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor) #'make-wishmaster) wishmaster-spec)))
-    (setf (wishmaster-converted-modules wishmaster) present-git-modules)))
 
 (defun init (path &key as-distributor as-wishmaster)
   "Make Desire fully functional, with PATH chosen as storage location.
@@ -684,9 +689,11 @@
   (determine-tools-and-update-remote-accessibility)
   (report t ";;; Scanning for modules in ~S~%" (meta-path))
   (let ((present-git-modules (update-module-locality-presence-cache (master 'git))))
-    (when-let ((wishmaster-spec (or as-distributor as-wishmaster)))
-      (setf *self* (set-up-wishmaster wishmaster-spec present-git-modules))
-      (advertise-wishmaster-conversions *self* (meta-path))))
+    (when-let* ((wishmaster-spec (or as-distributor as-wishmaster))
+                (wishmaster (ensure-wishmaster wishmaster-spec)))
+      (setf *self* wishmaster
+            (wishmaster-converted-modules wishmaster) present-git-modules)
+      (advertise-wishmaster-conversions wishmaster (meta-path))))
   (ensure-present-module-systems-loadable (master 'git))
   t)
 
