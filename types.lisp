@@ -195,7 +195,7 @@
                (downstring (transport remote)) "://" (down-case-name (remote-distributor remote))
                (when-let ((port (remote-distributor-port remote)))
                  (format nil ":~D" port))
-               (flatten-path-list (funcall (remote-path-fn remote) named) t)))
+               (flatten-path-list (funcall (remote-path-fn remote) named) t t)))
 
 ;;; most specific, exhaustive partition of LOCALITY
 (defclass git-locality (git locality) ())
