@@ -427,6 +427,7 @@
 
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
+   (asdf-search-restriction :accessor module-asdf-search-restriction :initarg :asdf-search-restriction :documentation "Specified.")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
@@ -434,6 +435,7 @@
    (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
    :registrator #'(setf module)    
+   :asdf-search-restriction nil
    :remotes nil :localities nil
    :systems nil :essential-p nil))
 
@@ -452,8 +454,10 @@
                                         (list :systems (mapcar #'name simple)))
                                       (when complex
                                         (list :complex-systems (mapcar #'name complex)))))))
+                        (when (module-asdf-search-restriction o)
+                          (list :asdf-search-restriction (module-asdf-search-restriction o)))
                         (when (module-essential-p o)
-                          (list :essential-p t))))))
+                          (list :essential-p (module-essential-p o)))))))
 
 (defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
   (when (module name :if-does-not-exist :continue)
@@ -462,11 +466,12 @@
 
 (defun module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems asdf-search-restriction &allow-other-keys) (read stream nil nil t)
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
       `(or (module ',name :if-does-not-exist :continue)
            (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
-                                 ,@(remove-from-plist initargs :systems :complex-systems))
+                                 ,@(when asdf-search-restriction `(:asdf-search-restriction ',asdf-search-restriction))
+                                 ,@(remove-from-plist initargs :systems :complex-systems :asdf-search-restriction))
              ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
              ,@(if systems-specified-p
                    (mapcar (curry #'emit-make-simple-system-form 'asdf-system name) systems)
