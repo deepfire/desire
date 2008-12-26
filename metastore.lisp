@@ -65,6 +65,16 @@
   `(within-directory (,(gensym "VOID") ,meta-path ,@options)
      ,@body))
 
+(defmacro within-distributor-meta ((distributor &key (metastore '(meta-path)) register-p update-p) &body body)
+  (with-gensyms (distributor-name)
+    (once-only (metastore)
+      `(let ((,distributor-name (down-case-name ,distributor)))
+         (within-meta (,metastore)
+           ,@(when register-p `((git "remote" "add" ,distributor-name)))
+           ,@(when update-p `((git "fetch" ,distributor-name)))
+           (within-ref (list "remotes" ,distributor-name "master")
+             ,@body))))))
+
 (defun commit-metafile (name metastore-directory &optional (commit-message (format nil "Updated ~A" name)))
   "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY."
   (within-meta (metastore-directory)
