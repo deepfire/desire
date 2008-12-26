@@ -136,7 +136,7 @@
                                                 ,@bindings))))
      ,@body))
 
-(define-external-program git :critical t :may-want-display t)
+(define-external-program git :may-want-display t)
 (define-external-program gitk :may-want-display t)
 #-win32
 (progn
