@@ -29,21 +29,22 @@
 
 (defun system-loadable-p (system)
   "See whether SYSTEM is loadable by the means of ASDF."
-  (handler-case (asdf:find-system (coerce-to-name system) nil)
+  (handler-case (multiple-value-bind (system-asd asd-symlink) (system-definition-path system)
+                  (and (equal (symlink-target-file-present-p asd-symlink) system-asd)
+                       (asdf:find-system (coerce-to-name system) nil)))
     (asdf:missing-dependency () ;; CXML...
       (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
       t)))
 
-(defun ensure-system-loadable (system &optional (locality (master 'git)))
-  (multiple-value-call (order ensure-symlink 1 0) (system-definition-path system locality)))
-
-(define-condition module-systems-unloadable-error (desire-error)
+(define-reported-condition module-systems-unloadable-error (desire-error)
   ((module :accessor module-system-unloadable-error-module :initarg :module)
    (systems :accessor module-system-unloadable-error-systems :initarg :systems))
-  (:report (lambda (cond stream)
-             (format stream "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>"
-                     (module-system-unloadable-error-module cond)
-                     (module-system-unloadable-error-systems cond)))))
+  (:report (module systems)
+           "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>"
+           module systems))
+
+(defun ensure-system-loadable (system &optional (locality (master 'git)))
+  (multiple-value-call (order ensure-symlink 1 0) (system-definition-path system locality)))
 
 (defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
   "Try making MODULE's systems loadable, defaulting to LOCALITY.
