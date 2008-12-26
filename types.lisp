@@ -416,7 +416,7 @@
          (case type
            (git '(git))
            (hg '(hg))
-           (darcs '(darcs-to-git))
+           (darcs '(darcs darcs-to-git))
            (cvs '(rsync git-cvsimport))
            (svn '(rsync git-svn)))))
 
