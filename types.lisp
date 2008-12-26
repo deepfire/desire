@@ -99,12 +99,17 @@
   (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>"
           (symbol-name (name o)) :remotes (distributor-remotes o)))
 
+(defvar *printing-wishmaster* nil)
+
 (defmethod print-object ((o wishmaster) stream)
-  (format stream "~@<#W(~;~S ~@<~(~S ~A~)~:@>~;)~:@>"
-          (if (typep o 'releasing-wishmaster)
-              (name o)
-              (git-remote-namestring (wishmaster-remote o)))
-          :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-remote o)))))
+  (if (and (typep o 'releasing-wishmaster)
+           (null *printing-wishmaster*))
+      (call-next-method)
+      (format stream "~@<#W(~;~S ~@<~(~S ~A~)~:@>~;)~:@>"
+              (if (typep o 'releasing-wishmaster)
+                  (name o)
+                  (git-remote-namestring (wishmaster-remote o)))
+              :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-remote o))))))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
@@ -645,7 +650,8 @@
 (defun advertise-wishmaster-conversions (wishmaster &optional (metastore (meta-path)))
   "Advertise the set of modules converted by WISHMASTER at METASTORE."
   (with-output-to-new-metafile (common-wishes 'common-wishes metastore :commit-p t)
-    (print wishmaster common-wishes)))
+    (let ((*printing-wishmaster* t))
+      (print wishmaster common-wishes))))
 
 (defun module-present-p (module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t))
   "See if MODULE's presence cache is positive for LOCALITY, failing that check the
