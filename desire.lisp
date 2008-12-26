@@ -55,6 +55,24 @@
 ;;;               (return-from fetch-module t))
 ;;;             (finally (warn 'module-fetch-failed :module o)))))
 
+(defvar *purgeworth-binaries* 
+  '("dfsl"        ;; OpenMCL
+    "ppcf" "x86f" ;; CMUCL
+    "fasl"        ;; SBCL
+    "fas" "o"     ;; ECL
+    "lib" "obj"   ;; ECL/win32
+    )) 
+
+(defun purge-binaries (&optional directory)
+  "Purge files with type among one of *PURGEWORTH-BINARIES* either in DIRECTORY,
+   or, when it's NIL, in *DEFAULT-PATHNAME-DEFAULTS*."
+  (dolist (type *purgeworth-binaries*)
+    (mapc #'delete-file (directory (subfile directory '(:wild-inferiors :wild) :type type)))))
+
+(define-reported-condition repository-not-clean-during-fetch (repository-error external-program-failure) ()
+  (:report (locality module)
+           "~@<repository for ~S in ~S has uncommitted changes during fetch~:@>" module locality))
+
 (defgeneric fetch-remote (locality remote module))
 
 (defmethod fetch-remote ((locality git-locality) (remote git) module)
@@ -62,10 +80,10 @@
     (unless (directory-exists-p repo-dir)
       (within-directory (dir repo-dir :if-exists :error :if-does-not-exist :create)
         (git "init-db")))
-    (ensure-module-gitremote module remote)
-    (within-directory (dir repo-dir)
-      (git "fetch" (down-case-name remote)))
-    (ensure-module-master-branch-from-remote module locality)))
+    (maybe-within-directory repo-dir
+      (ensure-gitremote (name remote) (url remote module))
+      (git "fetch" (down-case-name remote))
+      (ensure-master-branch-from-remote :remote-name (name remote)))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
   (let ((darcs-repo-dir (module-path module (master 'darcs)))
@@ -91,7 +109,7 @@
 (defmethod fetch :around (locality remote module)
   (with-condition-printing (t fetch-failure)
     (restart-bind ((retry (lambda () 
-                            (within-module-repository (dir module locality)
+                            (maybe-within-directory (module-path module locality)
                               (git "gui"))
                             (invoke-restart (find-restart 'retry)))
                      :test-function (of-type 'repository-not-clean-during-fetch)
@@ -114,11 +132,11 @@
 (defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module)
   (let ((darcs-repo-dir (module-path module (master 'darcs)))
         (git-repo-dir (module-path module git-locality)))
-    (purge-module-binaries module)
+    (purge-binaries git-repo-dir)
     (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create)
       (darcs-to-git (namestring darcs-repo-dir)))
-    (when (module-bare-p module git-locality)
-      (setf (module-bare-p module git-locality) nil))))
+    (when (repository-bare-p git-repo-dir)
+      (setf (repository-bare-p git-repo-dir) nil))))
 
 (defmethod fetch ((git-locality git-locality) (remote cvs-rsync-remote) module &aux (name (down-case-name module)))
   (let* ((cvs-locality (master 'cvs))
@@ -134,13 +152,12 @@
         (git-repo-dir (module-path module git-locality)))
     (unless (directory-exists-p git-repo-dir)
       (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create :if-exists :error)
-        (git-svn "init" (format nil "file:/~A" (namestring svn-repo-dir))))) ;; gratuitious SVN complication
+        (git-svn "init" (format nil "file://~A" (namestring svn-repo-dir))))) ;; gratuitious SVN complication
     (within-directory (git-repo-dir git-repo-dir)
       (git-svn "fetch"))))
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
-  (setf (module-world-readable-p module) *default-world-readable*))
-
+  (setf (repository-world-readable-p (module-path module git-locality)) *default-world-readable*))
 
 (defgeneric system-dependencies (s)
   (:method ((s mudballs-system)))
@@ -162,18 +179,19 @@
            (cons module-name (not (module-present-p (module module-name) *locality*))))
          ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
          (module-dependencies (m)
-           (iter (for system-file in (directory (merge-pathnames (make-pathname :directory (pathname-directory (module-path m)) :name :wild :type "asd")
-                                                                 (make-pathname :directory '(:relative :wild-inferiors)))))
-                 (if-let* ((system (system (pathname-name system-file) :if-does-not-exist :continue)))
-                          (multiple-value-bind (sysdeps unknown-sysdeps) (system-dependencies system)
-                            (ensure-system-loadable system)
-                            (when unknown-sysdeps
-                              (appending unknown-sysdeps into unknown-systems-depended-upon))
-                            (appending
-                             (remove-duplicates (mapcar (compose #'name #'system-module) sysdeps))
-                             into module-dependencies))
-                          (collect (intern (string-upcase (pathname-name system-file))) into unknown-system-encounters))
-                 (finally (return (values module-dependencies unknown-systems-depended-upon unknown-system-encounters))))))
+           (iter (for system-file in (remove-if (rcurry #'pathname-match-p (subwild (module-path m) '("_darcs")))
+                                                (directory (subwild (module-path m) (module-asdf-search-restriction m) :name :wild :type "asd"))))
+                 (if-let ((system (system (pathname-name system-file) :if-does-not-exist :continue)))
+                   (multiple-value-bind (known-sysdeps unknown-sysdeps) (system-dependencies system)
+                     (ensure-system-loadable system)
+                     (when unknown-sysdeps
+                       (appending unknown-sysdeps into unknown-systems-depended-upon))
+                     (let ((module-deps (remove-duplicates (mapcar #'system-module known-sysdeps))))
+                       (appending
+                        (mapcar #'name module-deps)
+                        into module-dependencies)))
+                   (collect (intern (string-upcase (pathname-name system-file))) into unknown-system-encounters))
+                 (finally (return (values (remove-duplicates module-dependencies) unknown-systems-depended-upon unknown-system-encounters))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let ((an-unsatisfied-module (module an-unsatisfied-name)))
         (fetch *locality* (module-remote an-unsatisfied-module) an-unsatisfied-module)
@@ -182,7 +200,7 @@
         (multiple-value-bind (module-deps unknown-sys-dep unknown-sys-enc) (module-dependencies an-unsatisfied-module)
           (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
             (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
-            (format t "~&~S,~:[~; added ~:*~S,~] ~D left~%"
+            (report t "~&; ~S,~:[~; added ~:*~S,~] ~D left~%"
                     an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
             (finish-output))
           (desire-do-one-step desires skip-present (union unknown-sys-dep unknown-sys-dep-acc) (union unknown-sys-enc unknown-sys-enc-acc))))

@@ -21,71 +21,62 @@
 (in-package :desire)
 
 
-(defmacro within-module-repository ((dir module locality) &body body)
-  `(within-directory (,dir (module-path ,module ,locality))
-     ,@body))
+(defun invoke-maybe-within-directory (fn &optional directory)
+  (if directory
+      (within-directory (foo directory) (funcall fn))
+      (funcall fn)))
 
-(defvar *purgeworth-binaries* 
-  '("dfsl"        ;; OpenMCL
-    "ppcf" "x86f" ;; CMUCL
-    "fasl"        ;; SBCL
-    "fas" "o"     ;; ECL
-    "lib" "obj"   ;; ECL/win32
-    )) 
+(defmacro maybe-within-directory (directory &body body)
+  `(invoke-maybe-within-directory (lambda () ,@body) ,directory))
 
-(defun purge-module-binaries (module &optional (locality (master 'git)))
-  "Purge MODULE's files with type among one of *PURGEWORTH-BINARIES* in
-   LOCALITY."
-  (dolist (type *purgeworth-binaries*)
-    (mapc #'delete-file (directory (subfile (module-path module locality) '(:wild-inferiors :wild) :type type)))))
-
-(define-reported-condition repository-not-clean-during-fetch (repository-error external-program-failure) ()
-  (:report (locality module)
-           "~@<repository for ~S in ~S has uncommitted changes during fetch~:@>" module locality))
-
-(defun repo-var (module var &optional (locality (master 'git)))
-  (declare (type git-locality locality) (type symbol var))
-  (within-module-repository (dir module locality)
+(defun gitvar (var &optional directory)
+  (declare (type symbol var))
+  (maybe-within-directory directory
     (multiple-value-bind (status output)
         (run-external-program 'git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :output t)
       (or status (string-right-trim '(#\Return #\Newline) output)))))
 
-(defun (setf repo-var) (val module var &optional (locality (master 'git)))
-  (declare (type git-locality locality) (type symbol var) (type string val))
-  (within-module-repository (dir module locality)
+(defun (setf gitvar) (val var &optional directory)
+  (declare (type symbol var) (type string val))
+  (maybe-within-directory directory
     (run-external-program 'git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
 
-(defun module-gitbranches (module &optional (locality (master 'git)))
-  (within-module-repository (dir module locality)
+(defun gitbranches (&optional directory)
+  (maybe-within-directory directory
     (let ((output (external-program-output-as-string 'git "branch")))
       (remove '* (mapcar (compose #'intern #'string-upcase) 
                          (mapcan (curry #'split-sequence #\Space)
                                  (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))))
 
-(defun module-gitremotes (module &optional (locality (master 'git)))
-  (within-module-repository (dir module locality)
+(defun gitremotes (&optional directory)
+  (maybe-within-directory directory
     (let ((output (external-program-output-as-string 'git "remote")))
       (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
 
-(defun module-add-gitremote (module gitremote &aux (locality (master 'git)))
-  (within-directory (dir (module-path module locality))
-    (git "remote" "add" (down-case-name gitremote) (url gitremote module))))
+(defun gitremote-present-p (name &optional directory)
+  (member name (gitremotes directory)))
 
-(defun ensure-module-gitremote (module gitremote &aux (locality (master 'git)))
-  (unless (member (name gitremote) (module-gitremotes module locality))
-    (module-add-gitremote module gitremote)))
+(defun add-gitremote (name url &optional directory)
+  (maybe-within-directory directory
+    (git "remote" "add" (downstring name) url)))
 
-(defun ensure-module-master-branch-from-remote (module locality &optional (remote-name (first (module-gitremotes module locality))))
-  (unless (find 'master (module-gitbranches module locality))
-    (within-directory (dir (module-path module locality))
-      (git "checkout" "-b" "master" (concatenate 'string (downstring remote-name) "/master")))))
+(defun ensure-gitremote (name url &optional directory)
+  (unless (gitremote-present-p name directory)
+    (add-gitremote name url directory)))
 
-(defun module-bare-p (module &optional (locality (master 'git)))
-  "See, whether or not MODULE within LOCALITY has its source checked out."
-  (null (directory-exists-p (subdirectory* (module-path module locality) ".git"))))
+(defun repository-present-p (&optional directory)
+  "See if MODULE repository and source code is available at LOCALITY."
+  (and (if directory (directory-exists-p directory) t)
+       (maybe-within-directory directory
+         (and (directory-exists-p (subdirectory* nil ".git"))
+              (not (null (gitbranches)))))))
 
-(defun (setf module-bare-p) (val module &optional (locality (master 'git)))
-  (within-module-repository (dir module locality)
+(defun repository-bare-p (&optional directory)
+  (maybe-within-directory directory
+    (null (directory-exists-p (subdirectory* nil ".git")))))
+
+(defun (setf repository-bare-p) (val directory)
+  (within-directory (directory directory)
     (if val
         (error "not implemented")
         (progn
@@ -93,54 +84,28 @@
             (sb-posix:mkdir ".git" #o755)
             (dolist (filename git-files)
               (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
-          (setf (repo-var module 'core.bar locality) "false")
+          (setf (gitvar 'core.bar) "false")
           (git "reset" "--hard")
           nil))))
 
-(defun determine-module-presence (module &optional (locality (master 'git)))
-  "See if MODULE repository and source code is available at LOCALITY."
-  (let ((repo (module-path module locality)))
-    (and (directory-exists-p repo)
-         (directory-exists-p (subdirectory* repo ".git"))
-         (within-directory (repo repo)
-           (not (null (module-gitbranches module locality)))))))
-
-(defun module-present-p (module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t))
-  "See if MODULE's presence cache is positive for LOCALITY, failing that check the
-   repository, and update the cache, accordingly to the result.
-
-   CHECK-WHEN-PRESENT-P determines if presence check is performed when MODULE's cache
-   is positive.
-   CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
-   cache results."
-  (with-slots (scan-positive-localities) module
-    (labels ((update-presence-in (locality)
-               (lret ((presence (determine-module-presence module locality)))
-                 (if presence
-                     (pushnew locality scan-positive-localities)
-                     (removef scan-positive-localities locality)))))
-      (if-let ((cache-hit (find locality scan-positive-localities)))
-        (if check-when-present-p
-            (update-presence-in locality)
-            t)
-        (if check-when-missing-p
-            (update-presence-in locality)
-            nil)))))
-
-(defmacro do-present-modules ((module &optional (locality '(master 'git))) &body body)
-  "Iterate the BODY over all modules cached as present in LOCALITY, with MODULE specifying
-   the driven variable binding."
-  `(do-modules (,module)
-     (when (module-present-p ,module ,locality nil nil)
-       ,@body)))
-
-(defun module-world-readable-p (module &optional (locality (master 'git)))
+(defun repository-world-readable-p (&optional directory)
   "See, whether or not MODULE within LOCALITY is allowed to be exported
    for the purposes of git-daemon."
-  (file-exists-p (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
+  (file-exists-p (subfile* directory ".git" "git-daemon-export-ok")))
 
-(defun (setf module-world-readable-p) (val module &optional (locality (master 'git)))
-  (let ((path (subfile* (module-path module locality) ".git" "git-daemon-export-ok")))
+(defun (setf repository-world-readable-p) (val &optional directory)
+  (let ((path (subfile* directory ".git" "git-daemon-export-ok")))
     (if val
         (open path :direction :probe :if-does-not-exist :create)
         (and (delete-file path) nil))))
+
+(defun ensure-master-branch-from-remote (&key directory (remote-name (first (gitremotes directory))))
+  (maybe-within-directory directory
+    (unless (find 'master (gitbranches))
+      (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master"))))))
+
+(defmacro within-ref (ref &body body)
+  `(progn
+     (git "checkout" (flatten-path-list ,ref))
+     (unwind-protect (progn ,@body)
+       (git "checkout" "master"))))
