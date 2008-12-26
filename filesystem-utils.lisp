@@ -27,6 +27,13 @@
                                                                               #p"k:\\program files\\git\\bin\\" #p"l:\\program files\\git\\bin\\"))
 (defparameter *executables* (make-hash-table :test 'eq))
 
+(defvar *run-external-programs-verbosely* nil
+  "Whether to echo the invoked external programs to standard output.")
+
+(defvar *run-external-programs-dryly* nil
+  "Whether to substitute actual execution of external programs with
+   mere printing of their paths and parameters.")
+
 (defun executable (name)
   (or (gethash name *executables*) (error "~@<Executable ~S isn't known.~@:>" name)))
 
@@ -60,13 +67,14 @@
           (leave (setf (gethash name *executables*) exec-path)))
         (finally (warn 'executable-not-found :name realname :search-path paths))))
 
-(defvar *run-external-programs-dryly* nil
-  "Whether to substitute actual execution of external programs with
-   mere printing of their paths and parameters.")
-
 (defmacro with-dryly-ran-externals (&body body)
   `(let ((*run-external-programs-dryly* t))
      (declare (special *run-external-programs-dryly*))
+     ,@body))
+
+(defmacro with-verbosely-ran-externals (&body body)
+  `(let ((*run-external-programs-verbosely* t))
+     (declare (special *run-external-programs-verbosely*))
      ,@body))
 
 (defun run-external-program (name parameters &key (valid-exit-codes (acons 0 t nil)) translated-error-exit-codes (output nil) (environment '("HOME=/tmp"))

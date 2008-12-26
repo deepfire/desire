@@ -18,9 +18,9 @@
    #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
    ;; filesystem-utils.lisp
-   #:with-dryly-ran-externals
-   ;; filesystem.lisp
-   #:within-module-repository
+   #:*verbose-execution* #:executable #:find-executable #:
+   #:*run-external-programs-dryly* #:with-dryly-ran-externals 
+   #:*run-external-programs-verbosely* #:with-verbosely-ran-externals 
    ;; asdf.lisp
    #:system-loadable-p #:system-definition-path #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
