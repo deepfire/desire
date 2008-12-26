@@ -84,17 +84,21 @@
    VALID-EXIT-CODES, or signal a condition of type
    EXTERNAL-PROGRAM-FAILURE."
   (declare (special *run-external-programs-dryly*))
-  (let* ((final-output (or output (make-string-output-stream)))
-         (exit-code (if *run-external-programs-dryly*
-                        (progn
-                          (format *error-output* "~S~{ ~S~}~%" pathname parameters)
-                          (caar valid-exit-codes))
-                        (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output final-output :environment environment)))))
-    (cdr (or (assoc exit-code valid-exit-codes)
-             (when-let ((error (assoc exit-code translated-error-exit-codes)))
-               (apply #'error (list* :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output)
-                                     (cdr error))))
-             (error 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output))))))
+  (flet ((note-execution (stream)
+           (format stream ";;; ~S~{ ~S~}~%" pathname parameters)
+           (finish-output stream)))
+    (let* ((final-output (or output (make-string-output-stream)))
+           (exit-code (progn
+                        (when (or *run-external-programs-dryly* *run-external-programs-verbosely*)
+                          (note-execution *standard-output*))
+                        (if *run-external-programs-dryly*
+                            (caar valid-exit-codes)
+                            (sb-ext:process-exit-code (sb-ext:run-program pathname parameters :output final-output :environment environment))))))
+      (cdr (or (assoc exit-code valid-exit-codes)
+               (when-let ((error (assoc exit-code translated-error-exit-codes)))
+                 (apply #'error (list* :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output)
+                                       (cdr error))))
+               (error 'external-program-failure :program pathname :parameters parameters :status exit-code :output (get-output-stream-string final-output)))))))
 
 (defmacro with-input-from-external-program ((stream-var name params) &body body)
   (with-gensyms (block str)
