@@ -171,27 +171,33 @@
 (defun fetch-anyway (module-name)
   (cons module-name nil))
 
+(defun module-system-definitions (module)
+  "Return a list of pathnames for all system definitions present in MODULE."
+  (remove-if (rcurry #'pathname-match-p (subwild (module-path module) '("_darcs")))
+             (directory (subwild (module-path module) (module-asdf-search-restriction module) :name :wild :type "asd"))))
+
+(defun system-pathname-name (pathname)
+  "Return the canonical name for a system residing in PATHNAME."
+  (intern (string-upcase (pathname-name pathname))))
+
 (defun desire-do-one-step (desires skip-present &optional unknown-sys-dep-acc unknown-sys-enc-acc)
   (declare (special *locality*) (optimize (debug 3)))
-  (flet ((next-unsatisfied-module ()
-           (car (find nil desires :key #'cdr)))
-         (fetch-if-missing (module-name)
-           (cons module-name (not (module-present-p (module module-name) *locality*))))
-         ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
-         (module-dependencies (m)
-           (iter (for system-file in (remove-if (rcurry #'pathname-match-p (subwild (module-path m) '("_darcs")))
-                                                (directory (subwild (module-path m) (module-asdf-search-restriction m) :name :wild :type "asd"))))
-                 (if-let ((system (system (pathname-name system-file) :if-does-not-exist :continue)))
-                   (multiple-value-bind (known-sysdeps unknown-sysdeps) (system-dependencies system)
-                     (ensure-system-loadable system)
-                     (when unknown-sysdeps
-                       (appending unknown-sysdeps into unknown-systems-depended-upon))
-                     (let ((module-deps (remove-duplicates (mapcar #'system-module known-sysdeps))))
-                       (appending
-                        (mapcar #'name module-deps)
-                        into module-dependencies)))
-                   (collect (intern (string-upcase (pathname-name system-file))) into unknown-system-encounters))
-                 (finally (return (values (remove-duplicates module-dependencies) unknown-systems-depended-upon unknown-system-encounters))))))
+  (labels ((next-unsatisfied-module ()
+             (car (find nil desires :key #'cdr)))
+           (fetch-if-missing (module-name)
+             (cons module-name (not (module-present-p (module module-name) *locality*))))
+           ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
+           (dependencies-add-system-name (module-name system-name &optional modules missing martians)
+             (if-let ((system (system system-name :if-does-not-exist :continue)))
+               (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
+                 (ensure-system-loadable system)
+                 (values (append (mapcar (compose #'name #'system-module) new-sysdeps) modules) (union new-missing missing) martians))
+               (values modules missing (list* module-name (string-upcase system-name) martians))))
+           (module-dependencies (m)
+             (iter (for system-file in (module-system-definitions m))
+                   (for (values modules-new missing-new martians-new) = (dependencies-add-system-name (name m) (pathname-name system-file) modules missing martians))
+                   (for (values modules missing martians) = (values modules-new missing-new martians-new))
+                   (finally (return (values (remove-duplicates modules) (mapcar #'symbol-name missing) martians))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let ((an-unsatisfied-module (module an-unsatisfied-name)))
         (fetch *locality* (module-remote an-unsatisfied-module) an-unsatisfied-module)
@@ -200,11 +206,15 @@
         (multiple-value-bind (module-deps unknown-sys-dep unknown-sys-enc) (module-dependencies an-unsatisfied-module)
           (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
             (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
-            (report t "~&; ~S,~:[~; added ~:*~S,~] ~D left~%"
+            (report t "~&~@<;; ~@;~S,~:[~; added ~:*~S,~] ~D left~:@>~%"
                     an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
             (finish-output))
-          (desire-do-one-step desires skip-present (union unknown-sys-dep unknown-sys-dep-acc) (union unknown-sys-enc unknown-sys-enc-acc))))
+          (desire-do-one-step desires skip-present (union unknown-sys-dep unknown-sys-dep-acc) (append unknown-sys-enc unknown-sys-enc-acc))))
       (values t unknown-sys-dep-acc unknown-sys-enc-acc))))
+
+(defparameter *implementation-provided-systems*
+  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
+  #-sbcl nil)
 
 (defun desire (desires &key skip-present)
   "Satisfy module DESIRES and return the list of names of updated modules.
@@ -237,9 +247,15 @@
            (*locality* (master 'git))
            (desired-list (mapcan #'rest interpreted-desires)))
       (declare (special *locality*))
-      (format t "Satisfying desire for ~D module~:*~P:~%" (length desired-list)) (finish-output)
-      (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present)
-      (format t "All done.~%") (finish-output))))
+      (report t "; Satisfying desire for ~D module~:*~P:~%" (length desired-list))
+      (multiple-value-bind (success missing martians) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present)
+        (declare (ignore success))
+        (let ((missing (set-difference missing *implementation-provided-systems* :test #'string= :key #'string)))
+          (when missing
+            (report t "; Required systems missing from definitions:~{ ~A~}~%" missing))
+          (when martians
+            (report t "; Unexpected systems:~{ ~A:~A~}~%" martians))))
+      (report t "; All done.~%"))))
 
 (defun desire* (&rest desires)
   "A spread interface function for DESIRE.
