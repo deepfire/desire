@@ -56,9 +56,11 @@
 
 (defun coerce-to-name (o)
   (declare (type (or symbol named) o))
-  (if (symbolp o)
-      o
-      (name o)))
+  (if (symbolp o) o (name o)))
+
+(defun coerce-to-named (o)
+  (declare (type (or symbol named) o))
+  (if (symbolp o) (make-instance 'named :name o) o))
 
 (defun sort-by-name (named-objects)
   "Sort object of class NAMED, lexicographically."
