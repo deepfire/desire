@@ -71,6 +71,14 @@
       (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
       t)))
 
+(defun asdf-hidden-systems (system &aux (name (name system)))
+  "Find out which ASDF systems hide in SYSTEM, which mustn't have been 
+   seen yet."
+  (let ((pre (hash-table-values asdf::*defined-systems*)))
+    (asdf:find-system name)
+    (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
+            :test #'string= :key (compose #'string-upcase #'asdf:component-name))))
+
 (define-reported-condition module-systems-unloadable-error (desire-error)
   ((module :accessor module-system-unloadable-error-module :initarg :module)
    (systems :accessor module-system-unloadable-error-systems :initarg :systems))

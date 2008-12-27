@@ -201,15 +201,20 @@
                          (set-difference martians happy-matches :test #'string=)))))
            (dependencies-add-system-def (module system-names &optional modules missing martians)
              (if-let ((system-name (first system-names)))
-               (let ((system-type (interpret-system-pathname-type (syspath system-name))))
+               (let* ((system-path (syspath system-name))
+                      (system-type (interpret-system-pathname-type system-path)))
                  (if-let ((system (or (lret ((system (system system-name :if-does-not-exist :continue)))
                                         (when system
                                           (unless (typep system system-type)
                                             (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
                                                    system-type system-name (type-of system)))))
                                       (maybe-register-martian (intern system-name) system-type module missing)))) ;; A happy match?
-                   (progn (ensure-system-loadable system (syspath system-name) *locality*)
-                          (add-system-dependencies system (rest system-names) modules (remove system-name missing :test #'string=) martians))
+                   (progn (ensure-system-loadable system system-path *locality*)
+                          (let* ((hidden-systems (and (eq system-type 'asdf-system) (asdf-hidden-systems system)))
+                                 (hidden-names (mapcar (compose #'string-upcase #'asdf:component-name) hidden-systems)))
+                            (mapc #'set-syspath hidden-names (make-list (length hidden-names) :initial-element system-path))
+                            (add-system-dependencies
+                             system (rest system-names) modules (remove system-name missing :test #'string=) (append hidden-names martians))))
                    (values (rest system-names) modules missing (adjoin system-name martians :test #'string=))))
                (values nil modules missing martians)))
            (module-dependencies (m missing martians &aux (sysfiles (system-definitions (module-path m *locality*) 'asdf-system)))
