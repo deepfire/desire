@@ -14,7 +14,7 @@
    #:init
    #:remote-disabled-p
    #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
-   #:add-desire #:desire #:desire*
+   #:add-desire
    #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
    ;; filesystem-utils.lisp
@@ -22,12 +22,14 @@
    #:*run-external-programs-dryly* #:with-dryly-ran-externals 
    #:*run-external-programs-verbosely* #:with-verbosely-ran-externals 
    ;; asdf.lisp
-   #:system-loadable-p #:system-definition-path #:ensure-system-loadable
+   #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
    #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
    #:module-bare-p #:module-present-p #:do-present-modules #:module-world-readable-p
    ;; desire.lisp
+   #:*register-happy-matches* #:*register-all-martians*
+   #:desire #:desire*
    #:define-application 
    #:fetch #:desire
    #:purge-module-binaries))

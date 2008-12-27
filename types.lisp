@@ -81,7 +81,7 @@
   (string-downcase (string x)))
 
 (defun down-case-name (x)
-  (string-downcase (string (name x))))
+  (string-downcase (string (xform-if (of-type 'named) #'name x))))
 
 ;;;
 ;;; Distributor name is its hostname.
@@ -221,7 +221,7 @@
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
-  (null (system-relativity system)))
+  (null (system-search-restriction system)))
 
 (defun module-simple-p (module)
   "Determine whether MODULE meets the requirements for a simple module."
@@ -427,7 +427,6 @@
 
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
-   (asdf-search-restriction :accessor module-asdf-search-restriction :initarg :asdf-search-restriction :documentation "Specified.")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
@@ -435,7 +434,6 @@
    (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
    :registrator #'(setf module)    
-   :asdf-search-restriction nil
    :remotes nil :localities nil
    :systems nil :essential-p nil))
 
@@ -454,8 +452,6 @@
                                         (list :systems (mapcar #'name simple)))
                                       (when complex
                                         (list :complex-systems (mapcar #'name complex)))))))
-                        (when (module-asdf-search-restriction o)
-                          (list :asdf-search-restriction (module-asdf-search-restriction o)))
                         (when (module-essential-p o)
                           (list :essential-p (module-essential-p o)))))))
 
@@ -466,12 +462,11 @@
 
 (defun module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems asdf-search-restriction &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
       `(or (module ',name :if-does-not-exist :continue)
            (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
-                                 ,@(when asdf-search-restriction `(:asdf-search-restriction ',asdf-search-restriction))
-                                 ,@(remove-from-plist initargs :systems :complex-systems :asdf-search-restriction))
+                                 ,@(remove-from-plist initargs :systems :complex-systems))
              ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
              ,@(if systems-specified-p
                    (mapcar (curry #'emit-make-simple-system-form 'asdf-system name) systems)
@@ -487,31 +482,41 @@
              (for ,module-var = (module ,module-name))
              ,@body))))
 
-(defclass asdf () ())
-(defclass mudballs () ())
+(defclass system-type-mixin ()
+  ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
+
+(defclass asdf (system-type-mixin) () (:default-initargs :pathname-type "asd"))
+(defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
+(defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
 
 (defclass system (registered)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
+   (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
    (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
    (applications :accessor system-applications :initarg :applications :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf system)
+   :search-restriction nil
    :module nil :applications nil :relativity nil))
 
 (defclass asdf-system (asdf system) ())
-(defclass mudballs-system (mudballs system) ())
+(defclass mudball-system (mudball system) ())
+(defclass xcvb-system (xcvb system) ())
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
           (append (list :module (name (system-module o)))
                   (and (system-relativity o) (list :relativity (system-relativity o)))
+                  (and (system-search-restriction o) (list :search-restriction (system-search-restriction o)))
                   (and (system-applications o) (list :applications (system-applications o))))))
 
 (defun system-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key module relativity &allow-other-keys) (read stream nil nil t)
+  (destructuring-bind (name &rest initargs &key module relativity search-restriction &allow-other-keys) (read stream nil nil t)
     `(or (system ',name :if-does-not-exist :continue)
-         (make-instance 'asdf-system :name ',name :module (module ',module) :relativity ',relativity ,@(remove-from-plist initargs :module :applications :relativity)))))
+         (make-instance 'asdf-system :name ',name :module (module ',module) :relativity ',relativity
+                        ,@(when search-restriction `(:search-restriction ',search-restriction))
+                        ,@(remove-from-plist initargs :module :applications :relativity :search-restriction)))))
 
 (defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
   (appendf (module-systems module) (list o)))

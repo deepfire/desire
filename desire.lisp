@@ -20,6 +20,19 @@
 
 (in-package :desire)
 
+
+(defparameter *implementation-provided-systems*
+  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
+  #-sbcl nil)
+
+(defvar *register-happy-matches* t
+  "Whether or not to define previously undefined systems when they are found,
+   if they are also depended upon by other systems.")
+
+(defvar *register-all-martians* nil
+  "Whether or not to define previously undefined systems when they are found,
+   even if they are not depended upon by other systems.")
+
 ;;;
 ;;; Remote update-ness:
 ;;;
@@ -142,7 +155,7 @@
   (let* ((cvs-locality (master 'cvs))
          (cvs-repo-dir (module-path module cvs-locality))
          (git-repo-dir (module-path module git-locality)))
-    (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config"))
+    (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config") :if-exists :supersede)
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module module :locality git-locality))
       (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name))))
@@ -159,62 +172,67 @@
 (defmethod fetch :after ((git-locality git-locality) remote module)
   (setf (repository-world-readable-p (module-path module git-locality)) *default-world-readable*))
 
-(defgeneric system-dependencies (s)
-  (:method ((s mudballs-system)))
-  (:method ((s asdf-system))
-    (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system (name s))))))
-          (if-let ((depsystem (system depname :if-does-not-exist :continue)))
-            (collect depsystem into known-systems)
-            (collect depname into unknown-names))
-          (finally (return (values known-systems unknown-names))))))
-
 (defun fetch-anyway (module-name)
   (cons module-name nil))
 
-(defun module-system-definitions (module)
-  "Return a list of pathnames for all system definitions present in MODULE."
-  (remove-if (rcurry #'pathname-match-p (subwild (module-path module) '("_darcs")))
-             (directory (subwild (module-path module) (module-asdf-search-restriction module) :name :wild :type "asd"))))
-
-(defun system-pathname-name (pathname)
-  "Return the canonical name for a system residing in PATHNAME."
-  (intern (string-upcase (pathname-name pathname))))
-
-(defun desire-do-one-step (desires skip-present &optional unknown-sys-dep-acc unknown-sys-enc-acc)
-  (declare (special *locality*) (optimize (debug 3)))
-  (labels ((next-unsatisfied-module ()
+(defun desire-do-one-step (desires skip-present missing martians)
+  (declare (special *departed-from-definitions-p* *locality*) (optimize (debug 3)))
+  (labels ((syspath (name) (declare (special *syspath*)) (gethash name *syspath*))
+           (set-syspath (name value) (declare (special *syspath*)) (setf (gethash name *syspath*) value))
+           (next-unsatisfied-module ()
              (car (find nil desires :key #'cdr)))
            (fetch-if-missing (module-name)
              (cons module-name (not (module-present-p (module module-name) *locality*))))
            ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
-           (dependencies-add-system-name (module-name system-name &optional modules missing martians)
-             (if-let ((system (system system-name :if-does-not-exist :continue)))
-               (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
-                 (ensure-system-loadable system)
-                 (values (append (mapcar (compose #'name #'system-module) new-sysdeps) modules) (union new-missing missing) martians))
-               (values modules missing (list* module-name (string-upcase system-name) martians))))
-           (module-dependencies (m)
-             (iter (for system-file in (module-system-definitions m))
-                   (for (values modules-new missing-new martians-new) = (dependencies-add-system-name (name m) (pathname-name system-file) modules missing martians))
-                   (for (values modules missing martians) = (values modules-new missing-new martians-new))
-                   (finally (return (values (remove-duplicates modules) (mapcar #'symbol-name missing) martians))))))
+           (maybe-register-martian (martian type module missing)
+             (when (or *register-all-martians*
+                       (and *register-happy-matches* (find martian missing :test #'string=)))
+               (report t ";; Registered a previously unknown system ~A~%" martian)
+               (setf *departed-from-definitions-p* t)
+               (make-instance type :name martian :module module)))
+           (add-system-dependencies (system system-names modules missing martians)
+             (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
+               (let* ((total-missing (union new-missing missing :test #'string=))
+                      (happy-matches (when *register-happy-matches*
+                                       (remove-if-not (rcurry #'member total-missing :test #'string=) martians))))
+                 (values (append happy-matches system-names) ;; Let them wash in the next tide.
+                         (append (mapcar (compose #'name #'system-module) new-sysdeps) modules)
+                         (set-difference total-missing happy-matches :test #'string=)
+                         (set-difference martians happy-matches :test #'string=)))))
+           (dependencies-add-system-def (module system-names &optional modules missing martians)
+             (if-let ((system-name (first system-names)))
+               (let ((system-type (interpret-system-pathname-type (syspath system-name))))
+                 (if-let ((system (or (lret ((system (system system-name :if-does-not-exist :continue)))
+                                        (when system
+                                          (unless (typep system system-type)
+                                            (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
+                                                   system-type system-name (type-of system)))))
+                                      (maybe-register-martian (intern system-name) system-type module missing)))) ;; A happy match?
+                   (progn (ensure-system-loadable system (syspath system-name) *locality*)
+                          (add-system-dependencies system (rest system-names) modules (remove system-name missing :test #'string=) martians))
+                   (values (rest system-names) modules missing (adjoin system-name martians :test #'string=))))
+               (values nil modules missing martians)))
+           (module-dependencies (m missing martians &aux (sysfiles (system-definitions (module-path m *locality*) 'asdf-system)))
+             (let ((sysnames (mapcar #'system-pathname-name sysfiles)))
+               (mapc #'set-syspath sysnames sysfiles)
+               (iter (with modules)
+                     (for (values sysnames-new modules-new missing-new martians-new) = (dependencies-add-system-def m sysnames modules missing martians))
+                     (setf (values sysnames modules missing martians) (values sysnames-new modules-new missing-new martians-new))
+                     (unless sysnames
+                       (return (values (remove-duplicates modules) missing martians)))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let ((an-unsatisfied-module (module an-unsatisfied-name)))
         (fetch *locality* (module-remote an-unsatisfied-module) an-unsatisfied-module)
         (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds, or errors
         (setf (desire-satisfied an-unsatisfied-name) t)
-        (multiple-value-bind (module-deps unknown-sys-dep unknown-sys-enc) (module-dependencies an-unsatisfied-module)
+        (multiple-value-bind (module-deps missing martians) (module-dependencies an-unsatisfied-module missing martians)
           (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
             (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
             (report t "~&~@<;; ~@;~S,~:[~; added ~:*~S,~] ~D left~:@>~%"
                     an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
             (finish-output))
-          (desire-do-one-step desires skip-present (union unknown-sys-dep unknown-sys-dep-acc) (append unknown-sys-enc unknown-sys-enc-acc))))
-      (values t unknown-sys-dep-acc unknown-sys-enc-acc))))
-
-(defparameter *implementation-provided-systems*
-  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
-  #-sbcl nil)
+          (desire-do-one-step desires skip-present missing martians)))
+      (values t missing martians))))
 
 (defun desire (desires &key skip-present)
   "Satisfy module DESIRES and return the list of names of updated modules.
@@ -244,17 +262,21 @@
           (when-let ((missing (remove-if (curry #'distributor-provides-module-p distributor) modules)))
             (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
+           *departed-from-definitions-p*
            (*locality* (master 'git))
+           (*syspath* (make-hash-table :test #'equal))
            (desired-list (mapcan #'rest interpreted-desires)))
-      (declare (special *locality*))
+      (declare (special *departed-from-definitions-p* *locality* *syspath*))
       (report t "; Satisfying desire for ~D module~:*~P:~%" (length desired-list))
-      (multiple-value-bind (success missing martians) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present)
+      (multiple-value-bind (success missing martians) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present nil nil)
         (declare (ignore success))
-        (let ((missing (set-difference missing *implementation-provided-systems* :test #'string= :key #'string)))
-          (when missing
-            (report t "; Required systems missing from definitions:~{ ~A~}~%" missing))
-          (when martians
-            (report t "; Unexpected systems:~{ ~A:~A~}~%" martians))))
+        (when-let ((missing (set-difference missing *implementation-provided-systems* :test #'string=)))
+          (report t "; Required systems missing from definitions:~{ ~A~}~%" missing))
+        (when martians
+          (report t "; Unexpected systems:~{ ~A~}~%" martians)))
+      (when *departed-from-definitions-p*
+        (report t "; Definitions modified, committing changes.~%")
+        (save-current-definitions :seal-p t))
       (report t "; All done.~%"))))
 
 (defun desire* (&rest desires)
