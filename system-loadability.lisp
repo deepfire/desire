@@ -28,7 +28,7 @@
   (:method ((s mudball-system)))
   (:method ((s asdf-system))
     (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system (down-case-name s))))))
-          (for sanitised-depname = (string-upcase (string depname)))
+          (for sanitised-depname = (string-upcase (string (xform-if #'consp #'second depname)))) ;; Drop version on the floor.
           (if-let ((depsystem (system sanitised-depname :if-does-not-exist :continue)))
             (collect depsystem into known-systems)
             (collect sanitised-depname into unknown-names))
