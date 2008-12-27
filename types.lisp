@@ -852,7 +852,7 @@
   (if-let ((distributor (module-distributor module)))
     (distributor-provides-module-p distributor module)
     (ecase if-does-not-exist
-      (:error (error 'insatiable-desire))
+      (:error (error 'insatiable-desire :desire module))
       (:continue nil))))
 
 (defun substitute-desires (in with)
