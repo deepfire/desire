@@ -208,8 +208,7 @@
                                             (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
                                                    type name (type-of system)))))
                                       (maybe-register-martian (intern name) type module missing)))) ;; A happy match?
-                   (progn (report t "; Ensuring ~S loadable at ~S~%" system path)
-                          (ensure-system-loadable system path *locality*)
+                   (progn (ensure-system-loadable system path *locality*)
                           (let* ((hidden-systems (and (eq type 'asdf-system) (asdf-hidden-systems system)))
                                  (hidden-names (mapcar (compose #'string-upcase #'asdf:component-name) hidden-systems)))
                             (mapc #'set-syspath hidden-names (make-list (length hidden-names) :initial-element path))
