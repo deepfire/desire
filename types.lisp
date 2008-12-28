@@ -816,10 +816,12 @@
 (defun module-distributor (module)
   "Find out the only distributor providing MODULE, or is specified
    to be a desired distributor for it, if there is ambiguity."
-  (if-let* ((distributors (module-distributors module))
-            (unambiguous-p (= 1 (length distributors))))
-           (first distributors)
-           (module-desired-p module)))
+  (if-let ((distributors (module-distributors module)))
+    (if (= 1 (length distributors))
+        (first distributors)
+        (or (module-desired-p module)
+            (first distributors)))
+    (error "~@<Inconsistency: module ~S is present, but no distributors claim to host it.~:@>" module)))
 
 (defun module-desired-remote (module)
   "Find the remote providing MODULE among those of its desired distributor, 
