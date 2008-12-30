@@ -184,12 +184,15 @@
            (fetch-if-missing (module-name)
              (cons module-name (not (module-present-p (module module-name) *locality*))))
            ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
-           (maybe-register-martian (martian type module missing)
+           (maybe-register-martian (martian path type module missing)
              (when (or *register-all-martians*
                        (and *register-happy-matches* (find martian missing :test #'string=)))
                (report t ";; Registered a previously unknown system ~A~%" martian)
                (setf *departed-from-definitions-p* t)
-               (make-instance type :name martian :module module)))
+               (make-instance type :name martian :module module
+                              :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
+                                                                    (hidden-p (not (equal pathname-name (downstring martian)))))
+                                                          pathname-name))))
            (add-system-dependencies (system required modules missing martians)
              (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
                (let* ((happy-matches (when *register-happy-matches*
@@ -207,7 +210,7 @@
                                           (unless (typep system type)
                                             (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
                                                    type name (type-of system)))))
-                                      (maybe-register-martian (intern name) type module missing)))) ;; A happy match?
+                                      (maybe-register-martian (intern name) path type module missing)))) ;; A happy match?
                    (progn (ensure-system-loadable system path *locality*)
                           (let* ((hidden-systems (and (eq type 'asdf-system) (asdf-hidden-systems system)))
                                  (hidden-names (mapcar (compose #'string-upcase #'asdf:component-name) hidden-systems)))

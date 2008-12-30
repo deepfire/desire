@@ -221,7 +221,8 @@
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
-  (null (system-search-restriction system)))
+  (and (null (system-search-restriction system))
+       (null (system-definition-pathname-name system))))
 
 (defun module-simple-p (module)
   "Determine whether MODULE meets the requirements for a simple module."
@@ -493,21 +494,27 @@
   ((module :accessor system-module :initarg :module :documentation "Specified.")
    (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
    (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
+   (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name :documentation "Specified.")
    (applications :accessor system-applications :initarg :applications :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf system)
-   :search-restriction nil
+   :search-restriction nil :definition-pathname-name nil
    :module nil :applications nil :relativity nil))
 
 (defclass asdf-system (asdf system) ())
 (defclass mudball-system (mudball system) ())
 (defclass xcvb-system (xcvb system) ())
 
+(defun system-definition-canonical-pathname-name (system)
+  "Return the canonical definition patname name for SYSTEM."
+  (downstring (name system)))
+
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
           (append (list :module (name (system-module o)))
                   (and (system-relativity o) (list :relativity (system-relativity o)))
                   (and (system-search-restriction o) (list :search-restriction (system-search-restriction o)))
+                  (and (system-definition-pathname-name o) (list :definition-pathname-name (system-definition-pathname-name o)))
                   (and (system-applications o) (list :applications (system-applications o))))))
 
 (defun system-reader (stream &optional char sharp)

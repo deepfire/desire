@@ -23,6 +23,19 @@
 (defvar *system-pathname-typemap* '(("asd" . asdf-system) ("mb" . mudball-system) ("xcvb" . xcvb-system))
   "The mapping between SYSTEM subclasses and definition pathname types.")
 
+(define-condition system-condition (desire-condition)
+  ((systems :accessor condition-systems :initarg :systems)))
+
+(define-reported-condition module-systems-unloadable-error (desire-error system-condition)
+  ((module :accessor module-system-unloadable-error-module :initarg :module))
+  (:report (module systems)
+           "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>" module systems))
+
+(define-reported-condition system-definition-missing-error (desire-error system-condition)
+  ((path :accessor system-definition-missing-error-path :initarg :path))
+  (:report (systems path)
+           "~@<Couldn't find the definition for ~S in ~S~:@>" (first systems) path))
+
 (defgeneric system-dependencies (s)
   (:method ((s xcvb-system)))
   (:method ((s mudball-system)))
@@ -46,13 +59,16 @@
 (defun apply-repo-system-filter (repository system-pathnames)
   (remove-if (rcurry #'pathname-match-p (subwild repository '("_darcs"))) system-pathnames))
 
-(defun system-definition (system repository)
+(defun system-definition (system repository &key (if-does-not-exist :error))
   "Return the pathname of a SYSTEM's definition within REPOSITORY."
-  (let ((name (down-case-name system))
+  (let ((name (or (system-definition-pathname-name system) (system-definition-canonical-pathname-name system)))
         (type (system-pathname-type system)))
-    (or (subfile repository (list name) :type type) ;; Try the fast path first.
+    (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
         (first (apply-repo-system-filter
-                repository (directory (subwild repository (or (system-search-restriction system) '("_darcs")) :name name :type type)))))))
+                repository (directory (subwild repository (or (system-search-restriction system) '("_darcs")) :name name :type type))))
+        (ecase if-does-not-exist
+          (:error (error 'system-definition-missing-error :systems (list system) :path repository))
+          (:continue nil)))))
 
 (defun system-definitions (repository type)
   "Return a list of all system definition pathnames of TYPE within REPOSITORY."
@@ -79,18 +95,12 @@
     (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
             :test #'string= :key (compose #'string-upcase #'asdf:component-name))))
 
-(define-reported-condition module-systems-unloadable-error (desire-error)
-  ((module :accessor module-system-unloadable-error-module :initarg :module)
-   (systems :accessor module-system-unloadable-error-systems :initarg :systems))
-  (:report (module systems)
-           "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>"
-           module systems))
-
 (defun ensure-system-loadable (system &optional path (locality (master 'git)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
    definition path within its module within LOCALITY."
-  (ensure-symlink (system-definition-registry-symlink-path system locality)
-                  (or path (system-definition system (module-path (system-module system) locality)))))
+  (when-let ((definition-pathname (or path (system-definition system (module-path (system-module system) locality) :if-does-not-exist :continue))))
+    (ensure-symlink (system-definition-registry-symlink-path system locality)
+                    definition-pathname)))
 
 (defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
   "Try making MODULE's systems loadable, defaulting to LOCALITY.
