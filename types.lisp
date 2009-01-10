@@ -105,9 +105,9 @@
   (if (and (typep o 'releasing-wishmaster)
            (null *printing-wishmaster*))
       (call-next-method)
-      (format stream "~@<#W(~;~S ~@<~(~S ~A~)~:@>~;)~:@>"
+      (format stream "~@<#W(~;~A ~@<~(~S ~A~)~:@>~;)~:@>"
               (if (typep o 'releasing-wishmaster)
-                  (name o)
+                  (symbol-name (name o))
                   (git-remote-namestring (wishmaster-remote o)))
               :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-remote o))))))
 
@@ -240,7 +240,7 @@
               (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
                 (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
                   (append (unless (equal default-remote-name (name o))
-                            (list `(:name ,(name o))))
+                            (list `(:name ,(symbol-name (name o)))))
                           (when-let ((port (remote-distributor-port o)))
                             (list `(:distributor-port ,port)))
                           (when-let ((port (remote-disabled-p o)))
@@ -311,7 +311,7 @@
 
 (defmethod print-object ((o locality) stream)
   (format stream "~@<#L(~;~A ~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
-          (symbol-name (type-of o)) (name o) (locality-path o)
+          (symbol-name (type-of o)) (symbol-name (name o)) (locality-path o)
           (append (when (locality-master-p o) (list (list :master-p t)))
                   (when (locality-scan-p o) (list (list :scan-p t))))))
 
@@ -450,9 +450,9 @@
                           (unless (and first (null other-systems) (system-simple-p first))
                             (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
                               (values (when simple
-                                        (list :systems (mapcar #'name simple)))
+                                        (list :systems (mapcar #'down-case-name simple)))
                                       (when complex
-                                        (list :complex-systems (mapcar #'name complex)))))))
+                                        (list :complex-systems (mapcar #'down-case-name complex)))))))
                         (when (module-essential-p o)
                           (list :essential-p (module-essential-p o)))))))
 
@@ -511,7 +511,7 @@
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
-          (append (list :module (name (system-module o)))
+          (append (list :module (symbol-name (name (system-module o))))
                   (and (system-relativity o) (list :relativity (system-relativity o)))
                   (and (system-search-restriction o) (list :search-restriction (system-search-restriction o)))
                   (and (system-definition-pathname-name o) (list :definition-pathname-name (system-definition-pathname-name o)))
@@ -538,7 +538,7 @@
 
 (defmethod print-object ((o application) stream)
   (format stream "~@<#A(~;~A~{ ~S ~S~}~;)~:@>" (symbol-name (name o))
-          (list :system (name (app-system o)) :package (app-package o) :function (app-function o)
+          (list :system (symbol-name (name (app-system o))) :package (app-package o) :function (app-function o)
                 :default-parameters (app-default-parameters o))))
 
 (defun application-reader (stream &optional char sharp)
