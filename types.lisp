@@ -735,6 +735,12 @@
            (with-open-metafile (common-wishes 'common-wishes metastore)
              (load common-wishes))))))
 
+(defun update-known-wishmasters (&optional (locality (master 'git)) (metastore (meta-path)))
+  (do-distributors (d)
+    (when (and (typep d 'wishmaster)
+               (not (eq d *self*)))
+      (update-wishmaster d locality metastore))))
+
 (defun ensure-present-module-systems-loadable (&optional (locality (master 'git)))
   "Ensure that all modules present in LOCALITY have their systems loadable.
    Return the list of present modules."
