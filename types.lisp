@@ -796,13 +796,16 @@
   (report t ";;; Determining available tools and deducing accessible remotes~%")
   (determine-tools-and-update-remote-accessibility)
   (configure-remote-wishmasters default-wishmasters (meta-path))
-  (report t ";;; Scanning for modules in ~S~%" (meta-path))
-  (let ((present-git-modules (update-module-locality-presence-cache (master 'git))))
-    (when-let ((wishmaster (and as (ensure-wishmaster as))))
-      (setf *self* wishmaster
-            (wishmaster-converted-modules wishmaster) present-git-modules)
-      (advertise-wishmaster-conversions wishmaster (meta-path))))
-  (ensure-present-module-systems-loadable (master 'git))
+  (report t ";;; Scanning for modules in ~S~%" *root-of-all-desires*)
+  (let* ((master (master 'git))
+         (present-git-modules (update-module-locality-presence-cache master)))
+    (if-let ((wishmaster (and as (ensure-wishmaster as))))
+      (progn
+        (setf *self* wishmaster
+              (wishmaster-converted-modules wishmaster) present-git-modules)
+        (advertise-wishmaster-conversions wishmaster (meta-path)))
+      (update-known-wishmasters master))
+    (ensure-present-module-systems-loadable master))
   t)
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
