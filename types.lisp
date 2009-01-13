@@ -626,9 +626,14 @@
 
 (defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
   "Define the set of master localities."
-  (when-let ((bad-paths (remove-if #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
-    ;; XXX: numeric
-    (error "~@<The specified paths ~S are not accessible.~:@>" bad-paths))
+  (loop (block retry
+          (restart-bind ((retry (lambda (&optional c) (declare (ignorable c) (special *missing-paths*)) (mapc #'ensure-directories-exist *missing-paths*) (return-from retry))
+                           :report-function (formatter "Create missing directories.")))
+            (return (let ((*missing-paths* (remove-if #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
+                      (declare (special *missing-paths*))
+                      ;; XXX: numeric
+                      (when *missing-paths*
+                        (error "~@<The specified paths ~S are not accessible.~:@>" *missing-paths*)))))))
   (let ((hostname (string-upcase (machine-instance))))
     (setf (master 'git)   (make-instance 'git-locality   :name hostname :path git-path :scan-p t)
           (master 'hg)    (make-instance 'hg-locality    :name (format-symbol t "~A-HG" hostname) :path hg-path)
@@ -636,7 +641,7 @@
           (master 'cvs)   (make-instance 'cvs-locality   :name (format-symbol t "~A-CVS" hostname) :path cvs-path)
           (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))
     (pushnew (ensure-directories-exist (git-locality-asdf-registry-path (master 'git))) asdf:*central-registry* :test #'equal)
-    (ensure-directories-exist (cvs-locality-lock-path (master 'cvs)))
+    (ensure-directories-exist (cvs-locality-lock-path (master 'cvs)) :verbose t)
     t))
 
 (defun define-master-localities-in (path &key (git-subdir "git") (hg-subdir "hg") (darcs-subdir "darcs") (cvs-subdir "cvs") (svn-subdir "svn"))
