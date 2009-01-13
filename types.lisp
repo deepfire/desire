@@ -141,6 +141,37 @@
 (defclass cvs (rcs-type-mixin)   () (:default-initargs :rcs-type 'cvs))
 (defclass svn (rcs-type-mixin)   () (:default-initargs :rcs-type 'svn))
 
+(defvar *class-slot-store* (make-hash-table :test 'equal))
+
+(define-container-hash-accessor *class-slot-store* %class-slot :type t :if-exists :continue)
+
+(defun class-slot (&rest class-slot-name)
+  (%class-slot class-slot-name))
+
+(defun set-class-slot (class-name slot-name value)
+  (setf (%class-slot (list class-name slot-name)) value))
+
+(defsetf class-slot set-class-slot)
+
+(defmacro with-class-slot (classes slot-name &body body)
+  `(symbol-macrolet ,(iter (for class in classes) (collect `(,class (class-slot ',class ',slot-name))))
+     ,@body))
+
+(with-class-slot (git hg darcs cvs svn) required-executables
+  (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git-cvsimport) svn '(rsync git-svn)))
+
+(with-class-slot (git hg darcs cvs svn) enabled-p
+  (setf git nil hg nil darcs nil cvs nil svn nil))
+
+(defun rcs-enabled-p (type)
+  (class-slot type 'enabled-p))
+
+(defun find-and-register-tools-for-remote-type (type)
+  "Find and make available executables for fetching from remotes of TYPE.
+   Return T when all executables required by TYPE are available, or NIL."
+  (setf (class-slot type 'enabled-p)
+        (every #'find-executable (class-slot type 'required-executables))))
+
 (defclass transport-mixin () ((transport :reader transport :initarg :transport)))
 
 ;;; non-exhaustive partition of TRANSPORT-MIXIN
@@ -415,16 +446,6 @@
             new)))
 
 (defsetf wishmaster-converted-modules set-wishmaster-converted-modules)
-
-(defun required-tools-available-for-remote-type-p (type)
-  "See if required executables for fetching from remotes of TYPE are present."
-  (every #'find-executable
-         (case type
-           (git '(git))
-           (hg '(hg))
-           (darcs '(darcs darcs-to-git))
-           (cvs '(rsync git-cvsimport))
-           (svn '(rsync git-svn)))))
 
 (defclass module (registered depobj)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
