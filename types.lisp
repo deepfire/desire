@@ -596,9 +596,7 @@
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
-  (let ((present (unzip #'required-tools-available-for-remote-type-p '(git hg darcs cvs svn))))
-    (unless (member 'git present)
-      (warn "~@<The git executable is not present. Desire is UNLIKELY to be of much use.~:@>"))
+  (let ((present (unzip #'find-and-register-tools-for-remote-type '(hg darcs cvs svn))))
     (do-remotes (r)
       (setf (remote-disabled-p r) (not (member (rcs-type r) present))))))
 
@@ -789,6 +787,8 @@
   (setf *root-of-all-desires* (parse-namestring path))
   (clear-definitions)
   (define-master-localities-in path)
+  (unless (find-and-register-tools-for-remote-type 'git)
+    (error "The git executable is missing, and so, DESIRE is of no use."))
   (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes wishmasters))
     (report t ";;; Ensured metastore at ~S~%" (meta-path)))
   (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
