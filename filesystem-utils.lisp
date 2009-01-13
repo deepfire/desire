@@ -25,7 +25,10 @@
                                                                               #p"g:\\program files\\git\\bin\\" #p"h:\\program files\\git\\bin\\"
                                                                               #p"i:\\program files\\git\\bin\\" #p"j:\\program files\\git\\bin\\"
                                                                               #p"k:\\program files\\git\\bin\\" #p"l:\\program files\\git\\bin\\"))
+
 (defparameter *executables* (make-hash-table :test 'eq))
+
+(define-container-hash-accessor *executables* executable :type pathname)
 
 (defvar *run-external-programs-verbosely* nil
   "Whether to echo the invoked external programs to standard output.")
@@ -33,9 +36,6 @@
 (defvar *run-external-programs-dryly* nil
   "Whether to substitute actual execution of external programs with
    mere printing of their paths and parameters.")
-
-(defun executable (name)
-  (or (gethash name *executables*) (error "~@<Executable ~S isn't known.~@:>" name)))
 
 ;;; SB-EXECUTABLE?
 (define-reported-condition external-program-failure (serious-condition)
@@ -58,11 +58,11 @@
   (:report (name search-path)
            "~@<a required executable, named ~D, wasn't found in search path ~S~:@>" name search-path))
 
-(defun find-executable (name &key (paths *executable-search-path*) &aux (realname (string-downcase (symbol-name name))))
+(defun find-executable (name &key (paths *executable-search-path*) &aux (realname (downstring name)))
   "See if executable with NAME is available in PATHS. When it is, associate NAME with that path and return the latter;
    otherwise, return NIL."
   (iter (for path in paths)
-        (for exec-path = (merge-pathnames path (make-pathname :name realname #+win32 #+win32 :type "exe")))
+        (for exec-path = (subfile path (list realname) #+win32 #+win32 :type "exe"))
         (when (probe-file exec-path) 
           (leave (setf (gethash name *executables*) exec-path)))
         (finally (warn 'executable-not-found :name realname :search-path paths))))
