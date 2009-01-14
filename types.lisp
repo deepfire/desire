@@ -831,16 +831,21 @@
               (compute-distributor-modules distributor)
               (mapcar #'coerce-to-name module-spec))))
 
-(defun remote-provides-module-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
-  "See whether REMOTE provides the MODULE."
-  (not (or (null (find (name module) (location-modules remote)))
-           (remote-disabled-p remote))))
+(defun remote-defines-module-p (remote module)
+  "See whether MODULE is defined for REMOTE."
+  (not (null (find (name module) (location-modules remote)))))
+
+(defun module-accessible-via-remote-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
+  "See whether REMOTE provides the MODULE, i.e. that MODULE is defined,
+   and the remote is not disabled."
+  (and (remote-defines-module-p remote module)
+       (not (remote-disabled-p remote))))
 
 (defun distributor-provides-module-p (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
   "See whether DISTRIBUTOR provides MODULE via any of its remotes, returning
    one, if so."
   (do-distributor-remotes (remote distributor)
-    (when (remote-provides-module-p remote module)
+    (when (module-accessible-via-remote-p remote module)
       (return remote))))
 
 (defun module-distributors (module)
@@ -916,11 +921,11 @@
                     (push module (rest new-home))))))))
 
 (defun compute-module-caches (module)
-  "Regarding MODULE, return remotes providing it, localities storing 
+  "Regarding MODULE, return remotes defining it, localities storing 
    (or desiring to store) it and systems it provides, as values."
   (values
    (do-remotes (remote)
-     (when (remote-provides-module-p remote module)
+     (when (remote-defines-module-p remote module)
        (collect remote)))
    (remove-duplicates
     (xform (module-desired-p module)
