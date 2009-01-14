@@ -240,7 +240,7 @@
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
 
-(defmethod transport ((o git-http-remote))
+(defmethod transport ((o git-combined-remote))
   (if *combined-remotes-prefer-native-over-http*
       'git 'http))
 
