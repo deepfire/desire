@@ -937,8 +937,8 @@
   "Update MODULE's locality, remote and system caches.
 
    The user must never need this."
-  (setf (values (module-remotes module) (module-localities module) (module-systems module))
-        (compute-module-caches module)))
+  (with-slots (remotes localities systems) module
+    (setf (values remotes localities systems) (compute-module-caches module))))
 
 (defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/dese/definitions.lisp"
                                                               "/mnt/little/git/clung/definitions.lisp"))
