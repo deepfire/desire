@@ -118,9 +118,17 @@
          (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
 
-(defmacro do-distributor-remotes ((var distributor) &body body)
-  `(iter (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
+(defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
+  `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
          ,@body))
+
+(defmacro do-distributor-modules ((module-var distributor) &body body)
+  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
+  (with-gensyms (remote module-name block)
+    `(do-distributor-remotes (,remote ,distributor ,block)
+       (iter (for ,module-name in (location-modules ,remote))
+             (for ,module-var = (module ,module-name))
+             (in ,block ,@body)))))
 
 (defun distributor-remote (distributor value &key (key #'name))
   (find value (distributor-remotes (coerce-to-distributor distributor)) :key key))
@@ -495,14 +503,6 @@
                    ;; Existence of complex systems implies absence of simple systems, by default.
                    (unless complex-systems
                      `(,(emit-make-simple-system-form 'asdf-system name name)))))))))
-
-(defmacro do-distributor-modules ((module-var distributor) &body body)
-  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
-  (with-gensyms (remote module-name)
-    `(do-distributor-remotes (,remote ,distributor)
-       (iter (for ,module-name in (location-modules ,remote))
-             (for ,module-var = (module ,module-name))
-             ,@body))))
 
 (defclass system-type-mixin ()
   ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
@@ -897,9 +897,13 @@
 
 (defun module-remote (module &key (if-does-not-exist :error))
   "Find out the only remote providing MODULE, or is specified
-   to be in a desired distributor for MODULE, if there is ambiguity."
-  (if-let ((distributor (module-distributor module)))
-    (distributor-provides-module-p distributor module)
+   to be in a desired distributor for MODULE, if there is ambiguity.
+
+   WARNING: loss of information via unmotivated choice."
+  (if-let ((remotes (do-remotes (remote)
+                      (when (remote-defines-module-p remote module)
+                        (collect remote)))))
+    (first remotes)
     (ecase if-does-not-exist
       (:error (error 'insatiable-desire :desire module))
       (:continue nil))))
