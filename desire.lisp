@@ -241,7 +241,7 @@
         (multiple-value-bind (module-deps missing martians) (module-dependencies an-unsatisfied-module missing martians)
           (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
             (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
-            (report t "~&~@<;; ~@;~S,~:[~; added ~:*~S,~] ~D left~:@>~%"
+            (report t "~&~@<;; ~@;~S,~:[~; added ~:*~A,~] ~D left~:@>~%"
                     an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
             (finish-output))
           (desire-do-one-step desires skip-present missing martians)))
