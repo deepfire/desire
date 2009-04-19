@@ -9,11 +9,13 @@
    #:distributor #:location #:remote #:locality #:master #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
-   #:do-distributors #:do-remotes
+   #:do-distributors #:do-remotes #:do-distributor-modules
    #:clear-definitions #:serialize-definitions #:read-definitions #:save-current-definitions #:load-definitions
    #:init
    #:remote-disabled-p
-   #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor
+   #:locality-path
+   #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor #:module-path
+   #:module-status #:module-public-packages #:module-hidden-p
    #:add-desire
    #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error

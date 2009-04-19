@@ -420,8 +420,10 @@
    to ensure its existence.
    In both cases the wishmaster object is returned.
    In other cases, a type error is signalled."
-  (funcall (fcase (etypecase wishmaster-spec (symbol t) (string nil))
-                  (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor) #'ensure-pure-wishmaster) wishmaster-spec))
+  (lret ((wishmaster (funcall (fcase (etypecase wishmaster-spec (symbol t) (string nil))
+                                     (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor) #'ensure-pure-wishmaster) wishmaster-spec)))
+    (do-distributor-modules (m wishmaster)
+      (change-class m 'origin-module))))
 
 (defun wishmaster-reader (stream &optional char sharp)
   (declare (ignore char sharp))
@@ -467,8 +469,14 @@
    :remotes nil :localities nil
    :systems nil :essential-p nil))
 
-;;; most specific, exhaustive partition of MODULE
-(defclass origin-module (module) ())
+(defclass origin-module (module) 
+  ((status :accessor module-status :initarg :status)
+   (public-packages :accessor module-public-packages :initarg :public-packages)
+   (hidden-p :accessor module-hidden-p :initarg :hidden-p))
+  (:default-initargs
+   :status :unknown
+   :public-packages nil
+   :hidden-p t))
 
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
