@@ -158,16 +158,16 @@
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config") :if-exists :supersede)
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module module :locality git-locality))
-      (git-cvsimport "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name))))
+      (git "cvsimport" "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name))))
 
 (defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)
   (let ((svn-repo-dir (module-path module (master 'svn)))
         (git-repo-dir (module-path module git-locality)))
     (unless (directory-exists-p git-repo-dir)
       (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create :if-exists :error)
-        (git-svn "init" (format nil "file://~A" (namestring svn-repo-dir))))) ;; gratuitious SVN complication
+        (git "svn" "init" (format nil "file://~A" (namestring svn-repo-dir))))) ;; gratuitious SVN complication
     (within-directory (git-repo-dir git-repo-dir)
-      (git-svn "fetch"))))
+      (git "svn" "fetch"))))
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
   (setf (repository-world-readable-p (module-path module git-locality)) *default-world-readable*))

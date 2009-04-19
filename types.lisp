@@ -166,7 +166,7 @@
      ,@body))
 
 (with-class-slot (git hg darcs cvs svn) required-executables
-  (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git-cvsimport) svn '(rsync git-svn)))
+  (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
 
 (with-class-slot (git hg darcs cvs svn) enabled-p
   (setf git nil hg nil darcs nil cvs nil svn nil))
