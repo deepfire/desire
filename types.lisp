@@ -97,7 +97,7 @@
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>"
-          (symbol-name (name o)) :remotes (distributor-remotes o)))
+          (string (name o)) :remotes (distributor-remotes o)))
 
 (defvar *printing-wishmaster* nil)
 
@@ -107,7 +107,7 @@
       (call-next-method)
       (format stream "~@<#W(~;~A ~@<~(~S ~A~)~:@>~;)~:@>"
               (if (typep o 'releasing-wishmaster)
-                  (symbol-name (name o))
+                  (string (name o))
                   (git-remote-namestring (wishmaster-remote o)))
               :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-remote o))))))
 
@@ -275,11 +275,11 @@
   (destructuring-bind ((form-binding) &rest form-body) (remote-path-form o)
     (let ((*print-case* :downcase))
       (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
-              (symbol-name (type-of o)) (symbol-name (name (remote-distributor o))) (list form-binding form-body)
+              (symbol-name (type-of o)) (string (name (remote-distributor o))) (list form-binding form-body)
               (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
                 (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
                   (append (unless (equal default-remote-name (name o))
-                            (list `(:name ,(symbol-name (name o)))))
+                            (list `(:name ,(string (name o)))))
                           (when-let ((port (remote-distributor-port o)))
                             (list `(:distributor-port ,port)))
                           (when-let ((port (remote-disabled-p o)))
@@ -350,7 +350,7 @@
 
 (defmethod print-object ((o locality) stream)
   (format stream "~@<#L(~;~A ~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
-          (symbol-name (type-of o)) (symbol-name (name o)) (locality-path o)
+          (symbol-name (type-of o)) (string (name o)) (locality-path o)
           (append (when (locality-master-p o) (list (list :master-p t)))
                   (when (locality-scan-p o) (list (list :scan-p t))))))
 
