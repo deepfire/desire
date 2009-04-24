@@ -403,14 +403,16 @@
           (distributor-remotes wishmaster))))
 
 (defun ensure-pure-wishmaster (url)
-  "URL is interpreted as a specification of a Git remote of a non-well known
-   pure wishmaster, which is either found or created."
+  "Return a non-well-known pure wishmaster specified by URL, which is
+   intepreted as pointing at its git remote.
+   The wishmaster is either found, or created, if it is not yet known."
   (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
     (or (distributor hostname :if-does-not-exist :continue)
         (let* ((wishmaster (make-pure-wishmaster type hostname port path))
                (remote (wishmaster-remote wishmaster)))
           (within-meta ((meta-path))
-            (ensure-gitremote (name remote) (url remote '.meta)))))))
+            (ensure-gitremote (name remote) (url remote '.meta)))
+          wishmaster))))
 
 (defun ensure-wishmaster (wishmaster-spec)
   "When WISHMASTER-SPEC is a symbol, find the distributor it names,
@@ -420,8 +422,10 @@
    to ensure its existence.
    In both cases the wishmaster object is returned.
    In other cases, a type error is signalled."
-  (lret ((wishmaster (funcall (fcase (etypecase wishmaster-spec (symbol t) (string nil))
-                                     (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor) #'ensure-pure-wishmaster) wishmaster-spec)))
+  (lret ((wishmaster (funcall (etypecase wishmaster-spec
+                                (symbol (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor))
+                                (string #'ensure-pure-wishmaster))
+                              wishmaster-spec)))
     (do-distributor-modules (m wishmaster)
       (change-class m 'origin-module))))
 
