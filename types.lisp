@@ -783,6 +783,9 @@
   (apply #'format stream format-control args)
   (finish-output stream))
 
+(defun pathname-absolute-p (pathname)
+  (eq (car (pathname-directory pathname)) :absolute))
+
 (defun init (path &key as (default-wishmasters (list *default-wishmaster*)))
   "Make Desire fully functional, with PATH chosen as storage location.
 
@@ -792,29 +795,32 @@
    distributor. That distributor will be further identified as self.
    DEFAULT-WISHMASTERS specifies a set of wishmaster specifications which
    are seeded into the system iff there is none of these yet."
-  (setf *root-of-all-desires* (parse-namestring path))
-  (clear-definitions)
-  (define-master-localities-in path)
-  (unless (find-and-register-tools-for-remote-type 'git)
-    (error "The git executable is missing, and so, DESIRE is of no use."))
-  (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes wishmasters))
-    (report t ";;; Ensured metastore at ~S~%" (meta-path)))
-  (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
-  (load-definitions (meta-path))
-  (report t ";;; Determining available tools and deducing accessible remotes~%")
-  (determine-tools-and-update-remote-accessibility)
-  (configure-remote-wishmasters default-wishmasters (meta-path))
-  (report t ";;; Scanning for modules in ~S~%" *root-of-all-desires*)
-  (let* ((master (master 'git))
-         (present-git-modules (update-module-locality-presence-cache master)))
-    (if-let ((wishmaster (and as (ensure-wishmaster as))))
-      (progn
-        (setf *self* wishmaster
-              (wishmaster-converted-modules wishmaster) present-git-modules)
-        (advertise-wishmaster-conversions wishmaster (meta-path)))
-      (update-known-wishmasters master))
-    (ensure-present-module-systems-loadable master))
-  t)
+  (let ((path (if (pathname-absolute-p path)
+                  path
+                  (merge-pathnames path))))
+    (setf *root-of-all-desires* (parse-namestring path))
+    (clear-definitions)
+    (define-master-localities-in path)
+    (unless (find-and-register-tools-for-remote-type 'git)
+      (error "The git executable is missing, and so, DESIRE is of no use."))
+    (when (ensure-metastore (meta-path) :required-metafiles '(definitions common-wishes wishmasters))
+      (report t ";;; Ensured metastore at ~S~%" (meta-path)))
+    (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions (meta-path)))
+    (load-definitions (meta-path))
+    (report t ";;; Determining available tools and deducing accessible remotes~%")
+    (determine-tools-and-update-remote-accessibility)
+    (configure-remote-wishmasters default-wishmasters (meta-path))
+    (report t ";;; Scanning for modules in ~S~%" *root-of-all-desires*)
+    (let* ((master (master 'git))
+           (present-git-modules (update-module-locality-presence-cache master)))
+      (if-let ((wishmaster (and as (ensure-wishmaster as))))
+              (progn
+                (setf *self* wishmaster
+                      (wishmaster-converted-modules wishmaster) present-git-modules)
+                (advertise-wishmaster-conversions wishmaster (meta-path)))
+              (update-known-wishmasters master))
+      (ensure-present-module-systems-loadable master))
+    t))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
