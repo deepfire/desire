@@ -92,7 +92,7 @@
                                             required-metafiles)))))
     (within-meta (directory :if-does-not-exist :create)
       (git "init")
-      (open (subfile* directory ".git" "git-daemon-export-ok") :direction :probe :if-does-not-exist :create)
+      (open  ".git/git-daemon-export-ok" :direction :probe :if-does-not-exist :create)
       (dolist (mf required-metafiles)
         (create-metafile mf directory)
         (commit-metafile mf directory (format nil "Created ~A" mf)))
