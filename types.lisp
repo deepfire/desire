@@ -23,7 +23,7 @@
 ;;;
 ;;; Knobs
 ;;;
-(defvar *default-wishmaster*                       'git.feelingofgreen.ru)
+(defvar *default-wishmaster*                       "git://git.feelingofgreen.ru")
 (defvar *desires*                                  nil "List of import descriptions.")
 (defvar *default-world-readable*                   t   "Whether to publish GIT repositories by default.")
 (defvar *self*                                     nil "The well-known self, if any.")
