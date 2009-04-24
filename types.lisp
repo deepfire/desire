@@ -769,7 +769,11 @@
         (t
          (within-distributor-meta (wishmaster :metastore metastore :update-p t)
            (with-open-metafile (common-wishes 'common-wishes metastore)
-             (load common-wishes))))))
+             (let ((*readtable* (copy-readtable))
+                   (*read-eval* nil)
+                   (*package* #.*package*))
+               (set-dispatch-macro-character #\# #\W 'wishmaster-reader *readtable*)
+               (load common-wishes)))))))
 
 (defun update-known-wishmasters (&optional (locality (master 'git)) (metastore (meta-path)))
   (do-distributors (d)
