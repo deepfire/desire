@@ -118,6 +118,41 @@
          (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
 
+(defun emit-make-simple-module-form (name)
+  `(or (module ',name :if-does-not-exist :continue)
+       (make-instance 'module :name ',name :umbrella ',name)))
+
+(defun emit-make-simple-system-form (type module-name name)
+  `(or (system ',name :if-does-not-exist :continue)
+       (make-instance ',type :name ',name :module (module ',module-name))))
+
+(defun path-form-to-path-fn-form (repo-var path-form)
+  "Upgrade the abbreviated PATH-FORM into a proper lambda form, with the repository
+   variable called REPO-VAR."
+  `(lambda (,repo-var) (list ,@path-form)))
+
+(defun emit-remote-form (type name distributor-form modules simple-modules simple-systemless-modules repovar path-form remote-initargs)
+  `(prog1
+       (make-instance ',type ,@(when name `(:name ',name)) :distributor ,distributor-form
+                      :modules ',(append modules simple-modules simple-systemless-modules)
+                      :path-form ',(list* (list repovar) path-form) :path-fn ,(path-form-to-path-fn-form repovar path-form)
+                      ,@remote-initargs)
+     ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
+     ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) simple-modules)))
+
+;;;
+;;; Actually, the wishmaster's module information isn't supposed to be interpreted
+;;; as a complete specification -- its only purpose is to provide information about
+;;; whom to ask for a specific module. So, module specification upgrading, etc.
+;;;
+(defun wishmaster-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  (destructuring-bind (distributor &key modules simple-modules simple-systemless-modules) (read stream nil nil)
+    `(lret ((wishmaster (ensure-wishmaster ,(quote-if-non-self-evaluating distributor))))
+      ,(emit-remote-form 'git-native-remote nil 'wishmaster modules simple-modules simple-systemless-modules
+                         'mod '((downstring (name mod))))
+       (setf (wishmaster-converted-modules wishmaster) (mapcar #'module ',(append modules simple-modules simple-systemless-modules))))))
+
 (defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
   `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
          ,@body))
@@ -321,29 +356,11 @@
   "See it the definition of SYSTEM is implied, and is therefore subject to omission. "
   (system-simple-p system))
 
-(defun emit-make-simple-module-form (name)
-  `(or (module ',name :if-does-not-exist :continue)
-       (make-instance 'module :name ',name :umbrella ',name)))
-
-(defun emit-make-simple-system-form (type module-name name)
-  `(or (system ',name :if-does-not-exist :continue)
-       (make-instance ',type :name ',name :module (module ',module-name))))
-
-(defun path-form-to-path-fn-form (repo-var path-form)
-  "Upgrade the abbreviated PATH-FORM into a proper lambda form, with the repository
-   variable called REPO-VAR."
-  `(lambda (,repo-var) (list ,@path-form)))
-
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
-    `(prog1
-         (make-instance ',type :distributor (distributor ',distributor) :modules ',(append modules simple-modules simple-systemless-modules)
-                        :path-form ',(list* (list repovar) path-form) :path-fn ,(path-form-to-path-fn-form repovar path-form)
-                        ,@(when name `(:name ',name))
-                        ,@(remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))
-       ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
-       ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) simple-modules))))
+    (emit-remote-form type name `(distributor ',distributor) modules simple-modules simple-systemless-modules repovar path-form
+                      (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))))
 
 (defun locality-master-p (o)
   (eq o (master (rcs-type o) :if-does-not-exist :continue)))
@@ -428,12 +445,6 @@
                               wishmaster-spec)))
     (do-distributor-modules (m wishmaster)
       (change-class m 'origin-module))))
-
-(defun wishmaster-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (destructuring-bind (distributor &key converted-modules) (read stream nil nil)
-    `(lret ((wishmaster (ensure-wishmaster ,(quote-if-non-self-evaluating distributor))))
-       (setf (wishmaster-converted-modules wishmaster) (mapcar #'module ',converted-modules)))))
 
 (defun wishmaster-remote (wishmaster)
   "Return the remote through which WISHMASTER exports converted modules."
