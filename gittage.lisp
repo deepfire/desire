@@ -23,7 +23,8 @@
 
 (defun invoke-maybe-within-directory (fn &optional directory)
   (if directory
-      (within-directory (foo directory) (funcall fn))
+      (within-directory directory
+        (funcall fn))
       (funcall fn)))
 
 (defmacro maybe-within-directory (directory &body body)
@@ -54,10 +55,12 @@
       (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
 
 (defun gitremote-present-p (name &optional directory)
+  (syncformat t "gr-p-p ~S ~S ~S~%" name directory (gitremotes directory))
   (member name (gitremotes directory)))
 
 (defun add-gitremote (name url &optional directory)
   (maybe-within-directory directory
+    (break)
     (git "remote" "add" (downstring name) url)))
 
 (defun ensure-gitremote (name url &optional directory)
@@ -76,7 +79,7 @@
     (null (directory-exists-p (subdirectory* nil ".git")))))
 
 (defun (setf repository-bare-p) (val directory)
-  (within-directory (directory directory)
+  (within-directory directory
     (if val
         (error "not implemented")
         (progn

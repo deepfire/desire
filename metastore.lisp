@@ -62,7 +62,7 @@
      ,@body))
 
 (defmacro within-meta ((meta-path &rest options) &body body)
-  `(within-directory (,(gensym "VOID") ,meta-path ,@options)
+  `(within-directory (,meta-path ,@options)
      ,@body))
 
 (defmacro within-distributor-meta ((distributor &key (metastore '(meta-path)) register-p update-p) &body body)

@@ -91,7 +91,7 @@
 (defmethod fetch-remote ((locality git-locality) (remote git) module)
   (let ((repo-dir (module-path module locality)))
     (unless (directory-exists-p repo-dir)
-      (within-directory (dir repo-dir :if-exists :error :if-does-not-exist :create)
+      (within-directory (repo-dir :lisp nil :if-exists :error :if-does-not-exist :create)
         (git "init-db")))
     (maybe-within-directory repo-dir
       (ensure-gitremote (name remote) (url remote module))
@@ -146,7 +146,7 @@
   (let ((darcs-repo-dir (module-path module (master 'darcs)))
         (git-repo-dir (module-path module git-locality)))
     (purge-binaries git-repo-dir)
-    (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create)
+    (within-directory (git-repo-dir :lisp nil :if-does-not-exist :create)
       (darcs-to-git (namestring darcs-repo-dir)))
     (when (repository-bare-p git-repo-dir)
       (setf (repository-bare-p git-repo-dir) nil))))
@@ -164,9 +164,9 @@
   (let ((svn-repo-dir (module-path module (master 'svn)))
         (git-repo-dir (module-path module git-locality)))
     (unless (directory-exists-p git-repo-dir)
-      (within-directory (git-repo-dir git-repo-dir :if-does-not-exist :create :if-exists :error)
+      (within-directory (git-repo-dir :lisp nil :if-does-not-exist :create :if-exists :error)
         (git "svn" "init" (format nil "file://~A" (namestring svn-repo-dir))))) ;; gratuitious SVN complication
-    (within-directory (git-repo-dir git-repo-dir)
+    (within-directory (git-repo-dir :lisp nil)
       (git "svn" "fetch"))))
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
