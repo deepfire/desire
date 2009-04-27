@@ -317,8 +317,6 @@
                             (list `(:name ,(string (name o)))))
                           (when-let ((port (remote-distributor-port o)))
                             (list `(:distributor-port ,port)))
-                          (when-let ((port (remote-disabled-p o)))
-                            (list `(:disabled-p t)))
                           (when complex
                             (list `(:modules ,(mapcar #'downstring complex))))
                           (when systemful
