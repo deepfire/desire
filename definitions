@@ -19,7 +19,7 @@
         (downstring (name mod)))
        :modules
        (cffi lw-compat closer-mop clbuild plexippus-xpath climplayer
-        bordeaux-threads iterate alexandria))
+        bordeaux-threads iterate alexandria stefil))
     #R(CVS-RSYNC-REMOTE COMMON-LISP.NET
        ((mod) "project" (downstring (module-umbrella mod)))
        :modules
@@ -37,7 +37,7 @@
         split-sequence trivial-sockets salza skippy))
     #R(DARCS-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~crhodes" (downstring (name mod))) :name common-lisp.net-krystof
-       :modules (clx vclos spatial-trees midi))
+       :modules (clx vclos midi))
     #R(GIT-HTTP-REMOTE COMMON-LISP.NET
        ((mod) "~loliveira" "git" (downstring (name mod)))
        :name common-lisp.net-luis :modules (texinfo-docstrings))
@@ -63,12 +63,11 @@
    :remotes
    (#R(GIT-NATIVE-REMOTE GIT.FEELINGOFGREEN.RU ((mod) (downstring (name mod)))
        :modules
-       (pestilence newlib mclinux common-db mcdust-one x86-win32 x86-linux
-        winnt-lptaccess mcdbio giveio mdb libmdb doc bin dot-gitignore
+       (pestilence newlib mclinux common-db mcdbio mdb libmdb doc bin
         clim-file-selector sb-x86-portio clxs ieee-latex assem regvaldefs
-        custom-harness standrei climock humint cl-git climb dwarf
-        captured-stream cl-io-elf cl-io-mod bintype clung desire semi-precious
-        pergamum)))) 
+        custom-harness standrei climock humint cl-git climb dwarf dot-gitignore
+        captured-stream cl-io-elf cl-io-mod bintype desire semi-precious
+        pergamum feelingofgreen)))) 
 #D(GIT.SANITYINC.COM
    :remotes
    (#R(GIT-NATIVE-REMOTE GIT.SANITYINC.COM
@@ -87,7 +86,7 @@
    :remotes
    (#R(GIT-NATIVE-REMOTE REPO.OR.CZ
        ((mod) (format nil "~A.git" (downstring (name mod))))
-       :modules (closure-html cxml darcs2git git)))) 
+       :modules (closure-html cxml xuriella darcs2git git)))) 
 #D(RVW.DOC.GOLD.AC.UK
    :remotes
    (#R(DARCS-HTTP-REMOTE RVW.DOC.GOLD.AC.UK
@@ -107,6 +106,12 @@
        ((mod) (format nil "~A.svn.sourceforge.net" (downstring (name mod)))
         "svn" (downstring (name mod)))
        :modules (lispbuilder)))) 
+#D(CVS.SOURCEFORGE.NET
+   :remotes
+   (#R(CVS-RSYNC-REMOTE CVS.SOURCEFORGE.NET
+       ((mod) (format nil "~A.cvs.sourceforge.net" (downstring (name mod)))
+        "cvsroot" (downstring (name mod)))
+       :modules (ggi))))
 #D(WWW.FRACTALCONCEPT.COM
    :remotes
    (#R(SVN-RSYNC-REMOTE WWW.FRACTALCONCEPT.COM
