@@ -844,69 +844,9 @@
    in which case an error is signalled."
   (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) :name name (remove-from-plist keys :name)))
 
-(defun distributor-related-desires (distributor-spec)
-  "Yield the names of modules currently desired from DISTRIBUTOR-SPEC."
-  (rest (find (coerce-to-name distributor-spec) *desires*)))
-
-(defun set-distributor-related-desires (new distributor-spec)
-  (setf (rest (find (coerce-to-name distributor-spec) *desires*)) new))
-
-(defsetf distributor-related-desires set-distributor-related-desires)
-
-(defun add-desire (distributor &optional (module-spec :everything) &aux (distributor (coerce-to-distributor distributor)))
-  "Add MODULE-SPEC (which is either a list of module specifications or an
-   :EVERYTHING wildcard) to the list of modules desired from DISTRIBUTOR."
-  (check-type module-spec (or (eql :everything) list))
-  (unionf (distributor-related-desires distributor)
-          (if (eq module-spec :everything)
-              (compute-distributor-modules distributor)
-              (mapcar #'coerce-to-name module-spec))))
-
-(defun remote-defines-module-p (remote module)
-  "See whether MODULE is defined for REMOTE."
-  (not (null (find (name module) (location-modules remote)))))
-
-(defun module-accessible-via-remote-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
-  "See whether REMOTE provides the MODULE, i.e. that MODULE is defined,
-   and the remote is not disabled."
-  (and (remote-defines-module-p remote module)
-       (not (remote-disabled-p remote))))
-
-(defun distributor-provides-module-p (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
-  "See whether DISTRIBUTOR provides MODULE via any of its remotes, returning
-   one, if so."
-  (do-distributor-remotes (remote distributor)
-    (when (module-accessible-via-remote-p remote module)
-      (return remote))))
-
-(defun module-distributors (module)
-  "Those distributors providing MODULE, by definition."
-  (do-distributors (distributor)
-    (when (distributor-provides-module-p distributor module)
-      (collect distributor))))
-
-(defun module-desired-p (module &aux (module (coerce-to-module module)))
-  "See whether MODULE is desired. Return the desired distributor, if so."
-  (iter (for (distributor-name . desires) in *desires*)
-        (when (member (name module) desires)
-          (return (distributor distributor-name)))))
-
-(defun module-distributor (module)
-  "Find out the only distributor providing MODULE, or is specified
-   to be a desired distributor for it, if there is ambiguity."
-  (if-let ((distributors (module-distributors module)))
-    (if (= 1 (length distributors))
-        (first distributors)
-        (or (module-desired-p module)
-            (first distributors)))
-    (error "~@<Inconsistency: module ~S is present, but no distributors claim to host it.~:@>" module)))
-
-(defun module-desired-remote (module)
-  "Find the remote providing MODULE among those of its desired distributor, 
-   if any."
-  (when-let ((distributor (module-desired-p module)))
-    (distributor-provides-module-p distributor module)))
-
+;;;
+;;; Conditions.
+;;;
 (define-condition desire-condition (condition) ())
 (define-condition desire-error (desire-condition error) ())
 (define-condition repository-error (desire-error)
@@ -926,18 +866,79 @@
   (:report (remote module execution-error)
            "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (name module) remote execution-error))
 
-(defun module-remote (module &key (if-does-not-exist :error))
-  "Find out the only remote providing MODULE, or is specified
-   to be in a desired distributor for MODULE, if there is ambiguity.
+;;;
+;;; Queries.
+;;;
+(defun remote-defines-module-p (remote module)
+  "See whether MODULE is defined for REMOTE."
+  (not (null (find (name module) (location-modules remote)))))
 
-   WARNING: loss of information via unmotivated choice."
-  (if-let ((remotes (do-remotes (remote)
-                      (when (remote-defines-module-p remote module)
-                        (collect remote)))))
-    (first remotes)
-    (ecase if-does-not-exist
-      (:error (error 'insatiable-desire :desire module))
-      (:continue nil))))
+(defun module-accessible-via-remote-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
+  "See whether REMOTE provides the MODULE, i.e. that MODULE is defined,
+   and the remote is not disabled."
+  (and (remote-defines-module-p remote module)
+       (not (remote-disabled-p remote))))
+
+(defun module-remotes (module)
+  "Compute the set of all remotes through which MODULE is available."
+  (do-remotes (remote)
+    (collecting (remote-defines-module-p remote module))))
+
+(defun module-enabled-remote (module)
+  "Return the first non-disabled remote providing MODULE.
+   The second value is a boolean, indicating non-emptiness of the set of
+   providing remotes, regardless of the enabled-p flag."
+  (apply/find-if (complement #'remote-disabled-p) #'module-remotes module))
+
+(defun module-remote (module &key (if-does-not-exist :error))
+  "Find the first remote occuring to provide MODULE."
+  (or (do-remotes (remote)
+        (finding remote such-that (remote-defines-module-p remote module)))
+      (ecase if-does-not-exist
+        (:error (error 'insatiable-desire :desire module))
+        (:continue nil))))
+
+(defun distributor-module-remotes (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
+  "Return the set of DISTRIBUTOR's remotes providing MODULE, regardless
+   of the current availability."
+  (remove-if-not (rcurry #'remote-defines-module-p module) (distributor-remotes distributor)))
+
+(defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
+  "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
+   The second value is a boolean, indicating non-emptiness of the set of
+   providing remotes, regardless of the enabled-p flag."
+  (apply/find-if (complement #'remote-disabled-p) #'distributor-module-remotes distributor module))
+
+(defun module-distributor (module &key (if-does-not-exist :error))
+  "Find the first distributor occuring to provide MODULE."
+  (remote-distributor (module-remote module :if-does-not-exist if-does-not-exist)))
+
+;;;
+;;; Desires.
+;;;
+(defun distributor-related-desires (distributor-spec)
+  "Yield the names of modules currently desired from DISTRIBUTOR-SPEC."
+  (rest (find (coerce-to-name distributor-spec) *desires*)))
+
+(defun set-distributor-related-desires (new distributor-spec)
+  (setf (rest (find (coerce-to-name distributor-spec) *desires*)) new))
+
+(defsetf distributor-related-desires set-distributor-related-desires)
+
+(defun add-desire (distributor &optional (module-spec :everything) &aux (distributor (coerce-to-distributor distributor)))
+  "Add MODULE-SPEC (which is either a list of module specifications or an
+   :EVERYTHING wildcard) to the list of modules desired from DISTRIBUTOR."
+  (check-type module-spec (or (eql :everything) list))
+  (unionf (distributor-related-desires distributor)
+          (if (eq module-spec :everything)
+              (compute-distributor-modules distributor)
+              (mapcar #'coerce-to-name module-spec))))
+
+(defun module-desired-p (module &aux (module (coerce-to-module module)))
+  "See whether MODULE is desired. Return the desired distributor, if so."
+  (iter (for (distributor-name . desires) in *desires*)
+        (when (member (name module) desires)
+          (return (distributor distributor-name)))))
 
 (defun substitute-desires (in with)
   "Substitute some of module->distributor maps in IN with those in WITH.
@@ -955,6 +956,9 @@
                                       (car (push (list new-dist) new-desires)))))
                     (push module (rest new-home))))))))
 
+;;;
+;;; Rudimentary caching.
+;;;
 (defun compute-module-caches (module)
   "Regarding MODULE, return remotes defining it, localities storing 
    (or desiring to store) it and systems it provides, as values."

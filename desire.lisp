@@ -272,7 +272,7 @@
   (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-distributor m)) m))) desires)))
     (iter (for (distributor-name . modules) in interpreted-desires)
           (for distributor = (distributor distributor-name))
-          (when-let ((missing (remove-if (curry #'distributor-provides-module-p distributor) modules)))
+          (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
             (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
            *departed-from-definitions-p*

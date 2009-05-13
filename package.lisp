@@ -14,7 +14,7 @@
    #:init
    #:remote-disabled-p
    #:locality-path
-   #:module-desired-p #:module-desired-remote #:module-remote #:module-distributors #:module-distributor #:module-path
+   #:module-desired-p #:module-enabled-remote #:module-path
    #:module-status #:module-public-packages #:module-hidden-p
    #:add-desire
    #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
