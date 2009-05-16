@@ -613,7 +613,7 @@
 (define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :if-exists :error)
 (define-container-hash-accessor *localities-by-path* locality-by-path :type locality :if-exists :error)
-(define-container-hash-accessor *masters*        master        :type locality)
+(define-container-hash-accessor *masters*        master        :type locality :if-exists :error)
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
