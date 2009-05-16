@@ -664,34 +664,21 @@
       (format stream "~%~%;;;~%;;; Applications~%;;;")
       (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream)))))
 
-(defun define-master-localities (git-path hg-path darcs-path cvs-path svn-path)
-  "Define the set of master localities."
-  (loop (block retry
-          (restart-bind ((retry (lambda (&optional c) (declare (ignorable c) (special *missing-paths*)) (mapc #'ensure-directories-exist *missing-paths*) (return-from retry))
-                           :report-function (formatter "Create missing directories.")))
-            (return (let ((*missing-paths* (remove-if #'directory-exists-p (list git-path hg-path darcs-path cvs-path svn-path))))
-                      (declare (special *missing-paths*))
-                      ;; XXX: numeric
-                      (when *missing-paths*
-                        (error "~@<The specified paths ~S are not accessible.~:@>" *missing-paths*)))))))
-  (let ((hostname (string-upcase (machine-instance))))
-    (setf (master 'git)   (make-instance 'git-locality   :name hostname :path git-path :scan-p t)
-          (master 'hg)    (make-instance 'hg-locality    :name (format-symbol t "~A-HG" hostname) :path hg-path)
-          (master 'darcs) (make-instance 'darcs-locality :name (format-symbol t "~A-DARCS" hostname) :path darcs-path)
-          (master 'cvs)   (make-instance 'cvs-locality   :name (format-symbol t "~A-CVS" hostname) :path cvs-path)
-          (master 'svn)   (make-instance 'svn-locality   :name (format-symbol t "~A-SVN" hostname) :path svn-path))
-    (pushnew (ensure-directories-exist (git-locality-asdf-registry-path (master 'git))) asdf:*central-registry* :test #'equal)
-    (ensure-directories-exist (cvs-locality-lock-path (master 'cvs)) :verbose t)
-    t))
+(defun define-master-locality-in (root-path rcs-type &aux (hostname (format-symbol #.*package* "~(~A~)" (machine-instance))))
+  "Define a locality of RCS-TYPE in a subdirectory of ROOT-PATH."
+  (lret* ((locality-type (find-class (format-symbol #.*package* "~A-LOCALITY" rcs-type)))
+          (path (subdirectory* root-path (string-downcase (string rcs-type))))
+          (locality (make-instance locality-type :name (default-remote-name hostname rcs-type) :path path)))
+    (unless (directory-exists-p path)
+      (ensure-directories-exist path))
+    (setf (master rcs-type) locality)
+    (case rcs-type
+      (git (pushnew (ensure-directories-exist (git-locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal))
+      (cvs (ensure-directories-exist (cvs-locality-lock-path locality) :verbose t)))))
 
-(defun define-master-localities-in (path &key (git-subdir "git") (hg-subdir "hg") (darcs-subdir "darcs") (cvs-subdir "cvs") (svn-subdir "svn"))
+(defun define-master-localities-in (path)
   "A shortcut for master locality set definition in PATH."
-  (define-master-localities
-    (subdirectory* path git-subdir)
-    (subdirectory* path hg-subdir)
-    (subdirectory* path darcs-subdir)
-    (subdirectory* path cvs-subdir)
-    (subdirectory* path svn-subdir)))
+  (mapc (curry #'define-master-locality-in path) '(git hg darcs cvs svn)))
 
 (defun meta-path ()
   "Return the path to the meta directory."
