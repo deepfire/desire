@@ -799,9 +799,10 @@
    distributor. That distributor will be further identified as self.
    DEFAULT-WISHMASTERS specifies a set of wishmaster specifications which
    are seeded into the system iff there is none of these yet."
-  (let ((path (if (pathname-absolute-p path)
-                  path
-                  (merge-pathnames path))))
+  (let* ((path (fad:pathname-as-directory path))
+         (path (if (pathname-absolute-p path)
+                   path
+                   (merge-pathnames path))))
     (setf *root-of-all-desires* (parse-namestring path))
     (clear-definitions)
     (define-master-localities-in path)
