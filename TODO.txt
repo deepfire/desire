@@ -16,3 +16,6 @@ maps:
                         
 computable:
         module          all-remotes, all-modules
+
+issues:
+	erring on missing distr modules, instead of warning
