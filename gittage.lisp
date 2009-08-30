@@ -55,12 +55,10 @@
       (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
 
 (defun gitremote-present-p (name &optional directory)
-  (syncformat t "gr-p-p ~S ~S ~S~%" name directory (gitremotes directory))
   (member name (gitremotes directory)))
 
 (defun add-gitremote (name url &optional directory)
   (maybe-within-directory directory
-    (break)
     (git "remote" "add" (downstring name) url)))
 
 (defun ensure-gitremote (name url &optional directory)
