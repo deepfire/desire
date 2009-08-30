@@ -880,11 +880,12 @@
 
 (defun module-remote (module &key (if-does-not-exist :error))
   "Find the first remote occuring to provide MODULE."
-  (or (do-remotes (remote)
-        (finding remote such-that (remote-defines-module-p remote module)))
-      (ecase if-does-not-exist
-        (:error (error 'insatiable-desire :desire module))
-        (:continue nil))))
+  (let ((module (coerce-to-module module)))
+    (or (do-remotes (remote)
+          (finding remote such-that (remote-defines-module-p remote module)))
+        (ecase if-does-not-exist
+          (:error (error 'insatiable-desire :desire module))
+          (:continue nil)))))
 
 (defun distributor-module-remotes (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
   "Return the set of DISTRIBUTOR's remotes providing MODULE, regardless
