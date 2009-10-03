@@ -867,7 +867,7 @@
   (and (remote-defines-module-p remote module)
        (not (remote-disabled-p remote))))
 
-(defun module-remotes (module)
+(defun compute-module-remotes (module)
   "Compute the set of all remotes through which MODULE is available."
   (do-remotes (remote)
     (collecting (remote-defines-module-p remote module))))
@@ -876,7 +876,7 @@
   "Return the first non-disabled remote providing MODULE.
    The second value is a boolean, indicating non-emptiness of the set of
    providing remotes, regardless of the enabled-p flag."
-  (apply/find-if (complement #'remote-disabled-p) #'module-remotes module))
+  (apply/find-if (complement #'remote-disabled-p) #'compute-module-remotes module))
 
 (defun module-remote (module &key (if-does-not-exist :error))
   "Find the first remote occuring to provide MODULE."
