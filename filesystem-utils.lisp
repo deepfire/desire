@@ -142,6 +142,9 @@
   `(let ((*translated-error-exit-codes* (list ,@(mapcar (curry #'cons 'list) bindings))))
      ,@body))
 
+(defmacro with-shell-predicate (form)
+  `(with-valid-exit-codes ((1 nil)) ,form))
+
 (defmacro exit-code-bind ((&rest bindings) &body body)
   `(handler-bind ((external-program-failure (lambda (cond)
                                               (case (cond-status cond)
