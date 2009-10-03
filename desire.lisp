@@ -93,10 +93,7 @@
     (unless (directory-exists-p repo-dir)
       (within-directory (repo-dir :lisp nil :if-exists :error :if-does-not-exist :create)
         (git "init-db")))
-    (maybe-within-directory repo-dir
-      (ensure-gitremote (name remote) (url remote module))
-      (git "fetch" (down-case-name remote))
-      (ensure-master-branch-from-remote :remote-name (name remote)))))
+    (git-fetch-remote remote (name module) repo-dir)))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
   (let ((darcs-repo-dir (module-path module (master 'darcs)))

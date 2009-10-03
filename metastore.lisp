@@ -61,26 +61,12 @@
                             ,@(remove-from-plist open-options :element-type :if-does-not-exist :if-exists))
      ,@body))
 
-(defmacro within-meta ((meta-path &rest options) &body body)
-  `(within-directory (,meta-path ,@options)
-     ,@body))
-
-(defmacro within-distributor-meta ((distributor &key (metastore '(meta-path)) register-p update-p) &body body)
-  (with-gensyms (distributor-name)
-    (once-only (metastore)
-      `(let ((,distributor-name (down-case-name ,distributor)))
-         (within-meta (,metastore)
-           ,@(when register-p `((git "remote" "add" ,distributor-name)))
-           ,@(when update-p `((git "fetch" ,distributor-name)))
-           (within-ref (list "remotes" ,distributor-name "master")
-             ,@body))))))
-
 (defun commit-metafile (name metastore-directory &optional (commit-message (format nil "Updated ~A" name)))
-  "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY."
-  (within-meta (metastore-directory)
-    (git "add" (symbol-name name))
-    (when (with-valid-exit-codes ((1 nil)) (git "status"))
-      (git "commit" "-m" (format nil "~A" commit-message)))))
+  "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY.
+Return status indicates whether there were changes and a new commit was done."
+  (within-directory (metastore-directory)
+    (when (with-shell-predicate (git "status"))
+      (git "commit" "-m" (format nil "~A" commit-message) (symbol-name name)))))
 
 (defun ensure-metastore (directory &key required-metafiles)
   "Ensure that a metastore exists at DIRECTORY.
@@ -90,7 +76,7 @@
                                      (every (compose #'file-exists-p
                                                      (rcurry #'metafile-path directory))
                                             required-metafiles)))))
-    (within-meta (directory :if-does-not-exist :create)
+    (within-directory (directory :if-does-not-exist :create)
       (git "init")
       (open  ".git/git-daemon-export-ok" :direction :probe :if-does-not-exist :create)
       (dolist (mf required-metafiles)

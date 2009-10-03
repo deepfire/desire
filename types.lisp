@@ -100,7 +100,8 @@
   ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified."))
   (:default-initargs
    :registrator #'(setf distributor) :remotes nil))
-(defclass wishmaster () ())
+(defclass wishmaster () 
+  ((gate-remote :accessor wishmaster-gate-remote :initarg :gate-remote)))
 
 (defclass releasing-wishmaster (wishmaster distributor) ())
 (defclass pure-wishmaster (wishmaster distributor) ())
@@ -116,10 +117,8 @@
            (null *printing-wishmaster*))
       (call-next-method)
       (format stream "~@<#W(~;~A ~@<~(~S ~A~)~:@>~;)~:@>"
-              (if (typep o 'releasing-wishmaster)
-                  (string (name o))
-                  (git-remote-namestring (wishmaster-remote o)))
-              :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-remote o))))))
+              (git-remote-namestring (wishmaster-gate-remote o))
+              :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-gate-remote o))))))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
@@ -149,19 +148,6 @@
                       ,@remote-initargs)
      ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
      ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) simple-modules)))
-
-;;;
-;;; Actually, the wishmaster's module information isn't supposed to be interpreted
-;;; as a complete specification -- its only purpose is to provide information about
-;;; whom to ask for a specific module. So, module specification upgrading, etc.
-;;;
-(defun wishmaster-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (destructuring-bind (distributor &key modules simple-modules simple-systemless-modules) (read stream nil nil)
-    `(lret ((wishmaster (ensure-wishmaster ,(quote-if-non-self-evaluating distributor))))
-      ,(emit-remote-form 'git-native-remote nil 'wishmaster modules simple-modules simple-systemless-modules
-                         'mod '((downstring (name mod))) '())
-       (setf (wishmaster-converted-modules wishmaster) (mapcar #'module ',(append modules simple-modules simple-systemless-modules))))))
 
 (defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
   `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
@@ -370,6 +356,21 @@
     (emit-remote-form type name `(distributor ',distributor) modules simple-modules simple-systemless-modules repovar path-form
                       (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))))
 
+(defun git-fetch-remote (remote module-name &optional locality-path)
+  "Fetch from REMOTE, with working directory optionally changed
+to LOCALITY-PATH."
+  (maybe-within-directory locality-path
+    (ensure-gitremote (name remote) (url remote module-name))
+    (git "fetch" (down-case-name remote))
+    (ensure-master-branch-from-remote :remote-name (name remote))))
+
+(defmacro within-wishmaster-meta ((wishmaster &key (metastore '(meta-path)) update-p) &body body)
+  (once-only (wishmaster metastore)
+    `(within-directory (,metastore)
+       ,@(when update-p `((git-fetch-remote (wishmaster-gate-remote ,wishmaster) :.meta)))
+       (within-ref (list "remotes" (down-case-name ,wishmaster) "master")
+         ,@body))))
+
 (defun locality-master-p (o)
   (eq o (master (rcs-type o) :if-does-not-exist :continue)))
 
@@ -423,9 +424,10 @@
    HOSTNAME, PORT and PATH."
   (lret ((path-form `((mod) ,@path (downstring (name mod))))
          (wishmaster (make-instance 'pure-wishmaster :name hostname)))
-    (push (make-instance type :distributor wishmaster :distributor-port port 
-                         :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod (rest path-form))))
-          (distributor-remotes wishmaster))))
+    (let ((gate-remote (make-instance type :distributor wishmaster :distributor-port port 
+                                      :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod (rest path-form))))))
+      (push gate-remote (distributor-remotes wishmaster))
+      (setf (wishmaster-gate-remote wishmaster) gate-remote))))
 
 (defun ensure-pure-wishmaster (url)
   "Return a non-well-known pure wishmaster specified by URL, which is
@@ -434,10 +436,19 @@
   (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
     (or (distributor hostname :if-does-not-exist :continue)
         (let* ((wishmaster (make-pure-wishmaster type hostname port path))
-               (remote (wishmaster-remote wishmaster)))
-          (within-meta ((meta-path))
+               (remote (wishmaster-gate-remote wishmaster)))
+          (within-directory ((meta-path))
             (ensure-gitremote (name remote) (url remote '.meta)))
           wishmaster))))
+
+(defun wishmaster-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  (destructuring-bind (url &key converted-modules) (read stream nil nil)
+    `(lret ((converted-modules ',converted-modules)
+            (wishmaster (ensure-pure-wishmaster ,url)))
+       ,@(mapcar #'emit-make-simple-module-form converted-modules)
+       ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) converted-modules)
+       (setf (wishmaster-converted-modules wishmaster) (mapcar #'module converted-modules)))))
 
 (defun ensure-wishmaster (wishmaster-spec)
   "When WISHMASTER-SPEC is a symbol, find the distributor it names,
@@ -451,32 +462,25 @@
                                 (symbol (compose (rcurry #'change-class 'releasing-wishmaster) #'distributor))
                                 (string #'ensure-pure-wishmaster))
                               wishmaster-spec)))
+    (let ((gate-remote (distributor-remote-if (of-type 'git-remote) wishmaster)))
+      (unless gate-remote
+        (error "~@<Can't promote ~S to a wishmaster, as it's lacking a gate remote.~:@>" wishmaster))
+      (unless (slot-boundp wishmaster 'gate-remote)
+        (setf (wishmaster-gate-remote wishmaster) gate-remote)))
     (do-distributor-modules (m wishmaster)
       (change-class m 'origin-module))))
 
-(defun wishmaster-remote (wishmaster)
-  "Return the remote through which WISHMASTER exports converted modules."
-  (or (find-if (of-type 'git-remote) (distributor-remotes wishmaster))
-      (error "~@<Wishmaster ~S is improper: no remotes of type GIT-REMOTE.~:@>" (name wishmaster))))
-
 (defun distributor-release-git-modules (distributor)
   "Return the list of release modules provided by DISTRIBUTOR via git."
-  (mapcar #'module (location-modules (wishmaster-remote distributor))))
+  (mapcar #'module (location-modules (wishmaster-gate-remote distributor))))
 
 (defun wishmaster-converted-modules (wishmaster)
   "Return the list of modules converted by WISHMASTER."
-  (git-remote-converted-modules (wishmaster-remote wishmaster)))
+  (git-remote-converted-modules (wishmaster-gate-remote wishmaster)))
 
 (defun set-wishmaster-converted-modules (wishmaster new)
-  "Set the list of modules converted by WISHMASTER.
-   Carefully avoid mixing in modules available as released by WISHMASTER."
-  (setf (git-remote-converted-modules (wishmaster-remote wishmaster))
-        (if (typep wishmaster 'releasing-wishmaster)
-            (let ((release-modules (distributor-release-git-modules wishmaster)))
-              (when-let ((missing (set-difference release-modules new)))
-                (error "~@<Modules ~S are missing from distributor ~S, which we pretend to be.~:@>" missing (name wishmaster)))
-              (set-difference new release-modules))
-            new)))
+  "Set the list of modules converted by WISHMASTER."
+  (setf (git-remote-converted-modules (wishmaster-gate-remote wishmaster)) new))
 
 (defsetf wishmaster-converted-modules set-wishmaster-converted-modules)
 
@@ -646,12 +650,16 @@
   "Return MODULE's path in LOCALITY, which defaults to master Git locality."
   (subdirectory* (locality-path locality) (downstring (coerce-to-name module))))
 
+(defmacro with-definition-read-context (&body body)
+  `(let ((*readtable* (copy-readtable))
+         (*read-eval* nil)
+         (*read-universal-time* (get-universal-time))
+         (*package* #.*package*))
+     ,@body))
+
 (defun read-definitions (stream)
   "Unserialise global definitions from STREAM."
-  (let ((*readtable* (copy-readtable))
-        (*read-eval* nil)
-        (*read-universal-time* (get-universal-time))
-        (*package* #.*package*))
+  (with-definition-read-context
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
     (set-dispatch-macro-character #\# #\W 'wishmaster-reader *readtable*)
     (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
@@ -752,13 +760,17 @@
     (when (module-present-p module locality t)
       (collect module))))
 
-(defun update-wishmaster-conversions (wishmaster &optional (locality (master 'git)) (metastore (meta-path)))
-  (let* ((present-git-modules (update-module-locality-presence-cache locality))
-         (old-conversions (wishmaster-converted-modules wishmaster))
-         (new-conversions (setf (wishmaster-converted-modules wishmaster) present-git-modules)))
+(defun wishmaster-recompute-exports (wishmaster present-set &optional (metastore (meta-path)))
+  (when (typep wishmaster 'releasing-wishmaster)
+    (let ((release-set (distributor-release-git-modules wishmaster)))
+      (when-let ((missing (set-difference release-set present-set)))
+        (error "~@<Modules ~S are missing from distributor ~S, which we pretend to be.~:@>" missing (name wishmaster)))))
+  (let* ((old-converted-set (wishmaster-converted-modules wishmaster))
+         (new-converted-set (set-difference present-set (distributor-release-git-modules wishmaster))))
+    (setf (wishmaster-converted-modules wishmaster) new-converted-set)
     (advertise-wishmaster-conversions wishmaster metastore)
-    (values (set-difference new-conversions old-conversions)
-            (set-difference old-conversions new-conversions))))
+    (values (set-difference new-converted-set old-converted-set)
+            (set-difference old-converted-set new-converted-set))))
 
 (defun bootstrap-wishmasters (wishmasters &optional (metastore (meta-path)))
   (with-output-to-new-metafile (metafile 'wishmasters metastore :commit-p t)
@@ -775,11 +787,9 @@
   (cond ((eq wishmaster *self*)
          (update-wishmaster-conversions wishmaster locality))
         (t
-         (within-distributor-meta (wishmaster :metastore metastore :update-p t)
+         (within-wishmaster-meta (wishmaster :metastore metastore :update-p t)
            (with-open-metafile (common-wishes 'common-wishes metastore)
-             (let ((*readtable* (copy-readtable))
-                   (*read-eval* nil)
-                   (*package* #.*package*))
+             (with-definition-read-context
                (set-dispatch-macro-character #\# #\W 'wishmaster-reader *readtable*)
                (load common-wishes)))))))
 
@@ -832,10 +842,14 @@
            (present-git-modules (update-module-locality-presence-cache master)))
       (if-let ((wishmaster (and as (ensure-wishmaster as))))
               (progn
+                (report t ";;; Advertising self as a wishmaster~%")
                 (setf *self* wishmaster
                       (wishmaster-converted-modules wishmaster) present-git-modules)
-                (advertise-wishmaster-conversions wishmaster (meta-path)))
-              (update-known-wishmasters master))
+                (wishmaster-recompute-exports wishmaster present-git-modules))
+              (progn
+                (report t ";;; Retrieving information about known wishmasters~%")
+                (update-known-wishmasters master)))
+      (report t ";;; Ensure that present module have their defined systems accessible~%")
       (ensure-present-module-systems-loadable master))
     t))
 
