@@ -34,24 +34,24 @@
   (declare (type symbol var))
   (maybe-within-directory directory
     (multiple-value-bind (status output)
-        (run-external-program 'git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :output t)
+        (git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :output t)
       (or status (string-right-trim '(#\Return #\Newline) output)))))
 
 (defun (setf gitvar) (val var &optional directory)
   (declare (type symbol var) (type string val))
   (maybe-within-directory directory
-    (run-external-program 'git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
+    (git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
 
 (defun gitbranches (&optional directory)
   (maybe-within-directory directory
-    (let ((output (external-program-output-as-string 'git "branch")))
+    (let ((output (execution-output-string 'git "branch")))
       (remove '* (mapcar (compose #'intern #'string-upcase) 
                          (mapcan (curry #'split-sequence #\Space)
                                  (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))))
 
 (defun gitremotes (&optional directory)
   (maybe-within-directory directory
-    (let ((output (external-program-output-as-string 'git "remote")))
+    (let ((output (execution-output-string 'git "remote")))
       (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
 
 (defun gitremote-present-p (name &optional directory)

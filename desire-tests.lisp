@@ -20,7 +20,7 @@
 
 (in-package :desire)
 
-(define-external-program false)
+(define-executable false)
 
 (defmethod fetch ((to (eql :please)) (from (eql :fail)))
   (false))

@@ -6,7 +6,7 @@
 (in-package :desire.system)
 
 (defsystem :desire
-  :depends-on (:alexandria :iterate :pergamum :semi-precious :cl-fad)
+  :depends-on (:alexandria :iterate :pergamum :semi-precious :cl-fad :executor)
   :components ((:file "package")
                ;; Tier #
                (:file "dependencies" :depends-on ("package"))

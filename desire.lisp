@@ -60,7 +60,7 @@
 ;;     (make-pathname :directory '(:relative "db") :name "current")))
 
 ;;;   (multiple-value-bind (primary backups) (url from)
-;;;     (with-condition-restart-binding ((external-program-failure continue))
+;;;     (with-condition-restart-binding ((executable-failure continue))
 ;;;       (iter (for url in (cons primary backups))
 ;;;             (restart-bind ((continue (lambda (cond) (declare (ignore cond)) (format t "failed to fetch from ~S~%" url) (next-iteration))
 ;;;                              :report-function (lambda (stream) (format stream "Try fetching from other backup URLs."))))
@@ -82,7 +82,7 @@
   (dolist (type *purgeworth-binaries*)
     (mapc #'delete-file (directory (subfile directory '(:wild-inferiors :wild) :type type)))))
 
-(define-reported-condition repository-not-clean-during-fetch (repository-error external-program-failure) ()
+(define-reported-condition repository-not-clean-during-fetch (repository-error executable-failure) ()
   (:report (locality module)
            "~@<repository for ~S in ~S has uncommitted changes during fetch~:@>" module locality))
 
@@ -112,7 +112,7 @@
     (rsync "-ravPz" (url remote module) (namestring svn-repo-dir))))
 
 (defmethod fetch-remote :around (locality remote module)
-  (with-error-resignaling (external-program-failure
+  (with-error-resignaling (executable-failure
                            ((cond) 'fetch-failure :remote remote :module module :execution-error (format nil "~A" cond)))
     (call-next-method)))
 

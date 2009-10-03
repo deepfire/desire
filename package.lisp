@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 
 (defpackage desire
-  (:use :common-lisp :alexandria :pergamum :iterate :depsolver)
+  (:use :common-lisp :alexandria :pergamum :iterate :depsolver :executor)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
   (:export
@@ -19,10 +19,6 @@
    #:add-desire
    #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
-   ;; filesystem-utils.lisp
-   #:*verbose-execution* #:executable #:find-executable #:
-   #:*run-external-programs-dryly* #:with-dryly-ran-externals 
-   #:*run-external-programs-verbosely* #:with-verbosely-ran-externals 
    ;; asdf.lisp
    #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
