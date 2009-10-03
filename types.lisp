@@ -66,6 +66,15 @@
   "Sort object of class NAMED, lexicographically."
   (sort named-objects #'string< :key (compose #'symbol-name #'name)))
 
+(defclass synchronisable ()
+  ((mirror :accessor synchronisable-mirror :initarg :mirror)
+   (last-sync-time :accessor synchronisable-last-sync-time :initarg :last-sync-time)
+   (synchronised-p :accessor synchronised-p :type boolean :initarg :synchronised-p))
+  (:default-initargs
+   :mirror nil
+   :last-sync-time 0
+   :synchronised-p nil))
+
 (defclass registered (named)
   ((registrator :accessor registered-registrator :type function :initarg :registrator)))
 
@@ -86,7 +95,7 @@
 ;;;
 ;;; Distributor name is its hostname.
 ;;;
-(defclass distributor (registered)
+(defclass distributor (registered synchronisable)
   ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified."))
   (:default-initargs
    :registrator #'(setf distributor) :remotes nil))
@@ -230,7 +239,7 @@
 (defclass cvs-rsync (cvs rsync) ())
 (defclass svn-rsync (svn rsync) ())
 
-(defclass location (registered)
+(defclass location (registered synchronisable)
   ((modules :accessor location-modules :initarg :modules :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs
    :registrator #'(setf locality)
@@ -470,7 +479,7 @@
 
 (defsetf wishmaster-converted-modules set-wishmaster-converted-modules)
 
-(defclass module (registered depobj)
+(defclass module (registered depobj synchronisable)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
@@ -532,7 +541,7 @@
 (defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
 (defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
 
-(defclass system (registered)
+(defclass system (registered synchronisable)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
    (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
    (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
@@ -570,7 +579,7 @@
 (defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
   (appendf (module-systems module) (list o)))
 
-(defclass application (registered)
+(defclass application (registered synchronisable)
   ((system :accessor app-system :initarg :system :documentation "Specified.")
    (package :accessor app-package :initarg :package :documentation "Specified.")
    (function :accessor app-function :initarg :function :documentation "Specified.")
