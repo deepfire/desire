@@ -857,7 +857,7 @@
 ;;;
 ;;; Queries.
 ;;;
-(defun remote-defines-module-p (remote module)
+(defun remote-defines-module-p (remote module &aux (module (coerce-to-module module)))
   "See whether MODULE is defined for REMOTE."
   (not (null (find (name module) (location-modules remote)))))
 
