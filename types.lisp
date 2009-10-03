@@ -116,7 +116,7 @@
   (if (and (typep o 'releasing-wishmaster)
            (null *printing-wishmaster*))
       (call-next-method)
-      (format stream "~@<#W(~;~A ~@<~(~S ~A~)~:@>~;)~:@>"
+      (format stream "~@<#W(~;~S ~@<~(~S ~A~)~:@>~;)~:@>"
               (git-remote-namestring (wishmaster-gate-remote o))
               :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-gate-remote o))))))
 
