@@ -159,7 +159,7 @@
   (destructuring-bind (distributor &key modules simple-modules simple-systemless-modules) (read stream nil nil)
     `(lret ((wishmaster (ensure-wishmaster ,(quote-if-non-self-evaluating distributor))))
       ,(emit-remote-form 'git-native-remote nil 'wishmaster modules simple-modules simple-systemless-modules
-                         'mod '((downstring (name mod))))
+                         'mod '((downstring (name mod))) '())
        (setf (wishmaster-converted-modules wishmaster) (mapcar #'module ',(append modules simple-modules simple-systemless-modules))))))
 
 (defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
