@@ -240,6 +240,7 @@
    :scan-p nil))
 (defclass remote (location registered)
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
+   (domain-name-takeover :accessor remote-domain-name-takeover :initarg :domain-name-takeover :documentation "Specified.")
    (distributor-port :accessor remote-distributor-port :type (or null (integer 0 65536)) :initarg :distributor-port :documentation "Specified, rarely.")
    (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
    (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Specified.")
@@ -247,7 +248,8 @@
   (:default-initargs
    :registrator #'(setf remote)
    :disabled-p nil
-   :distributor-port nil))
+   :distributor-port nil
+   :domain-name-takeover nil))
 
 ;;; intermediate types
 (defclass git-remote (git remote)
@@ -267,9 +269,12 @@
 (defun url (remote named-spec &aux (named (coerce-to-named named-spec)))
   (declare (type remote remote) (type (or symbol named) named-spec))
   (concatenate 'simple-base-string
-               (downstring (transport remote)) "://" (down-case-name (remote-distributor remote))
-               (when-let ((port (remote-distributor-port remote)))
-                 (format nil ":~D" port))
+               (downstring (transport remote)) "://"
+               (unless (remote-domain-name-takeover remote)
+                 (down-case-name (remote-distributor remote)))
+               (unless (remote-domain-name-takeover remote)
+                 (when-let ((port (remote-distributor-port remote)))
+                   (format nil ":~D" port)))
                (flatten-path-list (funcall (remote-path-fn remote) named) t t)))
 
 ;;; most specific, exhaustive partition of LOCALITY
