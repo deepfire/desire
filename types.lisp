@@ -92,6 +92,7 @@
 (defun down-case-name (x)
   (string-downcase (string (xform-if (of-type 'named) #'name x))))
 
+(defvar *read-universal-time*)
 ;;;
 ;;; Distributor name is its hostname.
 ;;;
@@ -124,16 +125,16 @@
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (prog1 (make-instance 'distributor :name ',name ,@(remove-from-plist initargs :remotes))
+         (prog1 (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t ,@(remove-from-plist initargs :remotes))
            ,@remotes))))
 
 (defun emit-make-simple-module-form (name)
   `(or (module ',name :if-does-not-exist :continue)
-       (make-instance 'module :name ',name :umbrella ',name)))
+       (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',name)))
 
 (defun emit-make-simple-system-form (type module-name name)
   `(or (system ',name :if-does-not-exist :continue)
-       (make-instance ',type :name ',name :module (module ',module-name))))
+       (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
 
 (defun path-form-to-path-fn-form (repo-var path-form)
   "Upgrade the abbreviated PATH-FORM into a proper lambda form, with the repository
@@ -142,7 +143,7 @@
 
 (defun emit-remote-form (type name distributor-form modules simple-modules simple-systemless-modules repovar path-form remote-initargs)
   `(prog1
-       (make-instance ',type ,@(when name `(:name ',name)) :distributor ,distributor-form
+       (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor ,distributor-form
                       :modules ',(append modules simple-modules simple-systemless-modules)
                       :path-form ',(list* (list repovar) path-form) :path-fn ,(path-form-to-path-fn-form repovar path-form)
                       ,@remote-initargs)
@@ -381,7 +382,7 @@
 (defun locality-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (type name path &rest initargs &key &allow-other-keys) (read stream nil nil)
-    `(make-instance ',type :name ',name :path ,path ,@(remove-from-plist initargs :path :modules))))
+    `(make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :path ,path ,@(remove-from-plist initargs :path :modules))))
 
 (defmethod initialize-instance :after ((o locality) &key path &allow-other-keys)
   (unless path
@@ -525,7 +526,7 @@
   (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
       `(or (module ',name :if-does-not-exist :continue)
-           (prog1 (make-instance 'module :name ',name :umbrella ',umbrella
+           (prog1 (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',umbrella
                                  ,@(remove-from-plist initargs :systems :complex-systems))
              ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
              ,@(if systems-specified-p
@@ -572,7 +573,7 @@
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key module relativity search-restriction &allow-other-keys) (read stream nil nil t)
     `(or (system ',name :if-does-not-exist :continue)
-         (make-instance 'asdf-system :name ',name :module (module ',module) :relativity ',relativity
+         (make-instance 'asdf-system :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module) :relativity ',relativity
                         ,@(when search-restriction `(:search-restriction ',search-restriction))
                         ,@(remove-from-plist initargs :module :applications :relativity :search-restriction)))))
 
@@ -596,7 +597,8 @@
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key system package function default-parameters &allow-other-keys) (read stream nil nil t)
     `(or (app ',name :if-does-not-exist :continue)
-         (make-instance 'application :name ',name :system (system ',system) :package ',package :function ',function :default-parameters ',default-parameters
+         (make-instance 'application :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t
+                        :system (system ',system) :package ',package :function ',function :default-parameters ',default-parameters
                         ,@(remove-from-plist initargs :system :package :function :default-parameters)))))
 
 (defmethod initialize-instance :after ((o application) &key system &allow-other-keys)
@@ -648,6 +650,7 @@
   "Unserialise global definitions from STREAM."
   (let ((*readtable* (copy-readtable))
         (*read-eval* nil)
+        (*read-universal-time* (get-universal-time))
         (*package* #.*package*))
     (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
     (set-dispatch-macro-character #\# #\W 'wishmaster-reader *readtable*)
@@ -802,7 +805,7 @@
 (defun init (path &key as (default-wishmasters (list *default-wishmaster*)))
   "Make Desire fully functional, with PATH chosen as storage location.
 
-   AS, when specified, will be interpreted as a distributor specificetion,
+   AS, when specified, will be interpreted as a distributor specification,
    that is, either a string, for an URL pointing to a Git remote of a 
    non-well-known converting wishmaster, or a symbol, naming a well-known
    distributor. That distributor will be further identified as self.
@@ -977,8 +980,7 @@
   (with-slots (remotes localities systems) module
     (setf (values remotes localities systems) (compute-module-caches module))))
 
-(defun test-core (&optional bail-out-early (pathes-from (list "/mnt/little/git/dese/definitions.lisp"
-                                                              "/mnt/little/git/clung/definitions.lisp"))
+(defun test-core (&optional bail-out-early (pathes-from (list "/little/git/desire/definitions.lisp"))
                   (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2"))
   (clear-definitions)
   (mapcar #'load pathes-from)
