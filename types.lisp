@@ -347,6 +347,9 @@
     (emit-remote-form type name `(distributor ',distributor) modules simple-modules simple-systemless-modules path-components
                       (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules))))
 
+;;;
+;;; NOTE: this is the reason why remotes have names
+;;;
 (defun git-fetch-remote (remote module-name &optional locality-path)
   "Fetch from REMOTE, with working directory optionally changed
 to LOCALITY-PATH."
