@@ -135,16 +135,14 @@
   `(or (system ',name :if-does-not-exist :continue)
        (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
 
-(defun path-form-to-path-fn-form (repo-var path-form)
-  "Upgrade the abbreviated PATH-FORM into a proper lambda form, with the repository
-   variable called REPO-VAR."
-  `(lambda (,repo-var) (list ,@path-form)))
-
-(defun emit-remote-form (type name distributor-form modules simple-modules simple-systemless-modules repovar path-form remote-initargs)
+(defun emit-remote-form (type name distributor-form modules simple-modules simple-systemless-modules path-components remote-initargs)
   `(prog1
        (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor ,distributor-form
                       :modules ',(append modules simple-modules simple-systemless-modules)
-                      :path-form ',(list* (list repovar) path-form) :path-fn ,(path-form-to-path-fn-form repovar path-form)
+                      :path ',path-components
+                      :path-fn (lambda ()
+                                 (declare (special *module* *umbrella*))
+                                 (list ,@path-components))
                       ,@remote-initargs)
      ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
      ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) simple-modules)))
@@ -242,9 +240,9 @@
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
    (domain-name-takeover :accessor remote-domain-name-takeover :initarg :domain-name-takeover :documentation "Specified.")
    (distributor-port :accessor remote-distributor-port :type (or null (integer 0 65536)) :initarg :distributor-port :documentation "Specified, rarely.")
-   (path-form :accessor remote-path-form :initarg :path-form :documentation "Specified.")
-   (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Specified.")
-   (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Cache."))
+   (path :accessor remote-path :initarg :path :documentation "Specified.")
+   (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Generated from above.")
+   (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Specified."))
   (:default-initargs
    :registrator #'(setf remote)
    :disabled-p nil
@@ -265,17 +263,6 @@
 (defclass darcs-http-remote (darcs-http remote) ())
 (defclass cvs-rsync-remote (cvs-rsync remote) ())
 (defclass svn-rsync-remote (svn-rsync remote) ())
-
-(defun url (remote named-spec &aux (named (coerce-to-named named-spec)))
-  (declare (type remote remote) (type (or symbol named) named-spec))
-  (concatenate 'simple-base-string
-               (downstring (transport remote)) "://"
-               (unless (remote-domain-name-takeover remote)
-                 (down-case-name (remote-distributor remote)))
-               (unless (remote-domain-name-takeover remote)
-                 (when-let ((port (remote-distributor-port remote)))
-                   (format nil ":~D" port)))
-               (flatten-path-list (funcall (remote-path-fn remote) named) t t)))
 
 ;;; most specific, exhaustive partition of LOCALITY
 (defclass git-locality (git locality) ())
@@ -308,22 +295,21 @@
                 (system-simple-p (first (module-systems module)))))))
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
-  (destructuring-bind ((form-binding) &rest form-body) (remote-path-form o)
-    (let ((*print-case* :downcase))
-      (format stream "~@<#R(~;~A ~A ~:<(~A)~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
-              (symbol-name (type-of o)) (string (name (remote-distributor o))) (list form-binding form-body)
-              (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
-                (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
-                  (append (unless (equal default-remote-name (name o))
-                            (list `(:name ,(string (name o)))))
-                          (when-let ((port (remote-distributor-port o)))
-                            (list `(:distributor-port ,port)))
-                          (when complex
-                            (list `(:modules ,(mapcar #'downstring complex))))
-                          (when systemful
-                            (list `(:simple-modules ,(mapcar #'downstring systemful))))
-                          (when systemless
-                            (list `(:simple-systemless-modules ,(mapcar #'downstring systemless)))))))))))
+  (let ((*print-case* :downcase))
+    (format stream "~@<#R(~;~A ~A ~:<~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
+            (symbol-name (type-of o)) (string (name (remote-distributor o))) (remote-path o)
+            (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
+              (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
+                (append (unless (equal default-remote-name (name o))
+                          (list `(:name ,(string (name o)))))
+                        (when-let ((port (remote-distributor-port o)))
+                          (list `(:distributor-port ,port)))
+                        (when complex
+                          (list `(:modules ,(mapcar #'downstring complex))))
+                        (when systemful
+                          (list `(:simple-modules ,(mapcar #'downstring systemful))))
+                        (when systemless
+                          (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))))))))
 
 (defun init-time-collate-remote-name (distributor rcs-type &optional specified-name)
   "Provide a mechanism for init-time name collation for REMOTE with 
@@ -357,9 +343,9 @@
 
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type distributor ((repovar) &rest path-form) &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
-    (emit-remote-form type name `(distributor ',distributor) modules simple-modules simple-systemless-modules repovar path-form
-                      (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :path-form :path-fn))))
+  (destructuring-bind (type distributor path-components &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
+    (emit-remote-form type name `(distributor ',distributor) modules simple-modules simple-systemless-modules path-components
+                      (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules))))
 
 (defun git-fetch-remote (remote module-name &optional locality-path)
   "Fetch from REMOTE, with working directory optionally changed
@@ -418,19 +404,13 @@ to LOCALITY-PATH."
 (defun git-remote-namestring (remote)
   "Produce a namestring for a git REMOTE."
   (declare (type git-remote remote))
-  (format nil "~A://~A~:[~;:~D~]/~{~A/~}"
-          (case (type-of remote) (git-native-remote "git") (git-http-remote "http") (git-combined-remote "git+http"))
-          (down-case-name remote)
-          (remote-distributor-port remote)
-          (butlast (rest (remote-path-form remote)))))
+  (url remote nil))
 
 (defun make-pure-wishmaster (type hostname port path)
   "Produces a pure wishmaster with Git remote of TYPE, accessible at 
    HOSTNAME, PORT and PATH."
-  (lret ((path-form `((mod) ,@path (downstring (name mod))))
-         (wishmaster (make-instance 'pure-wishmaster :name hostname)))
-    (let ((gate-remote (make-instance type :distributor wishmaster :distributor-port port 
-                                      :path-form path-form :path-fn (compile nil (path-form-to-path-fn-form 'mod (rest path-form))))))
+  (lret ((wishmaster (make-instance 'pure-wishmaster :name hostname)))
+    (let ((gate-remote (make-instance type :distributor wishmaster :distributor-port port :path path)))
       (push gate-remote (distributor-remotes wishmaster))
       (setf (wishmaster-gate-remote wishmaster) gate-remote))))
 
@@ -529,6 +509,35 @@ to LOCALITY-PATH."
   (when (module name :if-does-not-exist :continue)
     (break))
   (call-next-method))
+
+(defvar *module*)
+(defvar *umbrella*)
+
+(defun url (remote module-or-name &aux
+            (namep (symbolp module-or-name))
+            (module (if namep (module module-or-name :if-does-not-exist :continue) module-or-name))
+            (module-name (if namep module-or-name (name module))))
+  (declare (type remote remote) (type (or module symbol) module-or-name))
+  (let ((string-list (iter (for insn-spec in (let ((*module* (if module-name (downstring module-name) ""))
+                                                   (*umbrella* (when module (module-umbrella module))))
+                                               (declare (special *module* *umbrella*))
+                                               (funcall (remote-path-fn remote))))
+                           (destructuring-bind (cmd-or-data &optional arg) (ensure-cons insn-spec)
+                             (case cmd-or-data
+                               (:!/
+                                (collect arg)
+                                (next-iteration))
+                               (t
+                                (collect cmd-or-data)
+                                (collect "/")))))))
+    (apply #'concatenate 'simple-base-string
+           (downstring (transport remote)) "://"
+           (unless (remote-domain-name-takeover remote)
+             (down-case-name (remote-distributor remote)))
+           (unless (remote-domain-name-takeover remote)
+             (when-let ((port (remote-distributor-port remote)))
+               (format nil ":~D" port)))
+           string-list)))
 
 (defun module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
@@ -756,7 +765,7 @@ to LOCALITY-PATH."
      (when (module-present-p ,module ,locality nil nil)
        ,@body)))
 
-(defun update-module-locality-presence-cache (&optional (locality (master 'git)))
+(defun compute-module-locality-presence (&optional (locality (master 'git)))
   "Scan LOCALITY for known modules and update those modules's idea
    of where they are present.
 
@@ -790,7 +799,7 @@ to LOCALITY-PATH."
 
 (defun update-wishmaster (wishmaster &optional (locality (master 'git)) (metastore (meta-path)))
   (cond ((eq wishmaster *self*)
-         (update-wishmaster-conversions wishmaster locality))
+         (wishmaster-recompute-exports wishmaster (compute-module-locality-presence locality) metastore))
         (t
          (within-wishmaster-meta (wishmaster :metastore metastore :update-p t)
            (with-open-metafile (common-wishes 'common-wishes metastore)
@@ -844,7 +853,7 @@ to LOCALITY-PATH."
     (configure-remote-wishmasters default-wishmasters (meta-path))
     (report t ";;; Scanning for modules in ~S~%" *root-of-all-desires*)
     (let* ((master (master 'git))
-           (present-git-modules (update-module-locality-presence-cache master)))
+           (present-git-modules (compute-module-locality-presence master)))
       (if-let ((wishmaster (and as (ensure-wishmaster as))))
               (progn
                 (report t ";;; Advertising self as a wishmaster~%")
