@@ -517,7 +517,7 @@ to LOCALITY-PATH."
 (defvar *module*)
 (defvar *umbrella*)
 
-(defun url (remote module-or-name &aux
+(defun url (remote &optional module-or-name &aux
             (namep (symbolp module-or-name))
             (module (if namep (module module-or-name :if-does-not-exist :continue) module-or-name))
             (module-name (if namep module-or-name (name module))))
