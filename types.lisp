@@ -506,7 +506,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
    :hidden-p t))
 
 (defmethod print-object ((o module) stream)
-  (format stream "~@<#M(~;~A~{ ~<~S ~S~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
+  (format stream "~@<#M(~;~A~{ ~<~S ~A~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
                                                           (symbol-name (name o))
                                                           (list (symbol-name (name o)) (module-umbrella o)))
           (remove nil (multiple-value-call #'list
@@ -598,7 +598,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
-          (append (list :module (symbol-name (name (system-module o))))
+          (append (list :module (name (system-module o)))
                   (and (system-relativity o) (list :relativity (system-relativity o)))
                   (and (system-search-restriction o) (list :search-restriction (system-search-restriction o)))
                   (and (system-definition-pathname-name o) (list :definition-pathname-name (system-definition-pathname-name o)))
@@ -625,7 +625,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defmethod print-object ((o application) stream)
   (format stream "~@<#A(~;~A~{ ~S ~S~}~;)~:@>" (symbol-name (name o))
-          (list :system (symbol-name (name (app-system o))) :package (app-package o) :function (app-function o)
+          (list :system (name (app-system o)) :package (app-package o) :function (app-function o)
                 :default-parameters (app-default-parameters o))))
 
 (defun application-reader (stream &optional char sharp)
