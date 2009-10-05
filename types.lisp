@@ -28,6 +28,7 @@
 (defvar *default-world-readable*                   t   "Whether to publish GIT repositories by default.")
 (defvar *self*                                     nil "The well-known self, if any.")
 (defvar *combined-remotes-prefer-native-over-http* t "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
+(defvar *default-system-type*                      'asdf-system)
 
 ;;;
 ;;; Globals
@@ -145,7 +146,7 @@
                                  (list ,@path-components))
                       ,@remote-initargs)
      ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
-     ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) simple-modules)))
+     ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) simple-modules)))
 
 (defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
   `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
@@ -435,7 +436,7 @@ to LOCALITY-PATH."
     `(lret ((converted-modules ',converted-modules)
             (wishmaster (ensure-pure-wishmaster ,url)))
        ,@(mapcar #'emit-make-simple-module-form converted-modules)
-       ,@(mapcar (lambda (name) (emit-make-simple-system-form 'asdf-system name name)) converted-modules)
+       ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) converted-modules)
        (setf (wishmaster-converted-modules wishmaster) (mapcar #'module converted-modules)))))
 
 (defun ensure-wishmaster (wishmaster-spec)
@@ -551,10 +552,10 @@ to LOCALITY-PATH."
                                  ,@(remove-from-plist initargs :systems :complex-systems))
              ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
              ,@(if systems-specified-p
-                   (mapcar (curry #'emit-make-simple-system-form 'asdf-system name) systems)
+                   (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
                    ;; Existence of complex systems implies absence of simple systems, by default.
                    (unless complex-systems
-                     `(,(emit-make-simple-system-form 'asdf-system name name)))))))))
+                     `(,(emit-make-simple-system-form *default-system-type* name name)))))))))
 
 (defclass system-type-mixin ()
   ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
@@ -594,7 +595,7 @@ to LOCALITY-PATH."
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key module relativity search-restriction &allow-other-keys) (read stream nil nil t)
     `(or (system ',name :if-does-not-exist :continue)
-         (make-instance 'asdf-system :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module) :relativity ',relativity
+         (make-instance *default-system-type* :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module) :relativity ',relativity
                         ,@(when search-restriction `(:search-restriction ',search-restriction))
                         ,@(remove-from-plist initargs :module :applications :relativity :search-restriction)))))
 
