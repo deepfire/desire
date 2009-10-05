@@ -867,7 +867,7 @@ to LOCALITY-PATH."
               (progn
                 (report t ";;; Retrieving information about known wishmasters~%")
                 (update-known-wishmasters master)))
-      (report t ";;; Ensuring that present module have their defined systems accessible~%")
+      (report t ";;; Ensuring that present modules have their defined systems accessible~%")
       (ensure-present-module-systems-loadable master))
     t))
 
