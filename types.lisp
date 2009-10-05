@@ -522,18 +522,18 @@ to LOCALITY-PATH."
             (module (if namep (module module-or-name :if-does-not-exist :continue) module-or-name))
             (module-name (if namep module-or-name (name module))))
   (declare (type remote remote) (type (or module symbol) module-or-name))
-  (let ((string-list (iter (for insn-spec in (let ((*module* (if module-name (downstring module-name) ""))
-                                                   (*umbrella* (when module (module-umbrella module))))
-                                               (declare (special *module* *umbrella*))
-                                               (funcall (remote-path-fn remote))))
-                           (destructuring-bind (cmd-or-data &optional arg) (ensure-cons insn-spec)
-                             (case cmd-or-data
-                               (:!/
-                                (collect arg)
-                                (next-iteration))
-                               (t
-                                (collect cmd-or-data)
-                                (collect "/")))))))
+  (let* ((remote-path (let ((*module* (when module-name (downstring module-name)))
+                            (*umbrella* (when module (downstring (module-umbrella module)))))
+                        (declare (special *module* *umbrella*))
+                        (funcall (remote-path-fn remote))))
+         (remote-string-list (iter (for insn-spec in remote-path)
+                                   (cond ((eq insn-spec :no/)
+                                          (pop accumulated-path))
+                                         (t
+                                          (when insn-spec
+                                            (collect insn-spec into accumulated-path at beginning)
+                                            (collect "/" into accumulated-path at beginning))))
+                                   (finally (return (nreverse accumulated-path))))))
     (apply #'concatenate 'simple-base-string
            (downstring (transport remote)) "://"
            (unless (remote-domain-name-takeover remote)
@@ -541,7 +541,9 @@ to LOCALITY-PATH."
            (unless (remote-domain-name-takeover remote)
              (when-let ((port (remote-distributor-port remote)))
                (format nil ":~D" port)))
-           string-list)))
+           (unless (remote-domain-name-takeover remote)
+             "/")
+           remote-string-list)))
 
 (defun module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
