@@ -295,9 +295,9 @@
            (and (endp (rest (module-systems module)))
                 (system-simple-p (first (module-systems module)))))))
 
-(defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))) )
+(defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))))
   (let ((*print-case* :downcase))
-    (format stream "~@<#R(~;~A ~A ~:<~{ ~S~}~:@>~{ ~<~S ~A~:@>~}~;)~:@>"
+    (format stream "~@<#R(~;~A ~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
             (symbol-name (type-of o)) (string (name (remote-distributor o))) (remote-path o)
             (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
               (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
