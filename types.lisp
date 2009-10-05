@@ -385,13 +385,24 @@ to LOCALITY-PATH."
     (error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
   (setf (locality-by-path path) o))
 
-(defun parse-git-remote-namestring (namestring)
-  "Given a git remote NAMESTRING, deduce the remote's type, host, port and path,
-   and return them as multiple values."
+(defun uri-type-to-remote-type (uri-type)
+  (switch (uri-type :test #'string=)
+    ("http" 'git-http-remote)
+    ("git" 'git-native-remote)
+    ("git+http" 'git-combined-remote)
+    ("darcs" 'darcs-http-remote)
+    ("cvs" 'cvs-rsync-remote)
+    ("svn" 'svn-rsync-remote)))
+
+(defun parse-remote-namestring (namestring)
+  "Given a remote NAMESTRING, deduce the remote's type, host, port and path,
+and return them as multiple values.
+Note that http is interpreted as git-http -type remote.
+DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (let* ((colon-pos (or (position #\: namestring) (error "No colon in git remote namestring ~S." namestring)))
          (typestr (subseq namestring 0 colon-pos))
-         (type (switch (typestr :test #'string=) ("http" 'git-http-remote) ("git" 'git-native-remote) ("git+http" 'git-combined-remote)
-                       (t (error "Bad URI type ~S in git remote namestring ~S." typestr namestring)))))
+         (type (or (uri-type-to-remote-type typestr)
+                   (error "Bad URI type ~S in remote namestring ~S." typestr namestring))))
     (unless (> (length namestring) (+ colon-pos 3))
       (error "Git remote namestring ~S is too short." namestring))
     (unless (and (char= (aref namestring (+ 1 colon-pos)) #\/)
@@ -422,7 +433,7 @@ to LOCALITY-PATH."
   "Return a non-well-known pure wishmaster specified by URL, which is
    intepreted as pointing at its git remote.
    The wishmaster is either found, or created, if it is not yet known."
-  (multiple-value-bind (type hostname port path) (parse-git-remote-namestring url)
+  (multiple-value-bind (type hostname port path) (parse-remote-namestring url)
     (or (distributor hostname :if-does-not-exist :continue)
         (let* ((wishmaster (make-pure-wishmaster type hostname port path))
                (remote (wishmaster-gate-remote wishmaster)))
@@ -877,6 +888,93 @@ to LOCALITY-PATH."
   "Define locality of RCS-TYPE at PATH, if one doesn't exist already, 
    in which case an error is signalled."
   (apply #'make-instance (format-symbol (symbol-package rcs-type) "~A-LOCALITY" rcs-type) :name name (remove-from-plist keys :name)))
+
+(defun add-module (url &optional module-name &key systemless (system-type *default-system-type*))
+  "Assume MODULE-NAME is the last path element of URL, unless specified."
+  (labels ((find-distributor (raw-distname &aux (downdistname (downstring raw-distname)))
+             (or (distributor raw-distname :if-does-not-exist :continue)
+                 (do-distributors (d)
+                   (when (search (down-case-name d) downdistname)
+                     (return d)))))
+           (string-detect-splitsubst (string sub replacement &aux (posn (search sub string)))
+             "Detect whether STRING contains SUB, in which case the string is
+split, on SUB boundaries, with the latter replaced with REPLACEMENT,
+and every part except the first wrapped in remote /-suppressing
+syntax."
+             (if posn
+                 (let ((pre-sub (when (plusp posn)
+                                  (subseq string 0 posn)))
+                       (post-sub (when (< (+ posn (length sub)) (length string))
+                                   (subseq string (+ posn (length sub))))))
+                   (values (append (if pre-sub
+                                       (list pre-sub :no/ replacement)
+                                       (list replacement))
+                                   (when post-sub
+                                     (list :no/ post-sub)))
+                           t)) ;; signal that we did deconstruction
+                 (list string)))
+           (compute-remote-path-variants (raw-path modname)
+             (lret ((variants (list nil)))
+               (iter (for path-elt in raw-path)
+                     (for (values pathname-component deconsp) = (string-detect-splitsubst path-elt modname '*module*))
+                     (if deconsp
+                         (setf variants
+                               (append (iter (for av in (copy-list variants))
+                                             (collect (append av (subst '*umbrella* '*module* pathname-component))))
+                                       (iter (for av in (copy-list variants))
+                                             (collect (append av (list path-elt))))
+                                       (iter (for v in variants)
+                                             (collect (append v pathname-component)))))
+                         (setf variants
+                               (iter (for v in variants)
+                                     (collect (append v pathname-component)))))))))
+    (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url)
+      (let* ((module-name (or module-name (make-keyword (string-upcase (lastcar raw-path)))))
+             (downmodname (downstring module-name)))
+        (when (module module-name :if-does-not-exist :continue)
+          (error "~@<Module ~A already exists.~:@>" module-name))
+        (let* ((distributor (or (find-distributor distributor-name)
+                                (format t ";; Didn't find a corresponding distributor, created ~A and a corresponding remote~%;; ..~%" distributor-name)
+                                (make-instance 'distributor :name distributor-name)))
+               (downdistname (downstring distributor-name)))
+          (format t ";; Found distributor ~A, looking for a corresponding remote..~%" (name distributor))
+          (multiple-value-bind (dist remote-takeover) (string-detect-splitsubst downdistname downmodname '*module*)
+            (let ((variants (compute-remote-path-variants raw-path downmodname)))
+              (let ((remote (or (iter (for remote-path-variant in variants)
+                                      (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
+                                        (when-let ((remote (do-distributor-remotes (r distributor)
+                                                             (when (equalp remote-path-variant (remote-path r))
+                                                               (return r)))))
+                                          (return remote))))
+                                (make-instance 'git-remote
+                                               :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
+                                               :name (progn
+                                                       (format *query-io* "Tried remote variants:~%")
+                                                       (iter (for remote-path-variant in variants)
+                                                             (format *query-io* "~S~%"(append (when remote-takeover dist) remote-path-variant))
+                                                             (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
+                                                               (when-let ((remote (do-distributor-remotes (r distributor)
+                                                                                    (when (equalp remote-path-variant (remote-path r))
+                                                                                      (return r)))))
+                                                                 (return remote))))
+                                                       (format *query-io* "Against following remotes of ~S:~%" (name distributor))
+                                                       (do-distributor-remotes (r distributor)
+                                                         (format *query-io* "~S~%" (remote-path r)))
+                                                       (format *query-io* "No matching remote found, creating a new one. Enter the new remote name, or NIL to abort: ")
+                                                       (finish-output *query-io*)
+                                                       (or (read *query-io*)
+                                                           (return-from add-module nil)))
+                                               ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
+                                               :path (lastcar variants)))))
+                (unless (eq remote-type (type-of remote))
+                  (error "~@<Found remote ~S, but its type ~S doesn't match type ~S derived from specified type ~S.~:@>"
+                         (name remote) (type-of remote) remote-type remote-type))
+                (lret ((module (make-instance 'module :name module-name :umbrella module-name)))
+                  (appendf (location-modules remote) (list module-name))
+                  (unless systemless
+                    (make-instance system-type :name module-name :module module))
+                  (format t "deduced: ~S @ ~S :: ~S:~D / ~S => ~%~S~%"
+                          module-name remote-type (name distributor) port raw-path remote))))))))))
 
 ;;;
 ;;; Conditions.
