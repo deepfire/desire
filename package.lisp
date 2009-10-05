@@ -30,7 +30,9 @@
    #:desire #:desire*
    #:define-application 
    #:fetch #:desire
-   #:purge-module-binaries))
+   #:purge-module-binaries
+   ;; add-module.lisp
+   #:add-module))
 
 (in-package :desire)
 

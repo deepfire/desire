@@ -20,6 +20,7 @@
                (:file "types" :depends-on ("metastore"))
                ;; Tier 4
                (:file "system-loadability" :depends-on ("types"))
+               (:file "add-module" :depends-on ("types"))
                ;; Tier 5
                (:file "desire" :depends-on ("system-loadability"))
 ;;                (:file "application" :depends-on ("desire"))
