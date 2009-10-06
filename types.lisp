@@ -181,7 +181,7 @@
 
 (defvar *class-slot-store* (make-hash-table :test 'equal))
 
-(define-container-hash-accessor *class-slot-store* %class-slot :type t :if-exists :continue)
+(define-root-container *class-slot-store* %class-slot :type t :if-exists :continue)
 
 (defun class-slot (&rest class-slot-name)
   (%class-slot class-slot-name))
@@ -650,16 +650,16 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (symbol (string-upcase (symbol-name namespec)))
     (string (string-upcase namespec))))
 
-(define-container-hash-accessor *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors :iterator do-distributors)
-(define-container-hash-accessor *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
-(define-container-hash-accessor *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
-(define-container-hash-accessor *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
-(define-container-hash-accessor *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
-(define-container-hash-accessor *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-apps :type application)
-(define-container-hash-accessor *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
-(define-container-hash-accessor *localities*     locality      :type locality :mapper map-localities :if-exists :error)
-(define-container-hash-accessor *localities-by-path* locality-by-path :type locality :if-exists :error)
-(define-container-hash-accessor *masters*        master        :type locality :if-exists :error)
+(define-root-container *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors :iterator do-distributors)
+(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
+(define-root-container *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
+(define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
+(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
+(define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-apps :type application)
+(define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
+(define-root-container *localities*     locality      :type locality :mapper map-localities :if-exists :error)
+(define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
+(define-root-container *masters*        master        :type locality :if-exists :error)
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
