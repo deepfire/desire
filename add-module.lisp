@@ -149,8 +149,6 @@ of pathname component list variants, with MODNAME occurences substituted."
   (format t "injecting a~{ ~A~}~%" a)
   (dolist (a a) (setf (app         (name a)) a)))
 
-(defun invoke-with-operation (op fn))
-
 (defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*))
   (with-tracked-desirable-additions (module added-d added-r added-m added-s added-a)
       (do-add-module url module-name

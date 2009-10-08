@@ -144,6 +144,7 @@
 (defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
   (let ((hg-repo-dir (module-path module (master 'hg)))
         (git-repo-dir (module-path module git-locality)))
+    (declare (ignorable hg-repo-dir git-repo-dir))
     ))
 
 (defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module)
