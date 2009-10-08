@@ -29,6 +29,7 @@
 (defvar *self*                                     nil "The well-known self, if any.")
 (defvar *combined-remotes-prefer-native-over-http* t "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
 (defvar *default-system-type*                      'asdf-system)
+(defvar *fetch-errors-serious*                     nil)
 
 ;;;
 ;;; Globals
@@ -673,23 +674,32 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 (define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
 (define-root-container *masters*        master        :type locality :if-exists :error)
 
-(defun remove-distributor (distributor-designator)
-  (%remove-distributor (coerce-to-name distributor-designator)))
+(defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
+  (do-distributor-remotes (r d)
+    (%remove-remote r))
+  (%remove-distributor (name d)))
 
-(defun remove-module (module-designator)
-  (%remove-module (coerce-to-name module-designator)))
+(defun remove-remote (remote-designator &aux (r (coerce-to-remote remote-designator)))
+  (let ((d (remote-distributor r)))
+    (removef (distributor-remotes d) r)
+    (when (null (distributor-remotes d))
+      (remove-distributor d)))
+  (%remove-remote (name r)))
 
-(defun remove-app (app-designator &aux (app (coerce-to-application app-designator)))
-  (remove app (system-applications (app-system app)))
-  (%remove-app (name app)))
+(defun remove-module (module-designator &aux (m (coerce-to-module module-designator)))
+  (dolist (s (module-systems m))
+    (remove-system s))
+  (%remove-module (name m)))
 
-(defun remove-remote (remote-designator &aux (remote (coerce-to-remote remote-designator)))
-  (remove remote (module-remotes (remote-distributor remote)))
-  (%remove-remote (name remote)))
+(defun remove-system (system-designator &aux (s (coerce-to-system system-designator)))
+  (dolist (a (system-applications s))
+    (%remove-app a))
+  (removef (module-systems (system-module s)) s)
+  (%remove-system (name s)))
 
-(defun remove-system (system-designator &aux (system (coerce-to-system system-designator)))
-  (remove system (module-systems (system-module system)))
-  (%remove-system (name system)))
+(defun remove-app (app-designator &aux (a (coerce-to-application app-designator)))
+  (removef (system-applications (app-system a)) a)
+  (%remove-app (name a)))
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
