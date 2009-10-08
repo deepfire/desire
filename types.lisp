@@ -368,7 +368,9 @@ When there's a name clash NIL is returned."
   "Fetch from REMOTE, with working directory optionally changed
 to LOCALITY-PATH."
   (maybe-within-directory locality-path
-    (ensure-gitremote (name remote) (url remote module-name))
+    (let ((module-url (url remote module-name)))
+      (report t "; ensuring git remote for (~A ~A) => ~A~%" (name remote) module-name module-url)
+      (ensure-gitremote (name remote) module-url))
     (with-explanation ("fetching from remote ~A in ~S" (name remote) *default-pathname-defaults*)
       (git "fetch" (down-case-name remote)))
     (ensure-master-branch-from-remote :remote-name (name remote))))
