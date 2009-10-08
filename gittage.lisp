@@ -48,6 +48,9 @@
   (maybe-within-directory directory
     (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
       (let ((output (execution-output-string 'git "branch")))
+        (report t ";;; got: ~S => ~{ ~S~}~%" output (remove '* (mapcar (compose #'intern #'string-upcase) 
+                                                                       (mapcan (curry #'split-sequence #\Space)
+                                                                               (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
         (remove '* (mapcar (compose #'intern #'string-upcase) 
                            (mapcan (curry #'split-sequence #\Space)
                                    (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
@@ -55,9 +58,9 @@
 (defun gitremotes (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
-      (let ((output (execution-output-string 'git "remote")))
-        (report t ";;; got:~{ ~S~}~%" output)
-        (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))
+      (let* ((output (execution-output-string 'git "remote"))
+             (remote-names (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))
+        (mapcar (compose #'intern #'string-upcase) remote-names)))))
 
 (defun gitremote-present-p (name &optional directory)
   (member name (gitremotes directory)))
