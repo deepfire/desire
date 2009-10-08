@@ -541,11 +541,12 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 (defvar *module*)
 (defvar *umbrella*)
 
-(defun url (remote &optional module-or-name &aux
+(defun url (remote-or-name &optional module-or-name &aux
             (namep (symbolp module-or-name))
+            (remote (coerce-to-remote remote-or-name))
             (module (if namep (module module-or-name :if-does-not-exist :continue) module-or-name))
             (module-name (if namep module-or-name (name module))))
-  (declare (type remote remote) (type (or module symbol) module-or-name))
+  (declare (type (or remote symbol) remote) (type (or module symbol) module-or-name))
   (let* ((remote-path (let ((*module* (when module-name (downstring module-name)))
                             (*umbrella* (when module (downstring (module-umbrella module)))))
                         (declare (special *module* *umbrella*))
