@@ -195,18 +195,16 @@
   `(symbol-macrolet ,(iter (for class in classes) (collect `(,class (class-slot ',class ',slot-name))))
      ,@body))
 
-(with-class-slot (git hg darcs cvs svn) required-executables
-  (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
-
-(with-class-slot (git hg darcs cvs svn) enabled-p
-  (setf git nil hg nil darcs nil cvs nil svn nil))
-
 (defun rcs-enabled-p (type)
   (class-slot type 'enabled-p))
 
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
    Return T when all executables required by TYPE are available, or NIL."
+  (with-class-slot (git hg darcs cvs svn) required-executables
+    (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
+  (with-class-slot (git hg darcs cvs svn) enabled-p
+    (setf git nil hg nil darcs nil cvs nil svn nil))
   (setf (class-slot type 'enabled-p)
         (every #'find-executable (class-slot type 'required-executables))))
 
