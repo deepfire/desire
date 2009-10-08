@@ -932,7 +932,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (let* ((master (master 'git))
            (present-git-modules (compute-module-locality-presence master)))
       (report t "~D of them.~%" (length present-git-modules))
-      (let ((wishmaster (and as (ensure-wishmaster as))))
+      (if-let ((wishmaster (and as (ensure-wishmaster as))))
         (progn
           (report t ";;; Advertising self as a wishmaster~%")
           (setf *self* wishmaster
