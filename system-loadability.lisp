@@ -110,4 +110,4 @@ differently from that system's name."
   "Try making MODULE's systems loadable, defaulting to LOCALITY.
  
    Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
-  (mapc #'ensure-system-loadable (module-systems module)))
+  (mapc (rcurry #'ensure-system-loadable locality) (module-systems module)))
