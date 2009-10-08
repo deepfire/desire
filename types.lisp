@@ -676,26 +676,36 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
   (do-distributor-remotes (r d)
-    (%remove-remote r))
+    (do-remove-remote r))
   (%remove-distributor (name d)))
 
-(defun remove-remote (remote-designator &aux (r (coerce-to-remote remote-designator)))
-  (let ((d (remote-distributor r)))
-    (removef (distributor-remotes d) r)
-    (when (null (distributor-remotes d))
-      (remove-distributor d)))
+(defun do-remove-remote (r)
+  (dolist (m (location-modules r))
+    (do-remove-module m))
   (%remove-remote (name r)))
 
-(defun remove-module (module-designator &aux (m (coerce-to-module module-designator)))
+(defun remove-remote (remote-designator &aux (r (coerce-to-remote remote-designator)))
+  (removef (distributor-remotes (remote-distributor r)) r)
+  (do-remove-remote r))
+
+(defun do-remove-module (m)
   (dolist (s (module-systems m))
-    (remove-system s))
+    (do-remove-system s))
   (%remove-module (name m)))
 
-(defun remove-system (system-designator &aux (s (coerce-to-system system-designator)))
+(defun remove-module (module-designator &aux (m (coerce-to-module module-designator)))
+  (iter (for remote in (compute-module-remotes m))
+        (removef (location-modules remote) m))
+  (do-remove-module m))
+
+(defun do-remove-system (s)
   (dolist (a (system-applications s))
     (%remove-app a))
-  (removef (module-systems (system-module s)) s)
   (%remove-system (name s)))
+
+(defun remove-system (system-designator &aux (s (coerce-to-system system-designator)))
+  (removef (module-systems (system-module s)) s)
+  (do-remove-system s))
 
 (defun remove-app (app-designator &aux (a (coerce-to-application app-designator)))
   (removef (system-applications (app-system a)) a)
