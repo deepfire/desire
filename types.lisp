@@ -288,6 +288,13 @@
       distributor-name
       (format-symbol (symbol-package distributor-name) "~A~:[-~A~;~]" distributor-name (eq rcs-type 'git) rcs-type)))
 
+(defun choose-default-remote-name (distributor rcs-type)
+  "Try choose a default name for a remote with RCS-TYPE on DISTRIBUTOR.
+When there's a name clash NIL is returned."
+  (let ((default-name (default-remote-name (name distributor) rcs-type)))
+    (when-let ((non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
+      default-name)))
+
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
   (and (null (system-search-restriction system))
@@ -332,11 +339,9 @@
     (cond (specified-name (if (null (distributor-remote distributor specified-name))
                               specified-name
                               (error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
-          (t (if-let* ((default-name (default-remote-name distributor-name rcs-type))
-                       (non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
-                      default-name
-                      (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
-                             rcs-type distributor-name))))))
+          (t (or (choose-default-remote-name distributor rcs-type)
+                 (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
+                        rcs-type distributor-name))))))
 
 (defmethod initialize-instance :before ((o remote) &key distributor rcs-type name &allow-other-keys)
   (setf (name o) (init-time-collate-remote-name distributor rcs-type name)))

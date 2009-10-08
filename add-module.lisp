@@ -67,7 +67,13 @@ of pathname component list variants, with MODNAME occurences substituted."
                     (iter (for v in variants)
                           (collect (append v pathname-component))))))))
 
-(defun add-module (url &optional module-name &key systemless (system-type *default-system-type*))
+(defun location-add-module (location module-name system-type)
+  (lret ((module (make-instance 'module :name module-name :umbrella module-name)))
+    (appendf (location-modules location) (list module-name))
+    (when system-type
+      (make-instance system-type :name module-name :module module))))
+
+(defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
   (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url)
     (let* ((module-name (or module-name (make-keyword (string-upcase (lastcar raw-path)))))
@@ -80,39 +86,27 @@ of pathname component list variants, with MODNAME occurences substituted."
              (downdistname (downstring distributor-name)))
         (format t ";; Found distributor ~A, looking for a corresponding remote..~%" (name distributor))
         (multiple-value-bind (dist remote-takeover) (string-detect-splitsubst downdistname downmodname '*module*)
-          (let ((variants (compute-remote-path-variants raw-path downmodname)))
-            (let ((remote (or (iter (for remote-path-variant in variants)
-                                    (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
-                                      (when-let ((remote (do-distributor-remotes (r distributor)
-                                                           (when (equalp remote-path-variant (remote-path r))
-                                                             (return r)))))
-                                        (return remote))))
-                              (make-instance 'git-remote
-                                             :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
-                                             :name (progn
-                                                     (format *query-io* "Tried remote variants:~%")
-                                                     (iter (for remote-path-variant in variants)
-                                                           (format *query-io* "~S~%"(append (when remote-takeover dist) remote-path-variant))
-                                                           (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
-                                                             (when-let ((remote (do-distributor-remotes (r distributor)
-                                                                                  (when (equalp remote-path-variant (remote-path r))
-                                                                                    (return r)))))
-                                                               (return remote))))
-                                                     (format *query-io* "Against following remotes of ~S:~%" (name distributor))
-                                                     (do-distributor-remotes (r distributor)
-                                                       (format *query-io* "~S~%" (remote-path r)))
-                                                     (format *query-io* "No matching remote found, creating a new one. Enter the new remote name, or NIL to abort: ")
-                                                     (finish-output *query-io*)
-                                                     (or (read *query-io*)
-                                                         (return-from add-module nil)))
-                                             ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
-                                             :path (lastcar variants)))))
+          (flet ((query-remote-name ()
+                   (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
+                   (finish-output *query-io*)
+                   (or (read *query-io*)
+                       (return-from add-module nil))))
+            (let* ((variants (compute-remote-path-variants raw-path downmodname))
+                   (remote (or (iter (for remote-path-variant in variants)
+                                     (let ((remote-path-variant (append (unless remote-takeover dist) remote-path-variant)))
+                                       (when-let ((remote (do-distributor-remotes (r distributor)
+                                                            (when (equalp remote-path-variant (remote-path r))
+                                                              (return r)))))
+                                         (return remote))))
+                               (make-instance remote-type
+                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
+                                              :name (or (choose-default-remote-name distributor (rcs-type remote-type))
+                                                        (query-remote-name))
+                                              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
+                                              :path (lastcar variants)))))
               (unless (eq remote-type (type-of remote))
-                (error "~@<Found remote ~S, but its type ~S doesn't match type ~S derived from specified type ~S.~:@>"
-                       (name remote) (type-of remote) remote-type remote-type))
-              (lret ((module (make-instance 'module :name module-name :umbrella module-name)))
-                (appendf (location-modules remote) (list module-name))
-                (unless systemless
-                  (make-instance system-type :name module-name :module module))
-                (format t "deduced: ~S @ ~S :: ~S:~D / ~S => ~%~S~%"
-                        module-name remote-type (name distributor) port raw-path remote)))))))))
+                (error "~@<Found remote ~S, but its type ~S doesn't match type ~S.~:@>"
+                       (name remote) (type-of remote) remote-type))
+              (format t "deduced: ~S @ ~S :: ~S:~D / ~S => ~%~S~%"
+                      module-name remote-type (name distributor) port raw-path remote)
+              (location-add-module remote module-name (unless systemlessp system-type)))))))))
