@@ -857,16 +857,17 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (values (set-difference new-converted-set old-converted-set)
             (set-difference old-converted-set new-converted-set))))
 
-(defun bootstrap-definitions-using-wishmasters (wishmasters &optional (metastore (meta-path)))
+(defun set-up-default-wishmaster-list (wishmaster-urls &optional (metastore (meta-path)))
   (with-output-to-new-metafile (metafile 'wishmasters metastore :commit-p t)
-    (dolist (wishmaster wishmasters)
-      (print wishmaster metafile))))
+    (dolist (url wishmaster-urls)
+      (print url metafile))))
 
-(defun configure-remote-wishmasters (default-wishmasters &optional (metastore (meta-path)))
+(defun configure-remote-wishmasters (default-wishmaster-urls &optional (metastore (meta-path)))
   (when (metafile-empty-p 'wishmasters metastore)
-    (bootstrap-definitions-using-wishmasters default-wishmasters metastore))
+    (set-up-default-wishmaster-list default-wishmaster-urls metastore))
   (with-open-metafile (wishmasters 'wishmasters metastore)
-    (mapc #'ensure-wishmaster (all-stream-forms wishmasters))))
+    (dolist (url (all-stream-forms wishmasters))
+      (ensure-wishmaster url))))
 
 (defun update-wishmaster (wishmaster &optional (locality (master 'git)) (metastore (meta-path)))
   (cond ((eq wishmaster *self*)
