@@ -289,10 +289,9 @@
         (save-current-definitions :seal-p t))
       (report t "; All done.~%"))))
 
-(defun desire* (&rest desires)
+(defun lust (&rest desires)
   "A spread interface function for DESIRE.
-
-   Updates present specified modules and skips present depended ones."
+Updates present specified modules and skips present depended ones."
   (desire desires))
 
 ;; (defgeneric fetch-desired-p (repo)

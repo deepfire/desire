@@ -28,7 +28,7 @@
    #:module-bare-p #:module-present-p #:do-present-modules #:module-world-readable-p
    ;; desire.lisp
    #:*register-happy-matches* #:*register-all-martians*
-   #:desire #:desire*
+   #:desire #:lust
    #:define-application 
    #:fetch #:desire
    #:purge-module-binaries
