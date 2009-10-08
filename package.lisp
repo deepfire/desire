@@ -33,7 +33,9 @@
    #:fetch #:desire
    #:purge-module-binaries
    ;; add-module.lisp
-   #:add-module))
+   #:add-module
+   ;; apropos.lisp
+   #:apropos-desr))
 
 (in-package :desire)
 
