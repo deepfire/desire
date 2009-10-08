@@ -121,11 +121,13 @@
               (git-remote-namestring (wishmaster-gate-remote o))
               :converted-modules (mapcar #'name (git-remote-converted-modules (wishmaster-gate-remote o))))))
 
+(defvar *read-time-enclosing-distributor*)
+
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key remotes &allow-other-keys) (read stream nil nil t)
     `(or (distributor ',name :if-does-not-exist :continue)
-         (prog1 (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t ,@(remove-from-plist initargs :remotes))
+         (lret ((*read-time-enclosing-distributor* (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t ,@(remove-from-plist initargs :remotes))))
            ,@remotes))))
 
 (defun emit-make-simple-module-form (name)
@@ -136,9 +138,9 @@
   `(or (system ',name :if-does-not-exist :continue)
        (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
 
-(defun emit-remote-form (type name distributor-form modules simple-modules simple-systemless-modules path-components remote-initargs)
+(defun emit-remote-form (type name modules simple-modules simple-systemless-modules path-components remote-initargs)
   `(prog1
-       (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor ,distributor-form
+       (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor *read-time-enclosing-distributor*
                       :path ',path-components :modules ',(append modules simple-modules simple-systemless-modules)
                       ,@remote-initargs)
      ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
@@ -306,8 +308,8 @@ When there's a name clash NIL is returned."
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (rcs-type o)))))
   (let ((*print-case* :downcase))
-    (format stream "~@<#R(~;~A ~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
-            (symbol-name (type-of o)) (string (name (remote-distributor o))) (remote-path o)
+    (format stream "~@<#R(~;~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
+            (symbol-name (type-of o)) (remote-path o)
             (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-modules o) :key #'module)
               (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
                 (append (unless (equal default-remote-name (name o))
@@ -354,8 +356,8 @@ When there's a name clash NIL is returned."
 
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type distributor path-components &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
-    (emit-remote-form type name `(distributor ',distributor) modules simple-modules simple-systemless-modules path-components
+  (destructuring-bind (type path-components &rest initargs &key modules simple-modules simple-systemless-modules name &allow-other-keys) (read stream nil nil)
+    (emit-remote-form type name modules simple-modules simple-systemless-modules path-components
                       (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules))))
 
 ;;;
@@ -892,6 +894,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                 (update-known-wishmasters master)))
       (report t ";;; Ensuring that present modules have their defined systems accessible~%")
       (ensure-present-module-systems-loadable master))
+    (report t ";;; All done.~%")
     t))
 
 (defun define-locality (name rcs-type &rest keys &key &allow-other-keys)
