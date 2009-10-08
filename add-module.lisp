@@ -161,6 +161,14 @@ of pathname component list variants, with MODNAME occurences substituted."
         (lust (name module))))
     (inject-desirables added-d added-r added-m added-s added-a)))
 
+(defun add-module-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  (destructuring-bind (url &optional module-name &key (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
+   (add-module url)))
+
+(defun install-add-module-reader (&optional (char #\@))
+  (set-dispatch-macro-character #\# char #'add-module-reader *readtable*))
+
 (defun steal-module-def (url-or-name &optional remote-nickname)
   (if remote-nickname
       (let* ((remote (remote (ecase remote-nickname

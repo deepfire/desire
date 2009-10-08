@@ -34,7 +34,7 @@
    #:fetch #:desire
    #:purge-module-binaries
    ;; add-module.lisp
-   #:add-module
+   #:add-module #:add-module-reader #:install-add-module-reader
    ;; apropos.lisp
    #:apropos-desr))
 
