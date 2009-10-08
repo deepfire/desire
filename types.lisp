@@ -927,10 +927,10 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (determine-tools-and-update-remote-accessibility)
     (report t ";;; Remembering other wishmasters still walking the planes...~%")
     (recall-wishmasters default-wishmasters (meta-path))
-    (report t ";;; Scanning for modules in ~S..." *root-of-all-desires*)
+    (report t ";;; Scanning for modules in ~S...  " *root-of-all-desires*)
     (let* ((master (master 'git))
            (present-git-modules (compute-module-locality-presence master)))
-      (report t "~D of them~%" (length present-git-modules))
+      (report t "~D of them.~%" (length present-git-modules))
       (let ((wishmaster (and as (ensure-wishmaster as))))
         (progn
           (report t ";;; Advertising self as a wishmaster~%")
