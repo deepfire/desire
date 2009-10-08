@@ -48,10 +48,7 @@
   (maybe-within-directory directory
     (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
       (let ((output (execution-output-string 'git "branch")))
-        (report t ";;; got: ~S => ~{ ~S~}~%" output (remove '* (mapcar (compose #'intern #'string-upcase) 
-                                                                       (mapcan (curry #'split-sequence #\Space)
-                                                                               (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
-        (remove '* (mapcar (compose #'intern #'string-upcase) 
+        (remove :* (mapcar (compose #'make-keyword #'string-upcase) 
                            (mapcan (curry #'split-sequence #\Space)
                                    (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
 
@@ -112,9 +109,11 @@
 
 (defun ensure-master-branch-from-remote (&key directory (remote-name (first (gitremotes directory))))
   (maybe-within-directory directory
-    (unless (find 'master (gitbranches))
-      (with-explanation ("setting master branch to master of remote ~A in ~S" remote-name *default-pathname-defaults*)
-        (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master")))))))
+    (let ((branches (gitbranches)))
+      (report t ";;; Branches in ~S:~{ ~S~}~%" *default-pathname-defaults* branches)
+      (unless (find :master branches)
+        (with-explanation ("setting master branch to master of remote ~A in ~S" remote-name *default-pathname-defaults*)
+          (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master"))))))))
 
 (defmacro within-ref (ref &body body)
   (with-gensyms (refname)
