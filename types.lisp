@@ -367,6 +367,7 @@ When there's a name clash NIL is returned."
 (defun git-fetch-remote (remote module-name &optional locality-path)
   "Fetch from REMOTE, with working directory optionally changed
 to LOCALITY-PATH."
+  (report t "; GFR ~S ~S ~S~%" (name remote) module-name (url remote module-name))
   (maybe-within-directory locality-path
     (let ((module-url (url remote module-name)))
       (report t "; ensuring git remote for (~A ~A) => ~A~%" (name remote) module-name module-url)
