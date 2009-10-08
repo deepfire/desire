@@ -139,11 +139,7 @@
 (defun emit-remote-form (type name distributor-form modules simple-modules simple-systemless-modules path-components remote-initargs)
   `(prog1
        (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor ,distributor-form
-                      :modules ',(append modules simple-modules simple-systemless-modules)
-                      :path ',path-components
-                      :path-fn (lambda ()
-                                 (declare (special *module* *umbrella*))
-                                 (list ,@path-components))
+                      :path ',path-components :modules ',(append modules simple-modules simple-systemless-modules)
                       ,@remote-initargs)
      ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
      ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) simple-modules)))
@@ -346,8 +342,11 @@ When there's a name clash NIL is returned."
 (defmethod initialize-instance :before ((o remote) &key distributor rcs-type name &allow-other-keys)
   (setf (name o) (init-time-collate-remote-name distributor rcs-type name)))
 
-(defmethod initialize-instance :after ((o remote) &key distributor &allow-other-keys)
-  (appendf (distributor-remotes distributor) (list o)))
+(defmethod initialize-instance :after ((o remote) &key distributor path &allow-other-keys)
+  (appendf (distributor-remotes distributor) (list o))
+  (setf (remote-path-fn o) (compile nil `(lambda ()
+                                           (declare (special *module* *umbrella*))
+                                           (list ,@path)))))
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject to omission. "
