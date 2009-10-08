@@ -805,7 +805,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (let ((*printing-wishmaster* t))
       (print wishmaster common-wishes))))
 
-(defun module-present-p (module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t))
+(defun module-present-p (module-or-name &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t)
+                         &aux (module (coerce-to-module module-or-name)))
   "See if MODULE's presence cache is positive for LOCALITY, failing that check the
    repository, and update the cache, accordingly to the result.
 

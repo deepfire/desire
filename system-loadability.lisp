@@ -78,7 +78,8 @@
 (defun system-definition-registry-symlink-path (system &optional (locality (master 'git)))
   (subfile (git-locality-asdf-registry-path locality) (list (down-case-name system)) :type (system-pathname-type system)))
 
-(defun system-loadable-p (system &optional (locality (master 'git)))
+(defun system-loadable-p (system-or-name &optional (locality (master 'git))
+                          &aux (system (coerce-to-system system-or-name)))
   "See whether SYSTEM is loadable by the means of ASDF."
   (handler-case (and (equal (symlink-target-file-present-p (system-definition-registry-symlink-path system locality))
                             (system-definition system (module-path (system-module system) locality) :if-does-not-exist :continue))
