@@ -209,10 +209,11 @@
                                                    type name (type-of system)))))
                                       (maybe-register-martian (intern name) path type module missing)))) ;; A happy match?
                    (progn (ensure-system-loadable system path *locality*)
-                          (let* ((hidden-systems (and (eq type 'asdf-system) (asdf-hidden-systems system)))
-                                 (hidden-names (mapcar (compose #'string-upcase #'asdf:component-name) hidden-systems)))
-                            (mapc #'set-syspath hidden-names (make-list (length hidden-names) :initial-element path))
-                            (multiple-value-bind (missed-hide ambi-hide) (unzip (rcurry #'find missing :test #'string=) hidden-names)
+                          ;; A hidden system is a system definition residing in a file named differently from main system's name.
+                          ;; Find them.
+                          (let ((hidden-system-names (and (eq type 'asdf-system) (asdf-hidden-system-names system))))
+                            (mapc #'set-syspath hidden-system-names (make-list (length hidden-system-names) :initial-element path))
+                            (multiple-value-bind (missed-hide ambi-hide) (unzip (rcurry #'find missing :test #'string=) hidden-system-names)
                               (multiple-value-bind (new-required new-martians)
                                   (cond (*register-all-martians* (values (append ambi-hide missed-hide (rest required)) martians))
                                         (*register-happy-matches* (values (append missed-hide (rest required)) (append ambi-hide martians)))

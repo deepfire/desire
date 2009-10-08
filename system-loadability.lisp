@@ -87,13 +87,16 @@
       (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
       t)))
 
-(defun asdf-hidden-systems (system &aux (name (name system)))
-  "Find out which ASDF systems hide in SYSTEM, which mustn't have been 
-   seen yet."
+(defun asdf-hidden-system-names (system &aux (name (name system)))
+  "Find out names of ASDF systems hiding in SYSTEM, which mustn't have been 
+seen yet.
+A hidden system is a system with a definition residing in a file named
+differently from that system's name."
   (let ((pre (hash-table-values asdf::*defined-systems*)))
     (asdf:find-system name)
-    (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
-            :test #'string= :key (compose #'string-upcase #'asdf:component-name))))
+    (mapcar (compose #'string-upcase #'asdf:component-name)
+            (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
+                    :test #'string= :key (compose #'string-upcase #'asdf:component-name)))))
 
 (defun ensure-system-loadable (system &optional path (locality (master 'git)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
