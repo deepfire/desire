@@ -73,7 +73,7 @@ of pathname component list variants, with MODNAME occurences substituted."
     (when system-type
       (make-instance system-type :name module-name :module module))))
 
-(defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*))
+(defun do-add-module (url &optional module-name &key systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
   (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url)
     (let* ((module-name (or module-name (make-keyword (string-upcase (lastcar raw-path)))))
@@ -99,7 +99,7 @@ of pathname component list variants, with MODNAME occurences substituted."
                                      (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
                                      (finish-output *query-io*)
                                      (or (read *query-io*)
-                                         (return-from add-module nil))))
+                                         (return-from do-add-module nil))))
                               (make-instance remote-type
                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
                                              :name (or (choose-default-remote-name distributor (rcs-type remote-type))
@@ -116,56 +116,66 @@ of pathname component list variants, with MODNAME occurences substituted."
 
 (defparameter *auto-lust* nil)
 
-(defmacro with-tracked-desirable-additions (tracked-form (form-value added-dists added-rems added-mods added-syss) &body body)
-  (with-gensyms (orig-distributors orig-remotes orig-modules orig-systems)
-    `(let ((,orig-distributors (hash-table-values *distributors*))
-           (*distributors* (copy-hash-table *distributors*))
-           (,orig-remotes (hash-table-values *remotes*))
-           (*remotes* (copy-hash-table *remotes*))
-           (,orig-modules (hash-table-values *modules*))
-           (*modules* (copy-hash-table *modules*))
-           (,orig-systems (hash-table-values *systems*))
-           (*systems* (copy-hash-table *systems*)))
-       (let ((,form-value ,tracked-form)
-             (,added-dists (set-difference (hash-table-values *distributors*) ,orig-distributors))
-             (,added-rems (set-difference (hash-table-values *remotes*) ,orig-remotes))
-             (,added-mods (set-difference (hash-table-values *modules*) ,orig-modules))
-             (,added-syss (set-difference (hash-table-values *systems*) ,orig-systems)))
-         ,@body))))
+(defmacro with-tracked-desirable-additions ((form-value added-dists added-rems added-mods added-syss added-apps) tracked-form &body body)
+  (with-gensyms (orig-distributors orig-remotes orig-modules orig-systems orig-apps)
+    `(multiple-value-bind (,form-value ,added-dists ,added-rems ,added-mods ,added-syss ,added-apps)
+         (let ((,orig-distributors (hash-table-values *distributors*))
+               (*distributors* (copy-hash-table *distributors*))
+               (,orig-remotes (hash-table-values *remotes*))
+               (*remotes* (copy-hash-table *remotes*))
+               (,orig-modules (hash-table-values *modules*))
+               (*modules* (copy-hash-table *modules*))
+               (,orig-systems (hash-table-values *systems*))
+               (*systems* (copy-hash-table *systems*))
+               (,orig-apps (hash-table-values *apps*))
+               (*apps* (copy-hash-table *apps*)))
+           (values ,tracked-form
+                   (set-difference (hash-table-values *distributors*) ,orig-distributors)
+                   (set-difference (hash-table-values *remotes*) ,orig-remotes)
+                   (set-difference (hash-table-values *modules*) ,orig-modules)
+                   (set-difference (hash-table-values *systems*) ,orig-systems)
+                   (set-difference (hash-table-values *apps*) ,orig-apps)))
+       ,@body)))
 
 (defun inject-desirables (d r m s a)
+  (format t "injecting d ~S~%" d)
   (dolist (d d) (setf (distributor (name d)) d))
-  (dolist (r r) (setf (remote      (name r)) r))
+  (format t "injecting m ~S~%" m)
   (dolist (m m) (setf (module      (name m)) m))
+  (format t "injecting r ~S~%" r)
+  (dolist (r r) (setf (remote      (name r)) r))
+  (format t "injecting s ~S~%" s)
   (dolist (s s) (setf (system      (name s)) s))
+  (format t "injecting a ~S~%" a)
   (dolist (a a) (setf (app         (name a)) a)))
 
+(defun invoke-with-operation (op fn))
+
+(defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*) (auto-lust *auto-lust*))
+  (with-tracked-desirable-additions (module added-d added-r added-m added-s added-a)
+      (do-add-module url module-name
+                     :systemlessp systemlessp
+                     :system-type system-type)
+    (when auto-lust
+      (let ((*fetch-errors-serious* t))
+        (lust (name module))))
+    (inject-desirables added-d added-r added-m added-s added-a)))
+
 (defun steal-module-def (url-or-name &optional remote-nickname)
-  (multiple-value-bind (d r m s a)
-      (with-tracked-desirable-additions
-          (if remote-nickname
-              (let ((remote (remote (ecase remote-nickname
-                                      (svn_clnet 'common-lisp.net-svn)
-                                      (cvs_clnet 'common-lisp.net-cvs)
-                                      (ediware 'common-lisp.net-luis-ediware)
-                                      (lichteblau_com 'www.lichtblau.com)
-                                      (b9_com 'b9.com)
-                                      (clbuild_mirror 'common-lisp.net-clbuild-mirror)
-                                      (xach_com 'git.xach.com)))))
-                (location-add-module remote url-or-name 'asdf-system))
-              (add-module url-or-name))
-          (module added-d added-r added-m added-s)
-        (cond (*auto-lust*
-               (let ((*fetch-errors-serious* t))
-                 (handler-case (lust (name module))
-                   (error (c)
-                     (format t "~@<There was an error stealing ~S~:[~; ~:*~A~]:~%~%~A~%Correspondinly, releasing created resources..~:@>~%" url-or-name remote-nickname c)
-                     (dolist (d added-d)
-                       (format t "Removing distributor ~A with corresponding remotes:~{ ~A~}~%" (name d) (mapcar #'name (distributor-remotes d)))
-                       (remove-distributor d))
-                     (dolist (m added-m)
-                       (format t "Removing module ~A with corresponding systems:~{ ~A~}~%" (name m) (mapcar #'name (module-systems m)))
-                       (remove-module m))))))
-              (t
-               (values added-d added-r added-m added-s))))
-    (inject-desirables d r m s a)))
+  (if remote-nickname
+      (let* ((remote (remote (ecase remote-nickname
+                               (svn_clnet 'common-lisp.net-svn)
+                               (cvs_clnet 'common-lisp.net-cvs)
+                               (ediware 'common-lisp.net-luis-ediware)
+                               (lichteblau_com 'www.lichtblau.com)
+                               (b9_com 'b9.com)
+                               (clbuild_mirror 'common-lisp.net-clbuild-mirror)
+                               (xach_com 'git.xach.com))))
+             (module (location-add-module remote url-or-name 'asdf-system)))
+        (when *auto-lust*
+          (handler-case (lust (name module))
+            (error (c)
+              (remove-module module)
+              (remove-system (first (module-systems module)))
+              (error c)))))
+      (add-module url-or-name)))
