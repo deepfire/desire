@@ -747,7 +747,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   "Return the path to the meta directory."
   (subdirectory* (locality-path (master 'git)) ".meta"))
 
-(defun save-current-definitions (&key (seal-p t) (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
+(defun save-current-definitions (&key seal-p (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
   "Save current model of the world within METASTORE.
    When SEAL-P is non-NIL, the changes are committed."
   (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
