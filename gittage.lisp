@@ -121,5 +121,5 @@
        (with-explanation ("checking out ref ~A in ~S" ,refname *default-pathname-defaults*)
          (git "checkout" ,refname))
        (unwind-protect (progn ,@body)
-         (with-explanation ("checking out ref ~A failed, returning to master branch in ~S" ,refname *default-pathname-defaults*)
+         (with-explanation ("returning to master branch in ~S" ,refname *default-pathname-defaults*)
            (git "checkout" "master"))))))
