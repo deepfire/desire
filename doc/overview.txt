@@ -1,0 +1,145 @@
+Overview of desire, a software knowledge and distribution system.
+                     
+
+0. Index
+1. What is desire (supposed to be)?
+2. Overview of terms
+2.1 Distributors
+2.2 Remotes
+2.3 Modules
+2.4 Systems
+2.5 Applications
+2.6 Localities
+3. API (aka end-user interface)
+
+
+1. What is desire (supposed to be)?
+
+The domain of desire includes software distribution points, software
+modules and applications. All these terms are represented internally
+in a detailed, comprehensive manner, and full knowledge about them is
+maintained in a PRINT/READ-able form, additionally being easily
+transportable[1] between desire nodes.
+
+There are two sides of desire[2]:
+      - maximally streamlined software retrieval, and
+      - redistribution.
+
+--- footnotes ---
+1. Not yet, but the client mode depends on it, so at least partially it works.
+2. Although, by nature of being a full-knowledge system the applications might easily go beyond that.
+
+
+2. Overview of terms
+
+2.1 Distributors
+
+The largest unit of software granularity is a 'distributor', which
+corresponds to an internet domain name[1]. Currently, they don't carry
+much information beyond just that.
+
+'Wishmasters' represent instances of desire acting as distributors which
+are in business of making desire users lives easier by repackaging modules
+from their respective VCS of choice into git, relieving burden from
+the user and reducing the amount of points of failure.
+
+2.2 Remotes
+
+Distributors contain one or more 'remotes', which combine following
+concepts:
+      - version control system type (git, darcs, cvs or svn)
+      - transport type (native, http or rsync)
+      - simple pattern path on the distributor
+      - an internet port number
+
+The concept of remote serves (or actually, the more general type of
+location does) as a point of distribution for a group of modules.
+
+2.3 Modules
+
+Modules represent units of software, as released by the distributor,
+and contain the information remaining to complete the information
+provided by less granular concepts to construct a module address.
+
+Modules can be provided by several different remotes of different
+distributors.
+
+2.4 Systems
+
+Descending further down we meet systems.
+Systems are objects only meant to be relevant in the domain of Common Lisp
+software, and more precisely -- to backend system definition facilities,
+such as ASDF, XCVB, Mudballs or others[2].
+
+The concept of system introduces inter-system dependencies, which cross
+module boundaries, producing inter-module dependencies.
+
+Evidently, there can be several systems per module, and also those
+can be obscured from the end-user, either intentionally or by unfortunate
+accident[3].
+
+Desire handles all these complications and operates on the full
+inter-module dependency graph. It also doesn't store that graph anywhere,
+recomputing it instead every time a request for module is performed.
+
+2.5 Applications
+
+Applications are simple extensions of systems, providing some very
+preliminary support for launching applications, potentially simplifiable
+to the point of the end-user being able to say "launch mcclim" and
+have everything downloaded, required systems loaded and the application
+up and running as a result.
+
+2.6 Localities
+
+The more general type of 'location' besides remotes also includes
+'localities', which serve the same purpose as remotes, but on the local
+machine. Master localities are canonical locations for module repositories
+managed by a specific VCS type.
+The master git locality is a canonical location for module redistribution.
+
+--- footnotes ---
+
+1. Actually, sometimes a group of domain names, like in case of sourceforge.
+2. Currently, the only backend system implemented is ASDF.
+3. Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
+
+
+3. API (aka end-user interface)
+
+3.1 Querying the knowledge base: user level
+
+distributor name &key (if-does-not-exist :error) => distributor
+remote name &key (if-does-not-exist :error) => remote
+module name &key (if-does-not-exist :error) => module
+system name &key (if-does-not-exist :error) => system
+app name &key (if-does-not-exist :error) => app
+locality name &key (if-does-not-exist :error) => locality
+master name &key (if-does-not-exist :error) => locality
+
+name object => symbol
+
+url remote-designator &optional module-specifier => string
+
+apropos-desr string-designator &optional set-designator => <no values>
+apropos-desr-list string-designator &optional set-designator => desirables
+
+module-present-p module-designator module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) => boolean
+system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean
+
+3.2 Making wishes
+
+init path &key as (default-wishmasters (list *default-wishmaster*)) => boolean
+lust &rest module-names => boolean
+add-module url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*) => module
+
+3.2.1 Reader macros for add-module
+
+Following reader macro is enabled by install-add-module-reader
+#@"u://r.l"
+#@("u://r.l" &optional module-name &key (lust *auto-lust*))
+
+3.x Querying the knowledge base: advanced level
+
+system-definition system repository-path &key (if-does-not-exist :error) => pathname
+
