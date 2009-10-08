@@ -369,7 +369,8 @@ When there's a name clash NIL is returned."
 to LOCALITY-PATH."
   (maybe-within-directory locality-path
     (ensure-gitremote (name remote) (url remote module-name))
-    (git "fetch" (down-case-name remote))
+    (with-explanation ("fetching from remote ~A in ~S" (name remote) *default-pathname-defaults*)
+      (git "fetch" (down-case-name remote)))
     (ensure-master-branch-from-remote :remote-name (name remote))))
 
 (defmacro within-wishmaster-meta ((wishmaster &key (metastore '(meta-path)) update-p) &body body)

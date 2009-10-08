@@ -34,32 +34,37 @@
   (declare (type symbol var))
   (maybe-within-directory directory
     (multiple-value-bind (status output)
-        (git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :output t)
+        (with-explanation ("getting value of git variable ~A" (symbol-name var))
+          (git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :output t))
       (or status (string-right-trim '(#\Return #\Newline) output)))))
 
 (defun (setf gitvar) (val var &optional directory)
   (declare (type symbol var) (type string val))
   (maybe-within-directory directory
-    (git (list "config" "--replace-all" (string-downcase (symbol-name var)) val))))
+    (with-explanation ("setting git variable ~A to ~A" (symbol-name var) val)
+      (git (list "config" "--replace-all" (string-downcase (symbol-name var)) val)))))
 
 (defun gitbranches (&optional directory)
   (maybe-within-directory directory
-    (let ((output (execution-output-string 'git "branch")))
-      (remove '* (mapcar (compose #'intern #'string-upcase) 
-                         (mapcan (curry #'split-sequence #\Space)
-                                 (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))))
+    (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
+      (let ((output (execution-output-string 'git "branch")))
+        (remove '* (mapcar (compose #'intern #'string-upcase) 
+                           (mapcan (curry #'split-sequence #\Space)
+                                   (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
 
 (defun gitremotes (&optional directory)
   (maybe-within-directory directory
-    (let ((output (execution-output-string 'git "remote")))
-      (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))
+    (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
+      (let ((output (execution-output-string 'git "remote")))
+        (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))
 
 (defun gitremote-present-p (name &optional directory)
   (member name (gitremotes directory)))
 
 (defun add-gitremote (name url &optional directory)
   (maybe-within-directory directory
-    (git "remote" "add" (downstring name) url)))
+    (with-explanation ("adding a git remote ~A (~A) in ~S" name url *default-pathname-defaults*)
+      (git "remote" "add" (downstring name) url))))
 
 (defun ensure-gitremote (name url &optional directory)
   (unless (gitremote-present-p name directory)
@@ -86,7 +91,8 @@
             (dolist (filename git-files)
               (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
           (setf (gitvar 'core.bar) "false")
-          (git "reset" "--hard")
+          (with-explanation ("hard-resetting to HEAD git tree in ~S" *default-pathname-defaults*)
+            (git "reset" "--hard"))
           nil))))
 
 (defun repository-world-readable-p (&optional directory)
@@ -103,10 +109,14 @@
 (defun ensure-master-branch-from-remote (&key directory (remote-name (first (gitremotes directory))))
   (maybe-within-directory directory
     (unless (find 'master (gitbranches))
-      (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master"))))))
+      (with-explanation ("setting master branch to master of remote ~A in ~S" remote-name *default-pathname-defaults*)
+        (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master")))))))
 
 (defmacro within-ref (ref &body body)
-  `(progn
-     (git "checkout" (flatten-path-list ,ref))
-     (unwind-protect (progn ,@body)
-       (git "checkout" "master"))))
+  (with-gensyms (refname)
+    `(let ((,refname (flatten-path-list ,ref)))
+       (with-explanation ("checking out ref ~A in ~S" ,refname *default-pathname-defaults*)
+         (git "checkout" ,refname))
+       (unwind-protect (progn ,@body)
+         (with-explanation ("checking out ref ~A failed, returning to master branch in ~S" ,refname *default-pathname-defaults*)
+           (git "checkout" "master"))))))
