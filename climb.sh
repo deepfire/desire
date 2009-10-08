@@ -83,4 +83,4 @@ sbcl --noinform \
      --eval "(asdf:operate 'asdf:load-op 'desire :verbose nil)" \
      --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
      --eval "(desire:init \"$ROOT/\")" \
-     --eval "(desire:format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (desire* 'wish) and desire will make it happen.\")"
+     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (desire* 'wish) and desire will make it happen.\")"
