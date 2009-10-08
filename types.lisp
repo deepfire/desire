@@ -451,12 +451,13 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
    intepreted as pointing at its git remote.
    The wishmaster is either found, or created, if it is not yet known."
   (multiple-value-bind (type hostname port path) (parse-remote-namestring url)
-    (or (distributor hostname :if-does-not-exist :continue)
-        (let* ((wishmaster (make-pure-wishmaster type hostname port path))
-               (remote (wishmaster-gate-remote wishmaster)))
-          (within-directory ((meta-path))
-            (ensure-gitremote (name remote) (url remote '.meta)))
-          wishmaster))))
+    (let ((path (append path '(*module*))))
+      (or (distributor hostname :if-does-not-exist :continue)
+          (let* ((wishmaster (make-pure-wishmaster type hostname port path))
+                 (remote (wishmaster-gate-remote wishmaster)))
+            (within-directory ((meta-path))
+              (ensure-gitremote (name remote) (url remote '.meta)))
+            wishmaster)))))
 
 (defun wishmaster-reader (stream &optional char sharp)
   (declare (ignore char sharp))
