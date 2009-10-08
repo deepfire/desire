@@ -4,7 +4,7 @@ DESIRE_HOME=${3:-git.feelingofgreen.ru}
 
 desire_home=git://$DESIRE_HOME
 
-desire_deps="alexandria cl-fad pergamum iterate semi-precious"
+desire_deps="alexandria cl-fad executor pergamum iterate semi-precious"
 temp_asdf_suffix="$USER-desire-temp-$RANDOM"
 temp_asdf_root="/tmp/$temp_asdf_suffix"
 
