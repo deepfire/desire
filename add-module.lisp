@@ -151,12 +151,12 @@ of pathname component list variants, with MODNAME occurences substituted."
 
 (defun invoke-with-operation (op fn))
 
-(defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*) (auto-lust *auto-lust*))
+(defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*))
   (with-tracked-desirable-additions (module added-d added-r added-m added-s added-a)
       (do-add-module url module-name
                      :systemlessp systemlessp
                      :system-type system-type)
-    (when auto-lust
+    (when lust
       (let ((*fetch-errors-serious* t))
         (lust (name module))))
     (inject-desirables added-d added-r added-m added-s added-a)))
@@ -164,7 +164,7 @@ of pathname component list variants, with MODNAME occurences substituted."
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (url &optional module-name &key (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
-   (add-module url)))
+   (add-module url module-name :lust lust)))
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char #'add-module-reader *readtable*))
