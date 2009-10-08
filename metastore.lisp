@@ -65,10 +65,8 @@
   "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY.
 Return status indicates whether there were changes and a new commit was done."
   (within-directory (metastore-directory)
-    (when (with-explanation ("checking if there are changes of metafile ~A in ~S" (symbol-name name) *default-pathname-defaults*)
-            (with-shell-predicate (git "status")))
-      (with-explanation ("committing changes to metafile ~A in ~S" (symbol-name name) *default-pathname-defaults*)
-        (git "commit" "-m" (format nil "~A" commit-message) (symbol-name name))))))
+    (with-explanation ("committing changes (if any) to metafile ~A in ~S" (symbol-name name) *default-pathname-defaults*)
+      (git "commit" "-m" (format nil "~A" commit-message) (symbol-name name)))))
 
 (defun ensure-metastore (directory &key required-metafiles)
   "Ensure that a metastore exists at DIRECTORY.
