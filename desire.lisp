@@ -185,7 +185,7 @@
   (cons module-name nil))
 
 (defun desire-do-one-step (desires skip-present missing martians)
-  (declare (special *departed-from-definitions-p* *locality*) (optimize (debug 3)))
+  (declare (special *departed-from-definitions-p* *locality*))
   (labels ((syspath (name) (declare (special *syspath*)) (gethash name *syspath*))
            (set-syspath (name value) (declare (special *syspath*)) (setf (gethash name *syspath*) value))
            (next-unsatisfied-module ()
