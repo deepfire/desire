@@ -681,7 +681,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defun do-remove-remote (r)
   (dolist (m (location-modules r))
-    (do-remove-module m))
+    (when-let ((m (module m :if-does-not-exist :continue)))
+      (do-remove-module (module m))))
   (%remove-remote (name r)))
 
 (defun remove-remote (remote-designator &aux (r (coerce-to-remote remote-designator)))
