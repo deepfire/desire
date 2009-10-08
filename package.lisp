@@ -18,6 +18,7 @@
    #:locality-path
    #:module-desired-p #:module-enabled-remote #:module-path
    #:module-status #:module-public-packages #:module-hidden-p
+   #:url
    #:add-desire
    #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
