@@ -1,8 +1,16 @@
+#!/bin/bash
+
 ROOT="$1"
 APP="$2"
 DESIRE_HOME=${3:-git.feelingofgreen.ru}
 
 desire_home=git://$DESIRE_HOME
+
+if test -z "$RANDOM"
+then
+    echo "\$RANDOM is empty, nothing good will come out ot that -- please use GNU Bash."
+    exit 1
+fi
 
 desire_deps="alexandria cl-fad executor pergamum iterate semi-precious"
 temp_asdf_suffix="$USER-desire-temp-$RANDOM"
