@@ -270,6 +270,14 @@
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
 
+(defmethod rcs-type ((o (eql 'git-native-remote))) 'git)
+(defmethod rcs-type ((o (eql 'git-http-remote))) 'git)
+(defmethod rcs-type ((o (eql 'git-combined-remote))) 'git)
+(defmethod rcs-type ((o (eql 'hg-http-remote))) 'hg)
+(defmethod rcs-type ((o (eql 'darcs-http-remote))) 'darcs)
+(defmethod rcs-type ((o (eql 'cvs-rsync-remote))) 'cvs)
+(defmethod rcs-type ((o (eql 'svn-rsync-remote))) 'svn)
+
 (defmethod transport ((o git-combined-remote))
   (if *combined-remotes-prefer-native-over-http*
       'git 'http))
