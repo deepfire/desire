@@ -56,6 +56,7 @@
   (maybe-within-directory directory
     (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
       (let ((output (execution-output-string 'git "remote")))
+        (report t ";;; got:~{ ~S~}~%" output)
         (mapcar (compose #'intern #'string-upcase) (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))
 
 (defun gitremote-present-p (name &optional directory)
