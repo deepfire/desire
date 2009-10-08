@@ -5,6 +5,14 @@ ROOT="$1"
 APP="$2"
 DESIRE_HOME=${3:-git.feelingofgreen.ru}
 
+if test -z "$EXPLAIN"
+then
+    EXPLAIN=nil
+else
+    EXPLAIN=t
+    echo "NOTE: turning on execution explanation feature of desire."
+fi
+
 desire_home=git://$DESIRE_HOME
 
 if test -z "$RANDOM"
@@ -64,5 +72,6 @@ sbcl --noinform \
                    file)))" \
      --eval "(push 'temp-modules-search asdf:*system-definition-search-functions*)" \
      --eval "(asdf:operate 'asdf:load-op 'desire :verbose nil)" \
+     --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
      --eval "(desire:init \"$ROOT/\")" \
      --eval "(desire:format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (desire* 'wish) and desire will make it happen.\")"
