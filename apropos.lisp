@@ -64,4 +64,5 @@
 (defun apropos-desr (string-designator &optional set-designator)
   (dolist (o (apropos-desr-list string-designator set-designator))
     (briefly-describe o)
-    (terpri)))
+    (terpri))
+  (values))
