@@ -1,4 +1,5 @@
 #!/bin/bash
+version="0.1"
 
 ROOT="$1"
 APP="$2"
@@ -9,6 +10,24 @@ desire_home=git://$DESIRE_HOME
 if test -z "$RANDOM"
 then
     echo "\$RANDOM is empty, nothing good will come out ot that -- please use GNU Bash."
+    exit 1
+fi
+
+if test -z "$1" || test "$1" = "--help"
+then
+    cat <<EOF
+climb.sh, version $version - a bash script for bootstrapping desire on unix systems
+Usage:  climb.sh ABSOLUTE-ROOT-PATH [APPLICATION-NAME [BOOTSTRAP-HOST]]
+
+Bootstrap desire, the Common Lisp software knowledge and distribution system from
+BOOTSTRAP-HOST (which defaults to git.feelingofgreen.ru), optionally installing APP.
+EOF
+    exit
+fi
+
+if test ! "${ROOT:0:1}" = "/"
+then
+    echo "\$ROOT is not an absolute path."
     exit 1
 fi
 
