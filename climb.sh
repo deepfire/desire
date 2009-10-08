@@ -70,6 +70,7 @@ sbcl --noinform \
 	              (file (make-pathname :directory (append *temp-root* (list name)) :name name :type \"asd\" :case :local)))
                  (when (and file (probe-file file))
                    file)))" \
+     --eval "#+sbcl (declaim (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning)) #-sbcl t" \
      --eval "(push 'temp-modules-search asdf:*system-definition-search-functions*)" \
      --eval "(asdf:operate 'asdf:load-op 'desire :verbose nil)" \
      --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
