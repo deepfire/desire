@@ -288,7 +288,8 @@
       (when *departed-from-definitions-p*
         (report t "; Definitions modified, committing changes.~%")
         (save-current-definitions :seal-p t))
-      (report t "; All done.~%"))))
+      (report t "; All done.~%")
+      t)))
 
 (defun lust (&rest desires)
   "A spread interface function for DESIRE.
