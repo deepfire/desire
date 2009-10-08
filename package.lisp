@@ -11,6 +11,7 @@
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes #:do-distributor-modules
+   #:remove-distributor #:remove-remote #:remove-module #:remove-system #:remove-app
    #:clear-definitions #:serialize-definitions #:read-definitions #:save-current-definitions #:load-definitions
    #:init
    #:remote-disabled-p

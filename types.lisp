@@ -662,16 +662,34 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (symbol (string-upcase (symbol-name namespec)))
     (string (string-upcase namespec))))
 
-(define-root-container *distributors*   distributor   :name-transform-fn coerce-to-namestring :coercer t :mapper map-distributors :iterator do-distributors)
-(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
+(define-root-container *distributors*   distributor   :name-transform-fn coerce-to-namestring :remover %remove-distributor :coercer t :mapper map-distributors :iterator do-distributors)
+(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :remover %remove-module :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
 (define-root-container *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
-(define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
-(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :coercer t :mapper map-systems)
-(define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :coercer t :mapper map-apps :type application)
-(define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
+(define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring t :type module :mapper map-nonleaves :if-exists :continue)
+(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems)
+(define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
+(define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-root-container *localities*     locality      :type locality :mapper map-localities :if-exists :error)
 (define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
 (define-root-container *masters*        master        :type locality :if-exists :error)
+
+(defun remove-distributor (distributor-designator)
+  (%remove-distributor (coerce-to-name distributor-designator)))
+
+(defun remove-module (module-designator)
+  (%remove-module (coerce-to-name module-designator)))
+
+(defun remove-app (app-designator &aux (app (coerce-to-application app-designator)))
+  (remove app (system-applications (app-system app)))
+  (%remove-app (name app)))
+
+(defun remove-remote (remote-designator &aux (remote (coerce-to-remote remote-designator)))
+  (remove remote (module-remotes (remote-distributor remote)))
+  (%remove-remote (name remote)))
+
+(defun remove-system (system-designator &aux (system (coerce-to-system system-designator)))
+  (remove system (module-systems (system-module system)))
+  (%remove-system (name system)))
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where RCS tools are available and disable correspondingly inaccessible remotes."
