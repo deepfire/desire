@@ -117,7 +117,7 @@
     (call-next-method)))
 
 (defmethod fetch :around (locality remote module)
-  (with-condition-printing (t fetch-failure)
+  (with-maybe-just-printing-conditions (t fetch-failure) (not *fetch-errors-serious*)
     (restart-bind ((retry (lambda () 
                             (maybe-within-directory (module-path module locality)
                               (git "gui"))
