@@ -1,6 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 
 (defpackage desire
+  (:nicknames :desr)
   (:use :common-lisp :alexandria :pergamum :iterate :depsolver :executor)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
