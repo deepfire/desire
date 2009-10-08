@@ -845,7 +845,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (when (module-present-p module locality t)
       (collect module))))
 
-(defun wishmaster-recompute-exports (wishmaster present-set &optional (metastore (meta-path)))
+(defun wishmaster-recompute-and-advertise-exports (wishmaster present-set &optional (metastore (meta-path)))
   (when (typep wishmaster 'releasing-wishmaster)
     (let ((release-set (distributor-release-git-modules wishmaster)))
       (when-let ((missing (set-difference release-set present-set)))
@@ -862,7 +862,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (dolist (url wishmaster-urls)
       (print url metafile))))
 
-(defun configure-remote-wishmasters (default-wishmaster-urls &optional (metastore (meta-path)))
+(defun recall-wishmasters (default-wishmaster-urls &optional (metastore (meta-path)))
+  "Remember other wishmasters still walking the planes..."
   (when (metafile-empty-p 'wishmasters metastore)
     (set-up-default-wishmaster-list default-wishmaster-urls metastore))
   (with-open-metafile (wishmasters 'wishmasters metastore)
@@ -871,7 +872,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defun update-wishmaster (wishmaster &optional (locality (master 'git)) (metastore (meta-path)))
   (cond ((eq wishmaster *self*)
-         (wishmaster-recompute-exports wishmaster (compute-module-locality-presence locality) metastore))
+         (wishmaster-recompute-and-advertise-exports wishmaster (compute-module-locality-presence locality) metastore))
         (t
          (within-wishmaster-meta (wishmaster :metastore metastore :update-p t)
            (with-open-metafile (common-wishes 'common-wishes metastore)
@@ -922,19 +923,21 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (load-definitions (meta-path))
     (report t ";;; Determining available tools and deducing accessible remotes~%")
     (determine-tools-and-update-remote-accessibility)
-    (configure-remote-wishmasters default-wishmasters (meta-path))
-    (report t ";;; Scanning for modules in ~S~%" *root-of-all-desires*)
+    (report t ";;; Remembering other wishmasters still walking the planes...~%")
+    (recall-wishmasters default-wishmasters (meta-path))
+    (report t ";;; Scanning for modules in ~S..." *root-of-all-desires*)
     (let* ((master (master 'git))
            (present-git-modules (compute-module-locality-presence master)))
-      (if-let ((wishmaster (and as (ensure-wishmaster as))))
-              (progn
-                (report t ";;; Advertising self as a wishmaster~%")
-                (setf *self* wishmaster
-                      (wishmaster-converted-modules wishmaster) present-git-modules)
-                (wishmaster-recompute-exports wishmaster present-git-modules))
-              (progn
-                (report t ";;; Retrieving information about known wishmasters~%")
-                (update-known-wishmasters master)))
+      (report t "~D of them~%" (length present-git-modules))
+      (let ((wishmaster (and as (ensure-wishmaster as))))
+        (progn
+          (report t ";;; Advertising self as a wishmaster~%")
+          (setf *self* wishmaster
+                (wishmaster-converted-modules wishmaster) present-git-modules)
+          (wishmaster-recompute-and-advertise-exports wishmaster present-git-modules))
+        (progn
+          (report t ";;; Retrieving information about known wishmasters~%")
+          (update-known-wishmasters master)))
       (report t ";;; Ensuring that present modules have their defined systems accessible~%")
       (ensure-present-module-systems-loadable master))
     (report t ";;; All done.~%")
