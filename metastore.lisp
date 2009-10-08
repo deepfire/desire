@@ -39,7 +39,10 @@
   "Ensure that metafile called by NAME exists within METASTORE-DIRECTORY.
   
    The IF-EXISTS keyword is passed to OPEN."
-  (open (metafile-path name metastore-directory) :direction :probe :if-does-not-exist :create :if-exists if-exists))
+  (within-directory (metastore-directory)
+    (open (string name) :direction :probe :if-does-not-exist :create :if-exists if-exists)
+    (with-explanation ("creating metafile ~A in ~S" name *default-pathname-defaults*)
+      (git "add" (string name)))))
 
 (defmacro with-open-metafile ((stream name metastore-directory &rest open-options) &body body)
   `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character 
