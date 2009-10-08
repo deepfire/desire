@@ -81,7 +81,7 @@
 (defun system-loadable-p (system &optional (locality (master 'git)))
   "See whether SYSTEM is loadable by the means of ASDF."
   (handler-case (and (equal (symlink-target-file-present-p (system-definition-registry-symlink-path system locality))
-                            (system-definition system (module-path (system-module system) locality)))
+                            (system-definition system (module-path (system-module system) locality) :if-does-not-exist :continue))
                      (asdf:find-system (down-case-name system) nil))
     (asdf:missing-dependency () ;; CXML...
       (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
