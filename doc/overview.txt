@@ -1,16 +1,34 @@
 Overview of desire, a software knowledge and distribution system.
-                     
+                  October 9, 2009, 05:43
 
-0. Index
-1. What is desire (supposed to be)?
-2. Overview of terms
-2.1 Distributors
-2.2 Remotes
-2.3 Modules
-2.4 Systems
-2.5 Applications
-2.6 Localities
-3. API (aka end-user interface)
+0.  Index
+0.1   About this document
+1.  What is desire (supposed to be)?
+2.  Overview of terms
+2.1   Distributors
+2.2   Remotes
+2.3   Modules
+2.4   Systems
+2.5   Applications
+2.6   Localities
+3.  API (aka end-user interface)
+3.1   Querying the knowledge base: user level
+3.2   Making wishes
+3.2.1   Reader macros for add-module
+4.  Workflow
+4.1  Streamlined bootstrap
+4.2  Advanced use
+4.2.1 User mode
+4.2.2 Wishmaster mode
+4.2.3 The real truth about wishmaster and user modes
+5.  Shortcomings
+
+
+0.1 About this document
+
+This document has a canonical location:
+
+	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.txt
 
 
 1. What is desire (supposed to be)?
@@ -39,9 +57,10 @@ corresponds to an internet domain name[1]. Currently, they don't carry
 much information beyond just that.
 
 'Wishmasters' represent instances of desire acting as distributors which
-are in business of making desire users lives easier by repackaging modules
-from their respective VCS of choice into git, relieving burden from
-the user and reducing the amount of points of failure.
+are in business of making ordinary desire users' lives easier by
+repackaging modules from their respective VCS of choice into git,
+thereby relieving burden from the user and reducing the amount of points
+of failure.
 
 
 2.2 Remotes
@@ -152,3 +171,107 @@ Following reader macro is enabled by install-add-module-reader
 
 system-definition system repository-path &key (if-does-not-exist :error) => pathname
 
+
+4. Workflow
+
+4.1 Streamlined bootstrap
+
+To attain maximum ease, desire includes a booststrap script, whose
+canonical permanent location is:
+
+	http://www.feelingofgreen.ru/shared/git/desire/climb.sh
+
+The first argument should be an empty, writable filesystem location.
+That is, the exact filename must not exist, but its parent must exist,
+and be writable.
+
+This location will be registered as root directory for per-VCS localities,
+serving to satisfy storage needs arising from user module retrieval requests.
+
+The path to the 'git/.asdf-registry/' subdirectory of this root directory
+should be pushed into ASDF:*CENTRAL-REGISTRY*, if ASDF is to have access
+to modules in the desire's pool.
+
+This script when invoked performs following operations:
+  - use git to download modules desire depends on, placing them in /tmp,
+  - load desire,
+  - the most important part, cheer up the user!
+
+
+4.2 Advanced use
+
+Depending on the way you intend to run desire, you issue either:
+
+	(init "/path/to/root/"), for user mode
+or:
+	(init "/path/to/root/" :as 'well-known-distributor), for wishmaster mode
+
+---- Note: ----
+This path provided to INIT will henceforth be referred to as $ROOT.
+---------------
+        
+The modes provide the end-user with a tradeoff between hassle and variety
+of module available.
+
+This stems from the difference between operation of wishmaster and user modes.
+
+Wishmasters use a variety of tools to access the whole set of modules retrievable
+using desire, but from this power comes fragility and, because wishmasters also
+serve the role of simplifier gateways, time consuming whatever->git repository
+conversion process.
+
+User mode is the chief reason for that complications, as the only thing the user
+needs to have is git, and boy is that fast[1].
+
+The price, though, is relying on the set of modules available from wishmasters.
+
+
+4.2.1 User mode
+
+During INIT a default wishmaster (currently 'git.feelingofgreen.ru) will be
+chosen, its module export set will be retrieved and that, with the notable
+addition of modules present in $ROOT/git/, will constitute the whole set
+available to the end user.
+
+Who is, then, free to use LUST, APROPOS-DESR, LIST-MODULES and other
+such functions listed in section 3.
+
+
+4.2.2 Wishmaster mode
+
+This mode requires that the $ROOT/git/.meta/DEFINITIONS file contains
+a definition for the distributor your desire node will act as,
+and whose name you will pass using the :AS keyword to the INIT function.
+
+The INIT function:
+    - scans for modules in the canonical export location $ROOT/git/
+    - checks that this set includes every module that is claimed to be
+      "well known" to be distributed by our distributor[2], otherwise
+      signalling an error
+    - publishes the informations about non-"well known", converted modules
+    - calls it a day
+
+ADD-MODULE and the accompanying reader macro #@"u://r.l/" can be used
+to populate the set of known modules by hand.
+    
+
+--- footnotes ---
+
+1. Not faster than downloading and extracting release tarballs, though.
+2. This is tied to the concept of well known release locations and differs
+   from the set of modules converted and reexported in the wishmaster
+   process.
+
+
+5. Shortcomings
+
+* SBCL-only
+* ASDF-only
+* has a non-trivial amount of CL library dependencies, half of them
+  not exactly being common
+* calls out to an obscene amount of external executables, thereby only
+  being able to guess about failure reasons
+* the master mode is git-centric
+* obviously has rough edges
+* this documentation sucks
+* the author wants sleep
