@@ -2,18 +2,20 @@
 #+STARTUP: hidestars #+STARTUP: odd #+STARTUP: logdone #+STARTUP: nofninline
 
 Overview of desire, a software knowledge and distribution system.
-                  October 9, 2009, 09:37
+                  October 10, 2009, 01:30
 
                   
-1. About this document
+* About this document
 
 This document has a canonical location:
 
-	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.txt
+	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.html
 
+or, for the Org-mode source:
 
+	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.org
 
-2. What is desire (supposed to be)?
+* What is desire (supposed to be)?
 
 The domain of desire includes software distribution points, software
 modules and applications. All these terms are represented internally
@@ -22,24 +24,24 @@ maintained in a PRINT/READ-able form, additionally being easily
 transportable[1] between desire nodes.
 
 There are two sides of desire[2]:
-      o  maximally streamlined software retrieval, and
-      o  redistribution.
+     -  maximally streamlined software retrieval, and
+     -  redistribution.
 
 Desire shares concepts with and provides features like, at least:
-      o  asdf-install
-      o  mudballs
-      o  clbuild
+     -  asdf-install
+     -  mudballs
+     -  clbuild
 
-It can be obtained at:
+* How to obtain desire?
+
+Desire can be obtained at:
 
         git://git.feelingofgreen.ru/desire
 
-but please see section 4.1 for simplified bootstrap instructions.
-      
+but please see [[Streamlined bootstrap]].
 
-
-3. Overview of terms
-   1. Distributors
+* Overview of terms
+*** Distributors
 
 The largest unit of software granularity is a 'distributor', which
 corresponds to an internet domain name[3]. Currently, they don't carry
@@ -51,23 +53,19 @@ repackaging modules from their respective VCS of choice into git,
 thereby relieving burden from the user and reducing the amount of points
 of failure.
 
-
-
-   2. Remotes
+*** Remotes
 
 Distributors contain one or more 'remotes', which combine following
 concepts:
-      o version control system type (git, darcs, cvs or svn)
-      o transport type (native, http or rsync)
-      o simple pattern path on the distributor
-      o an internet port number
+     - version control system type (git, darcs, cvs or svn)
+     - transport type (native, http or rsync)
+     - simple pattern path on the distributor
+     - an internet port number
 
 The concept of remote serves (or actually, the more general type of
 location does) as a point of distribution for a group of modules.
 
-
-
-   3. Modules
+*** Modules
 
 Modules represent units of software, as released by the distributor,
 and contain the information remaining to complete the information
@@ -76,9 +74,7 @@ provided by less granular concepts to construct a module address.
 Modules can be provided by several different remotes of different
 distributors.
 
-
-
-   4. Systems
+*** Systems
 
 Descending further down we meet systems.
 Systems are objects only meant to be relevant in the domain of Common Lisp
@@ -96,9 +92,7 @@ Desire handles all these complications and operates on the full
 inter-module dependency graph. It also doesn't store that graph anywhere,
 recomputing it instead every time a request for module is performed.
 
-
-
-   5. Applications
+*** Applications
 
 Applications are simple extensions of systems, providing some very
 preliminary support for launching applications, potentially simplifiable
@@ -106,9 +100,7 @@ to the point of the end-user being able to say "launch mcclim" and
 have everything downloaded, required systems loaded and the application
 up and running as a result.
 
-
-
-   6. Localities
+*** Localities
 
 The more general type of 'location' besides remotes also includes
 'localities', which serve the same purpose as remotes, but on the local
@@ -116,55 +108,47 @@ machine. Master localities are canonical locations for module repositories
 managed by a specific VCS type.
 The master git locality is a canonical location for module redistribution.
 
+* API (aka end-user interface)
+*** Querying the knowledge base: user level
 
+     - distributor name &key (if-does-not-exist :error) => distributor
+     - remote name &key (if-does-not-exist :error) => remote
+     - module name &key (if-does-not-exist :error) => module
+     - system name &key (if-does-not-exist :error) => system
+     - app name &key (if-does-not-exist :error) => app
+     - locality name &key (if-does-not-exist :error) => locality
+     - master name &key (if-does-not-exist :error) => locality
 
-4. API (aka end-user interface)
-   1. Querying the knowledge base: user level
+     - name object => symbol
 
-distributor name &key (if-does-not-exist :error) => distributor
-remote name &key (if-does-not-exist :error) => remote
-module name &key (if-does-not-exist :error) => module
-system name &key (if-does-not-exist :error) => system
-app name &key (if-does-not-exist :error) => app
-locality name &key (if-does-not-exist :error) => locality
-master name &key (if-does-not-exist :error) => locality
+     - url remote-designator &optional module-specifier => string
 
-name object => symbol
+     - apropos-desr string-designator &optional set-designator => <no values>
+     - apropos-desr-list string-designator &optional set-designator => desirables
+     - list-modules => <no values>
 
-url remote-designator &optional module-specifier => string
+     - module-present-p module-designator module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) => boolean
+     - system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean
 
-apropos-desr string-designator &optional set-designator => <no values>
-apropos-desr-list string-designator &optional set-designator => desirables
-list-modules => <no values>
+*** Making wishes
 
-module-present-p module-designator module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) => boolean
-system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean
+     - init path &key as (default-wishmasters (list desr:*default-wishmaster*)) => boolean
+     - lust &rest module-names => boolean
+     - add-module url &optional module-name &key systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) => module
 
+***** Reader macros for add-module
 
+Following reader macro is enabled by install-add-module-reader:
 
-   2. Making wishes
-
-init path &key as (default-wishmasters (list *default-wishmaster*)) => boolean
-lust &rest module-names => boolean
-add-module url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*) => module
-
-
-      1. Reader macros for add-module
-
-Following reader macro is enabled by install-add-module-reader
 #@"u://r.l"
 #@("u://r.l" &optional module-name &key (lust *auto-lust*))
 
+*** Querying the knowledge base: advanced level
 
+     - system-definition system repository-path &key (if-does-not-exist :error) => pathname
 
-   3. Querying the knowledge base: advanced level
-
-system-definition system repository-path &key (if-does-not-exist :error) => pathname
-
-
-
-5. Workflow
-   1. Streamlined bootstrap
+* Workflow
+*** Streamlined bootstrap
 
 To attain maximum ease, desire includes a booststrap script, whose
 canonical permanent location is:
@@ -183,13 +167,12 @@ should be pushed into ASDF:*CENTRAL-REGISTRY*, if ASDF is to have access
 to modules in the desire's pool.
 
 This script when invoked performs following operations:
-  o  use git to download modules desire depends on, placing them in /tmp,
-  o  load desire,
-  o  the most important part, cheer up the user!
 
+     -  use git to download modules desire depends on, placing them in /tmp,
+     -  load desire,
+     -  the most important part, cheer up the user!
 
-
-   2. Advanced use
+*** Advanced use
 
 Depending on the way you intend to run desire, you issue either:
 
@@ -197,9 +180,7 @@ Depending on the way you intend to run desire, you issue either:
 or:
 	(init "/path/to/root/" :as 'well-known-distributor), for wishmaster mode
 
----- Note: ----
-This path provided to INIT will henceforth be referred to as $ROOT.
----------------
+(This path provided to INIT will henceforth be referred to as $ROOT.)
         
 The modes provide the end-user with a tradeoff between hassle and variety
 of module available.
@@ -216,8 +197,7 @@ needs to have is git, and boy is that fast[6].
 
 The price, though, is relying on the set of modules available from wishmasters.
 
-
-      1. User mode
+***** User mode
 
 During INIT a default wishmaster (currently 'git.feelingofgreen.ru) will be
 chosen, its module export set will be retrieved and that, with the notable
@@ -227,9 +207,7 @@ available to the end user.
 Who is, then, free to use LUST, APROPOS-DESR, LIST-MODULES and other
 such functions listed in section 3.
 
-
-
-      2. Wishmaster mode
+***** Wishmaster mode
 
 This mode requires that the $ROOT/git/.meta/DEFINITIONS file contains
 a definition for the distributor your desire node will act as,
@@ -244,25 +222,24 @@ It contains a healthy set of definitions which should be enough for
 beginning.
 
 The INIT function:
-    o  scans for modules in the canonical export location $ROOT/git/
-    o  checks that this set includes every module that is claimed to be
-      "well known" to be distributed by our distributor[7], otherwise
-      signalling an error
-    o  publishes the informations about non-"well known", converted modules
-    o  calls it a day
+
+     -  scans for modules in the canonical export location $ROOT/git/
+     -  checks that this set includes every module that is claimed to be
+         "well known" to be distributed by our distributor[7], otherwise
+         signalling an error
+     -  publishes the informations about non-"well known", converted modules
+     -  calls it a day
 
 
-         1. External executables required for module conversion
-
+******* External executables required for module conversion
+        
 The conversion is performed by external programs:
 
-    o  darcs-to-git[8]
-    o  git cvs, debian package git-cvs
-    o  git svn, debian package git-svn
+     -  darcs-to-git[8]
+     -  git cvs, debian package git-cvs
+     -  git svn, debian package git-svn
 
-
-
-      3. Extending definitions
+***** Extending definitions
 
 ADD-MODULE and the accompanying reader macro #@"u://r.l/" is a one-stop
 point useful for manual extension of the set of known entities. The URI
@@ -276,9 +253,7 @@ or created on the spot.
 SAVE-CURRENT-DEFINITIONS writes out changes into
 $ROOT/git/.meta/DEFINITIONS
 
-
-
-      4. The real truth about wishmaster and user modes
+***** The real truth about wishmaster and user modes
 
 The real truth is a bit more complicated, as the two modes have a
 non-trivial intersection in the ways they work. A more complete, proper
@@ -287,26 +262,24 @@ Some of the obvious functionality, like using non-converted modules
 without the pains of reexporting them, is clearly missing, but shouldn't
 be too hard to implement.
 
-
-
-6. Shortcomings
+* Shortcomings
 
 Some problems which pop out off the top of the head:
 
-o  SBCL-only
-o  ASDF-only
-o  Linux-only (might work on other unices)
-o  has a non-trivial amount of CL library dependencies, half of them
-  not exactly being common
-o  calls out to an obscene amount of external executables, thereby only
-  being able to guess about failure reasons
-o  can not do anything with software released as tarballs 
-o  the master mode is git-centric (probably not a big issue)
-o  obviously has rough edges
+     -  SBCL-only
+     -  ASDF-only
+     -  Linux-only (might work on other unices)
+     -  has a non-trivial amount of CL library dependencies, half of them
+        not exactly being common
+     -  calls out to an obscene amount of external executables, thereby only
+        being able to guess about failure reasons
+     -  can not do anything with software released as tarballs 
+     -  is git-centric (probably not a big issue)
+     -  obviously has rough edges
 
+-----
 
-
-7. Footnotes
+* Footnotes
 
 [1] Not yet, but the client mode depends on it, so at least partially it works.
 [2] Although, by nature of being a full-knowledge system the applications might
