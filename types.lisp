@@ -464,7 +464,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
             (wishmaster (ensure-pure-wishmaster ,url)))
        (let ((gate-remote (wishmaster-gate-remote wishmaster))
              (modules (list ,@(mapcar #'emit-make-simple-module-form converted-modules))))
-         (setf (location-modules gate-remote) modules)
+         (setf (location-modules gate-remote) (mapcar #'name modules))
          (dolist (m modules)
            (push gate-remote (module-remotes m)))
          ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) converted-modules)
