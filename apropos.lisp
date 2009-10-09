@@ -70,5 +70,7 @@
   (values))
 
 (defun list-modules ()
-  (mapc #'briefly-describe (sort (hash-table-values *modules*) #'name-lessp))
+  (dolist (m (sort (hash-table-values *modules*) #'name-lessp))
+    (briefly-describe m)
+    (terpri))
   (values))
