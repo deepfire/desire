@@ -81,6 +81,7 @@ sbcl --noinform \
      --eval "(declaim (optimize (debug $DEBUG)) #+sbcl (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))" \
      --eval "(push 'temp-modules-search asdf:*system-definition-search-functions*)" \
      --eval "(asdf:operate 'asdf:load-op 'desire :verbose nil)" \
+     --eval "(in-package :desr)" \
      --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
-     --eval "(desire:init \"$ROOT/\")" \
-     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (desire* 'wish) and desire will make it happen.\")"
+     --eval "(init \"$ROOT/\")" \
+     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (lust 'desiree) and it will happen.~%  You can link desire's pool of packages into ASDF by ensuring that #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*\")"
