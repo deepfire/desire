@@ -43,6 +43,7 @@ are in business of making desire users lives easier by repackaging modules
 from their respective VCS of choice into git, relieving burden from
 the user and reducing the amount of points of failure.
 
+
 2.2 Remotes
 
 Distributors contain one or more 'remotes', which combine following
@@ -55,6 +56,7 @@ concepts:
 The concept of remote serves (or actually, the more general type of
 location does) as a point of distribution for a group of modules.
 
+
 2.3 Modules
 
 Modules represent units of software, as released by the distributor,
@@ -63,6 +65,7 @@ provided by less granular concepts to construct a module address.
 
 Modules can be provided by several different remotes of different
 distributors.
+
 
 2.4 Systems
 
@@ -82,6 +85,7 @@ Desire handles all these complications and operates on the full
 inter-module dependency graph. It also doesn't store that graph anywhere,
 recomputing it instead every time a request for module is performed.
 
+
 2.5 Applications
 
 Applications are simple extensions of systems, providing some very
@@ -89,6 +93,7 @@ preliminary support for launching applications, potentially simplifiable
 to the point of the end-user being able to say "launch mcclim" and
 have everything downloaded, required systems loaded and the application
 up and running as a result.
+
 
 2.6 Localities
 
@@ -128,17 +133,20 @@ list-modules => <no values>
 module-present-p module-designator module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) => boolean
 system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean
 
+
 3.2 Making wishes
 
 init path &key as (default-wishmasters (list *default-wishmaster*)) => boolean
 lust &rest module-names => boolean
 add-module url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*) => module
 
+
 3.2.1 Reader macros for add-module
 
 Following reader macro is enabled by install-add-module-reader
 #@"u://r.l"
 #@("u://r.l" &optional module-name &key (lust *auto-lust*))
+
 
 3.x Querying the knowledge base: advanced level
 
