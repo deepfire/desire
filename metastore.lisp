@@ -71,20 +71,29 @@ Return status indicates whether there were changes and a new commit was done."
     (with-explanation ("committing changes (if any) to metafile ~A in ~S" (symbol-name name) *default-pathname-defaults*)
       (git "commit" "-m" (format nil "~A" commit-message) (symbol-name name)))))
 
+(defun metastore-present-p (directory &optional required-metafiles)
+  "Determine if a metastore is present in DIRECTORY, optionally
+additionally requiring that REQUIRED-METAFILES are present."
+  (and (directory-exists-p (subdirectory* directory ".git"))
+       (every (compose #'file-exists-p
+                       (rcurry #'metafile-path directory))
+              required-metafiles)))
+
+(defun init-metastore (directory &optional required-metafiles)
+  "Initialise metastore in DIRECTORY, with optional, empty
+REQUIRED-METAFILES."
+  (within-directory (directory :if-does-not-exist :create :if-exists :error)
+    (with-explanation ("initialising git metastore database in ~S" *default-pathname-defaults*)
+      (git "init"))
+    (open  ".git/git-daemon-export-ok" :direction :probe :if-does-not-exist :create)
+    (dolist (mf required-metafiles)
+      (create-metafile mf directory)
+      (commit-metafile mf directory (format nil "Created metafile ~A" mf)))
+    t))
+
 (defun ensure-metastore (directory &key required-metafiles)
   "Ensure that a metastore exists at DIRECTORY.
 
    Returns T if the metastore was created, or updated; NIL otherwise."
-  (if-let ((meta-missing-p (not (and (directory-exists-p (subdirectory* directory ".git"))
-                                     (every (compose #'file-exists-p
-                                                     (rcurry #'metafile-path directory))
-                                            required-metafiles)))))
-    (within-directory (directory :if-does-not-exist :create)
-      (with-explanation ("initialising git metastore database in ~S" *default-pathname-defaults*)
-        (git "init"))
-      (open  ".git/git-daemon-export-ok" :direction :probe :if-does-not-exist :create)
-      (dolist (mf required-metafiles)
-        (create-metafile mf directory)
-        (commit-metafile mf directory (format nil "Created ~A" mf)))
-      t)
-    nil))
+  (unless (metastore-present-p directory required-metafiles)
+    (init-metastore directory required-metafiles)))
