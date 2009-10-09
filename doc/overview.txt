@@ -1,39 +1,19 @@
+### -*- mode: org; -*-
+#+STARTUP: hidestars #+STARTUP: odd #+STARTUP: logdone #+STARTUP: nofninline
+
 Overview of desire, a software knowledge and distribution system.
                   October 9, 2009, 09:37
 
-0.  Index
-0.1   About this document
-1.  What is desire (supposed to be)?
-2.  Overview of terms
-2.1   Distributors
-2.2   Remotes
-2.3   Modules
-2.4   Systems
-2.5   Applications
-2.6   Localities
-3.  API (aka end-user interface)
-3.1   Querying the knowledge base: user level
-3.2   Making wishes
-3.2.1   Reader macros for add-module
-4.  Workflow
-4.1   Streamlined bootstrap
-4.2   Advanced use
-4.2.1   User mode
-4.2.2   Wishmaster mode
-4.2.2.1   External executables required for module conversion
-4.2.3   Extending definitions
-4.2.4   The real truth about wishmaster and user modes
-5.  Shortcomings
-
-
-0.1 About this document
+                  
+1. About this document
 
 This document has a canonical location:
 
 	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.txt
 
 
-1. What is desire (supposed to be)?
+
+2. What is desire (supposed to be)?
 
 The domain of desire includes software distribution points, software
 modules and applications. All these terms are represented internally
@@ -42,13 +22,13 @@ maintained in a PRINT/READ-able form, additionally being easily
 transportable[1] between desire nodes.
 
 There are two sides of desire[2]:
-      - maximally streamlined software retrieval, and
-      - redistribution.
+      o  maximally streamlined software retrieval, and
+      o  redistribution.
 
 Desire shares concepts with and provides features like, at least:
-      - asdf-install
-      - mudballs
-      - clbuild
+      o  asdf-install
+      o  mudballs
+      o  clbuild
 
 It can be obtained at:
 
@@ -56,18 +36,13 @@ It can be obtained at:
 
 but please see section 4.1 for simplified bootstrap instructions.
       
---- footnotes ---
-1. Not yet, but the client mode depends on it, so at least partially it works.
-2. Although, by nature of being a full-knowledge system the applications might
-   easily go beyond that.
 
 
-2. Overview of terms
-
-2.1 Distributors
+3. Overview of terms
+   1. Distributors
 
 The largest unit of software granularity is a 'distributor', which
-corresponds to an internet domain name[1]. Currently, they don't carry
+corresponds to an internet domain name[3]. Currently, they don't carry
 much information beyond just that.
 
 'Wishmasters' represent instances of desire acting as distributors which
@@ -77,20 +52,22 @@ thereby relieving burden from the user and reducing the amount of points
 of failure.
 
 
-2.2 Remotes
+
+   2. Remotes
 
 Distributors contain one or more 'remotes', which combine following
 concepts:
-      - version control system type (git, darcs, cvs or svn)
-      - transport type (native, http or rsync)
-      - simple pattern path on the distributor
-      - an internet port number
+      o version control system type (git, darcs, cvs or svn)
+      o transport type (native, http or rsync)
+      o simple pattern path on the distributor
+      o an internet port number
 
 The concept of remote serves (or actually, the more general type of
 location does) as a point of distribution for a group of modules.
 
 
-2.3 Modules
+
+   3. Modules
 
 Modules represent units of software, as released by the distributor,
 and contain the information remaining to complete the information
@@ -100,26 +77,28 @@ Modules can be provided by several different remotes of different
 distributors.
 
 
-2.4 Systems
+
+   4. Systems
 
 Descending further down we meet systems.
 Systems are objects only meant to be relevant in the domain of Common Lisp
 software, and more precisely -- to backend system definition facilities,
-such as ASDF, XCVB, Mudballs or others[2].
+such as ASDF, XCVB, Mudballs or others[4].
 
 The concept of system introduces inter-system dependencies, which cross
 module boundaries, producing inter-module dependencies.
 
 Evidently, there can be several systems per module, and also those
 can be obscured from the end-user, either intentionally or by unfortunate
-accident[3].
+accident[5].
 
 Desire handles all these complications and operates on the full
 inter-module dependency graph. It also doesn't store that graph anywhere,
 recomputing it instead every time a request for module is performed.
 
 
-2.5 Applications
+
+   5. Applications
 
 Applications are simple extensions of systems, providing some very
 preliminary support for launching applications, potentially simplifiable
@@ -128,7 +107,8 @@ have everything downloaded, required systems loaded and the application
 up and running as a result.
 
 
-2.6 Localities
+
+   6. Localities
 
 The more general type of 'location' besides remotes also includes
 'localities', which serve the same purpose as remotes, but on the local
@@ -136,16 +116,10 @@ machine. Master localities are canonical locations for module repositories
 managed by a specific VCS type.
 The master git locality is a canonical location for module redistribution.
 
---- footnotes ---
-
-1. Actually, sometimes a group of domain names, like in case of sourceforge.
-2. Currently, the only backend system implemented is ASDF.
-3. Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
 
 
-3. API (aka end-user interface)
-
-3.1 Querying the knowledge base: user level
+4. API (aka end-user interface)
+   1. Querying the knowledge base: user level
 
 distributor name &key (if-does-not-exist :error) => distributor
 remote name &key (if-does-not-exist :error) => remote
@@ -167,28 +141,30 @@ module-present-p module-designator module &optional (locality (master 'git)) che
 system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean
 
 
-3.2 Making wishes
+
+   2. Making wishes
 
 init path &key as (default-wishmasters (list *default-wishmaster*)) => boolean
 lust &rest module-names => boolean
 add-module url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*) => module
 
 
-3.2.1 Reader macros for add-module
+      1. Reader macros for add-module
 
 Following reader macro is enabled by install-add-module-reader
 #@"u://r.l"
 #@("u://r.l" &optional module-name &key (lust *auto-lust*))
 
 
-3.x Querying the knowledge base: advanced level
+
+   3. Querying the knowledge base: advanced level
 
 system-definition system repository-path &key (if-does-not-exist :error) => pathname
 
 
-4. Workflow
 
-4.1 Streamlined bootstrap
+5. Workflow
+   1. Streamlined bootstrap
 
 To attain maximum ease, desire includes a booststrap script, whose
 canonical permanent location is:
@@ -207,12 +183,13 @@ should be pushed into ASDF:*CENTRAL-REGISTRY*, if ASDF is to have access
 to modules in the desire's pool.
 
 This script when invoked performs following operations:
-  - use git to download modules desire depends on, placing them in /tmp,
-  - load desire,
-  - the most important part, cheer up the user!
+  o  use git to download modules desire depends on, placing them in /tmp,
+  o  load desire,
+  o  the most important part, cheer up the user!
 
 
-4.2 Advanced use
+
+   2. Advanced use
 
 Depending on the way you intend to run desire, you issue either:
 
@@ -235,12 +212,12 @@ serve the role of simplifier gateways, time consuming whatever->git repository
 conversion process.
 
 User mode is the chief reason for that complications, as the only thing the user
-needs to have is git, and boy is that fast[1].
+needs to have is git, and boy is that fast[6].
 
 The price, though, is relying on the set of modules available from wishmasters.
 
 
-4.2.1 User mode
+      1. User mode
 
 During INIT a default wishmaster (currently 'git.feelingofgreen.ru) will be
 chosen, its module export set will be retrieved and that, with the notable
@@ -251,7 +228,8 @@ Who is, then, free to use LUST, APROPOS-DESR, LIST-MODULES and other
 such functions listed in section 3.
 
 
-4.2.2 Wishmaster mode
+
+      2. Wishmaster mode
 
 This mode requires that the $ROOT/git/.meta/DEFINITIONS file contains
 a definition for the distributor your desire node will act as,
@@ -266,24 +244,25 @@ It contains a healthy set of definitions which should be enough for
 beginning.
 
 The INIT function:
-    - scans for modules in the canonical export location $ROOT/git/
-    - checks that this set includes every module that is claimed to be
-      "well known" to be distributed by our distributor[2], otherwise
+    o  scans for modules in the canonical export location $ROOT/git/
+    o  checks that this set includes every module that is claimed to be
+      "well known" to be distributed by our distributor[7], otherwise
       signalling an error
-    - publishes the informations about non-"well known", converted modules
-    - calls it a day
+    o  publishes the informations about non-"well known", converted modules
+    o  calls it a day
 
 
-4.2.2.1 External executables required for module conversion
-    
+         1. External executables required for module conversion
+
 The conversion is performed by external programs:
 
-    - darcs-to-git[3]
-    - git cvs, debian package git-cvs
-    - git svn, debian package git-svn
+    o  darcs-to-git[8]
+    o  git cvs, debian package git-cvs
+    o  git svn, debian package git-svn
 
 
-4.2.3 Extending definitions
+
+      3. Extending definitions
 
 ADD-MODULE and the accompanying reader macro #@"u://r.l/" is a one-stop
 point useful for manual extension of the set of known entities. The URI
@@ -298,7 +277,8 @@ SAVE-CURRENT-DEFINITIONS writes out changes into
 $ROOT/git/.meta/DEFINITIONS
 
 
-4.2.4 The real truth about wishmaster and user modes
+
+      4. The real truth about wishmaster and user modes
 
 The real truth is a bit more complicated, as the two modes have a
 non-trivial intersection in the ways they work. A more complete, proper
@@ -308,27 +288,35 @@ without the pains of reexporting them, is clearly missing, but shouldn't
 be too hard to implement.
 
 
---- footnotes ---
 
-1. Not faster than downloading and extracting release tarballs, though.
-2. This is tied to the concept of well known release locations and differs
-   from the set of modules converted and reexported in the wishmaster
-   process.
-3. Seemingly no longer available at original location, still can be obtained
-   through git://git.feelingofgreen.ru/darcs-to-git
-
-
-5. Shortcomings
+6. Shortcomings
 
 Some problems which pop out off the top of the head:
 
-* SBCL-only
-* ASDF-only
-* Linux-only (might work on other unices)
-* has a non-trivial amount of CL library dependencies, half of them
+o  SBCL-only
+o  ASDF-only
+o  Linux-only (might work on other unices)
+o  has a non-trivial amount of CL library dependencies, half of them
   not exactly being common
-* calls out to an obscene amount of external executables, thereby only
+o  calls out to an obscene amount of external executables, thereby only
   being able to guess about failure reasons
-* can not do anything with software released as tarballs 
-* the master mode is git-centric (probably not a big issue)
-* obviously has rough edges
+o  can not do anything with software released as tarballs 
+o  the master mode is git-centric (probably not a big issue)
+o  obviously has rough edges
+
+
+
+7. Footnotes
+
+[1] Not yet, but the client mode depends on it, so at least partially it works.
+[2] Although, by nature of being a full-knowledge system the applications might
+easily go beyond that.
+[3] Actually, sometimes a group of domain names, like in case of sourceforge.
+[4] Currently, the only backend system implemented is ASDF.
+[5] Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
+[6] Not faster than downloading and extracting release tarballs, though.
+[7] This is tied to the concept of well known release locations and differs
+from the set of modules converted and reexported in the wishmaster
+process.
+[8] Seemingly no longer available at original location, still can be obtained
+   through git://git.feelingofgreen.ru/darcs-to-git
