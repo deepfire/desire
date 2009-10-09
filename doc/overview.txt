@@ -249,6 +249,14 @@ This mode requires that the $ROOT/git/.meta/DEFINITIONS file contains
 a definition for the distributor your desire node will act as,
 and whose name you will pass using the :AS keyword to the INIT function.
 
+For the time being, it makes most sense to seed the definitions file
+from what is already accumulated at feelingofgreen.ru:
+
+	http://www.feelingofgreen.ru/shared/git/.meta/DEFINITIONS
+
+It contains a healthy set of definitions which should be enough for
+beginning.
+
 The INIT function:
     - scans for modules in the canonical export location $ROOT/git/
     - checks that this set includes every module that is claimed to be
