@@ -462,9 +462,13 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (destructuring-bind (url &key converted-modules) (read stream nil nil)
     `(lret ((converted-modules ',converted-modules)
             (wishmaster (ensure-pure-wishmaster ,url)))
-       ,@(mapcar #'emit-make-simple-module-form converted-modules)
-       ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) converted-modules)
-       (setf (wishmaster-converted-modules wishmaster) (mapcar #'module converted-modules)))))
+       (let ((gate-remote (wishmaster-gate-remote wishmaster))
+             (modules (list ,@(mapcar #'emit-make-simple-module-form converted-modules))))
+         (setf (location-modules gate-remote) modules)
+         (dolist (m modules)
+           (push gate-remote (module-remotes m)))
+         ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) converted-modules)
+         (setf (wishmaster-converted-modules wishmaster) (mapcar #'module converted-modules))))))
 
 (defun ensure-wishmaster (wishmaster-spec)
   "When WISHMASTER-SPEC is a symbol, find the distributor it names,
