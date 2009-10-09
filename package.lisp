@@ -37,7 +37,7 @@
    ;; add-module.lisp
    #:add-module #:add-module-reader #:install-add-module-reader
    ;; apropos.lisp
-   #:apropos-desr))
+   #:apropor-desr-list #:apropos-desr #:list-modules))
 
 (in-package :desire)
 

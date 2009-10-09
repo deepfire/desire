@@ -123,6 +123,7 @@ url remote-designator &optional module-specifier => string
 
 apropos-desr string-designator &optional set-designator => <no values>
 apropos-desr-list string-designator &optional set-designator => desirables
+list-modules => <no values>
 
 module-present-p module-designator module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) => boolean
 system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean

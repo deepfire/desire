@@ -31,23 +31,25 @@
         (:system *systems*)
         (:application *apps*))))
 
+(defun name-lessp (x y)
+  (string-lessp (string (name x)) (string (name y))))
+
 (defun apropos-desr-list (string-designator &optional set-designator)
   "Like APROPOS-DESR, except that it returns a list of desirable objects found."
   (declare (type (or symbol string) string-designator)
            (type (or null hash-table (member :distributor :remote :module :system :application)) set-designator))
-  (flet ((name-lessp (x y) (string-lessp (string (name x)) (string (name y)))))
-    (if set-designator
-        (let ((table (set-designator-to-hash-table set-designator))
-              (string (string string-designator))
-              (result nil))
-          (maphash-values (lambda (o)
-                            (when (search string (symbol-name (name o)) :test #'char-equal)
-                              (push o result)))
-                          table)
-          (sort result #'name-lessp))
-        (mapcan (lambda (table)
-                  (apropos-desr string-designator table))
-                (list *distributors* *remotes* *modules* *systems* *apps*)))))
+  (if set-designator
+      (let ((table (set-designator-to-hash-table set-designator))
+            (string (string string-designator))
+            (result nil))
+        (maphash-values (lambda (o)
+                          (when (search string (symbol-name (name o)) :test #'char-equal)
+                            (push o result)))
+                        table)
+        (sort result #'name-lessp))
+      (mapcan (lambda (table)
+                (apropos-desr string-designator table))
+              (list *distributors* *remotes* *modules* *systems* *apps*))))
 
 (defgeneric briefly-describe (desirable &optional stream)
   (:method ((o distributor) &optional (stream *standard-output*))
@@ -65,4 +67,8 @@
   (dolist (o (apropos-desr-list string-designator set-designator))
     (briefly-describe o)
     (terpri))
+  (values))
+
+(defun list-modules ()
+  (mapc #'briefly-describe (sort (hash-table-values *modules*) #'name-lessp))
   (values))
