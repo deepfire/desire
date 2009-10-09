@@ -84,4 +84,4 @@ sbcl --noinform \
      --eval "(in-package :desr)" \
      --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
      --eval "(init \"$ROOT/\")" \
-     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (lust 'desiree) and it will happen.~%  You can link desire's pool of packages into ASDF by ensuring that #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*\")"
+     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (lust 'desiree) and it will happen.~%  You can link desire's pool of packages into ASDF by ensuring that~%  #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*~%~%  To see what's possible, issue:~%    (apropos-desr 'clim)~%  or~%    (list-modules)~%~%  Have fun!~%~%\")"
