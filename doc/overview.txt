@@ -1,5 +1,5 @@
 Overview of desire, a software knowledge and distribution system.
-                  October 9, 2009, 05:43
+                  October 9, 2009, 08:27
 
 0.  Index
 0.1   About this document
@@ -43,9 +43,15 @@ There are two sides of desire[2]:
       - maximally streamlined software retrieval, and
       - redistribution.
 
+Desire shares concepts with and provides features like, at least:
+      - asdf-install
+      - mudballs
+      - clbuild
+
 --- footnotes ---
 1. Not yet, but the client mode depends on it, so at least partially it works.
-2. Although, by nature of being a full-knowledge system the applications might easily go beyond that.
+2. Although, by nature of being a full-knowledge system the applications might
+   easily go beyond that.
 
 
 2. Overview of terms
@@ -253,7 +259,17 @@ The INIT function:
 
 ADD-MODULE and the accompanying reader macro #@"u://r.l/" can be used
 to populate the set of known modules by hand.
-    
+
+
+4.2.3 The real truth about wishmaster and user modes
+
+The real truth is a bit more complicated, as the two modes have a
+non-trivial intersection in the ways they work. A more complete, proper
+explanation of underlying reasons for some of the choices is due.
+Some of the obvious functionality, like using non-converted modules
+without the pains of reexporting them, is clearly missing, but shouldn't
+be too hard to implement.
+
 
 --- footnotes ---
 
@@ -265,13 +281,15 @@ to populate the set of known modules by hand.
 
 5. Shortcomings
 
+Some problems which pop out off the top of the head:
+
 * SBCL-only
 * ASDF-only
+* Linux-only (might work on other unices)
 * has a non-trivial amount of CL library dependencies, half of them
   not exactly being common
 * calls out to an obscene amount of external executables, thereby only
   being able to guess about failure reasons
-* the master mode is git-centric
+* can not do anything with software released as tarballs 
+* the master mode is git-centric (probably not a big issue)
 * obviously has rough edges
-* this documentation sucks
-* the author wants sleep
