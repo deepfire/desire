@@ -92,7 +92,7 @@
                         (when systemless
                           (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))
                         (when-let ((converted-names (and (typep o 'gate) (gate-converted-module-names o))))
-                          (list `(:converted-module-names ',(mapcar #'downstring converted-names))))))))))
+                          (list `(:converted-module-names ,(mapcar #'downstring converted-names))))))))))
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject 
@@ -120,7 +120,7 @@ to omission from DEFINITIONS."
   (declare (ignore char sharp))
   (destructuring-bind (type path-components &rest initargs &key modules simple-modules simple-systemless-modules converted-module-names name &allow-other-keys) (read stream nil nil)
     (emit-remote-form type name modules simple-modules simple-systemless-modules converted-module-names path-components
-                      (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules))))
+                      (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :converted-module-names))))
 
 #+(or)
 (defun locality-master-p (o)
