@@ -627,7 +627,7 @@ LOCALITY-PATHNAME."
 (defun merge-remote-wishmaster (wishmaster &optional (metastore (meta-path)))
   "Merge definitions from WISHMASTER."
   (within-wishmaster-meta (wishmaster :metastore metastore)
-    (load-definitions metastore)))
+    (load-definitions :source wishmaster :force-source nil :metastore metastore)))
 
 (defun merge-remote-wishmasters (&optional (metastore (meta-path)))
   (do-wishmasters (w)
@@ -645,7 +645,7 @@ LOCALITY-PATHNAME."
   (do-present-modules (module locality)
     (ensure-module-systems-loadable module locality)))
 
-(defgeneric load-definitions (&optional metastore))
+(defgeneric load-definitions (&key source force-source metastore))
 (defgeneric save-current-definitions (&key seal-p commit-message metastore))
 
 (defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*))
@@ -670,7 +670,7 @@ locally present modules will be marked as converted."
       (report t ";;; No metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
       (clone-metastore *bootstrap-wishmaster-url* gate-path))
     (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions meta-path))
-    (load-definitions meta-path)
+    (load-definitions :force-source nil :metastore meta-path)
     (when merge-remote-wishmasters
       (report t ";;; Merging definitions from remote wishmasters...~%")
       (merge-remote-wishmasters meta-path))

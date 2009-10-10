@@ -23,6 +23,24 @@
 
 (defvar *read-universal-time*)
 (defvar *read-time-enclosing-distributor*)
+(defvar *read-time-force-source* nil)
+(defvar *read-time-election-source-distributor*)
+
+(defgeneric elect-slot-value (source incumbent slot-name source-value)
+  (:method :around (s (incumbent null) slot-name source-value)
+    source-value)
+  (:method (source incumbent slot-name source-value)
+    (error "~@<Fell through to default method in ELECT-SLOT-VALUE: ~S => ~S, slot ~S.~:@>" source incumbent slot-name))
+  (:method :around ((s distributor) (i distributor) slot-name source-value)
+    (if *read-time-force-source*
+        source-value
+        (call-next-method)))
+  (:method ((s distributor) (i distributor) (slot (eql 'wishmaster)) sval)
+    (let ((ival (slot-value i 'wishmaster)))
+      ;; only allow degradation of wishmaster status from himself
+      (if (and ival (null sval))
+          (not (eq s i))
+          sval))))
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#D(~;~A ~:[~;:wishmaster t~] ~@<~S ~S~:@>~;)~:@>"
@@ -31,9 +49,13 @@
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key wishmaster remotes &allow-other-keys) (read stream nil nil t)
-    `(or (distributor ',name :if-does-not-exist :continue)
-         (lret ((*read-time-enclosing-distributor* (make-instance 'distributor :name ',name :wishmaster ,wishmaster :last-sync-time ,*read-universal-time* :synchronised-p t ,@(remove-from-plist initargs :remotes))))
-           ,@remotes))))
+    `(let* ((source *read-time-election-source-distributor*)
+            (incumbent (distributor ',name :if-does-not-exist :continue))
+            (wishmaster (elect-slot-value source incumbent 'wishmaster ,wishmaster)))
+       (let ((*read-time-enclosing-distributor*
+              (or incumbent (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t))))
+         (setf (slot-value *read-time-enclosing-distributor* 'wishmaster) wishmaster)
+         ,@remotes))))
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
@@ -201,10 +223,12 @@ to omission from DEFINITIONS."
       (format stream "~%~%;;;~%;;; Applications~%;;;")
       (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream)))))
 
-(defmethod load-definitions (&optional (metastore (meta-path)))
+(defmethod load-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)))
   "Load definitions of the world from METASTORE."
-  (with-open-metafile (definitions 'definitions metastore)
-    (read-definitions definitions)))
+  (let ((*read-time-election-source-distributor* source)
+        (*read-time-force-source* force-source))
+    (with-open-metafile (definitions 'definitions metastore)
+      (read-definitions definitions))))
 
 (defmethod save-current-definitions (&key seal-p (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
   "Save current model of the world within METASTORE.
