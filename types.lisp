@@ -319,8 +319,8 @@ When there's a name clash NIL is returned."
     (when-let ((non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
       default-name)))
 
-(defun init-time-collate-remote-name (distributor vcs-type &optional specified-name)
-  "Provide a mechanism for init-time name collation for REMOTE with 
+(defun init-time-select-remote-name (distributor vcs-type &optional specified-name)
+  "Provide a mechanism for init-time name selection for REMOTE with 
    DISTRIBUTOR-NAME, and optionally SPECIFIED-NAME.
 
    Collation rules are considered in order, as follows:
@@ -338,7 +338,7 @@ When there's a name clash NIL is returned."
                         vcs-type distributor-name))))))
 
 (defmethod initialize-instance :before ((o remote) &key distributor vcs-type name &allow-other-keys)
-  (setf (name o) (init-time-collate-remote-name distributor vcs-type name)))
+  (setf (name o) (init-time-select-remote-name distributor vcs-type name)))
 
 (defmethod initialize-instance :after ((o remote) &key distributor path &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o))
