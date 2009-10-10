@@ -161,7 +161,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 
 ;;; exhaustive partition of LOCATION
 (defclass locality (location)
-  ((path :accessor locality-path :initarg :path :documentation "Specified.")
+  ((pathname :accessor locality-pathname :initarg :pathname :documentation "Specified.")
    (scan-p :accessor locality-scan-p :initarg :scan-p :documentation "Specified."))
   (:default-initargs
    :scan-p nil))
@@ -221,16 +221,16 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 ;;;
 ;;; Locality methods
 ;;;
-(defmethod initialize-instance :after ((o locality) &key path &allow-other-keys)
-  (unless path
+(defmethod initialize-instance :after ((o locality) &key pathname &allow-other-keys)
+  (unless pathname
     (error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
-  (setf (locality-by-path path) o)
-  (unless (directory-exists-p path)
-    (ensure-directories-exist path)))
+  (setf (locality-by-path pathname) o)
+  (unless (directory-exists-p pathname)
+    (ensure-directories-exist pathname)))
 
-(defmethod initialize-instance :after ((o cvs-locality) &key path &allow-other-keys)
-  (unless (directory-exists-p path)
-    (ensure-directories-exist path))
+(defmethod initialize-instance :after ((o cvs-locality) &key pathname &allow-other-keys)
+  (unless (directory-exists-p pathname)
+    (ensure-directories-exist pathname))
   (ensure-directories-exist (cvs-locality-lock-path o) :verbose t))
 
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
@@ -239,7 +239,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 (defun locality-asdf-registry-path (locality)
   "Provide the fixed definition of ASDF registry directory,
    within LOCALITY."
-  (subdirectory* (locality-path locality) ".asdf-registry"))
+  (subdirectory* (locality-pathname locality) ".asdf-registry"))
 
 (defun locality-register-with-asdf (locality)
   (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal))
@@ -247,11 +247,11 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 (defun cvs-locality-lock-path (cvs-locality)
   "Provide the fixed definition of lock directory for CVS repositories,
    within CVS-LOCALITY."
-  (subdirectory* (locality-path cvs-locality) ".cvs-locks"))
+  (subdirectory* (locality-pathname cvs-locality) ".cvs-locks"))
 
 (defun module-path (module &optional (locality (gate *self*)))
   "Return MODULE's path in LOCALITY, which defaults to master Git locality."
-  (subdirectory* (locality-path locality) (downstring (coerce-to-name module))))
+  (subdirectory* (locality-pathname locality) (downstring (coerce-to-name module))))
 
 ;;;
 ;;; Local distributor methods
@@ -262,7 +262,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
     (setf (slot-value o vcs-type)
           (make-instance (find-class (format-symbol #.*package* "~A-LOCALITY" vcs-type))
                          :name (default-remote-name (name o) vcs-type) :distributor o
-                         :path (subdirectory* (root o) (string-downcase (string vcs-type)))))))
+                         :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))))))
 
 (defmethod shared-initialize :after ((o local-distributor) slot-names &key &allow-other-keys)
   ;; The locality typed *gate-vcs-type* need to be produced differently between make-instance/change-class.
@@ -285,7 +285,7 @@ they participate in the desire wishmaster protocol or not."
   "Called once, during INIT, if we're pretending to be someone well-known."
   (setf (gate w) (change-class (find-if (of-type *gate-vcs-type*) (distributor-remotes w))
                                'git-locality
-                               :path (merge-pathnames #p"git/" root)))
+                               :pathname (merge-pathnames #p"git/" root)))
   (let ((locally-present-set (distributor-converted-modules w)) ; was computed by GATE-LOCALITY's :after I-I method
         ;; The logic here is that if we're engaging in this whole game,
         ;; we're only releasing via our gate remote (git), which means that
@@ -350,19 +350,19 @@ When there's a name clash NIL is returned."
 ;;;
 ;;; NOTE: this is the reason why remotes have names
 ;;;
-(defun git-fetch-remote (remote module-name &optional locality-path)
+(defun git-fetch-remote (remote module-name &optional locality-pathname)
   "Fetch from REMOTE, with working directory optionally changed
-to LOCALITY-PATH."
-  (maybe-within-directory locality-path
+to LOCALITY-PATHNAME."
+  (maybe-within-directory locality-pathname
     (let ((module-url (url remote module-name)))
       (ensure-gitremote (name remote) module-url))
     (with-explanation ("fetching module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
       (git "fetch" (down-case-name remote)))
     (ensure-master-branch-from-remote :remote-name (name remote))))
 
-(defun git-clone-remote (remote module-name &optional locality-path)
-  "Clone REMOTE, with working directory optionally changed to LOCALITY-PATH."
-  (maybe-within-directory locality-path
+(defun git-clone-remote (remote module-name &optional locality-pathname)
+  "Clone REMOTE, with working directory optionally changed to LOCALITY-PATHNAME."
+  (maybe-within-directory locality-pathname
     (let ((module-url (url remote module-name)))
       (with-explanation ("cloning module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
         (git "clone" "-o" (down-case-name remote) module-url)))))
@@ -591,7 +591,7 @@ remote, in which case TYPE must be subtype of GIT."
 
 (defun meta-path (&optional (local-distributor *self*))
   "Return the path to the meta directory."
-  (subdirectory* (locality-path (gate local-distributor)) ".meta"))
+  (subdirectory* (locality-pathname (gate local-distributor)) ".meta"))
 
 (defun compute-locality-module-presence (&optional (locality (gate *self*)))
   "Scan LOCALITY for known modules and update its and those modules's idea
@@ -608,10 +608,10 @@ The value returned is the list of found modules."
      (when (module-present-p ,module ,locality nil nil)
        ,@body)))
 
-(defun clone-metastore (url locality-path)
+(defun clone-metastore (url locality-pathname)
   "Clone metastore from URL, with working directory optionally changed to
-LOCALITY-PATH."
-  (maybe-within-directory locality-path
+LOCALITY-PATHNAME."
+  (maybe-within-directory locality-pathname
     (multiple-value-bind (type host port path) (parse-remote-namestring url)
       (declare (ignore type port path))
       (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)

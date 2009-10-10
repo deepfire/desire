@@ -100,7 +100,7 @@ to omission from DEFINITIONS."
 #+(or)
 (defmethod print-object ((o locality) stream)
   (format stream "~@<#L(~;~A ~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
-          (symbol-name (type-of o)) (string (name o)) (locality-path o)
+          (symbol-name (type-of o)) (string (name o)) (locality-pathname o)
           (append (when (locality-master-p o) (list (list :master-p t)))
                   (when (locality-scan-p o) (list (list :scan-p t))))))
 
@@ -108,7 +108,7 @@ to omission from DEFINITIONS."
 (defun locality-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (type name path &rest initargs &key &allow-other-keys) (read stream nil nil)
-    `(make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :path ,path ,@(remove-from-plist initargs :path :modules))))
+    `(make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :pathname ,path ,@(remove-from-plist initargs :path :modules))))
 
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~S ~A~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
