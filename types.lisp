@@ -608,7 +608,7 @@ The value returned is the list of found modules."
      (when (module-present-p ,module ,locality nil nil)
        ,@body)))
 
-(defun clone-metastore (&optional (url *bootstrap-wishmaster-url*) (locality-path (meta-path)))
+(defun clone-metastore (url locality-path)
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATH."
   (maybe-within-directory locality-path
@@ -661,13 +661,14 @@ locally present modules will be marked as converted."
                             path
                             (merge-pathnames path)))
          (root (parse-namestring absolute-path))
-         (meta-path (merge-pathnames #p"git/.meta/" root)))
+         (gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) root))
+         (meta-path (merge-pathnames #p".meta/" gate-path)))
     (clear-definitions)
     (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
       (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
     (unless (metastore-present-p meta-path '(definitions))
       (report t ";;; No metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
-      (clone-metastore *bootstrap-wishmaster-url* meta-path))
+      (clone-metastore *bootstrap-wishmaster-url* gate-path))
     (report t ";;; Loading definitions from ~S~%" (metafile-path 'definitions meta-path))
     (load-definitions meta-path)
     (when merge-remote-wishmasters
