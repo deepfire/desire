@@ -107,20 +107,16 @@ to omission from DEFINITIONS."
   `(or (system ',name :if-does-not-exist :continue)
        (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
 
-(defun emit-remote-form (type name modules simple-modules simple-systemless-modules converted-module-names path-components remote-initargs)
-  `(prog1
-       (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor *read-time-enclosing-distributor*
-                      :path ',path-components :modules ',(append modules simple-modules simple-systemless-modules)
-                      ,@(when converted-module-names `(:converted-module-names ',converted-module-names))
-                      ,@remote-initargs)
-     ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
-     ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) simple-modules)))
-
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type path-components &rest initargs &key modules simple-modules simple-systemless-modules converted-module-names name &allow-other-keys) (read stream nil nil)
-    (emit-remote-form type name modules simple-modules simple-systemless-modules converted-module-names path-components
-                      (remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :converted-module-names))))
+  (destructuring-bind (type path-components &rest initargs &key name modules simple-modules simple-systemless-modules converted-module-names &allow-other-keys) (read stream nil nil)
+    `(prog1
+         (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor *read-time-enclosing-distributor*
+                        :path ',path-components :modules ',(append modules simple-modules simple-systemless-modules)
+                        ,@(when converted-module-names `(:converted-module-names ',converted-module-names))
+                        ,@(remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :converted-module-names))
+       ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
+       ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) simple-modules))))
 
 #+(or)
 (defun locality-master-p (o)
