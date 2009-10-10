@@ -261,7 +261,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
   (:method ((o local-distributor) vcs-type)
     (setf (slot-value o vcs-type)
           (make-instance (find-class (format-symbol #.*package* "~A-LOCALITY" vcs-type))
-                         :name (default-remote-name (name o) vcs-type)
+                         :name (default-remote-name (name o) vcs-type) :distributor o
                          :path (subdirectory* (root o) (string-downcase (string vcs-type)))))))
 
 (defmethod shared-initialize :after ((o local-distributor) slot-names &key &allow-other-keys)
