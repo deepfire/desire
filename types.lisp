@@ -679,7 +679,7 @@ locally present modules will be marked as converted."
     (setf *self* (if-let ((d (and as (distributor as))))
                    (progn (report t ";;; Trying to establish self as ~A~%" as)
                           (change-class d 'local-distributor :root root :wishmaster t))
-                   (let ((local-name (format-symbol #.*package* "~(~A~)" (machine-instance))))
+                   (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
                      (report t ";;; Establishing self as non-well-known distributor ~A~%" local-name)
                      (make-instance 'local-distributor :name local-name :root root :omit-registration t))))
     (report t ";;; Ensuring that present modules have their defined systems accessible~%")
