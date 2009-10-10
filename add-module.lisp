@@ -69,7 +69,7 @@ of pathname component list variants, with MODNAME occurences substituted."
 
 (defun location-add-module (location module-name system-type)
   (lret ((module (make-instance 'module :name module-name :umbrella module-name)))
-    (appendf (location-modules location) (list module-name))
+    (appendf (location-module-names location) (list module-name))
     (when system-type
       (make-instance system-type :name module-name :module module))))
 
@@ -102,7 +102,7 @@ of pathname component list variants, with MODNAME occurences substituted."
                                          (return-from do-add-module nil))))
                               (make-instance remote-type
                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
-                                             :name (or (choose-default-remote-name distributor (rcs-type remote-type))
+                                             :name (or (choose-default-remote-name distributor (vcs-type remote-type))
                                                        (query-remote-name))
                                              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
                                              :path (append (when remote-takeover dist) (lastcar variants))))

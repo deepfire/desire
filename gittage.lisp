@@ -110,7 +110,6 @@
 (defun ensure-master-branch-from-remote (&key directory (remote-name (first (gitremotes directory))))
   (maybe-within-directory directory
     (let ((branches (gitbranches)))
-      (report t ";;; Branches in ~S:~{ ~S~}~%" *default-pathname-defaults* branches)
       (unless (find :master branches)
         (with-explanation ("setting master branch to master of remote ~A in ~S" remote-name *default-pathname-defaults*)
           (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master"))))))))

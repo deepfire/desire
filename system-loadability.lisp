@@ -75,10 +75,10 @@
   (apply-repo-system-filter
    repository (directory (subwild repository nil :name :wild :type (car (rassoc type *system-pathname-typemap* :test #'eq))))))
 
-(defun system-definition-registry-symlink-path (system &optional (locality (master 'git)))
-  (subfile (git-locality-asdf-registry-path locality) (list (down-case-name system)) :type (system-pathname-type system)))
+(defun system-definition-registry-symlink-path (system &optional (locality (gate *self*)))
+  (subfile (locality-asdf-registry-path locality) (list (down-case-name system)) :type (system-pathname-type system)))
 
-(defun system-loadable-p (system-or-name &optional (locality (master 'git))
+(defun system-loadable-p (system-or-name &optional (locality (gate *self*))
                           &aux (system (coerce-to-system system-or-name)))
   "See whether SYSTEM is loadable by the means of ASDF."
   (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path system locality))
@@ -99,14 +99,14 @@ differently from that system's name."
             (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
                     :test #'string= :key (compose #'string-upcase #'asdf:component-name)))))
 
-(defun ensure-system-loadable (system &optional path (locality (master 'git)))
+(defun ensure-system-loadable (system &optional path (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
    definition path within its module within LOCALITY."
   (when-let ((definition-pathname (or path (system-definition system (module-path (system-module system) locality) :if-does-not-exist :continue))))
     (ensure-symlink (system-definition-registry-symlink-path system locality)
                     definition-pathname)))
 
-(defun ensure-module-systems-loadable (module &optional (locality (master 'git)) &aux (module (coerce-to-module module)))
+(defun ensure-module-systems-loadable (module &optional (locality (gate *self*)) &aux (module (coerce-to-module module)))
   "Try making MODULE's systems loadable, defaulting to LOCALITY.
  
    Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."

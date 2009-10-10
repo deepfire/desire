@@ -44,7 +44,7 @@
     (with-explanation ("creating metafile ~A in ~S" name *default-pathname-defaults*)
       (git "add" (string name)))))
 
-(defmacro with-open-metafile ((stream name metastore-directory &rest open-options) &body body)
+(defmacro with-open-metafile ((stream name &optional (metastore-directory '*default-pathname-defaults*) &rest open-options) &body body)
   `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character 
                                  ,@(remove-from-plist open-options :element-type))
      ,@body))

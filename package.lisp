@@ -7,7 +7,7 @@
   (:shadow #:*modules*)
   (:export
    ;; types.lisp
-   #:distributor #:location #:remote #:locality #:master #:module #:system #:application #:app
+   #:distributor #:location #:remote #:locality #:gate #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes #:do-distributor-modules
