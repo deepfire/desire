@@ -297,8 +297,8 @@ they participate in the desire wishmaster protocol or not."
       (change-class (module m-name) 'origin-module))
     (nset-differencef (gate-converted-module-names (gate w)) release-set)))
 
-(defmethod initialize-instance :after ((o local-distributor) &key root &allow-other-keys)
-  (define-local-distributor-locality o *gate-vcs-type* :path root))
+(defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
+  (define-local-distributor-locality o *gate-vcs-type*))
 
 ;;;
 ;;; Remote methods
