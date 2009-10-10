@@ -2,7 +2,7 @@
 version="0.1"
 
 ROOT="$1"
-APP="$2"
+BRANCH="${2:-master}"
 DESIRE_HOME=${3:-git.feelingofgreen.ru}
 
 if test -z "$EXPLAIN"
@@ -37,6 +37,8 @@ Usage:  climb.sh ABSOLUTE-ROOT-PATH [APPLICATION-NAME [BOOTSTRAP-HOST]]
 
 Bootstrap desire, the Common Lisp software knowledge and distribution system from
 BOOTSTRAP-HOST (which defaults to git.feelingofgreen.ru), optionally installing APP.
+
+Optionally installing APP doesn't work yet. Ha.
 EOF
     exit
 fi
@@ -62,12 +64,16 @@ mkdir $temp_asdf_root || ( echo "FATAL: unable to create the bootstrap package d
 mkdir $ROOT || ( echo "FATAL: unable to create the root directory at \"$ROOT\", exiting." && exit 1 )
 mkdir $ROOT/git $ROOT/darcs $ROOT/hg $ROOT/cvs $ROOT/svn
 
-echo "NOTE: created required directories ok. Retrieving and loading desire and its dependencies..."
+echo "NOTE: created required directories ok. Retrieving and loading desire and its dependencies:"
 
 for desire_dep in $desire_deps desire
 do
+    echo -n "      $desire_dep: "
     git clone $desire_home/$desire_dep "$temp_asdf_root/$desire_dep" >/dev/null || ( echo "FATAL: failed to retrieve $desire_dep." && exit 1 )
+    echo "ok"
 done
+echo "NOTE: checking out branch $BRANCH of desire..."
+( cd $temp_asdf_root/desire; git reset --hard origin/$BRANCH; )
 
 sbcl --noinform \
      --eval "(require :asdf)" \
