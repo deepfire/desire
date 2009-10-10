@@ -35,9 +35,6 @@
 ;;;
 ;;; Globals
 ;;;
-(defvar *root-of-all-desires* nil
-  "The storage location for all source code, binaries and configuration files.")
-
 (defparameter *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
 (defparameter *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
 (defparameter *localities*         (make-hash-table :test #'equal) "Map names to localities.")
@@ -52,6 +49,8 @@
   "Empty all global definitions."
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps*))
     (setf (symbol-value var) (make-hash-table :test #'equal))))
+
+(defvar *original-self-gate-class-name*)
 
 ;;;;
 ;;;; Distributor
@@ -283,9 +282,9 @@ they participate in the desire wishmaster protocol or not."
 
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
-  (setf (gate w) (change-class (find-if (of-type *gate-vcs-type*) (distributor-remotes w))
-                               'git-locality
-                               :pathname (merge-pathnames #p"git/" root)))
+  (let ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w))))
+    (setf *original-self-gate-class-name* (class-name (class-of gate))
+          (gate w) (change-class gate 'git-locality :pathname (merge-pathnames #p"git/" root))))
   (let ((locally-present-set (distributor-converted-modules w)) ; was computed by GATE-LOCALITY's :after I-I method
         ;; The logic here is that if we're engaging in this whole game,
         ;; we're only releasing via our gate remote (git), which means that

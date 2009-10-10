@@ -43,19 +43,20 @@
           sval))))
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A ~:[~;:wishmaster t~] ~@<~S ~S~:@>~;)~:@>"
+  (format stream "~@<#D(~;~A~:[~; :WISHMASTER t~] ~@<~S ~S~:@>~;)~:@>"
           (string (name o)) (wishmasterp o) :remotes (distributor-remotes o)))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key wishmaster remotes &allow-other-keys) (read stream nil nil t)
-    `(let* ((source *read-time-election-source-distributor*)
-            (incumbent (distributor ',name :if-does-not-exist :continue))
-            (wishmaster (elect-slot-value source incumbent 'wishmaster ,wishmaster)))
-       (let ((*read-time-enclosing-distributor*
-              (or incumbent (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t))))
-         (setf (slot-value *read-time-enclosing-distributor* 'wishmaster) wishmaster)
-         ,@remotes))))
+  (let ((input-form (read stream nil nil t)))
+    (destructuring-bind (name &rest initargs &key wishmaster remotes &allow-other-keys) input-form
+      `(let* ((source *read-time-election-source-distributor*)
+              (incumbent (distributor ',name :if-does-not-exist :continue))
+              (wishmaster (elect-slot-value source incumbent 'wishmaster ,wishmaster)))
+         (let ((*read-time-enclosing-distributor*
+                (or incumbent (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t))))
+           (setf (slot-value *read-time-enclosing-distributor* 'wishmaster) wishmaster)
+           ,@remotes)))))
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
@@ -73,7 +74,11 @@
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o)))))
   (let ((*print-case* :downcase))
     (format stream "~@<#R(~;~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
-            (symbol-name (type-of o)) (remote-path o)
+            (symbol-name
+             (if (eq (remote-distributor o) *self*)
+                 *original-self-gate-class-name*
+                 (type-of o)))
+            (remote-path o)
             (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-module-names o) :key #'module)
               (multiple-value-bind (systemful systemless) (unzip #'module-systems simple :key #'module)
                 (append (unless (equal default-remote-name (name o))
@@ -85,7 +90,9 @@
                         (when systemful
                           (list `(:simple-modules ,(mapcar #'downstring systemful))))
                         (when systemless
-                          (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))))))))
+                          (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))
+                        (when-let ((converted-names (and (typep o 'gate) (gate-converted-module-names o))))
+                          (list `(:converted-module-names ',(mapcar #'downstring converted-names))))))))))
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject 
