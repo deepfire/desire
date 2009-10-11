@@ -585,17 +585,24 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (removef (system-applications (app-system a)) a)
   (%remove-app (name a)))
 
+(defun choose-gate-or-else (remotes)
+  (or (find-if (of-type 'gate) remotes)
+      (first remotes)))
+
 (defun module-best-remote (module &key (if-does-not-exist :error))
-  "Find the first remote occuring to provide MODULE."
+  "Find the best-suited remote occuring to provide MODULE.
+Obviously, gates are preferred."
   (let ((module (coerce-to-module module)))
-    (or (do-remotes (remote)
-          (finding remote such-that (remote-defines-module-p remote module)))
+    (or (choose-gate-or-else (do-remotes (r)
+                               (when (remote-defines-module-p r module)
+                                 (collect r))))
         (ecase if-does-not-exist
           (:error (error 'insatiable-desire :desire module))
           (:continue nil)))))
 
 (defun module-best-distributor (module &key (if-does-not-exist :error))
-  "Find the first distributor occuring to provide MODULE."
+  "Find the best-suited distributor occuring to provide MODULE.
+Those distributors with a gate best-remote are preferred, obviously."
   (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist)))
     (remote-distributor r)))
 
@@ -603,9 +610,10 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
    The second value is a boolean, indicating non-emptiness of the set of
    providing remotes, regardless of the enabled-p flag."
-  (do-distributor-remotes (r distributor)
-    (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
-      (return r))))
+  (choose-gate-or-else
+   (do-distributor-remotes (r distributor)
+     (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
+       (collect r)))))
 
 (defun meta-path (&optional (local-distributor *self*))
   "Return the path to the meta directory."
