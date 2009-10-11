@@ -116,10 +116,6 @@ This notably excludes converted modules."
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
    Return T when all executables required by TYPE are available, or NIL."
-  (with-class-slot (git hg darcs cvs svn) required-executables
-    (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
-  (with-class-slot (git hg darcs cvs svn) enabled-p
-    (setf git nil hg nil darcs nil cvs nil svn nil))
   (setf (class-slot type 'enabled-p)
         (every #'find-executable (class-slot type 'required-executables))))
 
@@ -719,6 +715,10 @@ locally present modules will be marked as converted."
          (gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) root))
          (meta-path (merge-pathnames #p".meta/" gate-path)))
     (clear-definitions)
+    (with-class-slot (git hg darcs cvs svn) required-executables
+      (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
+    (with-class-slot (git hg darcs cvs svn) enabled-p
+      (setf git nil hg nil darcs nil cvs nil svn nil))
     (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
       (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
     (unless (metastore-present-p meta-path '(definitions))
