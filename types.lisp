@@ -181,7 +181,7 @@ a special module called '.meta'."
   (find-if (of-type 'gate) (distributor-remotes distributor)))
 
 (defclass gate-remote (gate remote) ())
-(defclass gate-locality (gate-remote locality) ())
+(defclass gate-locality (locality gate-remote) ())
 
 ;;;;
 ;;;; Location * VCS
@@ -225,7 +225,7 @@ differ in only slight detail -- gate property, for example."
        (eq (transport x) (transport y))))
 
 ;;; most specific, exhaustive partition of LOCALITY
-(defclass git-locality (gate-native-remote gate-locality) ())
+(defclass git-locality (gate-locality gate-native-remote) ())
 (defclass hg-locality (hg locality) ())
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality) ())
@@ -279,13 +279,14 @@ differ in only slight detail -- gate property, for example."
 ;;;
 ;;; Local distributor methods
 ;;;
-(defgeneric define-local-distributor-locality (local-distributor vcs-type)
+(defgeneric define-local-distributor-locality (local-distributor vcs-type &rest arguments)
   (:documentation "Define a locality of VCS-TYPE in a subdirectory of LOCAL-DISTIBUTOR's root.")
-  (:method ((o local-distributor) vcs-type)
+  (:method ((o local-distributor) vcs-type &rest arguments)
     (setf (slot-value o vcs-type)
-          (make-instance (find-class (format-symbol #.*package* "~A-LOCALITY" vcs-type))
-                         :name (default-remote-name (name o) vcs-type) :distributor o
-                         :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))))))
+          (apply #'make-instance (find-class (format-symbol #.*package* "~A-LOCALITY" vcs-type))
+                 :name (default-remote-name (name o) vcs-type) :distributor o
+                 :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))
+                 arguments))))
 
 (defmethod shared-initialize :after ((o local-distributor) slot-names &key &allow-other-keys)
   ;; The locality typed *gate-vcs-type* need to be produced differently between make-instance/change-class.
@@ -324,7 +325,7 @@ they participate in the desire wishmaster protocol or not."
     (nset-differencef (gate-converted-module-names (gate w)) release-set)))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
-  (define-local-distributor-locality o *gate-vcs-type*))
+  (define-local-distributor-locality o *gate-vcs-type* :registrator #'(setf locality)))
 
 ;;;
 ;;; Remote methods

@@ -64,7 +64,11 @@
 ;;;; REGISTERED
 ;;;;
 (defclass registered (named)
-  ((registrator :accessor registered-registrator :type function :initarg :registrator)))
+  ((registrator :accessor registered-registrator :type function :initarg :registrator))
+  (:documentation
+   "This mixin has got a problem when there is more than one subclass of
+REGISTERED, in the mixing-in class precedence list, which provides the
+:REGISTRATOR initarg."))
 
 (defgeneric fully-qualified-name (o)
   (:documentation "A name which is supposed to be unique within the use domain.")
