@@ -23,24 +23,33 @@
 
 (defvar *read-universal-time*)
 (defvar *read-time-enclosing-distributor*)
+(defvar *read-time-enclosing-remote*)
 (defvar *read-time-force-source* nil)
-(defvar *read-time-election-source-distributor*)
+(defvar *read-time-merge-source-distributor*)
 
-(defgeneric elect-slot-value (source incumbent slot-name source-value)
-  (:method :around (s (incumbent null) slot-name source-value)
-    source-value)
-  (:method (source incumbent slot-name source-value)
-    (error "~@<Fell through to default method in ELECT-SLOT-VALUE: ~S => ~S, slot ~S.~:@>" source incumbent slot-name))
-  (:method :around ((s distributor) (i distributor) slot-name source-value)
+(defgeneric merge-slot-value (source owner subject subject-slot proposed-source-value)
+  (:documentation
+   "Merge value of SUBJECT's SUBJECT-SLOT, as defined by OWNER distributor,
+in the context of SOURCE distributor proposing PROPOSED-SOURCE-VALUE.
+The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
+  (:method :around (source (owner null) subject subject-slot proposed-source-value)
+    "Special case for newly appearing distributors."
+    proposed-source-value)
+  (:method :around ((source null) (owner distributor) subject subject-slot proposed-source-value)
+    "Special case for initial load of DEFINITIONS."
+    proposed-source-value)
+  (:method (source owner subject subject-slot proposed-source-value)
+    (error "~@<Fell through to default method in MERGE-SLOT-VALUE: ~S wants ~S => into slot ~S of ~S/~S.~:@>" source proposed-source-value subject-slot owner subject))
+  (:method :around ((source distributor) owner subject subject-slot proposed-source-value)
     (if *read-time-force-source*
-        source-value
+        proposed-source-value
         (call-next-method)))
-  (:method ((s distributor) (i distributor) (slot (eql 'wishmaster)) sval)
-    (let ((ival (slot-value i 'wishmaster)))
+  (:method ((source distributor) (owner distributor) (subject distributor) (subject-slot (eql 'wishmaster)) proposed-source-value)
+    (let ((oval (slot-value subject 'wishmaster)))
       ;; only allow degradation of wishmaster status from himself
-      (if (and ival (null sval))
-          (not (eq s i))
-          sval))))
+      (if (and oval (null proposed-source-value))
+          (not (eq source owner))
+          proposed-source-value))))
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#D(~;~A~:[~; :WISHMASTER t~] ~@<~S ~S~:@>~;)~:@>"
@@ -49,12 +58,13 @@
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (let ((input-form (read stream nil nil t)))
-    (destructuring-bind (name &rest initargs &key wishmaster remotes &allow-other-keys) input-form
-      `(let* ((source *read-time-election-source-distributor*)
-              (incumbent (distributor ',name :if-does-not-exist :continue))
-              (wishmaster (elect-slot-value source incumbent 'wishmaster ,wishmaster)))
-         (let ((*read-time-enclosing-distributor*
-                (or incumbent (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t))))
+    (destructuring-bind (name &key wishmaster remotes) input-form
+      `(let* ((source *read-time-merge-source-distributor*)
+              (owner (distributor ',name :if-does-not-exist :continue))
+              (subject owner)
+              (wishmaster (merge-slot-value source owner subject 'wishmaster ,wishmaster)))
+         (let ((*read-time-enclosing-distributor* (or subject (make-instance 'distributor :name ',name
+                                                                             :last-sync-time ,*read-universal-time* :synchronised-p t))))
            (setf (slot-value *read-time-enclosing-distributor* 'wishmaster) wishmaster)
            ,@remotes)))))
 
@@ -86,11 +96,11 @@
                         (when-let ((port (remote-distributor-port o)))
                           (list `(:distributor-port ,port)))
                         (when complex
-                          (list `(:modules ,(mapcar #'downstring complex))))
+                          (list `(:complex-modules ,(mapcar #'downstring complex))))
                         (when systemful
                           (list `(:simple-modules ,(mapcar #'downstring systemful))))
                         (when systemless
-                          (list `(:simple-systemless-modules ,(mapcar #'downstring systemless))))
+                          (list `(:systemless-modules ,(mapcar #'downstring systemless))))
                         (when-let ((converted-names (and (typep o 'gate) (gate-converted-module-names o))))
                           (list `(:converted-module-names ,(mapcar #'downstring converted-names))))))))))
 
@@ -109,14 +119,36 @@ to omission from DEFINITIONS."
 
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type path-components &rest initargs &key name modules simple-modules simple-systemless-modules converted-module-names &allow-other-keys) (read stream nil nil)
-    `(prog1
-         (make-instance ',type ,@(when name `(:name ',name)) :last-sync-time ,*read-universal-time* :synchronised-p t :distributor *read-time-enclosing-distributor*
-                        :path ',path-components :modules ',(append modules simple-modules simple-systemless-modules)
-                        ,@(when converted-module-names `(:converted-module-names ',converted-module-names))
-                        ,@(remove-from-plist initargs :name :distributor :type :modules :simple-modules :simple-systemless-modules :converted-module-names))
-       ,@(mapcar #'emit-make-simple-module-form (append simple-modules simple-systemless-modules))
-       ,@(mapcar (lambda (name) (emit-make-simple-system-form *default-system-type* name name)) simple-modules))))
+  (destructuring-bind (type path-components &key name distributor-port complex-modules simple-modules systemless-modules converted-module-names) (read stream nil nil)
+    `(let* ((source *read-time-merge-source-distributor*)
+            (owner *read-time-enclosing-distributor*)
+            (subject (find ',name (distributor-remotes owner) :key #'name))
+            (module-names (merge-slot-value source owner subject 'module-names ',(append complex-modules simple-modules systemless-modules)))
+            (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
+            (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
+       (lret ((*read-time-enclosing-remote* (or subject (make-instance ',type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port
+                                                                       :path ',path-components :module-names module-names
+                                                                       ,@(when converted-module-names `(:converted-module-names converted-module-names))
+                                                                       :last-sync-time ,*read-universal-time* :synchronised-p t))))
+         (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
+         (when (typep *read-time-enclosing-remote* 'gate)
+           (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))
+         (when subject
+           (dolist (m modules-for-disconnection)
+             (when-let ((m (module m :if-does-not-exist :continue)))
+               (remote-unlink-module subject m))))
+         (let ((amended-simple-modules (intersection module-names ',simple-modules))
+               (amended-systemless-modules (intersection module-names ',systemless-modules)))
+           (flet ((maybe-make-system-for-module (m name)
+                    (unless (member name amended-systemless-modules)
+                      (make-instance *default-system-type* :name name :module m
+                                     :last-sync-time ,*read-universal-time* :synchronised-p t))))
+             (dolist (m-name (intersection module-names (append amended-simple-modules amended-systemless-modules)))
+               (if-let ((m (module m-name :if-does-not-exist :continue)))
+                 (maybe-make-system-for-module m m-name)
+                 (let ((m (make-instance 'module :name m-name :umbrella m-name
+                                         :last-sync-time ,*read-universal-time* :synchronised-p t)))
+                   (maybe-make-system-for-module m m-name))))))))))
 
 #+(or)
 (defun locality-master-p (o)
@@ -211,7 +243,7 @@ to omission from DEFINITIONS."
     #+(or) (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
     (load stream)))
 
-(defun serialize-definitions (&optional stream)
+(defun serialise-definitions (&optional stream)
   "Serialise global definitions to STREAM."
   (let ((*print-case* :downcase)
         (*package* #.*package*))
@@ -228,7 +260,7 @@ to omission from DEFINITIONS."
 
 (defmethod load-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)))
   "Load definitions of the world from METASTORE."
-  (let ((*read-time-election-source-distributor* source)
+  (let ((*read-time-merge-source-distributor* source)
         (*read-time-force-source* force-source))
     (with-open-metafile (definitions 'definitions metastore)
       (read-definitions definitions))))
@@ -237,5 +269,5 @@ to omission from DEFINITIONS."
   "Save current model of the world within METASTORE.
 When SEAL-P is non-NIL, the changes are committed."
   (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
-    (serialize-definitions definitions)
+    (serialise-definitions definitions)
     (terpri definitions)))
