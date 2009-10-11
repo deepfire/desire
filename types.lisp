@@ -307,6 +307,9 @@ they participate in the desire wishmaster protocol or not."
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
   (let ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w))))
+    (report t "U-I-F-R-C ~S(~S/~S): ~S/~S/~S~%"
+            (name d) (mapcar #'name (distributor-remotes w)) (mapcar #'type-of (distributor-remotes w))
+            (when gate (name gate)) (when gate (type-of gate)) (when gate (remote-path gate)))
     (setf *original-self-gate-class-name* (class-name (class-of gate))
           (gate w) (change-class gate 'git-locality :pathname (merge-pathnames #p"git/" root))))
   (let ((locally-present-set (distributor-converted-modules w)) ; was computed by GATE-LOCALITY's :after I-I method
