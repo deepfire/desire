@@ -27,62 +27,55 @@
 (defvar *read-time-force-source* nil)
 (defvar *read-time-merge-source-distributor*)
 
-(defgeneric merge-slot-value (source owner subject subject-slot proposed-source-value)
+(defgeneric merge-slot-value (source owner subject subject-slot source-proposed-value)
   (:documentation
    "Merge value of SUBJECT's SUBJECT-SLOT, as defined by OWNER distributor,
-in the context of SOURCE distributor proposing PROPOSED-SOURCE-VALUE.
+in the context of SOURCE distributor proposing SOURCE-PROPOSED-VALUE.
 The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
-  (:method :around (source (owner null) subject subject-slot proposed-source-value)
-    "Special case for newly appearing distributors."
-    proposed-source-value)
-  (:method :around ((source null) (owner distributor) subject subject-slot proposed-source-value)
-    "Special case for initial load of DEFINITIONS."
-    proposed-source-value)
-  (:method :around ((source distributor) (owner distributor) (subject null) subject-slot proposed-source-value)
-    "Special case for initial load of DEFINITIONS."
-    proposed-source-value)
-  (:method (source owner subject subject-slot proposed-source-value)
-    (error "~@<Fell through to default method in MERGE-SLOT-VALUE: ~S wants ~S => into slot ~S of ~S/~S.~:@>" source proposed-source-value subject-slot owner subject))
-  (:method :around ((source distributor) owner subject subject-slot proposed-source-value)
+  (:method (source owner subject subject-slot source-proposed-value)
+    (error "~@<Fell through to default method in MERGE-SLOT-VALUE: ~S wants ~S => into slot ~S of ~S/~S.~:@>"
+           (when source (name source)) source-proposed-value subject-slot (when owner (name owner)) (when subject (name subject))))
+  (:method :around ((source distributor) owner subject subject-slot source-proposed-value)
     (if *read-time-force-source*
-        proposed-source-value
+        source-proposed-value
         (call-next-method)))
-  (:method ((source distributor) (owner distributor) (subject distributor) (subject-slot (eql 'wishmaster)) proposed-source-value)
-    (let ((oval (slot-value subject 'wishmaster)))
-      ;; only allow degradation of wishmaster status from himself
-      (if (and oval (null proposed-source-value))
-          (not (eq source owner))
-          proposed-source-value)))
-  (:method ((source distributor) (owner distributor) (subject remote) (subject-slot (eql 'converted-module-names)) proposed-source-value)
+  (:method :around (source (owner null) subject subject-slot source-proposed-value)
+    "Special case for newly appearing distributors."
+    source-proposed-value)
+  (:method :around ((source null) (owner distributor) subject subject-slot source-proposed-value)
+    "Special case for initial load of DEFINITIONS."
+    source-proposed-value)
+  (:method :around ((source distributor) (owner distributor) (subject null) subject-slot source-proposed-value)
+    "Special case for initial load of DEFINITIONS."
+    source-proposed-value)
+  (:method ((source distributor) (owner distributor) (subject remote) (subject-slot (eql 'converted-module-names)) source-proposed-value)
     ;; only allow degradation of released module set from owner
     (when (typep subject 'gate)
       (if (eq source owner)
-          proposed-source-value
-          (union (slot-value subject 'converted-module-names) proposed-source-value))))
-  (:method ((source distributor) (owner distributor) (subject remote) (subject-slot (eql 'module-names)) proposed-source-value)
+          source-proposed-value
+          (union (slot-value subject 'converted-module-names) source-proposed-value))))
+  (:method ((source distributor) (owner distributor) (subject remote) (subject-slot (eql 'module-names)) source-proposed-value)
     ;; only allow degradation of converted module set from owner
     (if (eq source owner)
-        proposed-source-value
-        (union (slot-value subject 'module-names) proposed-source-value))))
+        source-proposed-value
+        (union (slot-value subject 'module-names) source-proposed-value))))
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A~:[~; :WISHMASTER t~] ~@<~S ~S~:@>~;)~:@>"
-          (string (name o)) (wishmasterp o) :remotes (distributor-remotes o)))
+  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>"
+          (string (name o)) :remotes (distributor-remotes o)))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (let ((input-form (read stream nil nil t)))
     (destructuring-bind (name &key wishmaster remotes) input-form
-      `(let* ((source *read-time-merge-source-distributor*)
-              (owner (distributor ',name :if-does-not-exist :continue))
-              (subject owner)
-              (wishmaster (merge-slot-value source owner subject 'wishmaster ,wishmaster)))
-         (lret ((*read-time-enclosing-distributor* (or subject (make-instance 'distributor :name ',name
-                                                                              :last-sync-time ,*read-universal-time* :synchronised-p t))))
-           (setf (slot-value *read-time-enclosing-distributor* 'wishmaster) wishmaster)
+      `(let* ((owner (distributor ',name :if-does-not-exist :continue))
+              (subject owner))
+         (lret* ((d (or subject (make-instance 'distributor :name ',name
+                                               :last-sync-time ,*read-universal-time* :synchronised-p t)))
+                 (*read-time-enclosing-distributor* d))
            ,@remotes
-           (when wishmaster
-             (or (setf (gate *read-time-enclosing-distributor*) (find-if (of-type 'gate) (distributor-remotes *read-time-enclosing-distributor*))))))))))
+           (when (wishmasterp d)
+             (setf (gate d) (find-if (of-type 'gate) (distributor-remotes d)))))))))
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
@@ -101,8 +94,8 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
   (let ((*print-case* :downcase))
     (format stream "~@<#R(~;~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
             (symbol-name
-             (if (eq (remote-distributor o) *self*)
-                 (or *original-self-gate-class-name* (type-of o))
+             (or (when (eq (remote-distributor o) *self*)
+                   *original-self-gate-class-name*)
                  (type-of o)))
             (remote-path o)
             (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-module-names o) :key #'module)
@@ -125,20 +118,51 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 to omission from DEFINITIONS."
   (system-simple-p system))
 
+(defgeneric merge-remote-type (source owner subject-remote source-proposed-type)
+  (:documentation
+   "Merge value of SUBJECT-REMOTE's type, as defined by OWNER distributor,
+in the context of SOURCE distributor proposing SOURCE-PROPOSED-TYPE.
+The value returned is the merged type for SUBJECT-REMOTE.")
+  (:method :around ((source distributor) owner subject-remote source-proposed-type)
+    (if *read-time-force-source*
+        source-proposed-type
+        (call-next-method)))
+  (:method :around (source owner (subject-remote remote) source-proposed-type)
+    (if (eq (type-of subject-remote) source-proposed-type)
+        (type-of subject-remote)
+        (call-next-method)))
+  (:method (source owner subject-remote source-proposed-type)
+    (error "~@<Fell through to default method in MERGE-REMOTE-TYPE: distributor ~S wants type ~S for remote ~S of distributor ~S.~:@>"
+           (when source (name source)) source-proposed-type (when subject-remote (name subject-remote)) (when owner (name owner))))
+  (:method ((s null) (o distributor) (r null) source-proposed-type)
+    "Special case for initial load of DEFINITIONS."
+    source-proposed-type)
+  (:method ((s distributor) (o distributor) (r null) source-proposed-type)
+    "Special case for newly appearing remotes."
+    source-proposed-type)
+  (:method ((s distributor) (o distributor) (r gate-remote) source-proposed-type)
+    "Only allow gate remote type changes from an authoritative entity -- the owner."
+    (if (eq s o)
+        source-proposed-type
+        (type-of r)))
+  (:method ((s distributor) (o distributor) (r remote) source-proposed-type)
+    source-proposed-type))
+
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (type path-components &key name distributor-port complex-modules simple-modules systemless-modules converted-module-names) (read stream nil nil)
     `(let* ((source *read-time-merge-source-distributor*)
             (owner *read-time-enclosing-distributor*)
-            (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type))))
+            (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type)))) ; note that the vcs type doesn't change due to type merging
             (subject (find predicted-name (distributor-remotes owner) :key #'name))
+            (type (merge-remote-type source owner subject ',type))
             (module-names (merge-slot-value source owner subject 'module-names ',(append complex-modules simple-modules systemless-modules)))
             (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
             (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
-       (lret ((*read-time-enclosing-remote* (or subject (make-instance ',type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port
-                                                                       :path ',path-components :module-names module-names
-                                                                       ,@(when converted-module-names `(:converted-module-names converted-module-names))
-                                                                       :last-sync-time ,*read-universal-time* :synchronised-p t))))
+       (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject type))
+                                                (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port
+                                                               :path ',path-components :module-names module-names
+                                                               :last-sync-time ,*read-universal-time* :synchronised-p t))))
          (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
          (when (typep *read-time-enclosing-remote* 'gate)
            (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))

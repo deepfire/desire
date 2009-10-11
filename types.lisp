@@ -61,7 +61,6 @@
 (defclass distributor (registered synchronisable)
   ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified.")
    (modules :accessor distributor-modules :documentation "Cache.")
-   (wishmaster :accessor wishmasterp :initarg :wishmaster :documentation "Whether it participates in the DESIRE protocol.")
    (git :accessor gate :documentation "Manually managed."))
   (:default-initargs
    :registrator #'(setf distributor) :modules nil :remotes nil))
@@ -72,9 +71,7 @@
    (hg     :accessor local-hg    :documentation "Transitory hg locality of a locally-accessible distributor.")
    (darcs  :accessor local-darcs :documentation "Transitory darcs locality of a locally-accessible distributor.")
    (cvs    :accessor local-cvs   :documentation "Transitory cvs locality of a locally-accessible distributor.")
-   (svn    :accessor local-svn   :documentation "Transitory svn locality of a locally-accessible distributor."))
-  (:default-initargs
-   :wishmaster t))
+   (svn    :accessor local-svn   :documentation "Transitory svn locality of a locally-accessible distributor.")))
 
 (defmacro do-wishmasters ((var) &body body)
   `(do-distributors (,var)
@@ -177,12 +174,19 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :distributor-port nil
    :domain-name-takeover nil))
 
-(defclass gate-locality (gate locality remote) ())
+(defun wishmasterp (distributor)
+  "See whether DISTRIBUTOR participates in the DESIRE protocol,
+that is, whether it has a gate remote -- a git remote containing
+a special module called '.meta'."
+  (find-if (of-type 'gate) (distributor-remotes distributor)))
+
+(defclass gate-remote (gate remote) ())
+(defclass gate-locality (gate-remote locality) ())
 
 ;;;;
 ;;;; Location * VCS
 ;;;;
-(defclass git-remote (git gate remote) ())
+(defclass git-remote (git remote) ())
 
 ;;; most specific, exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
@@ -193,22 +197,42 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 (defclass cvs-rsync-remote (cvs-rsync remote) ())
 (defclass svn-rsync-remote (svn-rsync remote) ())
 
-(defun uri-type-to-remote-type (uri-type)
-  (switch (uri-type :test #'string=)
-    ("http" 'git-http-remote)
-    ("git" 'git-native-remote)
-    ("git+http" 'git-combined-remote)
-    ("darcs" 'darcs-http-remote)
-    ("cvs" 'cvs-rsync-remote)
-    ("svn" 'svn-rsync-remote)))
+;;; A special case location*vcs*role extension which is /going/ to be troublesome,
+;;; as it violates the simple world of the directly preceding comment.
+(defclass gate-native-remote (gate-remote git-native-remote) ())
+(defclass gate-http-remote (gate-remote git-http-remote) ())
+
+(defun remote-type-promote-to-gate (type)
+  (ecase type
+    (git-native-remote 'gate-native-remote)
+    (git-http-remote 'gate-http-remote)))
+
+(defun uri-type-to-remote-type (uri-type &key gate-p)
+  (xform gate-p #'remote-type-promote-to-gate
+         (switch (uri-type :test #'string=)
+           ("http" 'git-http-remote)
+           ("git" 'git-native-remote)
+           ("git+http" 'git-combined-remote)
+           ("darcs" 'darcs-http-remote)
+           ("cvs" 'cvs-rsync-remote)
+           ("svn" 'svn-rsync-remote))))
+
+;; Used for validation of user input in add-module
+(defun remote-types-compatible-p (x y)
+  "See if X and Y denote compatible remote types, that is that they
+differ in only slight detail -- gate property, for example."
+  (and (eq (vcs-type x) (vcs-type y))
+       (eq (transport x) (transport y))))
 
 ;;; most specific, exhaustive partition of LOCALITY
-(defclass git-locality (git-native-remote gate-locality) ())
+(defclass git-locality (gate-native-remote gate-locality) ())
 (defclass hg-locality (hg locality) ())
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
 
+(defmethod vcs-type ((o (eql 'gate-native-remote))) 'git)
+(defmethod vcs-type ((o (eql 'gate-http-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-native-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-http-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-combined-remote))) 'git)
@@ -366,14 +390,14 @@ to LOCALITY-PATHNAME."
       (with-explanation ("cloning module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
         (git "clone" "-o" (down-case-name remote) module-url)))))
 
-(defun parse-remote-namestring (namestring)
+(defun parse-remote-namestring (namestring &key gate-p)
   "Given a remote NAMESTRING, deduce the remote's type, host, port and path,
 and return them as multiple values.
 Note that http is interpreted as git-http -type remote.
 DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (let* ((colon-pos (or (position #\: namestring) (error "No colon in git remote namestring ~S." namestring)))
          (typestr (subseq namestring 0 colon-pos))
-         (type (or (uri-type-to-remote-type typestr)
+         (type (or (uri-type-to-remote-type typestr :gate-p gate-p)
                    (error "Bad URI type ~S in remote namestring ~S." typestr namestring))))
     (unless (> (length namestring) (+ colon-pos 3))
       (error "Git remote namestring ~S is too short." namestring))
@@ -463,7 +487,6 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   "See whether MODULE is defined for REMOTE."
   (or (not (null (find (name module) (location-module-names remote))))
       (when (typep remote 'gate)
-        (report t "gate ~S/~S~%" (type-of remote) (name remote))
         (not (null (find (name module) (gate-converted-module-names remote)))))))
 
 (defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
@@ -705,10 +728,10 @@ locally present modules will be marked as converted."
     (report t ";;; determining available tools and deducing accessible remotes~%")
     (determine-tools-and-update-remote-accessibility)
     (setf *self* (if-let ((d (and as (distributor as))))
-                   (progn (report t ";;; Trying to establish self as ~A~%" as)
-                          (change-class d 'local-distributor :root root :wishmaster t))
+                   (progn (report t ";;; trying to establish self as ~A~%" as)
+                          (change-class d 'local-distributor :root root))
                    (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
-                     (report t ";;; Establishing self as non-well-known distributor ~A~%" local-name)
+                     (report t ";;; establishing self as non-well-known distributor ~A~%" local-name)
                      (make-instance 'local-distributor :name local-name :root root :omit-registration t))))
     (report t ";;; ensuring that present modules have their defined systems accessible~%")
     ;; TODO: make this a method on NOTICE-MODULE-APPEARED

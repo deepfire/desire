@@ -87,9 +87,9 @@ of pathname component list variants, with MODNAME occurences substituted."
     (when system-type
       (make-instance system-type :name module-name :module m))))
 
-(defun do-add-module (url &optional module-name &key systemlessp (system-type *default-system-type*))
+(defun do-add-module (url &optional module-name &key gate-p systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
-  (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url)
+  (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url :gate-p gate-p)
     (let* ((module-name (or module-name (make-keyword (string-upcase (lastcar raw-path)))))
            (downmodname (downstring module-name)))
       (when (module module-name :if-does-not-exist :continue)
@@ -121,7 +121,7 @@ of pathname component list variants, with MODNAME occurences substituted."
                                              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
                                              :path (append (when remote-takeover dist) (lastcar variants))))
                             t))
-              (unless (eq remote-type (type-of remote))
+              (unless (remote-types-compatible-p remote-type (type-of remote))
                 (error "~@<Found remote ~S, but its type ~S doesn't match type ~S.~:@>"
                        (name remote) (type-of remote) remote-type))
               (format t "deduced: ~S @ ~S :: ~S:~D / ~S => ~%~S~%"
