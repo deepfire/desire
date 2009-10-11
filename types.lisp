@@ -461,7 +461,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defun remote-defines-module-p (remote module)
   "See whether MODULE is defined for REMOTE."
-  (not (null (find (name module) (location-module-names remote)))))
+  (or (not (null (find (name module) (location-module-names remote))))
+      (when (typep remote 'gate) (not (null (find (name module) (gate-converted-module-names remote)))))))
 
 (defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
                          &aux (module (coerce-to-module module-or-name)))

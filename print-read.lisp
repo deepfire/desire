@@ -77,10 +77,12 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
               (owner (distributor ',name :if-does-not-exist :continue))
               (subject owner)
               (wishmaster (merge-slot-value source owner subject 'wishmaster ,wishmaster)))
-         (let ((*read-time-enclosing-distributor* (or subject (make-instance 'distributor :name ',name
-                                                                             :last-sync-time ,*read-universal-time* :synchronised-p t))))
+         (lret ((*read-time-enclosing-distributor* (or subject (make-instance 'distributor :name ',name
+                                                                              :last-sync-time ,*read-universal-time* :synchronised-p t))))
            (setf (slot-value *read-time-enclosing-distributor* 'wishmaster) wishmaster)
-           ,@remotes)))))
+           ,@remotes
+           (when wishmaster
+             (or (setf (gate *read-time-enclosing-distributor*) (find-if (of-type 'gate) (distributor-remotes *read-time-enclosing-distributor*))))))))))
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
@@ -201,7 +203,7 @@ to omission from DEFINITIONS."
                                     ,@(remove-from-plist initargs :systems :complex-systems)))))
          (do-remotes (r)
            (when (remote-defines-module-p r m)
-             (remote-link-module r m)))
+             (pushnew r (module-remotes m))))
          ,@(if systems-specified-p
                (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
                ;; Existence of complex systems implies absence of simple systems, by default.
