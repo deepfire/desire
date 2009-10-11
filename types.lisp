@@ -145,7 +145,7 @@ This notably excludes converted modules."
 ;;;; Location
 ;;;;
 (defclass location (registered synchronisable)
-  ((module-names :accessor location-module-names :initarg :modules :documentation "Specified or maybe cached, for LOCALITYs."))
+  ((module-names :accessor location-module-names :initarg :module-names :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs
    :registrator #'(setf locality)
    :modules nil))
@@ -248,7 +248,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    within CVS-LOCALITY."
   (subdirectory* (locality-pathname cvs-locality) ".cvs-locks"))
 
-(defun module-path (module &optional (locality (gate *self*)))
+(defun module-pathname (module &optional (locality (gate *self*)))
   "Return MODULE's path in LOCALITY, which defaults to master Git locality."
   (subdirectory* (locality-pathname locality) (downstring (coerce-to-name module))))
 
@@ -388,54 +388,6 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                    (split-sequence #\/ rest :remove-empty-subseqs t))))
       (values type host port path))))
 
-(defun git-remote-namestring (remote)
-  "Produce a namestring for a git REMOTE."
-  (declare (type git-remote remote))
-  (url remote nil))
-
-(defun make-distributor (type hostname port path &key gate-p)
-  "Make a distributor residing at HOSTNAME, with a remote of TYPE,
-accesible at PORT and PATH. 
-When GATE-P is true, the remote will be set as distributor's gate
-remote, in which case TYPE must be subtype of GIT."
-  (lret ((d (make-instance 'distributor :name hostname)))
-    (let ((r (make-instance type :distributor d :distributor-port port :path path)))
-      (push r (distributor-remotes d))
-      (when gate-p
-        (unless (typep r *gate-vcs-type*)
-          (error "~@<Requested to make ~S a gate remote of ~A, but it is not a remote of gate type, i.e. ~A.~:@>"
-                 r hostname *gate-vcs-type*))
-        (setf (gate d) r)))))
-
-;;;;
-;;;; Modules
-;;;;
-(defclass module (registered depobj synchronisable)
-  ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
-   (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
-   (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
-   (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
-   (localities :accessor module-localities :initarg :localities :documentation "Cache. COMPUTE-MODULE-CACHES")
-   (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
-  (:default-initargs
-   :registrator #'(setf module)    
-   :remotes nil :localities nil
-   :systems nil :essential-p nil))
-
-(defclass origin-module (module) 
-  ((status :accessor module-status :initarg :status)
-   (public-packages :accessor module-public-packages :initarg :public-packages)
-   (hidden-p :accessor module-hidden-p :initarg :hidden-p))
-  (:default-initargs
-   :status :unknown
-   :public-packages nil
-   :hidden-p t))
-
-(defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
-  (when (module name :if-does-not-exist :continue)
-    (break))
-  (call-next-method))
-
 (defvar *module*)
 (defvar *umbrella*)
 
@@ -468,7 +420,72 @@ remote, in which case TYPE must be subtype of GIT."
              "/")
            remote-string-list)))
 
-(defun module-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
+;;;;
+;;;; Modules
+;;;;
+(defclass module (registered depobj synchronisable)
+  ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
+   (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
+   (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
+   (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
+   (localities :accessor module-localities :initarg :localities :documentation "Cache. COMPUTE-MODULE-CACHES")
+   (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
+  (:default-initargs
+   :registrator #'(setf module)    
+   :remotes nil :localities nil
+   :systems nil :essential-p nil))
+
+(defclass origin-module (module) 
+  ((status :accessor module-status :initarg :status)
+   (public-packages :accessor module-public-packages :initarg :public-packages)
+   (hidden-p :accessor module-hidden-p :initarg :hidden-p))
+  (:default-initargs
+   :status :unknown
+   :public-packages nil
+   :hidden-p t))
+
+(defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
+  (when (module name :if-does-not-exist :continue)
+    (break))
+  (call-next-method))
+
+(defun remote-link-module (remote module)
+  "Establish a 'provides' relationship between REMOTE and MODULE."
+  (pushnew (name module) (location-module-names remote))
+  (pushnew remote (module-remotes module)))
+
+(defun remote-unlink-module (remote module)
+  "Undo a 'provides' relationship between REMOTE and MODULE."
+  (removef (location-module-names remote) (name module))
+  (removef (module-remotes module) remote))
+
+(defun remote-defines-module-p (remote module)
+  "See whether MODULE is defined for REMOTE."
+  (not (null (find (name module) (location-module-names remote)))))
+
+(defun module-best-remote (module &key (if-does-not-exist :error))
+  "Find the first remote occuring to provide MODULE."
+  (let ((module (coerce-to-module module)))
+    (or (do-remotes (remote)
+          (finding remote such-that (remote-defines-module-p remote module)))
+        (ecase if-does-not-exist
+          (:error (error 'insatiable-desire :desire module))
+          (:continue nil)))))
+
+(defun module-best-distributor (module &key (if-does-not-exist :error))
+  "Find the first distributor occuring to provide MODULE."
+  (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist)))
+    (remote-distributor r)))
+
+(defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
+  "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
+   The second value is a boolean, indicating non-emptiness of the set of
+   providing remotes, regardless of the enabled-p flag."
+  (do-distributor-remotes (r distributor)
+    (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
+      (return r))))
+
+(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
                          &aux (module (coerce-to-module module-or-name)))
   "See if MODULE's presence cache is positive for LOCALITY, failing that check the
    repository, and update the cache, accordingly to the result.
@@ -479,7 +496,7 @@ remote, in which case TYPE must be subtype of GIT."
    cache results."
   (with-slots (scan-positive-localities) module
     (labels ((update-presence-in (locality)
-               (lret ((presence (repository-present-p (module-path module locality))))
+               (lret ((presence (repository-present-p (module-pathname module locality))))
                  (if presence
                      (pushnew locality scan-positive-localities)
                      (removef scan-positive-localities locality)))))
@@ -571,8 +588,9 @@ remote, in which case TYPE must be subtype of GIT."
   (%remove-module (name m)))
 
 (defun remove-module (module-designator &aux (m (coerce-to-module module-designator)))
-  (iter (for remote in (compute-module-remotes m))
-        (removef (location-module-names remote) m))
+  (do-remotes (r)
+    (when (remote-defines-module-p r m)
+      (removef (location-module-names r) (name m))))
   (do-remove-module m))
 
 (defun do-remove-system (s)
@@ -597,14 +615,14 @@ remote, in which case TYPE must be subtype of GIT."
 about their relationship.
 The value returned is the list of found modules."
   (do-modules (module)
-    (when (module-present-p module locality t)
+    (when (module-locally-present-p module locality t)
       (collect module))))
 
 (defmacro do-present-modules ((module &optional (locality '(gate *self*))) &body body)
   "Iterate the BODY over all modules cached as present in LOCALITY, with MODULE specifying
    the driven variable binding."
   `(do-modules (,module)
-     (when (module-present-p ,module ,locality nil nil)
+     (when (module-locally-present-p ,module ,locality nil nil)
        ,@body)))
 
 (defun clone-metastore (url locality-pathname)
@@ -715,54 +733,6 @@ locally present modules will be marked as converted."
            "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (name module) remote execution-error))
 
 ;;;
-;;; Queries.
-;;;
-(defun remote-defines-module-p (remote module &aux (module (coerce-to-module module)))
-  "See whether MODULE is defined for REMOTE."
-  (not (null (find (name module) (location-module-names remote)))))
-
-(defun module-accessible-via-remote-p (remote module &aux (remote (coerce-to-remote remote)) (module (coerce-to-module module)))
-  "See whether REMOTE provides the MODULE, i.e. that MODULE is defined,
-   and the remote is not disabled."
-  (and (remote-defines-module-p remote module)
-       (not (remote-disabled-p remote))))
-
-(defun compute-module-remotes (module)
-  "Compute the set of all remotes through which MODULE is available."
-  (do-remotes (remote)
-    (collecting (remote-defines-module-p remote module))))
-
-(defun module-enabled-remote (module)
-  "Return the first non-disabled remote providing MODULE.
-   The second value is a boolean, indicating non-emptiness of the set of
-   providing remotes, regardless of the enabled-p flag."
-  (apply/find-if (complement #'remote-disabled-p) #'compute-module-remotes module))
-
-(defun module-remote (module &key (if-does-not-exist :error))
-  "Find the first remote occuring to provide MODULE."
-  (let ((module (coerce-to-module module)))
-    (or (do-remotes (remote)
-          (finding remote such-that (remote-defines-module-p remote module)))
-        (ecase if-does-not-exist
-          (:error (error 'insatiable-desire :desire module))
-          (:continue nil)))))
-
-(defun distributor-module-remotes (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
-  "Return the set of DISTRIBUTOR's remotes providing MODULE, regardless
-   of the current availability."
-  (remove-if-not (rcurry #'remote-defines-module-p module) (distributor-remotes distributor)))
-
-(defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
-  "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
-   The second value is a boolean, indicating non-emptiness of the set of
-   providing remotes, regardless of the enabled-p flag."
-  (apply/find-if (complement #'remote-disabled-p) #'distributor-module-remotes distributor module))
-
-(defun module-distributor (module &key (if-does-not-exist :error))
-  "Find the first distributor occuring to provide MODULE."
-  (remote-distributor (module-remote module :if-does-not-exist if-does-not-exist)))
-
-;;;
 ;;; Desires.
 ;;;
 (defun distributor-related-desires (distributor-spec)
@@ -833,14 +803,14 @@ locally present modules will be marked as converted."
   (clear-definitions)
   (mapcar #'load pathes-from)
   (with-output-to-file (f path-int-0)
-    (serialize-definitions f))
+    (serialise-definitions f))
   (when bail-out-early
     (return-from test-core))
   (clear-definitions)
   (read-definitions path-int-0)
   (with-output-to-file (f path-int-1)
-    (serialize-definitions f))
+    (serialise-definitions f))
   (clear-definitions)
   (read-definitions path-int-1)
   (with-output-to-file (f path-int-2)
-    (serialize-definitions f)))
+    (serialise-definitions f)))

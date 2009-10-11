@@ -9,25 +9,38 @@
    ;; types.lisp
    #:distributor #:location #:remote #:locality #:gate #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
+   ;;   types.lisp :: direct knowledge base manipulation
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
    #:do-distributors #:do-remotes #:do-distributor-modules
+   #:coerce-to-distributor #:coerce-to-remote #:coerce-to-module #:coerce-to-system #:coerce-to-application
    #:remove-distributor #:remove-remote #:remove-module #:remove-system #:remove-app
-   #:clear-definitions #:serialize-definitions #:read-definitions #:save-current-definitions #:load-definitions
-   #:init
-   #:remote-disabled-p
-   #:locality-path
-   #:module-desired-p #:module-enabled-remote #:module-path
-   #:module-status #:module-public-packages #:module-hidden-p
-   #:url
-   #:add-desire
-   #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
+   ;;   types.lisp :: distributors
+   #:wishmasterp #:do-wishmasters #:do-distributor-remotes #:do-distributor-modules #:compute-distributor-modules
+   ;;   types.lisp :: remote
+   #:url #:parse-remote-namestring #:remote-disabled-p
+   ;;   types.lisp :: global UI
+   #:clear-definitions #:init #:vcs-enabled-p
+   ;;   types.lisp :: locality
+   #:locality-pathname #:module-pathname
+   ;;   types.lisp :: module
+   #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor
+   #:distributor-module-enabled-remote #:module-locally-present-p
+   ;;   types.lisp :: desires
+   #:add-desire #:module-desired-p
+   ;;   types.lisp :: knobs
+   #:*default-system-type* #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
+   ;;   types.lisp :: conditions
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
-   ;; asdf.lisp
+   ;;   types.lisp :: origin-module
+   #:module-status #:module-public-packages #:module-hidden-p
+   ;; print-read.lisp
+   #:serialise-definitions #:read-definitions #:save-current-definitions #:load-definitions
+   ;; system-loadability.lisp
    #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
    #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
-   #:module-bare-p #:module-present-p #:do-present-modules #:module-world-readable-p
+   #:module-bare-p #:module-locally-present-p #:do-present-modules #:module-world-readable-p
    ;; desire.lisp
    #:*register-happy-matches* #:*fetch-errors-serious* #:*register-all-martians*
    #:desire #:lust
@@ -35,7 +48,7 @@
    #:fetch #:desire
    #:purge-module-binaries
    ;; add-module.lisp
-   #:add-module #:add-module-reader #:install-add-module-reader
+   #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader
    ;; apropos.lisp
    #:apropor-desr-list #:apropos-desr #:list-modules))
 

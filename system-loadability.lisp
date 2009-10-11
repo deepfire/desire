@@ -82,7 +82,7 @@
                           &aux (system (coerce-to-system system-or-name)))
   "See whether SYSTEM is loadable by the means of ASDF."
   (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path system locality))
-                            (system-definition system (module-path (system-module system) locality) :if-does-not-exist :continue))
+                            (system-definition system (module-pathname (system-module system) locality) :if-does-not-exist :continue))
                      (asdf:find-system (down-case-name system) nil))
     (asdf:missing-dependency () ;; CXML...
       (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
@@ -102,7 +102,7 @@ differently from that system's name."
 (defun ensure-system-loadable (system &optional path (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
    definition path within its module within LOCALITY."
-  (when-let ((definition-pathname (or path (system-definition system (module-path (system-module system) locality) :if-does-not-exist :continue))))
+  (when-let ((definition-pathname (or path (system-definition system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
     (ensure-symlink (system-definition-registry-symlink-path system locality)
                     definition-pathname)))
 

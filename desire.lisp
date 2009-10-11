@@ -89,7 +89,7 @@
 (defgeneric fetch-remote (locality remote module))
 
 (defmethod fetch-remote ((locality git-locality) (remote git) module)
-  (let ((repo-dir (module-path module locality)))
+  (let ((repo-dir (module-pathname module locality)))
     (unless (directory-exists-p repo-dir)
       (within-directory (repo-dir :lisp nil :if-exists :error :if-does-not-exist :create)
         (with-explanation ("initialising git repository of module ~A in ~S" (name module) *default-pathname-defaults*)
@@ -97,7 +97,7 @@
     (git-fetch-remote remote (name module) repo-dir)))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
-  (let ((darcs-repo-dir (module-path module (local-darcs *self*)))
+  (let ((darcs-repo-dir (module-pathname module (local-darcs *self*)))
         (url (url remote module)))
     (if (directory-exists-p darcs-repo-dir)
         (with-explanation ("on behalf of module ~A, pulling from darcs remote ~A to ~S" (name module) url darcs-repo-dir)
@@ -107,13 +107,13 @@
 
 (defmethod fetch-remote ((git-locality git-locality) (remote cvs-rsync-remote) module)
   (let* ((cvs-locality (local-cvs *self*))
-         (cvs-repo-dir (module-path module cvs-locality))
+         (cvs-repo-dir (module-pathname module cvs-locality))
          (url (url remote module)))
     (with-explanation ("on behalf of module ~A, rsyncing from cvs remote ~A to ~S" (name module) url cvs-repo-dir)
       (rsync "-ravPz" (format nil "~A/cvsroot/" url) (namestring cvs-repo-dir)))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote svn-rsync-remote) module)
-  (let ((svn-repo-dir (module-path module (local-svn *self*)))
+  (let ((svn-repo-dir (module-pathname module (local-svn *self*)))
         (url (url remote module)))
     (with-explanation ("on behalf of module ~A, rsyncing from svn remote ~A to ~S" (name module) url svn-repo-dir)
       (rsync "-ravPz" url (namestring svn-repo-dir)))))
@@ -126,7 +126,7 @@
 (defmethod fetch :around (locality remote module)
   (with-maybe-just-printing-conditions (t fetch-failure) (not *fetch-errors-serious*)
     (restart-bind ((retry (lambda () 
-                            (maybe-within-directory (module-path module locality)
+                            (maybe-within-directory (module-pathname module locality)
                               (git "gui"))
                             (invoke-restart (find-restart 'retry)))
                      :test-function (of-type 'repository-not-clean-during-fetch)
@@ -143,12 +143,12 @@
 
 #+(or)
 (defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
-  (let ((hg-repo-dir (module-path module (local-hg *self*)))
-        (git-repo-dir (module-path module git-locality)))))
+  (let ((hg-repo-dir (module-pathname module (local-hg *self*)))
+        (git-repo-dir (module-pathname module git-locality)))))
 
 (defmethod fetch ((git-locality git-locality) (remote darcs-http-remote) module)
-  (let ((darcs-repo-dir (module-path module (local-darcs *self*)))
-        (git-repo-dir (module-path module git-locality)))
+  (let ((darcs-repo-dir (module-pathname module (local-darcs *self*)))
+        (git-repo-dir (module-pathname module git-locality)))
     (purge-binaries git-repo-dir)
     (within-directory (git-repo-dir :lisp nil :if-does-not-exist :create)
       (with-explanation ("on behalf of module ~A, converting from darcs to git: ~S => ~S" (name module) darcs-repo-dir *default-pathname-defaults*)
@@ -158,8 +158,8 @@
 
 (defmethod fetch ((git-locality git-locality) (remote cvs-rsync-remote) module &aux (name (down-case-name module)))
   (let* ((cvs-locality (local-cvs *self*))
-         (cvs-repo-dir (module-path module cvs-locality))
-         (git-repo-dir (module-path module git-locality)))
+         (cvs-repo-dir (module-pathname module cvs-locality))
+         (git-repo-dir (module-pathname module git-locality)))
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config") :if-exists :supersede)
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module module :locality git-locality))
@@ -167,8 +167,8 @@
         (git "cvsimport" "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name)))))
 
 (defmethod fetch ((git-locality git-locality) (remote svn-rsync-remote) module)
-  (let ((svn-repo-dir (module-path module (local-svn *self*)))
-        (git-repo-dir (module-path module git-locality)))
+  (let ((svn-repo-dir (module-pathname module (local-svn *self*)))
+        (git-repo-dir (module-pathname module git-locality)))
     (unless (directory-exists-p git-repo-dir)
       (within-directory (git-repo-dir :lisp nil :if-does-not-exist :create :if-exists :error)
         (with-explanation ("on behalf of module ~A, setting up svn to git conversion: ~S => ~S" (name module) svn-repo-dir *default-pathname-defaults*)
@@ -178,7 +178,7 @@
         (git "svn" "fetch")))))
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
-  (setf (repository-world-readable-p (module-path module git-locality)) *default-world-readable*))
+  (setf (repository-world-readable-p (module-pathname module git-locality)) *default-world-readable*))
 
 (defun fetch-anyway (module-name)
   (cons module-name nil))
@@ -190,7 +190,7 @@
            (next-unsatisfied-module ()
              (car (find nil desires :key #'cdr)))
            (fetch-if-missing (module-name)
-             (cons module-name (not (module-present-p (module module-name) *locality*))))
+             (cons module-name (not (module-locally-present-p (module module-name) *locality*))))
            ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
            (maybe-register-martian (martian path type module missing)
              (when (or *register-all-martians*
@@ -233,7 +233,7 @@
                                  system new-required modules (remove name missing :test #'string=) new-martians)))))
                    (values (rest required) modules missing (adjoin name martians :test #'string=))))
                (values nil modules missing martians)))
-           (module-dependencies (m missing martians &aux (sysfiles (system-definitions (module-path m *locality*) 'asdf-system)))
+           (module-dependencies (m missing martians &aux (sysfiles (system-definitions (module-pathname m *locality*) 'asdf-system)))
              (let ((required-sysnames (mapcar #'system-pathname-name sysfiles)))
                (mapc #'set-syspath required-sysnames sysfiles)
                (iter (with modules)
@@ -244,7 +244,7 @@
                        (return (values (remove-duplicates modules) missing martians)))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let ((an-unsatisfied-module (module an-unsatisfied-name)))
-        (fetch *locality* (module-remote an-unsatisfied-module) an-unsatisfied-module)
+        (fetch *locality* (module-best-remote an-unsatisfied-module) an-unsatisfied-module)
         (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds, or errors
         (setf (desire-satisfied an-unsatisfied-name) t)
         (multiple-value-bind (module-deps missing martians) (module-dependencies an-unsatisfied-module missing martians)
@@ -278,7 +278,7 @@
    Defined keywords:
     - SKIP-PRESENT - whether to skip updating specified modules which are 
       already present, defaults to nil."
-  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-distributor m)) m))) desires)))
+  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-best-distributor m)) m))) desires)))
     (iter (for (distributor-name . modules) in interpreted-desires)
           (for distributor = (distributor distributor-name))
           (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))

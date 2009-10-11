@@ -21,6 +21,20 @@
 (in-package :desire)
 
 
+(defun add-distributor (type hostname port path &key gate-p)
+  "Make a distributor residing at HOSTNAME, with a remote of TYPE,
+accesible at PORT and PATH. 
+When GATE-P is true, the remote will be set as distributor's gate
+remote, in which case TYPE must be subtype of GIT."
+  (lret ((d (make-instance 'distributor :name hostname)))
+    (let ((r (make-instance type :distributor d :distributor-port port :path path)))
+      (push r (distributor-remotes d))
+      (when gate-p
+        (unless (typep r *gate-vcs-type*)
+          (error "~@<Requested to make ~S a gate remote of ~A, but it is not a remote of gate type, i.e. ~A.~:@>"
+                 r hostname *gate-vcs-type*))
+        (setf (gate d) r)))))
+
 (defun find-distributor-fuzzy (distname &aux (downcase-distname (downstring distname)))
   "Find a distributor which looks like a match for DISTNAME.
 For example, domain name OGRE.SVN.SOURCEFORGE.NET refers to a distributor
