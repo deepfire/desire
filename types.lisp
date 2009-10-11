@@ -687,7 +687,7 @@ locally present modules will be marked as converted."
       (report t ";;; no metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
       (clone-metastore *bootstrap-wishmaster-url* gate-path))
     (report t ";;; loading definitions from ~S~%" (metafile-path 'definitions meta-path))
-    (load-definitions :force-source nil :metastore meta-path)
+    (load-definitions :force-source t :metastore meta-path)
     (when merge-remote-wishmasters
       (report t ";;; merging definitions from remote wishmasters...~%")
       (merge-remote-wishmasters meta-path))
