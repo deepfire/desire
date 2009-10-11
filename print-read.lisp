@@ -52,7 +52,18 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
       ;; only allow degradation of wishmaster status from himself
       (if (and oval (null proposed-source-value))
           (not (eq source owner))
-          proposed-source-value))))
+          proposed-source-value)))
+  (:method ((source distributor) (owner distributor) (subject remote) (subject-slot (eql 'converted-module-names)) proposed-source-value)
+    ;; only allow degradation of released module set from owner
+    (when (typep subject 'gate)
+      (if (eq source owner)
+          proposed-source-value
+          (union (slot-value subject 'converted-module-names) proposed-source-value))))
+  (:method ((source distributor) (owner distributor) (subject remote) (subject-slot (eql 'module-names)) proposed-source-value)
+    ;; only allow degradation of converted module set from owner
+    (if (eq source owner)
+        proposed-source-value
+        (union (slot-value subject 'module-names) proposed-source-value))))
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#D(~;~A~:[~; :WISHMASTER t~] ~@<~S ~S~:@>~;)~:@>"
@@ -125,7 +136,8 @@ to omission from DEFINITIONS."
   (destructuring-bind (type path-components &key name distributor-port complex-modules simple-modules systemless-modules converted-module-names) (read stream nil nil)
     `(let* ((source *read-time-merge-source-distributor*)
             (owner *read-time-enclosing-distributor*)
-            (subject (find ',name (distributor-remotes owner) :key #'name))
+            (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type))))
+            (subject (find predicted-name (distributor-remotes owner) :key #'name))
             (module-names (merge-slot-value source owner subject 'module-names ',(append complex-modules simple-modules systemless-modules)))
             (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
             (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
@@ -143,7 +155,8 @@ to omission from DEFINITIONS."
          (let ((amended-simple-modules (intersection module-names ',simple-modules))
                (amended-systemless-modules (intersection module-names ',systemless-modules)))
            (flet ((maybe-make-system-for-module (m name)
-                    (unless (member name amended-systemless-modules)
+                    (unless (or (system name :if-does-not-exist :continue)
+                                (member name amended-systemless-modules))
                       (make-instance *default-system-type* :name name :module m
                                      :last-sync-time ,*read-universal-time* :synchronised-p t))))
              (dolist (m-name (intersection module-names (append amended-simple-modules amended-systemless-modules)))
