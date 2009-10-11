@@ -463,28 +463,6 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   "See whether MODULE is defined for REMOTE."
   (not (null (find (name module) (location-module-names remote)))))
 
-(defun module-best-remote (module &key (if-does-not-exist :error))
-  "Find the first remote occuring to provide MODULE."
-  (let ((module (coerce-to-module module)))
-    (or (do-remotes (remote)
-          (finding remote such-that (remote-defines-module-p remote module)))
-        (ecase if-does-not-exist
-          (:error (error 'insatiable-desire :desire module))
-          (:continue nil)))))
-
-(defun module-best-distributor (module &key (if-does-not-exist :error))
-  "Find the first distributor occuring to provide MODULE."
-  (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist)))
-    (remote-distributor r)))
-
-(defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
-  "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
-   The second value is a boolean, indicating non-emptiness of the set of
-   providing remotes, regardless of the enabled-p flag."
-  (do-distributor-remotes (r distributor)
-    (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
-      (return r))))
-
 (defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
                          &aux (module (coerce-to-module module-or-name)))
   "See if MODULE's presence cache is positive for LOCALITY, failing that check the
@@ -605,6 +583,28 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 (defun remove-app (app-designator &aux (a (coerce-to-application app-designator)))
   (removef (system-applications (app-system a)) a)
   (%remove-app (name a)))
+
+(defun module-best-remote (module &key (if-does-not-exist :error))
+  "Find the first remote occuring to provide MODULE."
+  (let ((module (coerce-to-module module)))
+    (or (do-remotes (remote)
+          (finding remote such-that (remote-defines-module-p remote module)))
+        (ecase if-does-not-exist
+          (:error (error 'insatiable-desire :desire module))
+          (:continue nil)))))
+
+(defun module-best-distributor (module &key (if-does-not-exist :error))
+  "Find the first distributor occuring to provide MODULE."
+  (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist)))
+    (remote-distributor r)))
+
+(defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
+  "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
+   The second value is a boolean, indicating non-emptiness of the set of
+   providing remotes, regardless of the enabled-p flag."
+  (do-distributor-remotes (r distributor)
+    (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
+      (return r))))
 
 (defun meta-path (&optional (local-distributor *self*))
   "Return the path to the meta directory."
