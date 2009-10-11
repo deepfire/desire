@@ -123,14 +123,6 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 to omission from DEFINITIONS."
   (system-simple-p system))
 
-(defun emit-make-simple-module-form (name)
-  `(or (module ',name :if-does-not-exist :continue)
-       (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',name)))
-
-(defun emit-make-simple-system-form (type module-name name)
-  `(or (system ',name :if-does-not-exist :continue)
-       (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
-
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (type path-components &key name distributor-port complex-modules simple-modules systemless-modules converted-module-names) (read stream nil nil)
@@ -154,17 +146,15 @@ to omission from DEFINITIONS."
                (remote-unlink-module subject m))))
          (let ((amended-simple-modules (intersection module-names ',simple-modules))
                (amended-systemless-modules (intersection module-names ',systemless-modules)))
-           (flet ((maybe-make-system-for-module (m name)
-                    (unless (or (system name :if-does-not-exist :continue)
-                                (member name amended-systemless-modules))
-                      (make-instance *default-system-type* :name name :module m
-                                     :last-sync-time ,*read-universal-time* :synchronised-p t))))
-             (dolist (m-name (intersection module-names (append amended-simple-modules amended-systemless-modules)))
-               (if-let ((m (module m-name :if-does-not-exist :continue)))
-                 (maybe-make-system-for-module m m-name)
-                 (let ((m (make-instance 'module :name m-name :umbrella m-name
-                                         :last-sync-time ,*read-universal-time* :synchronised-p t)))
-                   (maybe-make-system-for-module m m-name))))))))))
+           (dolist (m-name (intersection module-names (append amended-simple-modules amended-systemless-modules)))
+             (lret ((m (or (module m-name :if-does-not-exist :continue)
+                           (make-instance 'module :name m-name :umbrella m-name
+                                          :last-sync-time ,*read-universal-time* :synchronised-p t))))
+               (remote-link-module *read-time-enclosing-remote* m)
+               (unless (or (system m-name :if-does-not-exist :continue)
+                           (member m-name amended-systemless-modules))
+                 (make-instance *default-system-type* :name m-name :module m
+                                :last-sync-time ,*read-universal-time* :synchronised-p t)))))))))
 
 #+(or)
 (defun locality-master-p (o)
@@ -198,19 +188,25 @@ to omission from DEFINITIONS."
                         (when (module-essential-p o)
                           (list :essential-p (module-essential-p o)))))))
 
+(defun emit-make-simple-system-form (type module-name name)
+  `(or (system ',name :if-does-not-exist :continue)
+       (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
+
 (defun module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
     (destructuring-bind (name umbrella) (if (consp name) name (list name name))
-      `(or (module ',name :if-does-not-exist :continue)
-           (prog1 (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',umbrella
-                                 ,@(remove-from-plist initargs :systems :complex-systems))
-             ;; The simple system -- this case is used only when the module is not simple itself, i.e. when it's got a non-default umbrella name.
-             ,@(if systems-specified-p
-                   (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
-                   ;; Existence of complex systems implies absence of simple systems, by default.
-                   (unless complex-systems
-                     `(,(emit-make-simple-system-form *default-system-type* name name)))))))))
+      `(lret ((m (or (module ',name :if-does-not-exist :continue)
+                     (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',umbrella
+                                    ,@(remove-from-plist initargs :systems :complex-systems)))))
+         (do-remotes (r)
+           (when (remote-defines-module-p r m)
+             (remote-link-module r m)))
+         ,@(if systems-specified-p
+               (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
+               ;; Existence of complex systems implies absence of simple systems, by default.
+               (unless complex-systems
+                 `(,(emit-make-simple-system-form *default-system-type* name name))))))))
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))

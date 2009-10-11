@@ -82,10 +82,10 @@ of pathname component list variants, with MODNAME occurences substituted."
                           (collect (append v pathname-component))))))))
 
 (defun location-add-module (location module-name system-type)
-  (lret ((module (make-instance 'module :name module-name :umbrella module-name)))
-    (appendf (location-module-names location) (list module-name))
+  (lret ((m (make-instance 'module :name module-name :umbrella module-name)))
+    (remote-link-module location m)
     (when system-type
-      (make-instance system-type :name module-name :module module))))
+      (make-instance system-type :name module-name :module m))))
 
 (defun do-add-module (url &optional module-name &key systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
