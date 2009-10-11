@@ -38,6 +38,9 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
   (:method :around ((source null) (owner distributor) subject subject-slot proposed-source-value)
     "Special case for initial load of DEFINITIONS."
     proposed-source-value)
+  (:method :around ((source distributor) (owner distributor) (subject null) subject-slot proposed-source-value)
+    "Special case for initial load of DEFINITIONS."
+    proposed-source-value)
   (:method (source owner subject subject-slot proposed-source-value)
     (error "~@<Fell through to default method in MERGE-SLOT-VALUE: ~S wants ~S => into slot ~S of ~S/~S.~:@>" source proposed-source-value subject-slot owner subject))
   (:method :around ((source distributor) owner subject subject-slot proposed-source-value)
