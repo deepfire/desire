@@ -245,7 +245,7 @@
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let ((an-unsatisfied-module (module an-unsatisfied-name)))
         (fetch *locality* (module-best-remote an-unsatisfied-module) an-unsatisfied-module)
-        (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds, or errors
+        (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds or signals an error
         (setf (desire-satisfied an-unsatisfied-name) t)
         (multiple-value-bind (module-deps missing martians) (module-dependencies an-unsatisfied-module missing martians)
           (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
