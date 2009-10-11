@@ -50,7 +50,7 @@
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps*))
     (setf (symbol-value var) (make-hash-table :test #'equal))))
 
-(defvar *original-self-gate-class-name*)
+(defvar *original-self-gate-class-name* nil)
 
 ;;;;
 ;;;; Distributor

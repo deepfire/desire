@@ -102,7 +102,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
     (format stream "~@<#R(~;~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
             (symbol-name
              (if (eq (remote-distributor o) *self*)
-                 *original-self-gate-class-name*
+                 (or *original-self-gate-class-name* (type-of o))
                  (type-of o)))
             (remote-path o)
             (multiple-value-bind (simple complex) (unzip #'module-simple-p (location-module-names o) :key #'module)
