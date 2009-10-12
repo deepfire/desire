@@ -2,8 +2,13 @@
 version="0.1"
 
 ROOT="$1"
-BRANCH="${2:-master}"
+APP="${2:-nil}"
 DESIRE_HOME=${3:-git.feelingofgreen.ru}
+
+if ! test "$APP" = "nil"
+then
+    echo "NOTE: upon successful bootstrap will install module $APP, along with dependencies"
+fi
 
 if test -z "$EXPLAIN"
 then
@@ -11,6 +16,13 @@ then
 else
     EXPLAIN=t
     echo "NOTE: turning on execution explanation feature of desire"
+fi
+
+if test -z "$BRANCH"
+then
+    BRANCH=master
+else
+    echo "NOTE: choosing an alternate branch of desire: '$BRANCH'"
 fi
 
 if test -z "$DEBUG"
@@ -90,4 +102,5 @@ sbcl --noinform \
      --eval "(in-package :desr)" \
      --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
      --eval "(init \"$ROOT/\")" \
-     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (lust 'desiree) and it will happen.~%  You can link desire's pool of packages into ASDF by ensuring that~%  #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*~%~%  To see what's possible, issue:~%    (apropos-desr 'clim)~%  or~%    (list-modules)~%~%  Have fun!~%~%\")"
+     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (lust 'desiree) and it will happen.~%  You can link desire's pool of packages into ASDF by ensuring that~%  #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*~%~%  To see what's possible, issue:~%    (apropos-desr 'clim)~%  or~%    (list-modules)~%~%  Have fun!~%~%\")" \
+     --eval "(init \"$ROOT/\")" \
