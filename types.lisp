@@ -686,7 +686,7 @@ LOCALITY-PATHNAME."
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
-  (let ((present (unzip #'find-and-register-tools-for-remote-type '(hg darcs cvs svn))))
+  (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
     (do-remotes (r)
       (setf (remote-disabled-p r) (not (member (vcs-type r) present))))))
 
