@@ -201,17 +201,27 @@
                               :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
                                                                     (hidden-p (not (equal pathname-name (downstring martian)))))
                                                           pathname-name))))
-           (add-system-dependencies (system required modules missing martians)
+           (add-system-dependencies (module system required modules missing martians)
+             "Given a MODULE's SYSTEM, detect its dependencies and, accordingly, extend the sets
+              of known REQUIRED systems, MODULES, MISSING unknown systems and MARTIAN unknown systems, 
+              returning them as multiple values."
              (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
                (let* ((happy-matches (when *register-happy-matches*
                                        (intersection martians new-missing :test #'string=))))
-                 (values (append happy-matches required) ;; Let them wash in the next tide.
-                         (append (mapcar (compose #'name #'system-module) new-sysdeps) modules)
-                         (union missing new-missing :test #'string=)
-                         (set-difference martians happy-matches :test #'string=)))))
+                 (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module) new-sysdeps)
+                   (values (append (mapcar (compose #'string #'name) local-newdeps) happy-matches required) ;; Let them wash in the next tide.
+                           (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
+                           (union missing new-missing :test #'string=)
+                           (set-difference martians happy-matches :test #'string=))))))
            (dependencies-add-system-def (module required &optional modules missing martians)
+             "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
+              the fallout. Return the modified sets of known REQUIRED systems, MODULES, 
+              MISSING unknown systems and MARTIAN unknown systems, returning them as multiple values."
+             (declare (special *syspath*))
              (if-let ((name (first required)))
-               (let* ((path (syspath name))
+               (let* ((required (rest required))
+                      (path (or (syspath name)
+                                (error "failed to find ~S among ~S~%" name (hash-table-keys *syspath*))))
                       (type (interpret-system-pathname-type path)))
                  (if-let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
                                         (when system
@@ -225,13 +235,11 @@
                           (let ((hidden-system-names (and (eq type 'asdf-system) (asdf-hidden-system-names system))))
                             (mapc #'set-syspath hidden-system-names (make-list (length hidden-system-names) :initial-element path))
                             (multiple-value-bind (missed-hide ambi-hide) (unzip (rcurry #'find missing :test #'string=) hidden-system-names)
-                              (multiple-value-bind (new-required new-martians)
-                                  (cond (*register-all-martians* (values (append ambi-hide missed-hide (rest required)) martians))
-                                        (*register-happy-matches* (values (append missed-hide (rest required)) (append ambi-hide martians)))
-                                        (t (values (rest required) (append missed-hide ambi-hide martians))))
-                                (add-system-dependencies
-                                 system new-required modules (remove name missing :test #'string=) new-martians)))))
-                   (values (rest required) modules missing (adjoin name martians :test #'string=))))
+                              (multiple-value-bind (new-required new-martians) (cond (*register-all-martians* (values (append ambi-hide missed-hide required) martians))
+                                                                                     (*register-happy-matches* (values (append missed-hide required) (append ambi-hide martians)))
+                                                                                     (t (values required (append missed-hide ambi-hide martians))))
+                                (add-system-dependencies module system new-required modules (remove name missing :test #'string=) new-martians)))))
+                   (values required modules missing (adjoin name martians :test #'string=))))
                (values nil modules missing martians)))
            (module-dependencies (m missing martians &aux (sysfiles (system-definitions (module-pathname m *locality*) 'asdf-system)))
              (let ((required-sysnames (mapcar #'system-pathname-name sysfiles)))
