@@ -111,7 +111,7 @@ then
 else
     echo "NOTE: found required directories ok. Updating desire:"
     echo "NOTE: checking out branch $BRANCH of desire..."
-    ( cd $temp_asdf_root/desire; git reset --hard origin/$BRANCH; git config user.name "Your Name"; git pull; )
+    ( cd $temp_asdf_root/desire; git fetch;  git reset --hard origin/$BRANCH; )
 fi
 
 echo "NOTE: all done going into lisp..."
