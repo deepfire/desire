@@ -21,7 +21,7 @@
    ;;   types.lisp :: global UI
    #:clear-definitions #:init #:vcs-enabled-p
    ;;   types.lisp :: locality
-   #:locality-pathname #:module-pathname
+   #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module
    #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor
    #:distributor-module-enabled-remote #:module-locally-present-p
