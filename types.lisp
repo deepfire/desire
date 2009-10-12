@@ -238,6 +238,16 @@ differ in only slight detail -- gate property, for example."
 (defmethod vcs-type ((o (eql 'cvs-rsync-remote))) 'cvs)
 (defmethod vcs-type ((o (eql 'svn-rsync-remote))) 'svn)
 
+(defmethod transport ((o (eql 'gate-native))) 'git-native)
+(defmethod transport ((o (eql 'gate-http-remote))) 'http)
+(defmethod transport ((o (eql 'git-native-remote))) 'git-native)
+(defmethod transport ((o (eql 'git-http-remote))) 'http)
+(defmethod transport ((o (eql 'git-combined-remote))) (if *combined-remotes-prefer-native-over-http* 'git 'http))
+(defmethod transport ((o (eql 'hg-http-remote))) 'hg-native)
+(defmethod transport ((o (eql 'darcs-http-remote))) 'http)
+(defmethod transport ((o (eql 'cvs-rsync-remote))) 'rsync)
+(defmethod transport ((o (eql 'svn-rsync-remote))) 'rsync)
+
 ;;;
 ;;; Locality methods
 ;;;
