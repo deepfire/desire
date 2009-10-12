@@ -737,6 +737,8 @@ locally present modules will be marked as converted."
                    (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
                      (report t ";;; establishing self as non-well-known distributor ~A~%" local-name)
                      (make-instance 'local-distributor :name local-name :root root :omit-registration t))))
+    (report t ";;; registering ~S with ASDF~%" (locality-asdf-registry-path (gate *self*)))
+    (locality-register-with-asdf (gate *self*))
     (report t ";;; ensuring that present modules have their defined systems accessible~%")
     ;; TODO: make this a method on NOTICE-MODULE-APPEARED
     (ensure-present-module-systems-loadable (gate *self*))
