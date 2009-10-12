@@ -301,11 +301,13 @@ The value returned is the merged type for SUBJECT-REMOTE.")
   (let ((*read-time-merge-source-distributor* source)
         (*read-time-force-source* force-source))
     (with-open-metafile (definitions 'definitions metastore)
-      (read-definitions definitions))))
+      (read-definitions definitions))
+    (values)))
 
 (defmethod save-current-definitions (&key seal-p (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
   "Save current model of the world within METASTORE.
 When SEAL-P is non-NIL, the changes are committed."
   (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
     (serialise-definitions definitions)
-    (terpri definitions)))
+    (terpri definitions))
+  (values))

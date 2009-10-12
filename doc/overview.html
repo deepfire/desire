@@ -8,7 +8,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system.</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2009-10-10 01:33:20 MSD"/>
+<meta name="generated" content="2009-10-12 05:24:17 MSD"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -72,7 +72,7 @@ lang="en" xml:lang="en">
 <div id="content">
 <h1 class="title">Overview of desire, a software knowledge and distribution system.</h1>
 
-<p>October 10, 2009, 01:30
+<p>October 12, 2009, 05:24
 </p>
 
 
@@ -85,8 +85,16 @@ lang="en" xml:lang="en">
 <li><a href="#sec-3">3 How to obtain desire? </a></li>
 <li><a href="#sec-4">4 Overview of terms </a>
 <ul>
-<li><a href="#sec-4.1">4.1 Distributors </a></li>
-<li><a href="#sec-4.2">4.2 Remotes </a></li>
+<li><a href="#sec-4.1">4.1 Distributors </a>
+<ul>
+<li><a href="#sec-4.1.1">4.1.1 Wishmaster </a></li>
+</ul>
+</li>
+<li><a href="#sec-4.2">4.2 Remotes </a>
+<ul>
+<li><a href="#sec-4.2.1">4.2.1 Gate remotes </a></li>
+</ul>
+</li>
 <li><a href="#sec-4.3">4.3 Modules </a></li>
 <li><a href="#sec-4.4">4.4 Systems </a></li>
 <li><a href="#sec-4.5">4.5 Applications </a></li>
@@ -95,24 +103,23 @@ lang="en" xml:lang="en">
 </li>
 <li><a href="#sec-5">5 API (aka end-user interface) </a>
 <ul>
-<li><a href="#sec-5.1">5.1 Querying the knowledge base: user level </a></li>
+<li><a href="#sec-5.1">5.1 Performing knowledge base queries </a></li>
 <li><a href="#sec-5.2">5.2 Making wishes </a>
 <ul>
 <li><a href="#sec-5.2.1">5.2.1 Reader macros for add-module </a></li>
 </ul>
 </li>
-<li><a href="#sec-5.3">5.3 Querying the knowledge base: advanced level </a></li>
+<li><a href="#sec-5.3">5.3 Less frequently used functions </a></li>
 </ul>
 </li>
 <li><a href="#sec-6">6 Workflow </a>
 <ul>
 <li><a href="#sec-6.1">6.1 Streamlined bootstrap </a></li>
-<li><a href="#sec-6.2">6.2 Advanced use </a>
+<li><a href="#sec-6.2">6.2 Normal, non-bootstrap use </a>
 <ul>
-<li><a href="#sec-6.2.1">6.2.1 User mode </a></li>
-<li><a href="#sec-6.2.2">6.2.2 Wishmaster mode </a></li>
+<li><a href="#sec-6.2.1">6.2.1 User aspect </a></li>
+<li><a href="#sec-6.2.2">6.2.2 Wishmaster aspect </a></li>
 <li><a href="#sec-6.2.3">6.2.3 Extending definitions </a></li>
-<li><a href="#sec-6.2.4">6.2.4 The real truth about wishmaster and user modes </a></li>
 </ul></li>
 </ul>
 </li>
@@ -151,12 +158,15 @@ or, for the Org-mode source:
 The domain of desire includes software distribution points, software
 modules and applications. All these terms are represented internally
 in a detailed, comprehensive manner, and full knowledge about them is
-maintained in a PRINT/READ-able form, additionally being easily
-transportable<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup> between desire nodes.
+maintained in a PRINT/READ-able form, and is easily transportable<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup>
+between desire nodes.
 </p>
 <p>
-There are two sides of desire<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>:
+There are three sides of desire:
 </p><ul>
+<li>
+ a knowledge base about world of software,
+</li>
 <li>
  maximally streamlined software retrieval, and
 </li>
@@ -215,16 +225,40 @@ but please see <a href="#sec-3">Streamlined bootstrap</a>.
 
 <p>
 The largest unit of software granularity is a 'distributor', which
-corresponds to an internet domain name<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup>. Currently, they don't carry
+corresponds to an internet domain name<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>. Currently, they don't carry
 much information beyond just that.
 </p>
 <p>
-'Wishmasters' represent instances of desire acting as distributors which
-are in business of making ordinary desire users' lives easier by
-repackaging modules from their respective VCS of choice into git,
-thereby relieving burden from the user and reducing the amount of points
-of failure.
+Distributors contain one or more 'remotes', which are typical points
+of distribution corresponding to sets of similarly-named repositories.
 </p>
+
+</div>
+
+<div id="outline-container-4.1.1" class="outline-4">
+<h4 id="sec-4.1.1"><span class="section-number-4">4.1.1</span> Wishmaster </h4>
+<div class="outline-text-4" id="text-4.1.1">
+
+
+<p>
+'Wishmaster' is a subtype of distributor which participates in the
+desire network, in the form of having a 'gate remote', upon which
+we will elaborate further below.
+</p>
+<p>
+This participation is twofold &ndash; information passing and module
+conversion (better term?).
+</p>
+<p>
+The information exchanged is that of wishmaster ideas about the world
+of software, that is, about all terms covered in this section.
+</p>
+<p>
+The module conversion serves to simplify life of average desire users
+by repackaging modules available through a variety of distribution
+means into a common DVCS format.
+</p>
+</div>
 </div>
 
 </div>
@@ -235,8 +269,11 @@ of failure.
 
 
 <p>
-Distributors contain one or more 'remotes', which combine following
-concepts:
+The concept of remote serves (or actually, the more general type of
+location does) as a point of distribution for a group of modules.
+</p>
+<p>
+Remotes combine following concepts:
 </p><ul>
 <li>
 version control system type (git, darcs, cvs or svn)
@@ -245,7 +282,7 @@ version control system type (git, darcs, cvs or svn)
 transport type (native, http or rsync)
 </li>
 <li>
-simple pattern path on the distributor
+simple pattern for matching module pathes on the distributor
 </li>
 <li>
 an internet port number
@@ -253,9 +290,34 @@ an internet port number
 </li>
 </ul>
 
-<p>The concept of remote serves (or actually, the more general type of
-location does) as a point of distribution for a group of modules.
+</div>
+
+<div id="outline-container-4.2.1" class="outline-4">
+<h4 id="sec-4.2.1"><span class="section-number-4">4.2.1</span> Gate remotes </h4>
+<div class="outline-text-4" id="text-4.2.1">
+
+
+<p>
+Gate remotes are special remotes which participate in the desire
+protocol. They have a special module called '.meta', which contains
+the containing distributor's idea about the world in a special file
+with name 'DEFINITIONS'.
 </p>
+<p>
+The information in this file is subject to propagation in the network
+of hosts participating in the desire protocol.
+</p>
+<p>
+Distributors recorded in these definitions are considered 'well-known'.
+</p>
+<p>
+Gate remotes have a second purpose: as parts of well-known wishmasters
+they serve for redistribution of modules converted by those wishmasters
+into a single repository format, currently 'git'. The modules converted
+in such a way are advertised differently from those which are considered
+'released' by the containing distributor.
+</p>
+</div>
 </div>
 
 </div>
@@ -272,7 +334,8 @@ provided by less granular concepts to construct a module address.
 </p>
 <p>
 Modules can be provided by several different remotes of different
-distributors.
+distributors. When retrieval of a module is requested, gate remotes
+are preferred above others.
 </p>
 </div>
 
@@ -287,7 +350,7 @@ distributors.
 Descending further down we meet systems.
 Systems are objects only meant to be relevant in the domain of Common Lisp
 software, and more precisely &ndash; to backend system definition facilities,
-such as ASDF, XCVB, Mudballs or others<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>.
+such as ASDF, XCVB, Mudballs or others<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup>.
 </p>
 <p>
 The concept of system introduces inter-system dependencies, which cross
@@ -296,7 +359,7 @@ module boundaries, producing inter-module dependencies.
 <p>
 Evidently, there can be several systems per module, and also those
 can be obscured from the end-user, either intentionally or by unfortunate
-accident<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>.
+accident<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>.
 </p>
 <p>
 Desire handles all these complications and operates on the full
@@ -315,9 +378,9 @@ recomputing it instead every time a request for module is performed.
 <p>
 Applications are simple extensions of systems, providing some very
 preliminary support for launching applications, potentially simplifiable
-to the point of the end-user being able to say "launch mcclim" and
+to the point of the end-user being able to say "run climacs" and
 have everything downloaded, required systems loaded and the application
-up and running as a result.
+up and running.
 </p>
 </div>
 
@@ -333,7 +396,8 @@ The more general type of 'location' besides remotes also includes
 'localities', which serve the same purpose as remotes, but on the local
 machine. Master localities are canonical locations for module repositories
 managed by a specific VCS type.
-The master git locality is a canonical location for module redistribution.
+The master git locality is a canonical location for both release and
+converted module redistribution.
 </p>
 </div>
 </div>
@@ -348,7 +412,7 @@ The master git locality is a canonical location for module redistribution.
 </div>
 
 <div id="outline-container-5.1" class="outline-3">
-<h3 id="sec-5.1"><span class="section-number-3">5.1</span> Querying the knowledge base: user level </h3>
+<h3 id="sec-5.1"><span class="section-number-3">5.1</span> Performing knowledge base queries </h3>
 <div class="outline-text-3" id="text-5.1">
 
 
@@ -400,6 +464,13 @@ module-present-p module-designator module &amp;optional (locality (master 'git))
 system-loadable-p system-designator &amp;optional (locality (master 'git)) =&gt; generalised-boolean
 
 </li>
+<li>
+module-best-remote module-designator &amp;key (if-does-not-exist :error) =&gt; remote
+</li>
+<li>
+module-best-distributor module-designator &amp;key (if-does-not-exist :error) =&gt; remote
+
+</li>
 </ul>
 </div>
 
@@ -440,13 +511,22 @@ Following reader macro is enabled by install-add-module-reader:
 </div>
 
 <div id="outline-container-5.3" class="outline-3">
-<h3 id="sec-5.3"><span class="section-number-3">5.3</span> Querying the knowledge base: advanced level </h3>
+<h3 id="sec-5.3"><span class="section-number-3">5.3</span> Less frequently used functions </h3>
 <div class="outline-text-3" id="text-5.3">
 
 
 <ul>
 <li>
 system-definition system repository-path &amp;key (if-does-not-exist :error) =&gt; pathname
+</li>
+<li>
+clear-definitions =&gt; &lt;no values&gt;
+</li>
+<li>
+save-current-definitions &amp;key seal-p =&gt; &lt;no values&gt;
+</li>
+<li>
+load-definitions &amp;key (source <b>self</b>) (force-source (eq source <b>self</b>)) (metastore (meta-path)) =&gt; &lt;no values&gt;
 
 </li>
 </ul>
@@ -503,107 +583,89 @@ This script when invoked performs following operations:
 
 </li>
 </ul>
+
+<p>The EXPLAIN environment variable, when set, causes the bootstrap script
+to make desire explain some of its actions.
+</p>
 </div>
 
 </div>
 
 <div id="outline-container-6.2" class="outline-3">
-<h3 id="sec-6.2"><span class="section-number-3">6.2</span> Advanced use </h3>
+<h3 id="sec-6.2"><span class="section-number-3">6.2</span> Normal, non-bootstrap use </h3>
 <div class="outline-text-3" id="text-6.2">
 
 
 <p>
-Depending on the way you intend to run desire, you issue either:
+The INIT procedure ensures that your desire node is in working order.
 </p>
 <p>
-(init "<i>path/to/root</i>"), for user mode
+Depending on whether you run a well-known desire node (that is, a wishmaster)
+you need to provide the :AS keyword to INIT:
+</p>
+<p>
+(init "<i>path/to/root</i>"), for non-well-known mode
 or:
-(init "<i>path/to/root</i>" :as 'well-known-distributor), for wishmaster mode
+(init "<i>path/to/root</i>" :as 'your-node-domain-name), for wishmaster mode
 </p>
 <p>
 (This path provided to INIT will henceforth be referred to as $ROOT.)
 </p>
 <p>
-The modes provide the end-user with a tradeoff between hassle and variety
-of module available.
+Unless you already have a '.meta' module, an initial seed version will be
+downloaded for you. Currently the wishmaster chosen for this is
+git.feelingofgreen.ru.
 </p>
 <p>
-This stems from the difference between operation of wishmaster and user modes.
+This procedure also determines the available VCS tools, as well as conversion
+tools, and determines the set of accessible remotes.
 </p>
 <p>
-Wishmasters use a variety of tools to access the whole set of modules retrievable
-using desire, but from this power comes fragility and, because wishmasters also
-serve the role of simplifier gateways, time consuming whatever-&gt;git repository
-conversion process.
-</p>
-<p>
-User mode is the chief reason for that complications, as the only thing the user
-needs to have is git, and boy is that fast<sup><a class="footref" name="fnr.6" href="#fn.6">6</a></sup>.
-</p>
-<p>
-The price, though, is relying on the set of modules available from wishmasters.
+Further, it scans the git locality for known modules, and makes their systems
+registered in the ASDF registry.
 </p>
 
 </div>
 
 <div id="outline-container-6.2.1" class="outline-4">
-<h4 id="sec-6.2.1"><span class="section-number-4">6.2.1</span> User mode </h4>
+<h4 id="sec-6.2.1"><span class="section-number-4">6.2.1</span> User aspect </h4>
 <div class="outline-text-4" id="text-6.2.1">
 
 
 <p>
-During INIT a default wishmaster (currently 'git.feelingofgreen.ru) will be
-chosen, its module export set will be retrieved and that, with the notable
-addition of modules present in $ROOT/git/, will constitute the whole set
-available to the end user.
+Unless you happen to have some conversion tools, the set of modules available
+to your node is restricted to those available via git remotes.
 </p>
 <p>
-Who is, then, free to use LUST, APROPOS-DESR, LIST-MODULES and other
-such functions listed in section 3.
+The LUST function serves to initially download and update a set of defined
+modules.
+</p>
+<p>
+APROPOS-DESR and LIST-MODULES provide convenient knowledge base query
+facilities. For a wider set of functions, please see section 3.
 </p>
 </div>
 
 </div>
 
 <div id="outline-container-6.2.2" class="outline-4">
-<h4 id="sec-6.2.2"><span class="section-number-4">6.2.2</span> Wishmaster mode </h4>
+<h4 id="sec-6.2.2"><span class="section-number-4">6.2.2</span> Wishmaster aspect </h4>
 <div class="outline-text-4" id="text-6.2.2">
 
 
 <p>
-This mode requires that the $ROOT/git/.meta/DEFINITIONS file contains
-a definition for the distributor your desire node will act as,
-and whose name you will pass using the :AS keyword to the INIT function.
-</p>
-<p>
-For the time being, it makes most sense to seed the definitions file
-from what is already accumulated at feelingofgreen.ru:
-</p>
-<p>
-<a href="http://www.feelingofgreen.ru/shared/git/.meta/DEFINITIONS">http://www.feelingofgreen.ru/shared/git/.meta/DEFINITIONS</a>
-</p>
-<p>
-It contains a healthy set of definitions which should be enough for
-beginning.
-</p>
-<p>
-The INIT function:
+From the wishmaster point of view (note that this happens the INIT function
+also does:
 </p>
 <ul>
 <li>
- scans for modules in the canonical export location $ROOT/git/
-</li>
-<li>
- checks that this set includes every module that is claimed to be
-"well known" to be distributed by our distributor<sup><a class="footref" name="fnr.7" href="#fn.7">7</a></sup>, otherwise
-signalling an error
+ checks that the locally available set of modules covers every module
+that is claimed to be "well known" to be distributed by our
+distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>, otherwise signalling an error
 </li>
 <li>
  publishes the informations about non-"well known", converted modules
-</li>
-<li>
- calls it a day
-
+in the gate remote's DEFINITIONS file
 
 </li>
 <li id="sec-6.2.2.1">External executables required for module conversion <br/>
@@ -613,7 +675,7 @@ The conversion is performed by external programs:
 </p>
 <ul>
 <li>
- darcs-to-git<sup><a class="footref" name="fnr.8" href="#fn.8">8</a></sup>
+ darcs-to-git<sup><a class="footref" name="fnr.6" href="#fn.6">6</a></sup>
 </li>
 <li>
  git cvs, debian package git-cvs
@@ -648,23 +710,6 @@ or created on the spot.
 <p>
 SAVE-CURRENT-DEFINITIONS writes out changes into
 $ROOT/git/.meta/DEFINITIONS
-</p>
-</div>
-
-</div>
-
-<div id="outline-container-6.2.4" class="outline-4">
-<h4 id="sec-6.2.4"><span class="section-number-4">6.2.4</span> The real truth about wishmaster and user modes </h4>
-<div class="outline-text-4" id="text-6.2.4">
-
-
-<p>
-The real truth is a bit more complicated, as the two modes have a
-non-trivial intersection in the ways they work. A more complete, proper
-explanation of underlying reasons for some of the choices is due.
-Some of the obvious functionality, like using non-converted modules
-without the pains of reexporting them, is clearly missing, but shouldn't
-be too hard to implement.
 </p>
 </div>
 </div>
@@ -721,31 +766,24 @@ being able to guess about failure reasons
 
 
 
-
-
 </div>
 </div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
-<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> Not yet, but the client mode depends on it, so at least partially it works.
+<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> Not entirely, but some merging functionality is already in place.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> Although, by nature of being a full-knowledge system the applications might
-easily go beyond that.
+<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> Actually, sometimes a group of domain names, like in case of sourceforge.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.3" href="#fnr.3">3</a></sup> Actually, sometimes a group of domain names, like in case of sourceforge.
+<p class="footnote"><sup><a class="footnum" name="fn.3" href="#fnr.3">3</a></sup> Currently, the only backend system implemented is ASDF.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.4" href="#fnr.4">4</a></sup> Currently, the only backend system implemented is ASDF.
+<p class="footnote"><sup><a class="footnum" name="fn.4" href="#fnr.4">4</a></sup> Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.5" href="#fnr.5">5</a></sup> Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
-</p>
-<p class="footnote"><sup><a class="footnum" name="fn.6" href="#fnr.6">6</a></sup> Not faster than downloading and extracting release tarballs, though.
-</p>
-<p class="footnote"><sup><a class="footnum" name="fn.7" href="#fnr.7">7</a></sup> This is tied to the concept of well known release locations and differs
+<p class="footnote"><sup><a class="footnum" name="fn.5" href="#fnr.5">5</a></sup> This is tied to the concept of well known release locations and differs
 from the set of modules converted and reexported in the wishmaster
 process.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.8" href="#fnr.8">8</a></sup> Seemingly no longer available at original location, still can be obtained
+<p class="footnote"><sup><a class="footnum" name="fn.6" href="#fnr.6">6</a></sup> Seemingly no longer available at original location, still can be obtained
 through git://git.feelingofgreen.ru/darcs-to-git
 </p>
 </div>
@@ -754,8 +792,8 @@ through git://git.feelingofgreen.ru/darcs-to-git
 <p class="author"> Author: Samium Gromoff
 <a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2009-10-10 01:33:20 MSD</p>
-<p class="creator">HTML generated by org-mode 6.31 in emacs 23</p>
+<p class="date"> Date: 2009-10-12 05:24:17 MSD</p>
+<p class="creator">HTML generated by org-mode 6.31a in emacs 23</p>
 </div>
 </div>
 </body>
