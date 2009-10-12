@@ -55,37 +55,66 @@ EOF
     exit
 fi
 
-if test ! "${ROOT:0:1}" = "/"
-then
-    echo "\$ROOT is not an absolute path"
-    exit 1
-fi
-
 desire_deps="alexandria cl-fad executor pergamum iterate semi-precious"
-temp_asdf_suffix="$USER-desire-temp-$RANDOM"
+if test -f ~/.climb-seed
+then
+    seed="$(cat ~/.climb-seed)"
+    root="$(cat ~/.climb-root)"
+    if test -d "/tmp/$USER-desire-temp-$seed" && test -d "$root" && test "${root:0:1}" = "/"
+    then
+        re=t
+        ROOT="$root"
+        echo "NOTE: found leftovers from previous bootstrap attempt in /tmp/$USER-desire-temp-$seed and $root, reusing them..." 
+    else
+        seed="$RANDOM"
+    fi
+else
+    seed="$RANDOM"
+fi
+echo -n "$seed" > ~/.climb-seed
+temp_asdf_suffix="$USER-desire-temp-$seed"
 temp_asdf_root="/tmp/$temp_asdf_suffix"
 
-test -z "$ROOT" && echo "ERROR: the first parameter must designate the desired location of the desire root" && exit 1
-test ! -d "$(dirname $ROOT)" && echo "ERROR: the parent directory of the first parameter must exist" && exit 1
-test -x "$ROOT" && echo "ERROR: the first parameter must specify a pathname not associated with any existing object" && exit 1
+
+if test -z "$re"
+then
+    if test ! "${ROOT:0:1}" = "/"
+    then
+        echo "\$ROOT is not an absolute path"
+        exit 1
+    fi
+    test -z "$ROOT" && echo "ERROR: the first parameter must designate the desired location of the desire root" && exit 1
+    test ! -d "$(dirname $ROOT)" && echo "ERROR: the parent directory of the first parameter must exist" && exit 1
+    test -x "$ROOT" && echo "ERROR: the first parameter must specify a pathname not associated with any existing object" && exit 1
+fi
 
 echo "NOTE: will use \"$ROOT\" as root directory for mirror subroots"
 echo "NOTE: will use \"$temp_asdf_root\" as bootstrap package directory"
 
-mkdir $temp_asdf_root || ( echo "FATAL: unable to create the bootstrap package directory at \"$temp_asdf_root\", exiting" && exit 1 )
-mkdir $ROOT || ( echo "FATAL: unable to create the root directory at \"$ROOT\", exiting" && exit 1 )
-mkdir $ROOT/git $ROOT/darcs $ROOT/hg $ROOT/cvs $ROOT/svn
+if test -z "$re"
+then
+    mkdir $temp_asdf_root || ( echo "FATAL: unable to create the bootstrap package directory at \"$temp_asdf_root\", exiting" && exit 1 )
+    mkdir $ROOT || ( echo "FATAL: unable to create the root directory at \"$ROOT\", exiting" && exit 1 )
+    mkdir $ROOT/git $ROOT/darcs $ROOT/hg $ROOT/cvs $ROOT/svn
 
-echo "NOTE: created required directories ok. Retrieving and loading desire and its dependencies:"
+    echo -n "$ROOT" > ~/.climb-root
+    echo "NOTE: created required directories ok. Retrieving and loading desire and its dependencies:"
 
-for desire_dep in $desire_deps desire
-do
-    echo -n "      $desire_dep: "
-    git clone $desire_home/$desire_dep "$temp_asdf_root/$desire_dep" >/dev/null || ( echo "FATAL: failed to retrieve $desire_dep" && exit 1 )
-    echo "ok"
-done
-echo "NOTE: checking out branch $BRANCH of desire..."
-( cd $temp_asdf_root/desire; git reset --hard origin/$BRANCH; )
+    for desire_dep in $desire_deps desire
+    do
+        echo -n "      $desire_dep: "
+        git clone $desire_home/$desire_dep "$temp_asdf_root/$desire_dep" >/dev/null || ( echo "FATAL: failed to retrieve $desire_dep" && exit 1 )
+        echo "ok"
+    done
+    echo "NOTE: checking out branch $BRANCH of desire..."
+    ( cd $temp_asdf_root/desire; git reset --hard origin/$BRANCH; )
+else
+    echo "NOTE: found required directories ok. Updating desire:"
+    echo "NOTE: checking out branch $BRANCH of desire..."
+    ( cd $temp_asdf_root/desire; git reset --hard origin/$BRANCH; git config user.name "Your Name"; git pull; )
+fi
+
+echo "NOTE: all done going into lisp..."
 
 sbcl --noinform \
      --eval "(require :asdf)" \
