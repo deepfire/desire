@@ -81,6 +81,16 @@ of pathname component list variants, with MODNAME occurences substituted."
                     (iter (for v in variants)
                           (collect (append v pathname-component))))))))
 
+(defun guess-module-name (distributor-name pathname-component-list)
+  "Interpret DISTRIBUTOR-NAME and PATHNAME-COMPONENT-LIST as components
+of a module URL and try to deduce name of the module."
+  (declare (ignore distributor-name))
+  (let* ((last (lastcar pathname-component-list))
+         (name (if-let ((tail (search ".git" last)))
+                 (subseq last 0 tail)
+                 last)))
+    (make-keyword (string-upcase name))))
+
 (defun location-add-module (location module-name system-type)
   (lret ((m (make-instance 'module :name module-name :umbrella module-name)))
     (remote-link-module location m)
@@ -90,7 +100,7 @@ of pathname component list variants, with MODNAME occurences substituted."
 (defun do-add-module (url &optional module-name &key gate-p systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
   (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url :gate-p gate-p)
-    (let* ((module-name (or module-name (make-keyword (string-upcase (lastcar raw-path)))))
+    (let* ((module-name (or module-name (guess-module-name distributor-name raw-path)))
            (downmodname (downstring module-name)))
       (when (module module-name :if-does-not-exist :continue)
         (error "~@<Module ~A already exists.~:@>" module-name))
