@@ -19,7 +19,7 @@
    ;;   types.lisp :: remote
    #:url #:parse-remote-namestring #:remote-disabled-p
    ;;   types.lisp :: global UI
-   #:clear-definitions #:init #:vcs-enabled-p
+   #:clear-definitions #:init #:vcs-enabled-p #:*unsaved-definition-changes-p*
    ;;   types.lisp :: locality
    #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module

@@ -184,7 +184,7 @@
   (cons module-name nil))
 
 (defun desire-do-one-step (desires skip-present missing martians)
-  (declare (special *departed-from-definitions-p* *locality*))
+  (declare (special *locality*))
   (labels ((syspath (name) (declare (special *syspath*)) (gethash name *syspath*))
            (set-syspath (name value) (declare (special *syspath*)) (setf (gethash name *syspath*) value))
            (next-unsatisfied-module ()
@@ -196,7 +196,7 @@
              (when (or *register-all-martians*
                        (and *register-happy-matches* (find martian missing :test #'string=)))
                (report t ";; Registered a previously unknown system ~A~%" martian)
-               (setf *departed-from-definitions-p* t)
+               (setf *unsaved-definition-changes-p* t)
                (make-instance type :name martian :module module
                               :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
                                                                     (hidden-p (not (equal pathname-name (downstring martian)))))
@@ -264,7 +264,7 @@
           (desire-do-one-step desires skip-present missing martians)))
       (values t missing martians))))
 
-(defun desire (desires &key skip-present)
+(defun desire (desires &key skip-present (seal-p t))
   "Satisfy module DESIRES and return the list of names of updated modules.
 
    Desire satisfaction means:
@@ -292,11 +292,10 @@
           (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
             (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
-           *departed-from-definitions-p*
            (*locality* (gate *self*))
            (*syspath* (make-hash-table :test #'equal))
            (desired-list (mapcan #'rest interpreted-desires)))
-      (declare (special *departed-from-definitions-p* *locality* *syspath*))
+      (declare (special *locality* *syspath*))
       (report t "; Satisfying desire for ~D module~:*~P:~%" (length desired-list))
       (multiple-value-bind (success missing martians) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present nil nil)
         (declare (ignore success))
@@ -304,7 +303,7 @@
           (report t "; Required systems missing from definitions:~{ ~A~}~%" missing))
         (when martians
           (report t "; Unexpected systems:~{ ~A~}~%" martians)))
-      (when *departed-from-definitions-p*
+      (when (and *unsaved-definition-changes-p* seal-p)
         (report t "; Definitions modified, committing changes.~%")
         (save-current-definitions :seal-p t))
       (report t "; All done.~%")

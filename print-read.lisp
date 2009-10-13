@@ -310,4 +310,5 @@ When SEAL-P is non-NIL, the changes are committed."
   (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
     (serialise-definitions definitions)
     (terpri definitions))
+  (setf *unsaved-definition-changes-p* nil)
   (values))

@@ -45,6 +45,10 @@
 (defparameter *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
 (defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 
+(defvar *unsaved-definition-changes-p* nil
+  "Whether the idea about the world changed, since INIT was performed, or
+SAVE-CURRENT-DEFINITIONS was called.")
+
 (defun clear-definitions ()
   "Empty all global definitions."
   (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps*))
@@ -737,6 +741,7 @@ locally present modules will be marked as converted."
     (when merge-remote-wishmasters
       (report t ";;; merging definitions from remote wishmasters...~%")
       (merge-remote-wishmasters meta-path))
+    (setf *unsaved-definition-changes-p* nil)
     (report t ";;; determining available tools and deducing accessible remotes~%")
     (determine-tools-and-update-remote-accessibility)
     (setf *self* (if-let ((d (and as (distributor as))))
