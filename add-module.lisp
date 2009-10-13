@@ -118,6 +118,7 @@ of pathname component list variants, with MODNAME occurences substituted."
                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
                                              :name (or (choose-default-remote-name distributor (vcs-type remote-type))
                                                        (query-remote-name))
+                                             :module-names nil
                                              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
                                              :path (append (when remote-takeover dist) (lastcar variants))))
                             t))
