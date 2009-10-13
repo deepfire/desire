@@ -108,12 +108,14 @@ of pathname component list variants, with MODNAME occurences substituted."
                             (when-let ((remote (do-distributor-remotes (r distributor)
                                                  (when (equalp remote-path-variant (remote-path r))
                                                    (return r)))))
+                              (format t ";; Found remote with a matching path, name's ~S~%" (name remote))
                               (return remote))))
                     (values (flet ((query-remote-name ()
                                      (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
                                      (finish-output *query-io*)
                                      (or (read *query-io*)
                                          (return-from do-add-module nil))))
+                              (format t ";; Couldn't find a remote with a matching path, making a new one.~%")
                               (make-instance remote-type
                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
                                              :name (or (choose-default-remote-name distributor (vcs-type remote-type))
