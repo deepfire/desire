@@ -97,7 +97,7 @@ of a module URL and try to deduce name of the module."
     (when system-type
       (make-instance system-type :name module-name :module m))))
 
-(defun do-add-module (url &optional module-name &key gate-p systemlessp (system-type *default-system-type*))
+(defun add-module-remote (url &optional module-name &key gate-p systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
   (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url :gate-p gate-p)
     (let* ((module-name (or module-name (guess-module-name distributor-name raw-path)))
@@ -124,7 +124,7 @@ of a module URL and try to deduce name of the module."
                                      (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
                                      (finish-output *query-io*)
                                      (or (read *query-io*)
-                                         (return-from do-add-module nil))))
+                                         (return-from add-module-remote nil))))
                               (format t ";; Couldn't find a remote with a matching path, making a new one.~%")
                               (make-instance remote-type
                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
@@ -178,13 +178,13 @@ of a module URL and try to deduce name of the module."
 
 (defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*))
   (with-tracked-desirable-additions (module added-d added-r added-m added-s added-a)
-      (do-add-module url module-name
-                     :systemlessp systemlessp
-                     :system-type system-type)
+      (add-module-remote url module-name
+                         :systemlessp systemlessp
+                         :system-type system-type)
+    (inject-desirables added-d added-r added-m added-s added-a)
     (when lust
       (let ((*fetch-errors-serious* t))
-        (lust (name module))))
-    (inject-desirables added-d added-r added-m added-s added-a)))
+        (lust (name module))))))
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
