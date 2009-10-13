@@ -23,6 +23,51 @@
 (defvar *system-pathname-typemap* '(("asd" . asdf-system) ("mb" . mudball-system) ("xcvb" . xcvb-system))
   "The mapping between SYSTEM subclasses and definition pathname types.")
 
+;;;;
+;;;; Backends
+;;;;
+(defgeneric system-dependencies (s)
+  (:method ((s xcvb-system)))
+  (:method ((s mudball-system)))
+  (:method ((s asdf-system))
+    (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system (down-case-name s))))))
+          (for sanitised-depname = (string-upcase (string (xform-if #'consp #'second depname)))) ;; Drop version on the floor.
+          (if-let ((depsystem (system sanitised-depname :if-does-not-exist :continue)))
+            (collect depsystem into known-systems)
+            (collect sanitised-depname into unknown-names))
+          (finally (return (values known-systems unknown-names))))))
+
+(defgeneric system-definition-registry-symlink-path (system &optional locality)
+  (:method :around (system &optional locality)
+    (subfile (call-next-method system locality) (list (down-case-name system)) :type (system-pathname-type system)))
+  (:method ((o asdf-system) &optional (locality (gate *self*)))
+    (locality-asdf-registry-path locality)))
+
+(defgeneric system-loadable-p (system-or-name &optional locality)
+  (:method ((o symbol) &optional (locality (gate *self*)))
+    (call-next-method (coerce-to-system o) locality))
+  (:method ((o asdf-system) &optional (locality (gate *self*)))
+    (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
+                              (system-definition o (module-pathname (system-module o) locality) :if-does-not-exist :continue))
+                       (asdf:find-system (down-case-name o) nil))
+      (asdf:missing-dependency () ;; CXML...
+        (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
+        t))))
+
+(defun asdf-hidden-system-names (system &aux (name (name system)))
+  "Find out names of ASDF systems hiding in SYSTEM, which mustn't have been 
+seen yet.
+A hidden system is a system with a definition residing in a file named
+differently from that system's name."
+  (let ((pre (hash-table-values asdf::*defined-systems*)))
+    (asdf:find-system name)
+    (mapcar (compose #'string-upcase #'asdf:component-name)
+            (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
+                    :test #'string= :key (compose #'string-upcase #'asdf:component-name)))))
+
+;;;;
+;;;; Conditions
+;;;;
 (define-condition system-condition (desire-condition)
   ((systems :accessor condition-systems :initarg :systems)))
 
@@ -36,17 +81,9 @@
   (:report (systems path)
            "~@<Couldn't find the definition for ~S in ~S~:@>" (first systems) path))
 
-(defgeneric system-dependencies (s)
-  (:method ((s xcvb-system)))
-  (:method ((s mudball-system)))
-  (:method ((s asdf-system))
-    (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system (down-case-name s))))))
-          (for sanitised-depname = (string-upcase (string (xform-if #'consp #'second depname)))) ;; Drop version on the floor.
-          (if-let ((depsystem (system sanitised-depname :if-does-not-exist :continue)))
-            (collect depsystem into known-systems)
-            (collect sanitised-depname into unknown-names))
-          (finally (return (values known-systems unknown-names))))))
-
+;;;;
+;;;; Generic
+;;;;
 (defun system-pathname-name (pathname)
   "Return the canonical name for a system residing in PATHNAME."
   (string-upcase (pathname-name pathname)))
@@ -74,30 +111,6 @@
   "Return a list of all system definition pathnames of TYPE within REPOSITORY."
   (apply-repo-system-filter
    repository (directory (subwild repository nil :name :wild :type (car (rassoc type *system-pathname-typemap* :test #'eq))))))
-
-(defun system-definition-registry-symlink-path (system &optional (locality (gate *self*)))
-  (subfile (locality-asdf-registry-path locality) (list (down-case-name system)) :type (system-pathname-type system)))
-
-(defun system-loadable-p (system-or-name &optional (locality (gate *self*))
-                          &aux (system (coerce-to-system system-or-name)))
-  "See whether SYSTEM is loadable by the means of ASDF."
-  (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path system locality))
-                            (system-definition system (module-pathname (system-module system) locality) :if-does-not-exist :continue))
-                     (asdf:find-system (down-case-name system) nil))
-    (asdf:missing-dependency () ;; CXML...
-      (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
-      t)))
-
-(defun asdf-hidden-system-names (system &aux (name (name system)))
-  "Find out names of ASDF systems hiding in SYSTEM, which mustn't have been 
-seen yet.
-A hidden system is a system with a definition residing in a file named
-differently from that system's name."
-  (let ((pre (hash-table-values asdf::*defined-systems*)))
-    (asdf:find-system name)
-    (mapcar (compose #'string-upcase #'asdf:component-name)
-            (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
-                    :test #'string= :key (compose #'string-upcase #'asdf:component-name)))))
 
 (defun ensure-system-loadable (system &optional path (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
