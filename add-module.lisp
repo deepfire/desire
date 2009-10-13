@@ -97,7 +97,7 @@ of a module URL and try to deduce name of the module."
     (when system-type
       (make-instance system-type :name module-name :module m))))
 
-(defun add-module-remote (url &optional module-name &key gate-p systemlessp (system-type *default-system-type*))
+(defun add-module-remote (url &optional module-name &key remote-name gate-p systemlessp (system-type *default-system-type*))
   "Assume MODULE-NAME is the last path element of URL, unless specified."
   (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url :gate-p gate-p)
     (let* ((module-name (or module-name (guess-module-name distributor-name raw-path)))
@@ -128,7 +128,12 @@ of a module URL and try to deduce name of the module."
                               (format t ";; Couldn't find a remote with a matching path, making a new one.~%")
                               (make-instance remote-type
                                              :distributor distributor :domain-name-takeover remote-takeover :distributor-port port 
-                                             :name (or (choose-default-remote-name distributor (vcs-type remote-type))
+                                             :name (or (prog1 remote-name
+                                                         (when remote-name
+                                                           (format t ";; Choosing provided remote name ~S~%" remote-name)))
+                                                       (lret ((default-name (choose-default-remote-name distributor (vcs-type remote-type))))
+                                                         (when default-name
+                                                           (format t ";; Choosing default remote name ~S~%" default-name)))
                                                        (query-remote-name))
                                              :module-names nil
                                              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
@@ -176,9 +181,10 @@ of a module URL and try to deduce name of the module."
   (format t "injecting a~{ ~A~}~%" a)
   (dolist (a a) (setf (app         (name a)) a)))
 
-(defun add-module (url &optional module-name &key systemlessp (system-type *default-system-type*) (lust *auto-lust*))
+(defun add-module (url &optional module-name &key systemlessp remote-name (system-type *default-system-type*) (lust *auto-lust*))
   (with-tracked-desirable-additions (module added-d added-r added-m added-s added-a)
       (add-module-remote url module-name
+                         :remote-name remote-name
                          :systemlessp systemlessp
                          :system-type system-type)
     (inject-desirables added-d added-r added-m added-s added-a)
@@ -188,8 +194,8 @@ of a module URL and try to deduce name of the module."
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (url &optional module-name &key (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
-   (add-module url module-name :lust lust)))
+  (destructuring-bind (url &key name remote-name (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
+    (add-module url name :lust lust :remote-name remote-name)))
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char #'add-module-reader *readtable*))
