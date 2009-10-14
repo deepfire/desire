@@ -697,7 +697,7 @@ LOCALITY-PATHNAME."
 
 (defun merge-remote-wishmaster (wishmaster &optional (metastore (meta-path)))
   "Merge definitions from WISHMASTER."
-  (within-wishmaster-meta (wishmaster :metastore metastore)
+  (within-wishmaster-meta (wishmaster :metastore metastore :update-p t)
     (load-definitions :source wishmaster :force-source nil :metastore metastore)))
 
 (defun merge-remote-wishmasters (&optional (metastore (meta-path)))
