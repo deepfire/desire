@@ -25,14 +25,6 @@
   #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
   #-sbcl nil)
 
-(defvar *register-happy-matches* t
-  "Whether or not to define previously undefined systems when they are found,
-   if they are also depended upon by other systems.")
-
-(defvar *register-all-martians* nil
-  "Whether or not to define previously undefined systems when they are found,
-   even if they are not depended upon by other systems.")
-
 ;;;
 ;;; Remote update-ness:
 ;;;
@@ -183,7 +175,7 @@
 (defun fetch-anyway (module-name)
   (cons module-name nil))
 
-(defun desire-do-one-step (desires skip-present missing martians)
+(defun desire-do-one-step (desires skip-present missing)
   (declare (special *locality*))
   (labels ((syspath (name) (declare (special *syspath*)) (gethash name *syspath*))
            (set-syspath (name value) (declare (special *syspath*)) (setf (gethash name *syspath*) value))
@@ -192,77 +184,68 @@
            (fetch-if-missing (module-name)
              (cons module-name (not (module-locally-present-p (module module-name) *locality*))))
            ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
-           (maybe-register-martian (martian path type module missing)
-             (when (or *register-all-martians*
-                       (and *register-happy-matches* (find martian missing :test #'string=)))
-               (report t ";; Registered a previously unknown system ~A~%" martian)
-               (setf *unsaved-definition-changes-p* t)
-               (make-instance type :name martian :module module
-                              :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
-                                                                    (hidden-p (not (equal pathname-name (downstring martian)))))
-                                                          pathname-name))))
-           (add-system-dependencies (module system required modules missing martians)
+           (register-new-system (name path type module &key hidden-p)
+             (report t ";; Registering a previously unknown system ~A~%" name)
+             (setf *unsaved-definition-changes-p* t)
+             (make-instance type :name name :module module :hidden-p hidden-p
+                            :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
+                                                                  (hidden-p (not (equal pathname-name (downstring name)))))
+                                                        pathname-name)))
+           (add-system-dependencies (module system required modules missing)
              "Given a MODULE's SYSTEM, detect its dependencies and, accordingly, extend the sets
-              of known REQUIRED systems, MODULES, MISSING unknown systems and MARTIAN unknown systems, 
-              returning them as multiple values."
+              of known REQUIRED systems, MODULES and MISSING unknown systems, returning them
+              as multiple values."
              (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
-               (let* ((happy-matches (when *register-happy-matches*
-                                       (intersection martians new-missing :test #'string=))))
-                 (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module) new-sysdeps)
-                   (values (append (mapcar (compose #'string #'name) local-newdeps) happy-matches required) ;; Let them wash in the next tide.
-                           (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
-                           (union missing new-missing :test #'string=)
-                           (set-difference martians happy-matches :test #'string=))))))
-           (dependencies-add-system-def (module required &optional modules missing martians)
+               (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module) new-sysdeps)
+                 (values (append required (mapcar (compose #'string #'name) local-newdeps)) ;; Let them wash in the next tide.
+                         (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
+                         (union missing new-missing :test #'string=)))))
+           (dependencies-add-system-def (module required &optional modules missing)
              "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
-              the fallout. Return the modified sets of known REQUIRED systems, MODULES, 
-              MISSING unknown systems and MARTIAN unknown systems, returning them as multiple values."
+              the fallout. Return the modified sets of known REQUIRED systems, MODULES and
+              MISSING unknown systems, returning them as multiple values."
              (declare (special *syspath*))
              (if-let ((name (first required)))
                (let* ((required (rest required))
-                      (path (or (syspath name)
-                                (error "failed to find ~S among ~S~%" name (hash-table-keys *syspath*))))
+                      (path (or (syspath name) (error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%" name (hash-table-keys *syspath*))))
                       (type (interpret-system-pathname-type path)))
-                 (if-let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
-                                        (when system
-                                          (unless (typep system type)
-                                            (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
-                                                   type name (type-of system)))))
-                                      (maybe-register-martian (intern name) path type module missing)))) ;; A happy match?
-                   (progn (ensure-system-loadable system path *locality*)
-                          ;; A hidden system is a system definition residing in a file named differently from main system's name.
-                          ;; Find them.
-                          (let ((hidden-system-names (and (eq type 'asdf-system) (asdf-hidden-system-names system))))
-                            (mapc #'set-syspath hidden-system-names (make-list (length hidden-system-names) :initial-element path))
-                            (multiple-value-bind (missed-hide ambi-hide) (unzip (rcurry #'find missing :test #'string=) hidden-system-names)
-                              (multiple-value-bind (new-required new-martians) (cond (*register-all-martians* (values (append ambi-hide missed-hide required) martians))
-                                                                                     (*register-happy-matches* (values (append missed-hide required) (append ambi-hide martians)))
-                                                                                     (t (values required (append missed-hide ambi-hide martians))))
-                                (add-system-dependencies module system new-required modules (remove name missing :test #'string=) new-martians)))))
-                   (values required modules missing (adjoin name martians :test #'string=))))
-               (values nil modules missing martians)))
-           (module-dependencies (m missing martians &aux (sysfiles (system-definitions (module-pathname m *locality*) 'asdf-system)))
+                 (let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
+                                     (when system
+                                       (unless (typep system type)
+                                         (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>" type name (type-of system)))))
+                                   (register-new-system (intern name) path type module))))
+                   (ensure-system-loadable system path *locality*)
+                   ;; A hidden system is a system definition residing in a file named differently from main system's name.
+                   ;; Find them.
+                   (let ((hidden-system-names (and (eq type 'asdf-system) (not (system-hidden-p system)) (asdf-hidden-system-names system))))
+                     (dolist (hidden-name hidden-system-names)
+                       (set-syspath hidden-name path)
+                       (let ((hidden (or (system hidden-name :if-does-not-exist :continue)
+                                         (register-new-system hidden-name path type module :hidden-p t))))
+                         (ensure-system-loadable hidden path *locality*)))
+                     (add-system-dependencies module system (append required hidden-system-names) modules (remove name missing :test #'string=)))))
+               (values nil modules missing)))
+           (module-dependencies (m missing &aux (sysfiles (system-definitions (module-pathname m *locality*) 'asdf-system)))
              (let ((required-sysnames (mapcar #'system-pathname-name sysfiles)))
                (mapc #'set-syspath required-sysnames sysfiles)
                (iter (with modules)
-                     (for (values required-sysnames-new modules-new missing-new martians-new) =
-                          (dependencies-add-system-def m required-sysnames modules missing martians))
-                     (setf (values required-sysnames modules missing martians) (values required-sysnames-new modules-new missing-new martians-new))
+                     (for (values required-sysnames-new modules-new missing-new) = (dependencies-add-system-def m required-sysnames modules missing))
+                     (setf (values required-sysnames modules missing) (values required-sysnames-new modules-new missing-new))
                      (unless required-sysnames
-                       (return (values (remove-duplicates modules) missing martians)))))))
+                       (return (values (remove-duplicates modules) missing)))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let ((an-unsatisfied-module (module an-unsatisfied-name)))
         (fetch *locality* (module-best-remote an-unsatisfied-module) an-unsatisfied-module)
         (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds or signals an error
         (setf (desire-satisfied an-unsatisfied-name) t)
-        (multiple-value-bind (module-deps missing martians) (module-dependencies an-unsatisfied-module missing martians)
+        (multiple-value-bind (module-deps missing) (module-dependencies an-unsatisfied-module missing)
           (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
             (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
             (report t "~&~@<;; ~@;~S,~:[~; added ~:*~A,~] ~D left~:@>~%"
                     an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
             (finish-output))
-          (desire-do-one-step desires skip-present missing martians)))
-      (values t missing martians))))
+          (desire-do-one-step desires skip-present missing)))
+      (values t missing))))
 
 (defun desire (desires &key skip-present (seal-p t))
   "Satisfy module DESIRES and return the list of names of updated modules.
@@ -297,12 +280,10 @@
            (desired-list (mapcan #'rest interpreted-desires)))
       (declare (special *locality* *syspath*))
       (report t "; Satisfying desire for ~D module~:*~P:~%" (length desired-list))
-      (multiple-value-bind (success missing martians) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present nil nil)
+      (multiple-value-bind (success missing) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present nil)
         (declare (ignore success))
         (when-let ((missing (set-difference missing *implementation-provided-systems* :test #'string=)))
-          (report t "; Required systems missing from definitions:~{ ~A~}~%" missing))
-        (when martians
-          (report t "; Unexpected systems:~{ ~A~}~%" martians)))
+          (report t "; Required systems missing from definitions:~{ ~A~}~%" missing)))
       (when (and *unsaved-definition-changes-p* seal-p)
         (report t "; Definitions modified, committing changes.~%")
         (save-current-definitions :seal-p t))

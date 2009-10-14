@@ -536,13 +536,14 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defclass system (registered synchronisable)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
+   (hidden-p :accessor system-hidden-p :initarg :hidden-p :documentation "Specified.")
    (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
    (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
    (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name :documentation "Specified.")
    (applications :accessor system-applications :initarg :applications :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf system)
-   :search-restriction nil :definition-pathname-name nil
+   :hidden-p nil :search-restriction nil :definition-pathname-name nil
    :module nil :applications nil :relativity nil))
 
 (defclass asdf-system (asdf system) ())
