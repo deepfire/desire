@@ -60,7 +60,7 @@
         (mapcar (compose #'intern #'string-upcase) remote-names)))))
 
 (defun gitremote-present-p (name &optional directory)
-  (member name (gitremotes directory)))
+  (member name (gitremotes directory) :test #'string=))
 
 (defun add-gitremote (name url &optional directory)
   (maybe-within-directory directory
