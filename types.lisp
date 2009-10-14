@@ -462,12 +462,15 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 (defclass module (registered depobj synchronisable)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
-   (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans fill this one.")
+   (system-path-whitelist :accessor module-system-path-whitelist :initarg :path-whitelist :documentation "Specified.")
+   (system-path-blacklist :accessor module-system-path-blacklist :initarg :path-blacklist :documentation "Specified.")
+   (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans should fill this one.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
    (localities :accessor module-localities :initarg :localities :documentation "Cache. COMPUTE-MODULE-CACHES")
    (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
-   :registrator #'(setf module)    
+   :registrator #'(setf module)
+   :path-whitelist nil :path-blacklist nil
    :remotes nil :localities nil
    :systems nil :essential-p nil))
 
