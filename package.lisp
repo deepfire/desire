@@ -25,6 +25,8 @@
    ;;   types.lisp :: module
    #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor
    #:distributor-module-enabled-remote #:module-locally-present-p
+   ;;   types.lisp :: system
+   #:system-hidden-p
    ;;   types.lisp :: desires
    #:add-desire #:module-desired-p
    ;;   types.lisp :: knobs

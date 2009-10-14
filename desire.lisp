@@ -184,10 +184,10 @@
            (fetch-if-missing (module-name)
              (cons module-name (not (module-locally-present-p (module module-name) *locality*))))
            ((setf desire-satisfied) (val m) (setf (cdr (assoc m desires)) val))
-           (register-new-system (name path type module &key hidden-p)
+           (register-new-system (name path type module)
              (report t ";; Registering a previously unknown system ~A~%" name)
              (setf *unsaved-definition-changes-p* t)
-             (make-instance type :name name :module module :hidden-p hidden-p
+             (make-instance type :name name :module module
                             :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
                                                                   (hidden-p (not (equal pathname-name (downstring name)))))
                                                         pathname-name)))
@@ -221,7 +221,7 @@
                      (dolist (hidden-name hidden-system-names)
                        (set-syspath hidden-name path)
                        (let ((hidden (or (system hidden-name :if-does-not-exist :continue)
-                                         (register-new-system hidden-name path type module :hidden-p t))))
+                                         (register-new-system hidden-name path type module))))
                          (ensure-system-loadable hidden path *locality*)))
                      (add-system-dependencies module system (append required hidden-system-names) modules (remove name missing :test #'string=)))))
                (values nil modules missing)))

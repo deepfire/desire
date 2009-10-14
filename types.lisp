@@ -536,15 +536,22 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defclass system (registered synchronisable)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
-   (hidden-p :accessor system-hidden-p :initarg :hidden-p :documentation "Specified.")
    (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
    (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
-   (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name :documentation "Specified.")
+   (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name
+                             :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
    (applications :accessor system-applications :initarg :applications :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf system)
    :hidden-p nil :search-restriction nil :definition-pathname-name nil
    :module nil :applications nil :relativity nil))
+
+(defun system-hidden-p (system)
+  "A hidden system is a system whose definition resides in a file
+named differently from system's name. We have to store the name of
+the definition file for such systems.
+Find out whether SYSTEM is hidden."
+  (not (null (system-definition-pathname-name system))))
 
 (defclass asdf-system (asdf system) ())
 (defclass mudball-system (mudball system) ())
