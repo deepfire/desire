@@ -55,15 +55,22 @@
         t))))
 
 (defun asdf-hidden-system-names (system &aux (name (name system)))
-  "Find out names of ASDF systems hiding in SYSTEM, which mustn't have been 
-seen yet.
+  "Find out names of ASDF systems hiding in SYSTEM.
 A hidden system is a system with a definition residing in a file named
 differently from that system's name."
-  (let ((pre (hash-table-values asdf::*defined-systems*)))
-    (asdf:find-system name)
-    (mapcar (compose #'string-upcase #'asdf:component-name)
-            (remove (string name) (mapcar #'cdr (set-difference (hash-table-values asdf::*defined-systems*) pre))
-                    :test #'string= :key (compose #'string-upcase #'asdf:component-name)))))
+  (let ((orig asdf::*defined-systems*)
+        (test (make-hash-table :test 'equalp)))
+    (unwind-protect
+         (progn
+           (setf asdf::*defined-systems* test)
+           (handler-case
+               (let ((*break-on-signals* nil))
+                 (asdf:find-system name))
+             (error () nil))
+           (mapcar (compose #'string-upcase #'asdf:component-name)
+                   (remove (string name) (mapcar #'cdr (hash-table-values test))
+                           :test #'string= :key (compose #'string-upcase #'asdf:component-name))))
+      (setf asdf::*defined-systems* orig))))
 
 ;;;;
 ;;;; Conditions
