@@ -114,10 +114,16 @@ differently from that system's name."
           (:error (error 'system-definition-missing-error :systems (list system) :path repository))
           (:continue nil)))))
 
-(defun system-definitions (repository type)
-  "Return a list of all system definition pathnames of TYPE within REPOSITORY."
-  (apply-repo-system-filter
-   repository (directory (subwild repository nil :name :wild :type (car (rassoc type *system-pathname-typemap* :test #'eq))))))
+(defun module-system-definitions (module type &optional (locality (gate *self*)))
+  "Return a list of all MODULE's system definition pathnames corresponding to
+system TYPE within LOCALITY."
+  (let* ((path (module-pathname module locality))
+         (pass1 (directory (subwild path (module-system-path-whitelist module)
+                                    :name :wild :type (or (car (rassoc type *system-pathname-typemap* :test #'eq))
+                                                          (error "~@<Unknown system type ~S.~:@>" type))))))
+    (if-let ((blacklist (module-system-path-blacklist module)))
+      (remove-if (rcurry #'pathname-match-p (subwild path blacklist)) pass1)
+      pass1)))
 
 (defun ensure-system-loadable (system &optional path (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 

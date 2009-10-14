@@ -91,13 +91,7 @@ of a module URL and try to deduce name of the module."
                  last)))
     (make-keyword (string-upcase name))))
 
-(defun location-add-module (location module-name system-type)
-  (lret ((m (make-instance 'module :name module-name :umbrella module-name)))
-    (remote-link-module location m)
-    (when system-type
-      (make-instance system-type :name module-name :module m))))
-
-(defun add-module-remote (url &optional module-name &key remote-name gate-p systemlessp (system-type *default-system-type*))
+(defun add-module-remote (url &optional module-name &key remote-name gate-p)
   "Assume MODULE-NAME is the last path element of URL, unless specified."
   (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url :gate-p gate-p)
     (let* ((module-name (or module-name (guess-module-name distributor-name raw-path)))
@@ -144,7 +138,7 @@ of a module URL and try to deduce name of the module."
                        (name remote) (type-of remote) remote-type))
               (format t "deduced: ~S @ ~S :: ~S:~D / ~S => ~%~S~%"
                       module-name remote-type (name distributor) port raw-path remote)
-              (values (location-add-module remote module-name (unless systemlessp system-type)) created-distributor-p created-remote-p))))))))
+              (values module-name distributor remote))))))))
 
 (defparameter *auto-lust* nil)
 
@@ -181,21 +175,25 @@ of a module URL and try to deduce name of the module."
   (format t "injecting a~{ ~A~}~%" a)
   (dolist (a a) (setf (app         (name a)) a)))
 
-(defun add-module (url &optional module-name &key systemlessp remote-name (system-type *default-system-type*) (lust *auto-lust*))
-  (with-tracked-desirable-additions (module added-d added-r added-m added-s added-a)
-      (add-module-remote url module-name
-                         :remote-name remote-name
-                         :systemlessp systemlessp
-                         :system-type system-type)
-    (inject-desirables added-d added-r added-m added-s added-a)
-    (when lust
-      (let ((*fetch-errors-serious* t))
-        (lust (name module))))))
+(defun location-add-module (location module-name)
+  (lret ((m ))
+    (remote-link-module location m)))
+
+(defun add-module (url &optional module-name &key systemlessp remote-name path-whitelist path-blacklist (system-type *default-system-type*) (lust *auto-lust*))
+  (with-tracked-desirable-additions (deduced-module-name added-d added-r added-m added-s added-a)
+      (multiple-value-bind (module-name distributor remote) (add-module-remote url module-name :remote-name remote-name)
+        (declare (ignore distributor))
+        (let ((module (make-instance 'module :name module-name :umbrella module-name :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+          (remote-link-module remote module)
+          (when lust
+            (let ((*fetch-errors-serious* t))
+              (lust (name module))))))
+    (inject-desirables added-d added-r added-m added-s added-a)))
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (url &key name remote-name (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
-    (add-module url name :lust lust :remote-name remote-name)))
+  (destructuring-bind (url &key name remote-name path-whitelist path-blacklist (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
+    (add-module url name :lust lust :remote-name remote-name :path-whitelist path-whitelist :path-blacklist path-blacklist)))
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char #'add-module-reader *readtable*))

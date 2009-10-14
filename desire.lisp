@@ -264,7 +264,7 @@
                  (unless (system hidden-system-name :if-does-not-exist :continue)
                    (register-new-system (intern hidden-system-name) path type module)))))
            (module-dependencies (m system-vocabulary)
-             (let* ((required-sysfiles (system-definitions (module-pathname m *locality*) 'asdf-system))
+             (let* ((required-sysfiles (module-system-definitions m 'asdf-system *locality*))
                     (unsatisfied-module-system-names (mapcar #'system-pathname-name required-sysfiles))
                     (extended-system-vocabulary system-vocabulary))
                (iter (for required-sysfile in required-sysfiles)

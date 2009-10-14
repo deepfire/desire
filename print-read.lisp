@@ -202,7 +202,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     `(make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :pathname ,path ,@(remove-from-plist initargs :path :modules))))
 
 (defmethod print-object ((o module) stream)
-  (format stream "~@<#M(~;~A~{ ~<~S ~A~:@>~}~;)~:@>" (symbol-name (name o))
+  (format stream "~@<#M(~;~A~{ ~<~(~S ~S~)~:@>~}~;)~:@>" (symbol-name (name o))
           (remove nil (multiple-value-call #'list
                         (unless (eq (name o) (module-umbrella o))
                           (list :umbrella (module-umbrella o)))
@@ -210,9 +210,9 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                           (unless (and first (null other-systems) (system-simple-p first) (eq (name first) (name o)))
                             (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
                               (values (when simple
-                                        (list :systems (mapcar #'down-case-name simple)))
+                                        (list :systems (mapcar #'name simple)))
                                       (when complex
-                                        (list :complex-systems (mapcar #'down-case-name complex)))))))
+                                        (list :complex-systems (mapcar #'name complex)))))))
                         (when-let ((whitelist (module-system-path-whitelist o)))
                           (list :path-whitelist whitelist))
                         (when-let ((blacklist (module-system-path-blacklist o)))
