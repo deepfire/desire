@@ -200,12 +200,12 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     `(make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :pathname ,path ,@(remove-from-plist initargs :path :modules))))
 
 (defmethod print-object ((o module) stream)
-  (format stream "~@<#M(~;~A~{ ~<~S ~A~:@>~}~;)~:@>" (if (eq (name o) (module-umbrella o))
-                                                          (symbol-name (name o))
-                                                          (list (symbol-name (name o)) (module-umbrella o)))
+  (format stream "~@<#M(~;~A~{ ~<~S ~A~:@>~}~;)~:@>" (symbol-name (name o))
           (remove nil (multiple-value-call #'list
+                        (unless (eq (name o) (module-umbrella o))
+                          (list :umbrella (module-umbrella o)))
                         (destructuring-bind (&optional first &rest other-systems) (module-systems o)
-                          (unless (and first (null other-systems) (system-simple-p first))
+                          (unless (and first (null other-systems) (system-simple-p first) (eq (name first) (name o)))
                             (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
                               (values (when simple
                                         (list :systems (mapcar #'down-case-name simple)))
@@ -220,19 +220,18 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 
 (defun module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
-    (destructuring-bind (name umbrella) (if (consp name) name (list name name))
-      `(lret ((m (or (module ',name :if-does-not-exist :continue)
-                     (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',umbrella
-                                    ,@(remove-from-plist initargs :systems :complex-systems)))))
-         (do-remotes (r)
-           (when (remote-defines-module-p r m)
-             (pushnew r (module-remotes m))))
-         ,@(if systems-specified-p
-               (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
-               ;; Existence of complex systems implies absence of simple systems, by default.
-               (unless complex-systems
-                 `(,(emit-make-simple-system-form *default-system-type* name name))))))))
+  (destructuring-bind (name &rest initargs &key (umbrella name) (systems nil systems-specified-p) complex-systems &allow-other-keys) (read stream nil nil t)
+    `(lret ((m (or (module ',name :if-does-not-exist :continue)
+                   (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',umbrella
+                                  ,@(remove-from-plist initargs :umbrella :systems :complex-systems)))))
+       (do-remotes (r)
+         (when (remote-defines-module-p r m)
+           (pushnew r (module-remotes m))))
+       ,@(if systems-specified-p
+             (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
+             ;; Existence of complex systems implies absence of simple systems, by default.
+             (unless complex-systems
+               `(,(emit-make-simple-system-form *default-system-type* name name)))))))
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
