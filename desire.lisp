@@ -244,7 +244,8 @@
                      (unless (vocab-presentp system-vocabulary hidden-name #'string=)
                        (setf hidden-system-vocabulary (system-maybe-add-new hidden-system-vocabulary hidden-name)))
                      (let ((hidden (or (system hidden-name :if-does-not-exist :continue)
-                                       (register-new-system hidden-name path type module))))
+                                       ;; XXX: how come we ever hit this?
+                                       (register-new-system (intern hidden-name) path type module))))
                        (ensure-system-loadable hidden path *locality*)))
                    (setf (system-satisfiedp system-vocabulary name) t) ;; made loadable, deps added, hiddens uncovered
                    (add-system-dependencies module system modules (append system-vocabulary hidden-system-vocabulary))))
@@ -260,7 +261,8 @@
                (set-syspath name path)
                (dolist (hidden-system-name (and (eq type 'asdf-system) (asdf-hidden-system-names system)))
                  (set-syspath hidden-system-name path)
-                 (register-new-system (intern hidden-system-name) path type module))))
+                 (unless (system hidden-system-name :if-does-not-exist :continue)
+                   (register-new-system (intern hidden-system-name) path type module)))))
            (module-dependencies (m system-vocabulary)
              (let* ((required-sysfiles (system-definitions (module-pathname m *locality*) 'asdf-system))
                     (unsatisfied-module-system-names (mapcar #'system-pathname-name required-sysfiles))
