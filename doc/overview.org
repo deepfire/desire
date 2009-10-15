@@ -1,9 +1,11 @@
 ### -*- mode: org; -*-
 #+STARTUP: hidestars #+STARTUP: odd #+STARTUP: logdone #+STARTUP: nofninline
+#+STYLE: <link rel="stylesheet" type="text/css" href="style.css" />
 
-Overview of desire, a software knowledge and distribution system.
-                  October 12, 2009, 05:24
-
+Overview of desire, a software knowledge and distribution system
+#+BEGIN_CENTER
+October 15, 2009, 08:00
+#+END_CENTER
 
 * About this document
 
