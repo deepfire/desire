@@ -2,12 +2,12 @@
 version="0.1"
 
 ROOT="$1"
-APP="${2:-nil}"
+DESIRE="${2:-nil}"
 DESIRE_HOME=${3:-git.feelingofgreen.ru}
 
-if ! test "$APP" = "nil"
+if ! test "$DESIRE" = "nil"
 then
-    echo "NOTE: upon successful bootstrap will install module $APP, along with dependencies"
+    echo "NOTE: upon successful bootstrap will install, load and maybe launch $DESIRE, along with dependencies"
 fi
 
 if test -z "$EXPLAIN"
@@ -45,12 +45,11 @@ if test -z "$1" || test "$1" = "--help"
 then
     cat <<EOF
 climb.sh, version $version - a bash script for bootstrapping desire on unix systems
-Usage:  climb.sh ABSOLUTE-ROOT-PATH [APPLICATION-NAME [BOOTSTRAP-HOST]]
+Usage:  climb.sh ABSOLUTE-ROOT-PATH [APP-OR-SYS-OR-MOD-NAME [BOOTSTRAP-HOST]]
 
 Bootstrap desire, the Common Lisp software knowledge and distribution system from
-BOOTSTRAP-HOST (which defaults to git.feelingofgreen.ru), optionally installing APP.
-
-Optionally installing APP doesn't work yet. Ha.
+BOOTSTRAP-HOST (which defaults to git.feelingofgreen.ru), optionally installing
+the entity with APP-OR-SYS-OR-MOD-NAME.
 EOF
     exit
 fi
@@ -117,19 +116,49 @@ fi
 echo "NOTE: all done going into lisp..."
 
 sbcl --noinform \
+     --eval "(progn #+sbcl (require :sb-grovel))" \
      --eval "(require :asdf)" \
-     --eval "(setf (values *compile-verbose* *compile-print* *load-verbose*) (values nil nil nil))" \
-     --eval "(defparameter *temp-root* '(:absolute \"tmp\" \"$temp_asdf_suffix/\"))" \
-     --eval "(defun temp-modules-search (system)
-               (let* ((name (asdf::coerce-name system))
-	              (file (make-pathname :directory (append *temp-root* (list name)) :name name :type \"asd\" :case :local)))
-                 (when (and file (probe-file file))
-                   file)))" \
-     --eval "(declaim (optimize (debug $DEBUG)) #+sbcl (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))" \
-     --eval "(push 'temp-modules-search asdf:*system-definition-search-functions*)" \
-     --eval "(asdf:operate 'asdf:load-op 'desire :verbose nil)" \
+     --eval "
+(progn
+  (setf (values *compile-verbose* *compile-print* *load-verbose*) (values nil nil nil))
+  (defparameter *temp-root* '(:absolute \"tmp\" \"$temp_asdf_suffix/\"))
+  (defun temp-modules-search (system)
+   (let* ((name (asdf::coerce-name system))
+          (file (make-pathname :directory (append *temp-root* (list name)) :name name :type \"asd\" :case :local)))
+     (when (and file (probe-file file))
+         file)))
+  (declaim (optimize (debug $DEBUG))
+           #+sbcl (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
+  (push 'temp-modules-search asdf:*system-definition-search-functions*)
+  (asdf:operate 'asdf:load-op 'desire :verbose nil))" \
      --eval "(in-package :desr)" \
-     --eval "(setf executor:*execute-explanatory* $EXPLAIN)" \
-     --eval "(init \"$ROOT/\")" \
-     --eval "(format t \"~&~%~%   Congratulations! You have reached a point where you can wish for any package~%  desire knows about. Just type (lust 'desiree) and it will happen.~%  You can link desire's pool of packages into ASDF by ensuring that~%  #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*~%~%  To see what's possible, issue:~%    (apropos-desr 'clim)~%  or~%    (list-modules)~%~%  Have fun!~%~%\")" \
-     --eval "(when '$APP (lust :$APP))"
+     --eval "
+(progn
+  (setf executor:*execute-explanatory* $EXPLAIN)
+  (init \"$ROOT/\")
+  (format t \"~&~%~%~
+   Congratulations! You have reached a point where you can wish for any package~%~
+  desire knows about. Just type (lust 'desiree) and it will happen.~%~
+  You can link desire's pool of packages into ASDF by ensuring that~%~
+  #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*~%~%~
+  To see what's possible, issue:~%~
+    (apropos-desr 'clim)~%~
+  or~%~
+    (list-modules)~%~%~
+  Have fun!~%~%\")
+  (let* ((app (app '$DESIRE :if-does-not-exist :continue))
+         (system  (if app
+                      (app-system app)
+                      (system '$DESIRE :if-does-not-exist :continue)))
+         (module (if system
+                     (system-module system)
+                     (module '$DESIRE :if-does-not-exist :continue))))
+    (when (and '$DESIRE (not module))
+      (error \"~@<A desire ~S was provided, but no such entity (application, system or module) is known to desire.~:@>\"
+             '$DESIRE))
+    (when module
+      (lust (name module)))
+    (when system
+      (require (down-case-name system)))
+    (when app
+      (apply (app-function app) (app-default-parameters app)))))"
