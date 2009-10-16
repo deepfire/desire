@@ -281,7 +281,7 @@
       (let* ((an-unsatisfied-module (module an-unsatisfied-name))
              (best-remote (module-best-remote an-unsatisfied-module)))
         (fetch *locality* best-remote an-unsatisfied-module)
-        (checkout-remote-branch an-unsatisfied-module best-remote :master t *locality*)
+        (reset-to-remote-branch an-unsatisfied-module best-remote :master t *locality*)
         (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds or signals an error
         (setf (desire-satisfied an-unsatisfied-name) t)
         (multiple-value-bind (module-deps new-system-vocabulary) (module-dependencies an-unsatisfied-module system-vocabulary)

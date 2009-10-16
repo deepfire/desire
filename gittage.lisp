@@ -58,8 +58,8 @@
 
 (defun git-repository-reset-hard (&optional ref directory)
   (maybe-within-directory directory
-    (with-explanation ("hard-resetting repository in ~S to ~:[HEAD~;~:*~S~]" *default-pathname-defaults* ref)
-      (apply #'git "reset" "--hard" (when ref (flatten-path-list ref))))))
+    (with-explanation ("hard-resetting repository in ~S to ~:[master~;~:*~S~]" *default-pathname-defaults* ref)
+      (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref)))))))
 
 (defun (setf git-repository-bare-p) (val directory)
   (within-directory directory
@@ -179,13 +179,13 @@
   "This assumes that the local 'master' branch is present."
   (maybe-within-directory directory
     (with-retry-restarts ((hardreset-repository () (git-repository-reset-hard)))
-      (when (git-repository-changes-p directory)
-        (ecase if-changes
-          (:continue)
-          (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
-                       (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
-          (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
-                             (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))))
+      (unless (eq if-changes :ignore)
+        (when (git-repository-changes-p directory)
+          (ecase if-changes
+            (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
+                         (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
+            (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
+                               (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory))))))
       (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
         (git "checkout" (flatten-path-list ref))))))
 

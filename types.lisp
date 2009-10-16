@@ -393,13 +393,14 @@ to DIRECTORY."
       (ensure-gitremote (name remote) module-url))
     (fetch-gitremote (name remote))))
 
-(defun checkout-remote-branch (module remote &optional (branch-name :master) (reset-before-checkout nil) (locality (gate *self*)))
+(defun reset-to-remote-branch (module remote &optional (branch-name :master) (reset-before-checkout nil) (locality (gate *self*)))
   (within-directory ((module-pathname module locality))
     (let ((ref (list "remotes" (down-case-name remote) (downstring branch-name))))
       (ensure-gitbranch :master ref)
       (when reset-before-checkout
-        (git-repository-reset-hard))
-      (git-checkout-ref ref))))
+        (git-repository-reset-hard '("master"))
+        (git-checkout-ref '("master") *default-pathname-defaults* :if-changes :ignore))
+      (git-repository-reset-hard ref))))
 
 (defun git-clone-remote (remote module-name &optional locality-pathname)
   "Clone REMOTE, with working directory optionally changed to LOCALITY-PATHNAME."
@@ -648,7 +649,8 @@ Find out whether SYSTEM is hidden."
 Obviously, gates are preferred."
   (let ((module (coerce-to-module module)))
     (or (choose-gate-or-else (do-remotes (r)
-                               (when (remote-defines-module-p r module)
+                               (when (and (remote-defines-module-p r module)
+                                          (not (eq (remote-distributor r) *self*)))
                                  (collect r))))
         (ecase if-does-not-exist
           (:error (error 'insatiable-desire :desire module))
