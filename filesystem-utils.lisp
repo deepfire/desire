@@ -21,7 +21,7 @@
 (in-package :desire)
 
 
-(define-executable git :may-want-display t)
+(define-executable git :may-want-display t :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat"))
 (define-executable gitk :may-want-display t)
 #-win32
 (progn
