@@ -385,15 +385,17 @@ When there's a name clash NIL is returned."
 ;;;
 ;;; NOTE: this is the reason why remotes have names
 ;;;
-(defun git-fetch-remote (remote module-name &optional locality-pathname)
+(defun git-fetch-remote (remote module-name &optional directory)
   "Fetch from REMOTE, with working directory optionally changed
-to LOCALITY-PATHNAME."
-  (maybe-within-directory locality-pathname
+to DIRECTORY."
+  (maybe-within-directory directory
     (let ((module-url (url remote module-name)))
       (ensure-gitremote (name remote) module-url))
-    (with-explanation ("fetching module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
-      (git "fetch" (down-case-name remote)))
-    (ensure-master-branch-from-remote :remote-name (name remote))))
+    (fetch-gitremote (name remote))))
+
+(defun checkout-remote (module remote &optional (branch :master) (locality (gate *self*)))
+  (within-directory ((module-pathname module locality))
+    (git-checkout-ref (list "remotes" (down-case-name remote) (downstring branch)))))
 
 (defun git-clone-remote (remote module-name &optional locality-pathname)
   "Clone REMOTE, with working directory optionally changed to LOCALITY-PATHNAME."
@@ -515,7 +517,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
    cache results."
   (with-slots (scan-positive-localities) module
     (labels ((update-presence-in (locality)
-               (lret ((presence (repository-present-p (module-pathname module locality))))
+               (lret ((presence (git-repository-present-p (module-pathname module locality))))
                  (if presence
                      (pushnew locality scan-positive-localities)
                      (removef scan-positive-localities locality)))))
@@ -695,7 +697,7 @@ LOCALITY-PATHNAME."
   (once-only (w metastore)
     `(within-directory (,metastore)
        ,@(when update-p `((git-fetch-remote (gate ,w) :.meta)))
-       (within-ref (list "remotes" (down-case-name ,w) "master")
+       (with-git-ref (list "remotes" (down-case-name ,w) "master")
          ,@body))))
 
 (defun merge-remote-wishmaster (wishmaster &optional (metastore (meta-path)))

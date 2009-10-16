@@ -145,8 +145,8 @@
     (within-directory (git-repo-dir :lisp nil :if-does-not-exist :create)
       (with-explanation ("on behalf of module ~A, converting from darcs to git: ~S => ~S" (name module) darcs-repo-dir *default-pathname-defaults*)
         (darcs-to-git (namestring darcs-repo-dir))))
-    (when (repository-bare-p git-repo-dir)
-      (setf (repository-bare-p git-repo-dir) nil))))
+    (when (git-repository-bare-p git-repo-dir)
+      (setf (git-repository-bare-p git-repo-dir) nil))))
 
 (defmethod fetch ((git-locality git-locality) (remote cvs-rsync-remote) module &aux (name (down-case-name module)))
   (let* ((cvs-locality (local-cvs *self*))
@@ -170,7 +170,7 @@
         (git "svn" "fetch")))))
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
-  (setf (repository-world-readable-p (module-pathname module git-locality)) *default-world-readable*))
+  (setf (git-repository-world-readable-p (module-pathname module git-locality)) *default-world-readable*))
 
 (defun fetch-anyway (module-name)
   (cons module-name nil))

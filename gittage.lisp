@@ -30,6 +30,81 @@
 (defmacro maybe-within-directory (directory &body body)
   `(invoke-maybe-within-directory (lambda () ,@body) ,directory))
 
+(define-condition vcs-condition ()
+  ((vcs :accessor condition-vcs :initarg :vcs)))
+
+(define-condition git-condition (vcs-condition)
+  ()
+  (:default-initargs :vcs 'git))
+
+(define-condition git-error (error git-condition)
+  ())
+
+(define-simple-error git-error)
+
+;;;
+;;; Repositories
+;;;
+(defun git-repository-present-p (&optional directory)
+  "See if MODULE repository and source code is available at LOCALITY."
+  (and (if directory (directory-exists-p directory) t)
+       (maybe-within-directory directory
+         (and (directory-exists-p (subdirectory* nil ".git"))
+              (not (null (gitbranches)))))))
+
+(defun git-repository-bare-p (&optional directory)
+  (maybe-within-directory directory
+    (null (directory-exists-p (subdirectory* nil ".git")))))
+
+(defun git-repository-reset-hard (&optional ref directory)
+  (maybe-within-directory directory
+    (with-explanation ("hard-resetting repository in ~S to ~:[HEAD~;~:*~S~]" *default-pathname-defaults* ref)
+      (apply #'git "reset" "--hard" (when ref (flatten-path-list ref))))))
+
+(defun (setf git-repository-bare-p) (val directory)
+  (within-directory directory
+    (if val
+        (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory)
+        (progn
+          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
+            (sb-posix:mkdir ".git" #o755)
+            (dolist (filename git-files)
+              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
+          (setf (gitvar 'core.bar) "false")
+          (git-repository-reset-hard)
+          nil))))
+
+(defun git-repository-world-readable-p (&optional directory)
+  "See, whether or not MODULE within LOCALITY is allowed to be exported
+   for the purposes of git-daemon."
+  (file-exists-p (subfile* directory ".git" "git-daemon-export-ok")))
+
+(defun (setf git-repository-world-readable-p) (val &optional directory)
+  "Change git-daemon's idea about world-readability of DIRECTORY."
+  (let ((path (subfile* directory ".git" "git-daemon-export-ok")))
+    (if val
+        (open path :direction :probe :if-does-not-exist :create)
+        (delete-file path))
+    val))
+
+(defun git-repository-unstaged-changes-p (&optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
+      (not (with-shell-predicate (git "diff" "--exit-code"))))))
+
+(defun git-repository-staged-changes-p (&optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
+      (not (with-shell-predicate (git "diff" "--cached" "--exit-code"))))))
+
+(defun git-repository-changes-p (&optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("determining whether git repository at ~S has staged or unstaged changes" *default-pathname-defaults*)
+      (not (with-shell-predicate (git "diff" "HEAD" "--exit-code"))))))
+
+;;;
+;;; Config variables
+;;;
 (defun gitvar (var &optional directory)
   (declare (type symbol var))
   (maybe-within-directory directory
@@ -44,6 +119,9 @@
     (with-explanation ("setting git variable ~A to ~A" (symbol-name var) val)
       (git (list "config" "--replace-all" (string-downcase (symbol-name var)) val)))))
 
+;;;
+;;; Branches
+;;;
 (defun gitbranches (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
@@ -52,6 +130,21 @@
                            (mapcan (curry #'split-sequence #\Space)
                                    (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
 
+(defun gitbranch-present-p (name &optional directory)
+  (member name (gitbranches directory) :test #'string=))
+
+(defun add-gitbranch (name &optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("adding a git branch ~A in ~S" name *default-pathname-defaults*)
+      (git "branch" (downstring name)))))
+
+(defun ensure-gitbranch (name &optional directory)
+  (unless (gitbranch-present-p name directory)
+    (add-gitbranch name directory)))
+
+;;;
+;;; Remotes
+;;;
 (defun gitremotes (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
@@ -71,54 +164,28 @@
   (unless (gitremote-present-p name directory)
     (add-gitremote name url directory)))
 
-(defun repository-present-p (&optional directory)
-  "See if MODULE repository and source code is available at LOCALITY."
-  (and (if directory (directory-exists-p directory) t)
-       (maybe-within-directory directory
-         (and (directory-exists-p (subdirectory* nil ".git"))
-              (not (null (gitbranches)))))))
-
-(defun repository-bare-p (&optional directory)
+(defun fetch-gitremote (remote-name &optional directory)
   (maybe-within-directory directory
-    (null (directory-exists-p (subdirectory* nil ".git")))))
+    (with-explanation ("fetching from git remote ~A in ~S" remote-name *default-pathname-defaults*)
+      (git "fetch" (downstring remote-name)))))
 
-(defun (setf repository-bare-p) (val directory)
-  (within-directory directory
-    (if val
-        (error "not implemented")
-        (progn
-          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
-            (sb-posix:mkdir ".git" #o755)
-            (dolist (filename git-files)
-              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
-          (setf (gitvar 'core.bar) "false")
-          (with-explanation ("hard-resetting to HEAD git tree in ~S" *default-pathname-defaults*)
-            (git "reset" "--hard"))
-          nil))))
-
-(defun repository-world-readable-p (&optional directory)
-  "See, whether or not MODULE within LOCALITY is allowed to be exported
-   for the purposes of git-daemon."
-  (file-exists-p (subfile* directory ".git" "git-daemon-export-ok")))
-
-(defun (setf repository-world-readable-p) (val &optional directory)
-  (let ((path (subfile* directory ".git" "git-daemon-export-ok")))
-    (if val
-        (open path :direction :probe :if-does-not-exist :create)
-        (and (delete-file path) nil))))
-
-(defun ensure-master-branch-from-remote (&key directory (remote-name (first (gitremotes directory))))
+;;;
+;;; Refs
+;;;
+(defun git-checkout-ref (ref &optional directory &key (if-changes :error))
   (maybe-within-directory directory
-    (let ((branches (gitbranches)))
-      (unless (find :master branches)
-        (with-explanation ("setting master branch to master of remote ~A in ~S" remote-name *default-pathname-defaults*)
-          (git "checkout" "-b" "master" (fuse-downcased-string-path-list (list remote-name "master"))))))))
+    (with-retry-restarts ((hardreset-repository () (git-repository-reset-hard)))
+      (when (git-repository-changes-p directory)
+        (ecase if-changes
+          (:continue)
+          (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
+                       (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
+          (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
+                             (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))))
+      (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
+        (git "checkout" (flatten-path-list ref))))))
 
-(defmacro within-ref (ref &body body)
-  (with-gensyms (refname)
-    `(let ((,refname (flatten-path-list ,ref)))
-       (with-explanation ("checking out ref ~A in ~S" ,refname *default-pathname-defaults*)
-         (git "checkout" ,refname))
-       (unwind-protect (progn ,@body)
-         (with-explanation ("returning to master branch in ~S" ,refname *default-pathname-defaults*)
-           (git "checkout" "master"))))))
+(defmacro with-git-ref (ref &body body)
+  `(unwind-protect (progn (git-checkout-ref ,ref)
+                          ,@body)
+     (git-checkout-ref '("master"))))
