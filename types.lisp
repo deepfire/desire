@@ -393,9 +393,11 @@ to DIRECTORY."
       (ensure-gitremote (name remote) module-url))
     (fetch-gitremote (name remote))))
 
-(defun checkout-remote (module remote &optional (branch :master) (locality (gate *self*)))
+(defun checkout-remote-branch (module remote &optional (branch-name :master) (locality (gate *self*)))
   (within-directory ((module-pathname module locality))
-    (git-checkout-ref (list "remotes" (down-case-name remote) (downstring branch)))))
+    (let ((ref (list "remotes" (down-case-name remote) (downstring branch-name))))
+      (ensure-gitbranch :master ref)
+      (git-checkout-ref ref))))
 
 (defun git-clone-remote (remote module-name &optional locality-pathname)
   "Clone REMOTE, with working directory optionally changed to LOCALITY-PATHNAME."

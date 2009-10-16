@@ -133,14 +133,14 @@
 (defun gitbranch-present-p (name &optional directory)
   (member name (gitbranches directory) :test #'string=))
 
-(defun add-gitbranch (name &optional directory)
+(defun add-gitbranch (name ref &optional directory)
   (maybe-within-directory directory
-    (with-explanation ("adding a git branch ~A in ~S" name *default-pathname-defaults*)
-      (git "branch" (downstring name)))))
+    (with-explanation ("adding a git branch ~A tracking ~S in ~S" name ref *default-pathname-defaults*)
+      (git "branch" (downstring name) (flatten-path-list ref)))))
 
-(defun ensure-gitbranch (name &optional directory)
+(defun ensure-gitbranch (name ref &optional directory)
   (unless (gitbranch-present-p name directory)
-    (add-gitbranch name directory)))
+    (add-gitbranch name ref directory)))
 
 ;;;
 ;;; Remotes
@@ -173,6 +173,7 @@
 ;;; Refs
 ;;;
 (defun git-checkout-ref (ref &optional directory &key (if-changes :error))
+  "This assumes that the local 'master' branch is present."
   (maybe-within-directory directory
     (with-retry-restarts ((hardreset-repository () (git-repository-reset-hard)))
       (when (git-repository-changes-p directory)

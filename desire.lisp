@@ -278,8 +278,10 @@
                      (when (every (curry #'system-satisfiedp extended-system-vocabulary) unsatisfied-module-system-names)
                        (return (values (remove-duplicates modules) extended-system-vocabulary)))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
-      (let ((an-unsatisfied-module (module an-unsatisfied-name)))
-        (fetch *locality* (module-best-remote an-unsatisfied-module) an-unsatisfied-module)
+      (let* ((an-unsatisfied-module (module an-unsatisfied-name))
+             (best-remote (module-best-remote an-unsatisfied-module)))
+        (fetch *locality* best-remote an-unsatisfied-module)
+        (checkout-remote-branch an-unsatisfied-module best-remote :master *locality*)
         (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds or signals an error
         (setf (desire-satisfied an-unsatisfied-name) t)
         (multiple-value-bind (module-deps new-system-vocabulary) (module-dependencies an-unsatisfied-module system-vocabulary)
