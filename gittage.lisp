@@ -90,17 +90,20 @@
 (defun git-repository-unstaged-changes-p (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
-      (not (with-shell-predicate (git "diff" "--exit-code"))))))
+      (with-avoided-executable-output
+        (not (with-shell-predicate (git "diff" "--exit-code")))))))
 
 (defun git-repository-staged-changes-p (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
-      (not (with-shell-predicate (git "diff" "--cached" "--exit-code"))))))
+      (with-avoided-executable-output
+        (not (with-shell-predicate (git "diff" "--cached" "--exit-code")))))))
 
 (defun git-repository-changes-p (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has staged or unstaged changes" *default-pathname-defaults*)
-      (not (with-shell-predicate (git "diff" "HEAD" "--exit-code"))))))
+      (with-avoided-executable-output
+        (not (with-shell-predicate (git "diff" "HEAD" "--exit-code")))))))
 
 ;;;
 ;;; Config variables
