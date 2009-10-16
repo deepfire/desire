@@ -393,10 +393,12 @@ to DIRECTORY."
       (ensure-gitremote (name remote) module-url))
     (fetch-gitremote (name remote))))
 
-(defun checkout-remote-branch (module remote &optional (branch-name :master) (locality (gate *self*)))
+(defun checkout-remote-branch (module remote &optional (branch-name :master) (reset-before-checkout nil) (locality (gate *self*)))
   (within-directory ((module-pathname module locality))
     (let ((ref (list "remotes" (down-case-name remote) (downstring branch-name))))
       (ensure-gitbranch :master ref)
+      (when reset-before-checkout
+        (git-repository-reset-hard))
       (git-checkout-ref ref))))
 
 (defun git-clone-remote (remote module-name &optional locality-pathname)
