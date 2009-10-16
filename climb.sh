@@ -54,7 +54,7 @@ EOF
     exit
 fi
 
-desire_deps="alexandria cl-fad executor pergamum iterate semi-precious"
+desire_deps="alexandria asdf cl-fad executor pergamum iterate semi-precious"
 if test -f ~/.climb-seed
 then
     seed="$(cat ~/.climb-seed)"
@@ -115,20 +115,23 @@ fi
 
 echo "NOTE: all done going into lisp..."
 
+export SBCL_BUILDING_CONTRIB=t
+
 sbcl --noinform \
-     --eval "(progn #+sbcl (require :sb-grovel))" \
-     --eval "(require :asdf)" \
      --eval "
 (progn
   (setf (values *compile-verbose* *compile-print* *load-verbose*) (values nil nil nil))
+  (declaim (optimize (debug $DEBUG))
+           #+sbcl (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
+  (load (compile-file \"/tmp/$temp_asdf_suffix/asdf/asdf.lisp\")))" \
+     --eval "
+(progn
   (defparameter *temp-root* '(:absolute \"tmp\" \"$temp_asdf_suffix/\"))
   (defun temp-modules-search (system)
    (let* ((name (asdf::coerce-name system))
           (file (make-pathname :directory (append *temp-root* (list name)) :name name :type \"asd\" :case :local)))
      (when (and file (probe-file file))
          file)))
-  (declaim (optimize (debug $DEBUG))
-           #+sbcl (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
   (push 'temp-modules-search asdf:*system-definition-search-functions*)
   (asdf:operate 'asdf:load-op 'desire :verbose nil))" \
      --eval "(in-package :desr)" \
