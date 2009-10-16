@@ -18,6 +18,14 @@ else
     echo "NOTE: turning on execution explanation feature of desire"
 fi
 
+if test -z "$VERBOSE"
+then
+    VERBOSE=nil
+else
+    VERBOSE=t
+    echo "NOTE: turning on verbose external execution"
+fi
+
 if test -z "$BRANCH"
 then
     BRANCH=master
@@ -108,9 +116,15 @@ then
     echo "NOTE: checking out branch $BRANCH of desire..."
     ( cd $temp_asdf_root/desire; git reset --hard origin/$BRANCH; )
 else
-    echo "NOTE: found required directories ok. Updating desire:"
-    echo "NOTE: checking out branch $BRANCH of desire..."
-    ( cd $temp_asdf_root/desire; git fetch;  git reset --hard origin/$BRANCH; )
+    echo "NOTE: found required directories ok. Updating desire and dependencies:"
+    for desire_dep in $desire_deps desire
+    do
+        echo -n "      $desire_dep: "
+        ( cd "$temp_asdf_root/$desire_dep" && git fetch origin >/dev/null 2>&1 && git reset --hard remotes/origin/master >/dev/null || ( echo "FATAL: failed to retrieve $desire_dep" && exit 1 ))
+        echo "ok"
+    done
+    echo "NOTE: checking out '$BRANCH' branch of desire..."
+    ( cd $temp_asdf_root/desire;  git reset --hard origin/$BRANCH; )
 fi
 
 echo "NOTE: all done going into lisp..."
@@ -137,7 +151,7 @@ sbcl --noinform \
      --eval "(in-package :desr)" \
      --eval "
 (progn
-  (setf executor:*execute-explanatory* $EXPLAIN)
+  (setf executor:*execute-explanatory* $EXPLAIN executor:*execute-verbosely* $VERBOSE)
   (init \"$ROOT/\")
   (format t \"~&~%~%~
    Congratulations! You have reached a point where you can wish for any package~%~
