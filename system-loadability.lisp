@@ -27,6 +27,11 @@
 ;;;; Backends
 ;;;;
 (defgeneric system-dependencies (s)
+  (:method :around ((s system))
+    (handler-case (let ((*break-on-signals* nil))
+                    (call-next-method))
+      (error (c)
+        (format t "~@<; ~:;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c))))
   (:method ((s xcvb-system)))
   (:method ((s mudball-system)))
   (:method ((s asdf-system))
@@ -44,8 +49,13 @@
     (locality-asdf-registry-path locality)))
 
 (defgeneric system-loadable-p (system-or-name &optional locality)
+  (:method :around ((s system) &optional (locality (gate *self*)))
+    (handler-case (let ((*break-on-signals* nil))
+                    (call-next-method s locality))
+      (error (c)
+        (format t "~@<; ~:;WARNING: error while querying backend of system ~S about its loadability: ~A~:@>~%" (name s) c))))
   (:method ((o symbol) &optional (locality (gate *self*)))
-    (call-next-method (coerce-to-system o) locality))
+    (system-loadable-p (coerce-to-system o) locality))
   (:method ((o asdf-system) &optional (locality (gate *self*)))
     (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
                               (system-definition o (module-pathname (system-module o) locality) :if-does-not-exist :continue))
@@ -63,10 +73,10 @@ differently from that system's name."
     (unwind-protect
          (progn
            (setf asdf::*defined-systems* test)
-           (handler-case
-               (let ((*break-on-signals* nil))
-                 (asdf:find-system name))
-             (error () nil))
+           (handler-case (let ((*break-on-signals* nil))
+                           (asdf:find-system name))
+             (error (c)
+               (format t "~@<; ~:;WARNING: error while querying ASDF about hidden names of system ~S: ~A~:@>~%" (name system) c)))
            (mapcar (compose #'string-upcase #'asdf:component-name)
                    (remove (string name) (mapcar #'cdr (hash-table-values test))
                            :test #'string= :key (compose #'string-upcase #'asdf:component-name))))
