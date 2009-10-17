@@ -66,9 +66,11 @@ SAVE-CURRENT-DEFINITIONS was called.")
 (defclass distributor (registered synchronisable)
   ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified.")
    (modules :accessor distributor-modules :documentation "Cache.")
-   (git :accessor gate :documentation "Manually managed."))
+   (git :accessor gate :documentation "Manually managed.")
+   (relationships :accessor distributor-relationships :initarg :relationships))
   (:default-initargs
-   :registrator #'(setf distributor) :modules nil :remotes nil))
+   :registrator #'(setf distributor) :modules nil :remotes nil
+   :relationships nil))
 
 (defclass local-distributor (distributor)
   ((root   :accessor root        :initarg :root :documentation "Root of all desires.")
@@ -99,6 +101,23 @@ SAVE-CURRENT-DEFINITIONS was called.")
   "Compute the set of module names published by DISTRIBUTOR.
 This notably excludes converted modules."
   (remove-duplicates (mapcan #'location-module-names (distributor-remotes (coerce-to-distributor distributor)))))
+
+(defclass relationship ()
+  ((from :accessor rel-from :initarg :from)
+   (to :accessor rel-to :initarg :to)))
+
+(defclass definition-subscription (relationship)
+  ((branch :accessor rel-branch :initarg :branch)))
+
+(defun rel (distributor to)
+  (cadr (assoc to (distributor-relationships distributor) :test #'eq)))
+
+(defun set-rel (distributor to value)
+  (if-let ((cell (assoc to (distributor-relationships distributor) :test #'eq)))
+    (setf (second cell) value)
+    (setf (distributor-relationships distributor) (acons to value (distributor-relationships distributor)))))
+
+(defsetf rel set-rel)
 
 ;;;;
 ;;;; VCS nomenclature
