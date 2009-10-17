@@ -720,8 +720,6 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
         (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
           (git "clone" "-o" remote-name (concatenate 'string url "/.meta")))
         (within-directory meta-dir
-          (with-explanation ("fetching .meta branches from ~A in ~S" url *default-pathname-defaults*)
-            (git "fetch" remote-name))
           (git-repository-reset-hard `("remotes" ,remote-name ,(downstring branch))))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
