@@ -175,6 +175,92 @@
 ;;;
 ;;; Refs
 ;;;
+(defun git-read-ref (pathname)
+  (let ((*read-base* #x10)
+        (*read-eval* nil))
+    (lret ((refval (read-from-string (file-as-string pathname))))
+      (unless (and (integerp refval) (not (minusp refval)))
+        (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval)))))
+
+(defun ref-shortp (ref)
+  (endp (rest ref)))
+
+(defun ref-value (ref directory)
+  (git-read-ref (subfile directory (list* ".git" "refs" (if (ref-shortp ref)
+                                                            (list* "heads" ref)
+                                                            ref)))))
+
+(defgeneric ref-equal (ref-a ref-b directory)
+  (:method ((a integer) (b integer) directory) (= a b))
+  (:method ((a integer) (b list) directory)    (= a (ref-value b directory)))
+  (:method ((a list) (b integer) directory)    (= (ref-value a directory) b))
+  (:method ((a list) (b list) directory)       (= (ref-value a directory)
+                                                  (ref-value b directory))))
+
+(defun full-ref-to-pathname (ref directory)
+  (merge-pathnames (make-pathname :directory (list* :relative ".git" "refs" (butlast ref)) :name (lastcar ref)) directory))
+
+(defun pathname-to-full-ref (pathname directory)
+  (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
+    (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
+
+(defun head-pathnames (directory)
+  (remove nil (directory (subwild directory `(".git" "refs" "heads") :name :wild :type :wild)
+                         #+sbcl :resolve-symlinks #+sbcl nil)
+          :key #'pathname-name))
+
+(defun all-remote-head-pathnames (directory)
+  (remove nil (directory (subwild directory `(".git" "refs" "remotes") :name :wild :type :wild)
+                         #+sbcl :resolve-symlinks #+sbcl nil)
+          :key #'pathname-name))
+
+(defun remote-head-pathnames (remote directory)
+  (remove nil (directory (subwild directory `(".git" "refs" "remotes" ,(downstring remote)) :name :wild :type :wild)
+                         #+sbcl :resolve-symlinks #+sbcl nil)
+          :key #'pathname-name))
+
+(defmacro do-heads ((ref refval directory) &body body)
+  (with-gensyms (pathname)
+    (once-only (directory)
+      `(iter (for ,pathname in (head-pathnames ,directory))
+             (for ,ref = (cdr (pathname-to-full-ref ,pathname ,directory)))
+             (for ,refval = (git-read-ref ,pathname))
+             ,@body))))
+
+(defmacro do-all-remote-heads ((ref refval directory) &body body)
+  (with-gensyms (pathname)
+    (once-only (directory)
+      `(iter (for ,pathname in (all-remote-head-pathnames ,directory))
+             (for ,ref = (cdr (pathname-to-full-ref ,pathname ,directory)))
+             (for ,refval = (git-read-ref ,pathname))
+             ,@body))))
+
+(defmacro do-remote-heads ((ref refval remote directory) &body body)
+  (with-gensyms (pathname)
+    (once-only (directory)
+      `(iter (for ,pathname in (remote-head-pathnames ,remote ,directory))
+             (for ,ref = (cddr (pathname-to-full-ref ,pathname ,directory)))
+             (for ,refval = (git-read-ref ,pathname))
+             ,@body))))
+
+(defun map-heads (fn directory)
+  (do-heads (ref refval directory)
+    (collect (funcall fn ref refval))))
+
+(defun map-all-remote-heads (fn directory)
+  (do-all-remote-heads (ref refval directory)
+    (collect (funcall fn ref refval))))
+
+(defun map-remote-heads (fn remote directory)
+  (do-remote-heads (ref refval remote directory)
+    (collect (funcall fn ref refval))))
+
+(defun refs-by-value (refval directory)
+  (append (do-heads (ref val directory)
+            (when (= refval val) (collect ref)))
+          (do-all-remote-heads (ref val directory)
+            (when (= refval val) (collect ref)))))
+
 (defun git-checkout-ref (ref &optional directory &key (if-changes :error))
   "This assumes that the local 'master' branch is present."
   (maybe-within-directory directory
