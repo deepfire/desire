@@ -59,7 +59,7 @@
 (defun git-repository-reset-hard (&optional ref directory)
   (maybe-within-directory directory
     (with-explanation ("hard-resetting repository in ~S to ~:[master~;~:*~S~]" *default-pathname-defaults* ref)
-      (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref)))))))
+      (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
 
 (defun (setf git-repository-bare-p) (val directory)
   (within-directory directory
