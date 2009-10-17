@@ -209,14 +209,18 @@
           :key #'pathname-name))
 
 (defun all-remote-head-pathnames (directory)
-  (remove nil (directory (subwild directory `(".git" "refs" "remotes") :name :wild :type :wild)
-                         #+sbcl :resolve-symlinks #+sbcl nil)
-          :key #'pathname-name))
+  (remove-if (lambda (p &aux (name (pathname-name p))) (or (null name) (string= name "HEAD")))
+             (directory (subwild directory `(".git" "refs" "remotes") :name :wild :type :wild)
+                        #+sbcl :resolve-symlinks #+sbcl nil)))
 
 (defun remote-head-pathnames (remote directory)
-  (remove nil (directory (subwild directory `(".git" "refs" "remotes" ,(downstring remote)) :name :wild :type :wild)
-                         #+sbcl :resolve-symlinks #+sbcl nil)
-          :key #'pathname-name))
+  (remove-if (lambda (p &aux (name (pathname-name p))) (or (null name) (string= name "HEAD")))
+             (directory (subwild directory `(".git" "refs" "remotes" ,(downstring remote)) :name :wild :type :wild)
+                        #+sbcl :resolve-symlinks #+sbcl nil)))
+
+(defun remote-head-ref (remote directory)
+  (file-as-string (subfile directory `(".git" "refs" "remotes" ,(downstring remote) "HEAD"))
+                  :position 5))
 
 (defmacro do-packed-refs ((ref refval directory) &body body)
   (with-gensyms (packed-refs-path s line 1read-offt)
