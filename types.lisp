@@ -110,12 +110,12 @@ This notably excludes converted modules."
   ((branch :accessor rel-branch :initarg :branch)))
 
 (defun rel (distributor to)
-  (cadr (assoc to (distributor-relationships distributor) :test #'eq)))
+  (cdr (assoc to (distributor-relationships distributor) :test #'eq)))
 
-(defun set-rel (distributor to value)
-  (if-let ((cell (assoc to (distributor-relationships distributor) :test #'eq)))
-    (setf (second cell) value)
-    (setf (distributor-relationships distributor) (acons to value (distributor-relationships distributor)))))
+(defun set-rel (distributor to value &aux (rships (distributor-relationships distributor)))
+  (if-let ((cell (assoc to rships :test #'eq)))
+    (setf (cdr cell) value)
+    (setf (distributor-relationships distributor) (acons to value rships))))
 
 (defsetf rel set-rel)
 
