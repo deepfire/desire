@@ -709,30 +709,49 @@ The value returned is the list of found modules."
      (when (module-locally-present-p ,module ,locality nil nil)
        ,@body)))
 
-(defun clone-metastore (url locality-pathname)
+(defun clone-metastore (url locality-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
-LOCALITY-PATHNAME."
-  (maybe-within-directory locality-pathname
+LOCALITY-PATHNAME. BRANCH is then checked out."
+  (within-directory locality-pathname
     (multiple-value-bind (type host port path) (parse-remote-namestring url)
       (declare (ignore type port path))
-      (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
-        (git "clone" "-o" (string-downcase host) (concatenate 'string url "/.meta"))))))
+      (let ((remote-name (string-downcase host))
+            (meta-dir (subdirectory* locality-pathname ".meta")))
+        (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
+          (git "clone" "-o" remote-name (concatenate 'string url "/.meta")))
+        (within-directory meta-dir
+          (with-explanation ("fetching .meta branches from ~A in ~S" url *default-pathname-defaults*)
+            (git "fetch" remote-name))
+          (git-repository-reset-hard `("remotes" ,remote-name ,(downstring branch))))))))
 
-(defmacro within-wishmaster-meta ((w &key (metastore '(meta-path)) update-p) &body body)
-  (once-only (w metastore)
+(defun reestablish-metastore-subscriptions (metastore-pathname)
+  (within-directory metastore-pathname
+    (iter (for (nil remote-name branch-name) in (remove-if-not #'ref-remotep (refs-by-value (ref-value '("master") metastore-pathname) metastore-pathname)))
+          (for d = (distributor (string-upcase remote-name) :if-does-not-exist :continue))
+          (unless d (continue))
+          (for rel = (make-instance 'definition-subscription :from *self* :to d :branch branch-name))
+          (set-rel d *self* rel)
+          (set-rel *self* d rel))))
+
+(defmacro within-wishmaster-meta ((wishmaster branch &key (metastore '(meta-path)) update-p) &body body)
+  (once-only (wishmaster metastore)
     `(within-directory (,metastore)
-       ,@(when update-p `((git-fetch-remote (gate ,w) :.meta)))
-       (with-git-ref (list "remotes" (down-case-name ,w) "master")
+       ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
+       (with-git-ref (list "remotes" (down-case-name ,wishmaster) ,branch)
          ,@body))))
 
 (defun merge-remote-wishmaster (wishmaster &optional (metastore (meta-path)))
   "Merge definitions from WISHMASTER."
-  (within-wishmaster-meta (wishmaster :metastore metastore :update-p t)
-    (load-definitions :source wishmaster :force-source nil :metastore metastore)))
+  (let ((branch (if-let ((r (rel *self* wishmaster)))
+                  (rel-branch r)
+                  "master")))
+    (within-wishmaster-meta (wishmaster branch :metastore metastore :update-p t)
+      (load-definitions :source wishmaster :force-source nil :metastore metastore))))
 
 (defun merge-remote-wishmasters (&optional (metastore (meta-path)))
   (do-wishmasters (w)
-    (merge-remote-wishmaster w metastore)))
+    (unless (eq w *self*)
+      (merge-remote-wishmaster w metastore))))
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
@@ -749,7 +768,7 @@ LOCALITY-PATHNAME."
 (defgeneric load-definitions (&key source force-source metastore))
 (defgeneric save-current-definitions (&key seal-p commit-message metastore))
 
-(defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*))
+(defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master))
   "Make Desire fully functional, with PATH chosen as storage location.
 
 AS, when specified, will be interpreted as a distributor name, whose
@@ -773,9 +792,10 @@ locally present modules will be marked as converted."
       (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
     (unless (metastore-present-p meta-path '(definitions))
       (report t ";;; no metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
-      (clone-metastore *bootstrap-wishmaster-url* gate-path))
+      (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))
     (report t ";;; loading definitions from ~S~%" (metafile-path 'definitions meta-path))
     (load-definitions :force-source t :metastore meta-path)
+    (reestablish-metastore-subscriptions meta-path)
     (when merge-remote-wishmasters
       (report t ";;; merging definitions from remote wishmasters...~%")
       (merge-remote-wishmasters meta-path))

@@ -152,7 +152,7 @@ sbcl --noinform \
      --eval "
 (progn
   (setf executor:*execute-explanatory* $EXPLAIN executor:*execute-verbosely* $VERBOSE)
-  (init \"$ROOT/\")
+  (init \"$ROOT/\" :wishmaster-branch :$BRANCH)
   (format t \"~&~%~%~
    Congratulations! You have reached a point where you can wish for any package~%~
   desire knows about. Just type (lust 'desiree) and it will happen.~%~
