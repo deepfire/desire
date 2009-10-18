@@ -48,6 +48,11 @@
   (:method ((o asdf-system) &optional (locality (gate *self*)))
     (locality-asdf-registry-path locality)))
 
+(defun system-definition-type (pathname)
+  "Detect the type of system definition residing at PATHNAME."
+  (or (cdr (assoc (pathname-type pathname) *system-pathname-typemap* :test #'string=))
+      (error "~@<Couldn't detect type of system in alleged definition at ~S.~:@>" pathname)))
+
 (defgeneric system-loadable-p (system-or-name &optional locality)
   (:method :around ((s system) &optional (locality (gate *self*)))
     (handler-case (let ((*break-on-signals* nil))
