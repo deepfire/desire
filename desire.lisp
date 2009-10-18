@@ -172,37 +172,51 @@
 (defmethod fetch :after ((git-locality git-locality) remote module)
   (setf (git-repository-world-readable-p (module-pathname module git-locality)) *default-world-readable*))
 
-(defun fetch-anyway (module-name)
-  (cons module-name nil))
+(defun make-missing-wanted (name) (cons name (cons nil :wanted)))
+(defun make-missing-unwanted (name) (cons name (cons nil nil)))
+(defun make-present-unwanted (name) (cons name (cons :present nil)))
 
-(defun desire-do-one-step (desires skip-present system-vocabulary)
+(defun desire-do-one-step (module-vocabulary system-vocabulary &key skip-present complete)
   (declare (special *locality*))
   (labels ((syspath (name) (declare (special *syspath*)) (gethash name *syspath*))
            (set-syspath (name value) (declare (special *syspath*)) (setf (gethash name *syspath*) value))
-           (vocab-next-fail (vocab &optional (test #'eq))
-             (car (find nil vocab :key #'cdr :test test)))
-           (vocab-presentp (vocab subj &optional (test #'eq))
-             (not (null (assoc subj vocab :test test))))
+           (subj (c) (car c))
+           (cell (c) (cdr c))
+           (wantedp (c) (cdr c))
+           (successp (c) (car c))
+           ((setf wantedp) (v c) (setf (cdr c) v))
+           ((setf successp) (v c) (setf (car c) v))
+           (missing-wantedp (c) (and (wantedp c) (not (successp c))))
+           (vocab-next-missing-wanted (vocab)
+             (subj (find-if #'missing-wantedp vocab :key #'cell)))
+           (entry (vocab subj &optional (test #'eq))
+             (assoc subj vocab :test test))
            (vocab-successp (vocab subj &optional (test #'eq))
-             (cdr (assoc subj vocab :test test)))
+             (successp (cell (entry vocab subj test))))
+           (vocab-wantedp (vocab subj &optional (test #'eq))
+             (wantedp (cell (entry vocab subj test))))
            ((setf vocab-successp) (successp vocab subj &optional (test #'eq))
-             (setf (cdr (assoc subj vocab :test test)) successp))
-           (vocab-maybe-extend-require (vocab subj &optional (test #'eq))
-             (if (assoc subj vocab :test test)
-                 vocab
-                 (acons subj nil vocab)))
-           (make-fail-vocab (fail-subjs &optional vocab)
-             (if fail-subjs
-                 (acons (first fail-subjs) nil (make-fail-vocab (rest fail-subjs) vocab))
+             (setf (successp (cell (entry vocab subj test))) successp))
+           ((setf vocab-wantedp) (wantedp vocab subj &optional (test #'eq))
+             (setf (wantedp (cell (entry vocab subj test))) wantedp))
+           (vocab-add-missing-wanted (wanted-subjs &optional vocab)
+             (if wanted-subjs
+                 (cons (vocab-make-missing-wanted (first wanted-subjs)) (vocab-add-missing-wanted (rest wanted-subjs) vocab))
                  vocab))
-           (next-unsatisfied-module () (vocab-next-fail desires))
-           ((setf desire-satisfied) (val modname) (setf (vocab-successp desires modname) val))
-           (next-unsatisfied-system (system-vocabulary) (vocab-next-fail system-vocabulary #'string=))
-           (system-satisfiedp (system-vocabulary sysname) (vocab-successp system-vocabulary sysname #'string=))
+           (vocab-maybe-add-missing-wanted (vocab subj &optional (test #'eq))
+             (if (entry vocab subj test)
+                 vocab
+                 (vocab-add-missing-wanted (list subj) vocab)))
+           (next-unsatisfied-module () (vocab-next-missing-wanted module-vocabulary))
+           ((setf desire-satisfied) (val modname) (setf (vocab-successp module-vocabulary modname) val))
+           (next-unsatisfied-system (system-vocabulary) (vocab-next-missing-wanted system-vocabulary))
+           (system-unwanted-or-satisfied-p (system-vocabulary sysname) (when-let ((cell (cell (entry system-vocabulary sysname #'string=))))
+                                                                         (or (not (wantedp cell)) (successp cell))))
            ((setf system-satisfiedp) (val system-vocabulary sysname) (setf (vocab-successp system-vocabulary sysname #'string=) val))
-           (system-maybe-add-new (system-vocabulary sysname) (vocab-maybe-extend-require system-vocabulary sysname #'string=))
-           (fetch-if-missing (module-name)
-             (cons module-name (not (module-locally-present-p (module module-name) *locality*))))
+           (module-make-maybe-missing-wanted (module-name)
+             (cons module-name (cons (when (module-locally-present-p (module module-name) *locality*)
+                                       :present)
+                                     :wanted)))
            (register-new-system (name path type module)
              (report t ";; Registering a previously unknown system ~A~%" name)
              (setf *unsaved-definition-changes-p* t)
@@ -217,10 +231,11 @@
              (multiple-value-bind (new-sysdeps new-missing) (system-dependencies system)
                (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module) new-sysdeps)
                  (let ((extended-system-vocabulary system-vocabulary))
-                   (dolist (newdep local-newdeps)
-                     (setf extended-system-vocabulary (system-maybe-add-new extended-system-vocabulary (string (name newdep)))))
-                   (dolist (missing new-missing)
-                     (setf extended-system-vocabulary (system-maybe-add-new extended-system-vocabulary missing)))
+                   (dolist (newdep (append (mapcar (compose #'string #'name) local-newdeps)
+                                           new-missing))
+                     (if-let ((cell (entry system-vocabulary newdep #'string=)))
+                       (setf (wantedp cell) :wanted)
+                       (setf extended-system-vocabulary (vocab-add-missing-wanted (list newdep) extended-system-vocabulary))))
                    ;; NOTE: on module boundaries we lose precise system dependency names
                    (values (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
                            extended-system-vocabulary)))))
@@ -230,92 +245,109 @@
               MISSING unknown systems, returning them as multiple values."
              (declare (special *syspath*))
              (if-let ((name (next-unsatisfied-system system-vocabulary)))
-               (let* ((system (system name))
-                      (path (or (syspath name) (error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%" name (hash-table-keys *syspath*))))
-                      (type (interpret-system-pathname-type path)))
-                 (unless (typep system type)
-                   (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>" type name (type-of system)))
-                 ;; A hidden system is a system definition residing in a file named differently from main system's name.
-                 ;; Find them.
-                 (let ((hidden-system-names (and (eq type 'asdf-system) (not (system-hidden-p system)) (asdf-hidden-system-names system)))
-                       hidden-system-vocabulary)
-                   (dolist (hidden-name hidden-system-names)
-                     (unless (vocab-presentp system-vocabulary hidden-name #'string=)
-                       (setf hidden-system-vocabulary (system-maybe-add-new hidden-system-vocabulary hidden-name)))
-                     (let ((hidden (or (system hidden-name :if-does-not-exist :continue)
-                                       ;; XXX: how come we ever hit this?
-                                       (register-new-system (intern hidden-name) path type module))))
-                       (ensure-system-loadable hidden path *locality*)))
-                   (setf (system-satisfiedp system-vocabulary name) t) ;; made loadable, deps added, hiddens uncovered
-                   (add-system-dependencies module system modules (append system-vocabulary hidden-system-vocabulary))))
+               (if-let ((system (system name :if-does-not-exist :continue)))
+                 (let* ((path (or (syspath name)
+                                  (error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
+                                         name (hash-table-keys *syspath*))))
+                        (type (interpret-system-pathname-type path)))
+                   (unless (typep system type)
+                     (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
+                            type name (type-of system)))
+                   (setf (system-satisfiedp system-vocabulary name) :present) ; made loadable, hiddens uncovered, deps about to be added
+                   (add-system-dependencies module system modules system-vocabulary))
+                 (if-let ((cell (cell (entry system-vocabulary name #'string=))))
+                   (progn
+                     (setf (wantedp cell) :wanted)
+                     (values modules (cons cell (remove cell system-vocabulary))))
+                   (error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
                (values modules system-vocabulary)))
-           (add-visible-system (module name path system-vocabulary)
-             (lret* ((type (interpret-system-pathname-type path))
-                     (system (or (lret ((system (system name :if-does-not-exist :continue)))
-                                   (when system
-                                     (unless (typep system type)
-                                       (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>" type name (type-of system)))))
-                                 (register-new-system (intern name) path type module)))
-                     (extended-system-vocabulary (acons name nil system-vocabulary)))
+           (add-visible-system (module name path type vocabulary &optional (actual-type (system-definition-type path)))
+             (unless (eq type actual-type)
+               (error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
+             (lret ((system (or (lret ((system (system name :if-does-not-exist :continue)))
+                                  (when system
+                                    (unless (typep system type)
+                                      (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
+                                             type name (type-of system)))))
+                                (register-new-system (intern name) path type module))))
                (set-syspath name path)
                (ensure-system-loadable system path *locality*)
-               (dolist (hidden-system-name (and (eq type 'asdf-system) (asdf-hidden-system-names system)))
-                 (set-syspath hidden-system-name path)
-                 (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
-                                          (register-new-system (intern hidden-system-name) path type module))))
-                   (ensure-system-loadable hidden-system path *locality*)))))
-           (module-dependencies (m system-vocabulary)
-             (let* ((required-sysfiles (module-system-definitions m 'asdf-system *locality*))
-                    (unsatisfied-module-system-names (mapcar #'system-pathname-name required-sysfiles))
-                    (extended-system-vocabulary system-vocabulary))
-               (iter (for required-sysfile in required-sysfiles)
-                     (for unsatisfied-module-system-name in unsatisfied-module-system-names)
-                     (setf extended-system-vocabulary (add-visible-system m unsatisfied-module-system-name required-sysfile extended-system-vocabulary)))
-               (iter (with modules)
-                     ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the vocabulary,
-                     ;; where we've appended our required systems.
-                     (for (values modules-new new-extended-system-vocabulary) = (satisfy-next-system m modules extended-system-vocabulary))
-                     (setf (values modules extended-system-vocabulary) (values modules-new new-extended-system-vocabulary))
-                     (when (every (curry #'system-satisfiedp extended-system-vocabulary) unsatisfied-module-system-names)
-                       (return (values (remove-duplicates modules) extended-system-vocabulary)))))))
+               (append vocabulary
+                       (when (typep system 'asdf-system)
+                         ;; A hidden system is a system definition residing in a file named differently from main system's name.
+                         ;; Find them.
+                         (iter (for hidden-system-name in (asdf-hidden-system-names system))
+                               (set-syspath hidden-system-name path)
+                               (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
+                                                        (register-new-system (intern hidden-system-name) path type module))))
+                                 (ensure-system-loadable hidden-system path *locality*))
+                               (collect (if complete
+                                            (make-missing-wanted hidden-system-name)
+                                            (make-missing-unwanted hidden-system-name))))))))
+           (module-dependencies (m system-vocabulary system-type)
+             (let ((all-sysfiles (module-system-definitions m system-type *locality*)))
+               (multiple-value-bind (main-sysfile other-sysfiles) (unzip (curry #'string= (down-case-name m)) all-sysfiles :key #'pathname-name)
+                 (unless main-sysfile
+                   (error "~@<Unable to determine main system of module ~S, system backend ~S.~:@>" (name m) system-type))
+                 ;; This doesn't deal with other modules providing same systems. Will silently break.
+                 (let* ((required-sysfiles (list* (first main-sysfile) (when complete other-sysfiles)))
+                        (also-sysfiles (unless complete other-sysfiles))
+                        (required-names (mapcar (curry #'system-definition-name system-type) required-sysfiles))
+                        (also-names (mapcar (curry #'system-definition-name system-type) also-sysfiles))
+                        (extended-system-vocabulary (append (mapcar #'make-missing-wanted required-names)
+                                                            (mapcar #'make-missing-unwanted also-names)
+                                                            system-vocabulary)))
+                   (iter (for sysfile in (append required-sysfiles also-sysfiles))
+                         (for name in (append required-names also-names))
+                         (setf extended-system-vocabulary (add-visible-system m name sysfile system-type extended-system-vocabulary)))
+                   (iter (with modules)
+                         ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the vocabulary,
+                         ;; where we've appended our required systems.
+                         (for (values modules-new new-extended-system-vocabulary) = (satisfy-next-system m modules extended-system-vocabulary))
+                         (setf (values modules extended-system-vocabulary) (values modules-new new-extended-system-vocabulary))
+                         (when (every (curry #'system-unwanted-or-satisfied-p extended-system-vocabulary) required-names)
+                           (return (values (remove-duplicates modules) extended-system-vocabulary)))))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let* ((an-unsatisfied-module (module an-unsatisfied-name))
              (best-remote (module-best-remote an-unsatisfied-module)))
         (fetch *locality* best-remote an-unsatisfied-module)
         (reset-to-remote-branch an-unsatisfied-module best-remote :master t *locality*)
-        (ensure-module-systems-loadable an-unsatisfied-module *locality*) ;; this either succeeds or signals an error
         (setf (desire-satisfied an-unsatisfied-name) t)
-        (multiple-value-bind (module-deps new-system-vocabulary) (module-dependencies an-unsatisfied-module system-vocabulary)
-          (let ((added-deps-from-this-module (remove-if (rcurry #'assoc desires) module-deps)))
-            (appendf desires (mapcar (if skip-present #'fetch-if-missing #'fetch-anyway) added-deps-from-this-module))
+        (multiple-value-bind (module-deps new-system-vocabulary)
+            (module-dependencies an-unsatisfied-module system-vocabulary *default-system-type*)
+          (let* ((added-deps-from-this-module (remove-if (rcurry #'assoc module-vocabulary) module-deps))
+                 (new-module-vocabulary (append module-vocabulary (mapcar (if skip-present
+                                                                              #'module-make-maybe-missing-wanted
+                                                                              #'make-missing-wanted)
+                                                                          added-deps-from-this-module))))
             (report t "~&~@<;; ~@;~S,~:[~; added ~:*~A,~] ~D left~:@>~%"
-                    an-unsatisfied-name added-deps-from-this-module (count-if-not #'cdr desires))
-            (finish-output))
-          (desire-do-one-step desires skip-present new-system-vocabulary)))
-      (values t system-vocabulary))))
+                    an-unsatisfied-name added-deps-from-this-module (count-if-not #'cadr new-module-vocabulary))
+            (desire-do-one-step new-module-vocabulary new-system-vocabulary :skip-present skip-present :complete complete))))
+      system-vocabulary)))
 
-(defun desire (desires &key skip-present (seal-p t))
+(defun desire (desires &key skip-present (seal t) complete)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
-   Desire satisfaction means:
-    - for specified missing modules, retrieval,
-    - for specified present modules, update, unless SKIP-PRESENT is
-      non-nil,
+Desire satisfaction means:
+   - for specified missing modules, retrieval,
+   - for specified present modules, update, unless SKIP-PRESENT is
+     non-nil,
 
-   In all cases, all systems present in the set union of specified and
-   depended upon modules are ensured to be loadable.
+In all cases, systems present in the set union of specified and
+depended upon modules are ensured to be loadable. See also the
+documentation of the COMPLETE keyword.
 
-   When individual desires are symbols, they are interpreted as module
-   names, and are intepreted in the context of the global *DESIRES*.
+When individual desires are symbols, they are interpreted as module names.
+When they are lists, their first element is interpreted as the source
+distributor, from which the rest of the list is supposed to be fetched.
+These two forms can be mixed in the list of desires.
 
-   When they are lists, their first element is interpreted as the source
-   distributor, from which the rest of the list is supposed to be imported.
-
-   These two forms can be mixed in the list of desires.
-
-   Defined keywords:
-    - SKIP-PRESENT - whether to skip updating specified modules which are 
-      already present, defaults to nil."
+Defined keywords:
+   - SKIP-PRESENT - whether to skip updating specified modules which are 
+     already present, defaults to nil,
+   - SEAL - whether to commit any definition changes, and,
+   - COMPLETE - whether to obtain all modules' systems, even those not
+     part of main module systems' complete dependency graphs."
   (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-best-distributor m)) m))) desires)))
     (iter (for (distributor-name . modules) in interpreted-desires)
           (for distributor = (distributor distributor-name))
@@ -324,16 +356,14 @@
     (let* ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
            (*locality* (gate *self*))
            (*syspath* (make-hash-table :test #'equal))
-           (desired-list (mapcan #'rest interpreted-desires))
-           (initial-system-vocabulary (mapcar (rcurry #'cons t) *implementation-provided-systems*)))
+           (desired-list (mapcan #'rest interpreted-desires)))
       (declare (special *locality* *syspath*))
       (report t "; Satisfying desire for ~D module~:*~P:~%" (length desired-list))
-      (multiple-value-bind (success system-vocabulary) (desire-do-one-step (mapcar #'fetch-anyway desired-list) skip-present initial-system-vocabulary)
-        (declare (ignore success))
-        (when-let ((missing-system-names (mapcar #'car (remove t system-vocabulary :key #'cdr))))
-          (report t "; Required systems missing from definitions:~{ ~A~}~%" missing-system-names)))
-      (when (and *unsaved-definition-changes-p* seal-p)
-        (report t "; Definitions modified, committing changes.~%")
+      (desire-do-one-step (mapcar #'make-missing-wanted desired-list)
+                          (mapcar #'make-present-unwanted *implementation-provided-systems*)
+                          :skip-present skip-present :complete complete)
+      (when (and *unsaved-definition-changes-p* seal)
+        (report t "; Definitions modified and sealing was requested, committing changes.~%")
         (save-current-definitions :seal-p t))
       (report t "; All done.~%")
       t)))

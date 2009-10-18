@@ -53,6 +53,10 @@
   (or (cdr (assoc (pathname-type pathname) *system-pathname-typemap* :test #'string=))
       (error "~@<Couldn't detect type of system in alleged definition at ~S.~:@>" pathname)))
 
+(defgeneric system-definition-name (system-type system-definition-pathname)
+  (:method ((type (eql 'asdf-system)) pathname)
+    (pathname-name pathname)))
+
 (defgeneric system-loadable-p (system-or-name &optional locality)
   (:method :around ((s system) &optional (locality (gate *self*)))
     (handler-case (let ((*break-on-signals* nil))
@@ -109,11 +113,6 @@ differently from that system's name."
 (defun system-pathname-name (pathname)
   "Return the canonical name for a system residing in PATHNAME."
   (string-upcase (pathname-name pathname)))
-
-(defun interpret-system-pathname-type (pathname)
-  "Return the canonical type for a system residing in PATHNAME."
-  (or (cdr (assoc (pathname-type pathname) *system-pathname-typemap* :test #'string=))
-      (error "~@<Bad pathname type ~S: want one of ~S~:@>" (pathname-type pathname) (mapcar #'car *system-pathname-typemap*))))
 
 (defun apply-repo-system-filter (repository system-pathnames)
   (remove-if (rcurry #'pathname-match-p (subwild repository '("_darcs"))) system-pathnames))

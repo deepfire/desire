@@ -724,7 +724,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory metastore-pathname
-    (iter (for (nil remote-name branch-name) in (remove-if-not #'ref-remotep (refs-by-value (ref-value '("master") metastore-pathname) metastore-pathname)))
+    (iter (for (nil remote-name branch-name) in (remove-if-not #'ref-remotep (refs-by-value (ref-value '("master") metastore-pathname)
+                                                                                            metastore-pathname)))
           (for d = (distributor (string-upcase remote-name) :if-does-not-exist :continue))
           (unless d (continue))
           (for rel = (make-instance 'definition-subscription :from *self* :to d :branch branch-name))
