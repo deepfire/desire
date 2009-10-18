@@ -242,11 +242,14 @@
     (when (funcall predicate ref refval)
       (collect (funcall fn ref refval)))))
 
-(defun ref-value (ref directory)
+(defun ref-value (ref directory &key (if-does-not-exist :error))
   (let ((path (ref-path ref directory)))
     (if (probe-file path)
         (read-ref path)
-        (car (remove nil (map-packed-refs (lambda (r v) (when (string= "master" (first r)) v)) #'identity directory))))))
+        (or (car (remove nil (map-packed-refs (lambda (r v) (when (string= "master" (first r)) v)) #'identity directory)))
+            (ecase if-does-not-exist
+              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref directory))
+              (:continue nil))))))
 
 (defun map-pathnames-full-refs (fn pathnames directory)
   (iter (for pathname in pathnames)
