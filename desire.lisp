@@ -235,7 +235,6 @@
                       (type (interpret-system-pathname-type path)))
                  (unless (typep system type)
                    (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>" type name (type-of system)))
-                 (ensure-system-loadable system path *locality*)
                  ;; A hidden system is a system definition residing in a file named differently from main system's name.
                  ;; Find them.
                  (let ((hidden-system-names (and (eq type 'asdf-system) (not (system-hidden-p system)) (asdf-hidden-system-names system)))
@@ -259,10 +258,12 @@
                                  (register-new-system (intern name) path type module)))
                      (extended-system-vocabulary (acons name nil system-vocabulary)))
                (set-syspath name path)
+               (ensure-system-loadable system path *locality*)
                (dolist (hidden-system-name (and (eq type 'asdf-system) (asdf-hidden-system-names system)))
                  (set-syspath hidden-system-name path)
-                 (unless (system hidden-system-name :if-does-not-exist :continue)
-                   (register-new-system (intern hidden-system-name) path type module)))))
+                 (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
+                                          (register-new-system (intern hidden-system-name) path type module))))
+                   (ensure-system-loadable hidden-system path *locality*)))))
            (module-dependencies (m system-vocabulary)
              (let* ((required-sysfiles (module-system-definitions m 'asdf-system *locality*))
                     (unsatisfied-module-system-names (mapcar #'system-pathname-name required-sysfiles))
