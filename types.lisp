@@ -721,7 +721,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
           (git "clone" "-o" remote-name (concatenate 'string url "/.meta")))
         (within-directory meta-dir
           (ensure-gitbranch :master '("HEAD"))
-          (git-checkout-ref '("heads" "master"))
+          (git-checkout-ref '("master"))
           (git-repository-reset-hard `("remotes" ,remote-name ,(downstring branch))))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
