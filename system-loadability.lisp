@@ -23,6 +23,10 @@
 (defvar *system-pathname-typemap* '(("asd" . asdf-system) ("mb" . mudball-system) ("xcvb" . xcvb-system))
   "The mapping between SYSTEM subclasses and definition pathname types.")
 
+(defun system-type-file-type (type)
+  (or (car (rassoc type *system-pathname-typemap* :test #'eq))
+      (error "~@<Unknown system type ~S.~:@>" type)))
+
 ;;;;
 ;;;; Backends
 ;;;;
@@ -132,12 +136,16 @@ differently from that system's name."
   "Return a list of all MODULE's system definition pathnames corresponding to
 system TYPE within LOCALITY."
   (let* ((path (module-pathname module locality))
-         (pass1 (directory (subwild path (module-system-path-whitelist module)
-                                    :name :wild :type (or (car (rassoc type *system-pathname-typemap* :test #'eq))
-                                                          (error "~@<Unknown system type ~S.~:@>" type))))))
+         (pass1 (directory (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-file-type type)))))
     (if-let ((blacklist (module-system-path-blacklist module)))
       (remove-if (rcurry #'pathname-match-p (subwild path blacklist)) pass1)
       pass1)))
+
+(defun central-module-system-definition-pathname (module type &optional (locality (gate *self*)))
+  (let* ((file-type (system-type-file-type type))
+         (central-system-pathname (subfile (module-pathname module locality) (list (down-case-name module)) :type file-type)))
+    (and (probe-file central-system-pathname)
+         central-system-pathname)))
 
 (defun ensure-system-loadable (system &optional path (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
