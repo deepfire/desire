@@ -312,10 +312,10 @@ The value returned is the merged type for SUBJECT-REMOTE.")
       (read-definitions definitions))
     (values)))
 
-(defmethod save-current-definitions (&key seal-p (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
+(defmethod save-current-definitions (&key seal (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
   "Save current model of the world within METASTORE.
 When SEAL-P is non-NIL, the changes are committed."
-  (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal-p :commit-message commit-message)
+  (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal :commit-message commit-message)
     (serialise-definitions definitions)
     (terpri definitions))
   (setf *unsaved-definition-changes-p* nil)

@@ -364,7 +364,7 @@ Defined keywords:
                           :skip-present skip-present :complete complete)
       (when (and *unsaved-definition-changes-p* seal)
         (report t "; Definitions modified and sealing was requested, committing changes.~%")
-        (save-current-definitions :seal-p t))
+        (save-current-definitions :seal t))
       (report t "; All done.~%")
       t)))
 
