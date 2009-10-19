@@ -305,5 +305,6 @@
   (git-checkout-ref `(,(downstring name)) directory :if-changes if-changes))
 
 (defun reset-gitbranch-to-remote-branch (name qualified-remote-branch-name directory &optional reset-before-checkout)
-  (checkout-gitbranch name directory reset-before-checkout)
-  (git-repository-reset-hard (list* "remotes" qualified-remote-branch-name) directory))
+  (let ((remote-ref (list* "remotes" qualified-remote-branch-name)))
+    (checkout-gitbranch name directory reset-before-checkout :if-does-not-exist :create :default-ref remote-ref)
+    (git-repository-reset-hard remote-ref directory)))
