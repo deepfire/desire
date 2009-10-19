@@ -301,7 +301,7 @@
                    (add-gitbranch name default-ref directory)
                    (git-error "~@<While checking out branch ~A in ~S: branch doesn't exist and the default ref was not provided.~:@>" name directory)))))
   (when reset-before-checkout
-    (git-repository-reset-hard '("HEAD")))
+    (git-repository-reset-hard nil directory))
   (git-checkout-ref `(,(downstring name)) directory :if-changes if-changes))
 
 (defun reset-gitbranch-to-remote-branch (name qualified-remote-branch-name directory &optional reset-before-checkout)
