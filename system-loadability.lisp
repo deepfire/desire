@@ -55,7 +55,7 @@
 
 (defgeneric system-definition-name (system-type system-definition-pathname)
   (:method ((type (eql 'asdf-system)) pathname)
-    (pathname-name pathname)))
+    (string-upcase (pathname-name pathname))))
 
 (defgeneric system-loadable-p (system-or-name &optional locality)
   (:method :around ((s system) &optional (locality (gate *self*)))

@@ -201,7 +201,7 @@
              (setf (wantedp (cell (entry vocab subj test))) wantedp))
            (vocab-add-missing-wanted (wanted-subjs &optional vocab)
              (if wanted-subjs
-                 (cons (vocab-make-missing-wanted (first wanted-subjs)) (vocab-add-missing-wanted (rest wanted-subjs) vocab))
+                 (cons (make-missing-wanted (first wanted-subjs)) (vocab-add-missing-wanted (rest wanted-subjs) vocab))
                  vocab))
            (vocab-maybe-add-missing-wanted (vocab subj &optional (test #'eq))
              (if (entry vocab subj test)
@@ -210,8 +210,6 @@
            (next-unsatisfied-module () (vocab-next-missing-wanted module-vocabulary))
            ((setf desire-satisfied) (val modname) (setf (vocab-successp module-vocabulary modname) val))
            (next-unsatisfied-system (system-vocabulary) (vocab-next-missing-wanted system-vocabulary))
-           (system-unwanted-or-satisfied-p (system-vocabulary sysname) (when-let ((cell (cell (entry system-vocabulary sysname #'string=))))
-                                                                         (or (not (wantedp cell)) (successp cell))))
            ((setf system-satisfiedp) (val system-vocabulary sysname) (setf (vocab-successp system-vocabulary sysname #'string=) val))
            (module-make-maybe-missing-wanted (module-name)
              (cons module-name (cons (when (module-locally-present-p (module module-name) *locality*)
@@ -233,7 +231,7 @@
                  (let ((extended-system-vocabulary system-vocabulary))
                    (dolist (newdep (append (mapcar (compose #'string #'name) local-newdeps)
                                            new-missing))
-                     (if-let ((cell (entry system-vocabulary newdep #'string=)))
+                     (if-let ((cell (cell (entry system-vocabulary newdep #'string=))))
                        (setf (wantedp cell) :wanted)
                        (setf extended-system-vocabulary (vocab-add-missing-wanted (list newdep) extended-system-vocabulary))))
                    ;; NOTE: on module boundaries we lose precise system dependency names
@@ -306,7 +304,8 @@
                          ;; where we've appended our required systems.
                          (for (values modules-new new-extended-system-vocabulary) = (satisfy-next-system m system-type modules extended-system-vocabulary))
                          (setf (values modules extended-system-vocabulary) (values modules-new new-extended-system-vocabulary))
-                         (when (every (curry #'system-unwanted-or-satisfied-p extended-system-vocabulary) required-names)
+                         (when (not (iter (for (name satisfied . wanted) in extended-system-vocabulary)
+                                          (finding name such-that (and wanted (not satisfied)))))
                            (return (values (remove-duplicates modules) extended-system-vocabulary)))))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
       (let* ((an-unsatisfied-module (module an-unsatisfied-name))
