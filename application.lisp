@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 ;;;
-;;;  (c) copyright 2007-2008 by
+;;;  (c) copyright 2007-2009 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -20,16 +20,13 @@
 
 (in-package :desire)
 
-(defun define-application (name system package function &rest default-parameters)
-  (make-instance 'application :name name :system (system system) :package package :function function :default-parameters default-parameters))
-
 (defun run (application-designator &rest parameters)
   (let* ((a (coerce-to-application application-designator))
          (s (app-system a)))
     (unless (system-loadable-p s)
-      (lust (name s)))
-    (require (name s))
+      (error "~@<Can't launch ~A, as its primary system, ~A, isn't loadable.~:@>" (name a) (name s)))
+    (unless (find-package (app-package a))
+      (report t "; Package containing primary function of app ~A not found, requiring the respective system...~%"
+              (name a))
+      (require (name s)))
     (apply (symbol-function (find-symbol (string (app-function a)) (app-package a))) (or parameters (app-default-parameters a)))))
-
-(defmethod purge-fasls ((a application))
-  (mapc #'purge-fasls (system-module (app-system a))))

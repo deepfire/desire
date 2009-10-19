@@ -25,6 +25,6 @@
                (:file "print-read" :depends-on ("types"))
                ;; Tier 5
                (:file "desire" :depends-on ("system-loadability"))
-;;                (:file "application" :depends-on ("desire"))
+               (:file "application" :depends-on ("system-loadability"))
                ))
   

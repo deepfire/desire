@@ -185,4 +185,4 @@ sbcl --noinform \
     (when system
       (require (down-case-name system)))
     (when app
-      (apply (app-function app) (app-default-parameters app)))))"
+      (run app))))"
