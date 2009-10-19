@@ -269,7 +269,7 @@
                      (values modules (cons cell (remove cell system-vocabulary))))
                    (error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
                (values modules system-vocabulary)))
-           (add-visible-system (module name path type vocabulary &optional (actual-type (system-definition-type path)))
+           (add-visible-system (module name path type vocabulary known-visible &optional (actual-type (system-definition-type path)))
              (unless (eq type actual-type)
                (error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
              (let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
@@ -279,16 +279,16 @@
                                             type name (type-of system)))))
                                (register-new-system (intern (string-upcase name)) path type module))))
                (set-syspath name path)
-               (ensure-system-loadable system path *locality*)
+               (ensure-system-loadable system path t *locality*)
                (append vocabulary
                        (when (typep system 'asdf-system)
                          ;; A hidden system is a system definition residing in a file named differently from main system's name.
                          ;; Find them.
-                         (iter (for hidden-system-name in (asdf-hidden-system-names system))
+                         (iter (for hidden-system-name in (set-difference (asdf-hidden-system-names system) known-visible :test #'equal))
                                (set-syspath hidden-system-name path)
                                (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
                                                         (register-new-system (intern hidden-system-name) path type module))))
-                                 (ensure-system-loadable hidden-system path *locality*))
+                                 (ensure-system-loadable hidden-system path nil *locality*))
                                (collect (if complete
                                             (make-missing-wanted hidden-system-name)
                                             (make-missing-unwanted hidden-system-name))))))))
@@ -301,12 +301,13 @@
                       (also-sysfiles (unless complete other-sysfiles))
                       (required-names (mapcar (curry #'system-definition-name system-type) required-sysfiles))
                       (also-names (mapcar (curry #'system-definition-name system-type) also-sysfiles))
+                      (all-names (append required-names also-names))
                       (extended-system-vocabulary (append (mapcar #'make-missing-wanted required-names)
                                                           (mapcar #'make-missing-unwanted also-names)
                                                           system-vocabulary)))
                  (iter (for sysfile in (append required-sysfiles also-sysfiles))
                        (for name in (append required-names also-names))
-                       (setf extended-system-vocabulary (add-visible-system m name sysfile system-type extended-system-vocabulary)))
+                       (setf extended-system-vocabulary (add-visible-system m name sysfile system-type extended-system-vocabulary all-names)))
                  (iter (with modules)
                        ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the vocabulary,
                        ;; where we've appended our required systems.

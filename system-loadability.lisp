@@ -147,10 +147,13 @@ system TYPE within LOCALITY."
     (and (probe-file central-system-pathname)
          central-system-pathname)))
 
-(defun ensure-system-loadable (system &optional path (locality (gate *self*)))
+(defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
    definition path within its module within LOCALITY."
   (when-let ((definition-pathname (or path (system-definition system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
+    (unless (string= (down-case-name system) (pathname-name definition-pathname))
+      (when check-path-sanity
+        (error "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))
     (ensure-symlink (system-definition-registry-symlink-path system locality)
                     definition-pathname)))
 
@@ -158,4 +161,5 @@ system TYPE within LOCALITY."
   "Try making MODULE's systems loadable, defaulting to LOCALITY.
  
    Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
-  (mapc (rcurry #'ensure-system-loadable nil locality) (module-systems module)))
+  (dolist (s (module-systems module))
+    (ensure-system-loadable s nil (not (system-hidden-p s)) locality)))
