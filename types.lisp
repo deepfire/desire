@@ -767,7 +767,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
     (ensure-module-systems-loadable module locality)))
 
 (defgeneric load-definitions (&key source force-source metastore))
-(defgeneric save-current-definitions (&key seal-p commit-message metastore))
+(defgeneric save-current-definitions (&key seal commit-message metastore))
 
 (defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master))
   "Make Desire fully functional, with PATH chosen as storage location.
