@@ -412,15 +412,6 @@ to DIRECTORY."
       (ensure-gitremote (name remote) module-url))
     (fetch-gitremote (name remote))))
 
-(defun reset-to-remote-branch (module remote &optional (branch-name :master) (reset-before-checkout nil) (locality (gate *self*)))
-  (within-directory ((module-pathname module locality))
-    (let ((ref (list "remotes" (down-case-name remote) (downstring branch-name))))
-      (ensure-gitbranch :master ref)
-      (when reset-before-checkout
-        (git-repository-reset-hard '("master"))
-        (git-checkout-ref '("master") *default-pathname-defaults* :if-changes :ignore))
-      (git-repository-reset-hard ref))))
-
 (defun git-clone-remote (remote module-name &optional locality-pathname)
   "Clone REMOTE, with working directory optionally changed to LOCALITY-PATHNAME."
   (maybe-within-directory locality-pathname

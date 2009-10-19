@@ -122,7 +122,7 @@
                               (git "gui"))
                             (invoke-restart (find-restart 'retry)))
                      :test-function (of-type 'repository-not-clean-during-fetch)
-                     :report-function (formatter "Launch git gui to fix the issue, then retry the command.")))
+                     :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))
       (call-next-method))))
 
 (defmethod fetch :before ((locality locality) (remote remote) module)
@@ -171,6 +171,15 @@
 
 (defmethod fetch :after ((git-locality git-locality) remote module)
   (setf (git-repository-world-readable-p (module-pathname module git-locality)) *default-world-readable*))
+
+(defgeneric update-module-using-remote (module remote &optional locality)
+  (:method (module remote &optional (locality (gate *self*)))
+    (fetch locality remote module))
+  (:method :after (module (remote git-remote) &optional locality)
+    (reset-gitbranch-to-remote-branch :master `(,(down-case-name remote) "master") (module-pathname module locality) t)))
+
+(defun update-module (module &optional (locality (gate *self*)))
+  (update-module-using-remote module (module-best-remote module) locality))
 
 (defun make-missing-wanted (name) (cons name (cons nil :wanted)))
 (defun make-missing-unwanted (name) (cons name (cons nil nil)))
@@ -308,10 +317,8 @@
                                           (finding name such-that (and wanted (not satisfied)))))
                            (return (values (remove-duplicates modules) extended-system-vocabulary)))))))))
     (if-let ((an-unsatisfied-name (next-unsatisfied-module)))
-      (let* ((an-unsatisfied-module (module an-unsatisfied-name))
-             (best-remote (module-best-remote an-unsatisfied-module)))
-        (fetch *locality* best-remote an-unsatisfied-module)
-        (reset-to-remote-branch an-unsatisfied-module best-remote :master t *locality*)
+      (let* ((an-unsatisfied-module (module an-unsatisfied-name)))
+        (update-module an-unsatisfied-module *locality*)
         (setf (desire-satisfied an-unsatisfied-name) t)
         (multiple-value-bind (module-deps new-system-vocabulary)
             (module-dependencies an-unsatisfied-module system-vocabulary *default-system-type*)
