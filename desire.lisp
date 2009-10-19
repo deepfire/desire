@@ -239,7 +239,7 @@
                    ;; NOTE: on module boundaries we lose precise system dependency names
                    (values (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
                            extended-system-vocabulary)))))
-           (satisfy-next-system (module &optional modules system-vocabulary)
+           (satisfy-next-system (module system-type &optional modules system-vocabulary)
              "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
               the fallout. Return the modified sets of known REQUIRED systems, MODULES and
               MISSING unknown systems, returning them as multiple values."
@@ -249,10 +249,11 @@
                  (let* ((path (or (syspath name)
                                   (error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
                                          name (hash-table-keys *syspath*))))
-                        (type (interpret-system-pathname-type path)))
-                   (unless (typep system type)
-                     (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
-                            type name (type-of system)))
+                        (actual-type (system-definition-type path)))
+                   (unless (subtypep system-type actual-type)
+                     (error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
+                   (unless (typep system system-type)
+                     (error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
                    (setf (system-satisfiedp system-vocabulary name) :present) ; made loadable, hiddens uncovered, deps about to be added
                    (add-system-dependencies module system modules system-vocabulary))
                  (if-let ((cell (cell (entry system-vocabulary name #'string=))))
@@ -264,12 +265,12 @@
            (add-visible-system (module name path type vocabulary &optional (actual-type (system-definition-type path)))
              (unless (eq type actual-type)
                (error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
-             (lret ((system (or (lret ((system (system name :if-does-not-exist :continue)))
-                                  (when system
-                                    (unless (typep system type)
-                                      (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
-                                             type name (type-of system)))))
-                                (register-new-system (intern name) path type module))))
+             (let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
+                                 (when system
+                                   (unless (typep system type)
+                                     (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
+                                            type name (type-of system)))))
+                               (register-new-system (intern (string-upcase name)) path type module))))
                (set-syspath name path)
                (ensure-system-loadable system path *locality*)
                (append vocabulary
@@ -303,7 +304,7 @@
                    (iter (with modules)
                          ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the vocabulary,
                          ;; where we've appended our required systems.
-                         (for (values modules-new new-extended-system-vocabulary) = (satisfy-next-system m modules extended-system-vocabulary))
+                         (for (values modules-new new-extended-system-vocabulary) = (satisfy-next-system m system-type modules extended-system-vocabulary))
                          (setf (values modules extended-system-vocabulary) (values modules-new new-extended-system-vocabulary))
                          (when (every (curry #'system-unwanted-or-satisfied-p extended-system-vocabulary) required-names)
                            (return (values (remove-duplicates modules) extended-system-vocabulary)))))))))
