@@ -292,3 +292,18 @@
   `(unwind-protect (progn (git-checkout-ref ,ref)
                           ,@body)
      (git-checkout-ref '("master"))))
+
+(defun checkout-gitbranch (name directory &optional reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
+  (unless (gitbranch-present-p name directory)
+    (ecase if-does-not-exist 
+      (:error (git-error "~@<Asked to check out a nonexistent branch ~A in ~S~:@>" name directory))
+      (:create (if default-ref
+                   (add-gitbranch name default-ref directory)
+                   (git-error "~@<While checking out branch ~A in ~S: branch doesn't exist and the default ref was not provided.~:@>" name directory)))))
+  (when reset-before-checkout
+    (git-repository-reset-hard '("HEAD")))
+  (git-checkout-ref `(,(downstring name)) directory :if-changes if-changes))
+
+(defun reset-gitbranch-to-remote-branch (name qualified-remote-branch-name directory &optional reset-before-checkout)
+  (checkout-gitbranch name directory reset-before-checkout)
+  (git-repository-reset-hard (list* "remotes" qualified-remote-branch-name) directory))
