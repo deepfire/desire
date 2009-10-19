@@ -33,6 +33,13 @@ else
     echo "NOTE: choosing an alternate branch of desire: '$BRANCH'"
 fi
 
+if test -z "$METABRANCH"
+then
+    METABRANCH=$BRANCH
+else
+    echo "NOTE: choosing a metastore branch different from desire branch: '$METABRANCH'"
+fi
+
 if test -z "$DEBUG"
 then
     DEBUG=0
@@ -152,7 +159,7 @@ sbcl --noinform \
      --eval "
 (progn
   (setf executor:*execute-explanatory* $EXPLAIN executor:*execute-verbosely* $VERBOSE)
-  (init \"$ROOT/\" :wishmaster-branch :$BRANCH)
+  (init \"$ROOT/\" :wishmaster-branch :$METABRANCH)
   (format t \"~&~%~%~
    Congratulations! You have reached a point where you can wish for any package~%~
   desire knows about. Just type (lust 'desiree) and it will happen.~%~
