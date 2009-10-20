@@ -6,7 +6,8 @@
 (in-package :desire.system)
 
 (defsystem :desire
-  :depends-on (:alexandria :iterate :pergamum :semi-precious :cl-fad :executor)
+  :depends-on (:alexandria :iterate :cl-fad
+               :pergamum :semi-precious :executor)
   :components ((:file "package")
                ;; Tier #
                (:file "dependencies" :depends-on ("package"))
@@ -26,5 +27,7 @@
                ;; Tier 5
                (:file "desire" :depends-on ("system-loadability"))
                (:file "application" :depends-on ("system-loadability"))
+               (:module "system-quirks" :depends-on ("system-loadability")
+                        :components ((:file "cl-launch")))
                ))
   

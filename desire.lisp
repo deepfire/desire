@@ -178,8 +178,12 @@
   (:method :after (module (remote git-remote) &optional locality)
     (reset-gitbranch-to-remote-branch :master `(,(down-case-name remote) "master") (module-pathname module locality) t)))
 
+(defgeneric module-post-install (module module-name locality)
+  (:method ((o module) (name symbol) (l locality))))
+
 (defun update-module (module &optional (locality (gate *self*)))
-  (update-module-using-remote module (module-best-remote module) locality))
+  (update-module-using-remote module (module-best-remote module) locality)
+  (module-post-install module (name module) locality))
 
 (defun make-missing-wanted (name) (cons name (cons nil :wanted)))
 (defun make-missing-unwanted (name) (cons name (cons nil nil)))
