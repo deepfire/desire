@@ -45,6 +45,8 @@
 (defparameter *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
 (defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 
+(defvar *desire-root* nil "Absolute pathname of a directory containing master localities and installed tools.")
+
 (defvar *unsaved-definition-changes-p* nil
   "Whether the idea about the world changed, since INIT was performed, or
 SAVE-CURRENT-DEFINITIONS was called.")
@@ -749,7 +751,9 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
   (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
     (do-remotes (r)
-      (setf (remote-disabled-p r) (not (member (vcs-type r) present))))))
+      (setf (remote-disabled-p r) (not (member (vcs-type r) present))))
+    (find-executable 'make)
+    (find-executable 'cp)))
 
 (defun ensure-present-module-systems-loadable (&optional (locality (gate *self*)))
   "Ensure that all modules present in LOCALITY have their systems loadable.
@@ -771,42 +775,42 @@ locally present modules will be marked as converted."
   (let* ((path (fad:pathname-as-directory path))
          (absolute-path (if (pathname-absolute-p path)
                             path
-                            (merge-pathnames path)))
-         (root (parse-namestring absolute-path))
-         (gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) root))
-         (meta-path (merge-pathnames #p".meta/" gate-path)))
-    (clear-definitions)
-    (with-class-slot (git hg darcs cvs svn) required-executables
-      (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
-    (with-class-slot (git hg darcs cvs svn) enabled-p
-      (setf git nil hg nil darcs nil cvs nil svn nil))
-    (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
-      (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
-    (unless (metastore-present-p meta-path '(definitions))
-      (report t ";;; no metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
-      (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))
-    (report t ";;; loading definitions from ~S~%" (metafile-path 'definitions meta-path))
-    (load-definitions :force-source t :metastore meta-path)
-    (setf *self* (if-let ((d (and as (distributor as))))
-                   (progn (report t ";;; trying to establish self as ~A~%" as)
-                          (change-class d 'local-distributor :root root))
-                   (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
-                     (report t ";;; establishing self as non-well-known distributor ~A~%" local-name)
-                     (make-instance 'local-distributor :name local-name :root root :omit-registration t))))
-    (reestablish-metastore-subscriptions meta-path)
-    (when merge-remote-wishmasters
-      (report t ";;; merging definitions from remote wishmasters...~%")
-      (merge-remote-wishmasters meta-path))
-    (setf *unsaved-definition-changes-p* nil)
-    (report t ";;; determining available tools and deducing accessible remotes~%")
-    (determine-tools-and-update-remote-accessibility)
-    (report t ";;; registering ~S with ASDF~%" (locality-asdf-registry-path (gate *self*)))
-    (locality-register-with-asdf (gate *self*))
-    (report t ";;; ensuring that present modules have their defined systems accessible~%")
-    ;; TODO: make this a method on NOTICE-MODULE-APPEARED
-    (ensure-present-module-systems-loadable (gate *self*))
-    (report t ";;; all done~%")
-    (values)))
+                            (merge-pathnames path))))
+    (setf *desire-root* (parse-namestring absolute-path))
+    (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) *desire-root*))
+           (meta-path (merge-pathnames #p".meta/" gate-path)))
+      (clear-definitions)
+      (with-class-slot (git hg darcs cvs svn) required-executables
+        (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
+      (with-class-slot (git hg darcs cvs svn) enabled-p
+        (setf git nil hg nil darcs nil cvs nil svn nil))
+      (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
+        (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+      (unless (metastore-present-p meta-path '(definitions))
+        (report t ";;; no metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
+        (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))
+      (report t ";;; loading definitions from ~S~%" (metafile-path 'definitions meta-path))
+      (load-definitions :force-source t :metastore meta-path)
+      (setf *self* (if-let ((d (and as (distributor as))))
+                     (progn (report t ";;; trying to establish self as ~A~%" as)
+                            (change-class d 'local-distributor :root *desire-root*))
+                     (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
+                       (report t ";;; establishing self as non-well-known distributor ~A~%" local-name)
+                       (make-instance 'local-distributor :name local-name :root *desire-root* :omit-registration t))))
+      (reestablish-metastore-subscriptions meta-path)
+      (when merge-remote-wishmasters
+        (report t ";;; merging definitions from remote wishmasters...~%")
+        (merge-remote-wishmasters meta-path))
+      (setf *unsaved-definition-changes-p* nil)
+      (report t ";;; determining available tools and deducing accessible remotes~%")
+      (determine-tools-and-update-remote-accessibility)
+      (report t ";;; registering ~S with ASDF~%" (locality-asdf-registry-path (gate *self*)))
+      (locality-register-with-asdf (gate *self*))
+      (report t ";;; ensuring that present modules have their defined systems accessible~%")
+      ;; TODO: make this a method on NOTICE-MODULE-APPEARED
+      (ensure-present-module-systems-loadable (gate *self*))
+      (report t ";;; all done~%")
+      (values))))
 
 (defun define-locality (name vcs-type &rest keys &key &allow-other-keys)
   "Define locality of VCS-TYPE at PATH, if one doesn't exist already, 

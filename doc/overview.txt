@@ -1,0 +1,5 @@
+The documentation was converted into a richer format, and the generated output
+is available at:
+
+    http://www.feelingofgreen.ru/shared/git/desire/doc/overview.html
+

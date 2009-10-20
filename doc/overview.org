@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-October 15, 2009, 08:00
+October 20, 2009, 10:16
 #+END_CENTER
 
 * About this document
@@ -41,7 +41,7 @@ Desire can be obtained at:
 
         git://git.feelingofgreen.ru/desire
 
-but please see [[Streamlined bootstrap]].
+        but please see [[Streamlined%20bootstrap][streamlined bootstrap]].
 
 * Overview of terms
 *** Distributors
@@ -145,48 +145,92 @@ converted module redistribution.
 
 * API (aka end-user interface)
 *** Performing knowledge base queries
+      - distributor name &key (if-does-not-exist :error) => distributor ::
+      - remote name &key (if-does-not-exist :error) => remote ::
+      - module name &key (if-does-not-exist :error) => module ::
+      - system name &key (if-does-not-exist :error) => system ::
+      - app name &key (if-does-not-exist :error) => app ::
+      - locality name &key (if-does-not-exist :error) => locality ::
+        Find objects by name.
 
-     - distributor name &key (if-does-not-exist :error) => distributor
-     - remote name &key (if-does-not-exist :error) => remote
-     - module name &key (if-does-not-exist :error) => module
-     - system name &key (if-does-not-exist :error) => system
-     - app name &key (if-does-not-exist :error) => app
-     - locality name &key (if-does-not-exist :error) => locality
-     - master name &key (if-does-not-exist :error) => locality
+      - name object => symbol ::
+        Yield object's name.
 
-     - name object => symbol
+      - url remote-designator &optional module-specifier => string ::
+        Compute the URL of a module designated by MODULE-SPECIFIER contained a remote designated by
+        REMOTE-DESIGNATOR.
 
-     - url remote-designator &optional module-specifier => string
+      - apropos-desr string-designator &optional set-designator => <no values> ::
+        Like APROPOS, but finds objects from the domain of Desire.
 
-     - apropos-desr string-designator &optional set-designator => <no values>
-     - apropos-desr-list string-designator &optional set-designator => desirables
-     - list-modules => <no values>
+      - apropos-desr-list string-designator &optional set-designator => desirables ::
+        Like APROPOS-LIST, but finds objects from the domain of Desire.
 
-     - module-present-p module-designator module &optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) => boolean
-     - system-loadable-p system-designator &optional (locality (master 'git)) => generalised-boolean
+      - list-modules => <no values> ::
+        List all known modules, with some additional information.
 
-     - module-best-remote module-designator &key (if-does-not-exist :error) => remote
-     - module-best-distributor module-designator &key (if-does-not-exist :error) => remote
+      - module-present-p module-designator &optional (locality (gate =*self*=)) check-when-present-p (check-when-missing-p t) => boolean ::
+        Determine whether module designated by MODULE-DESIGNATOR is present in LOCALITY, which defaults
+        to the local gate locality.
+
+      - system-loadable-p system-designator &optional (locality (gate =*self*=)) => generalised-boolean ::
+        Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
+        to the local gate locality.
+
+      - module-best-remote module-designator &key (if-does-not-exist :error) => remote ::
+        Produce the remote, if any, which will be chosen to satisfy desires for module
+        designated by MODULE-DESIGNATOR.
+
+      - module-best-distributor module-designator &key (if-does-not-exist :error) => remote ::
+        Produce the distributor, if any, whose remote will be chosen to satisfy desires
+        for module designated by MODULE-DESIGNATOR.
 
 *** Making wishes
 
-     - init path &key as (default-wishmasters (list desr:*default-wishmaster*)) => boolean
-     - lust &rest module-names => boolean
-     - add-module url &optional module-name &key systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) => module
+      - init path &key as (default-wishmasters (list desr:*default-wishmaster*)) => boolean ::
+        Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
+       
+        When AS is non-NIL an attempt is made to establish an identity to a defined distributor
+        named by the AS keyword.
+
+        This is performed by checking that the locally available set of modules covers every module
+        that is claimed to be "well known" to be published by our distributor[6]. When this check
+        fails an error is signalled.
+
+      - =*desire-root*= ::
+        The root directory containing all VCS-specific locations, set during INIT-time.
+
+      - lust &rest module-names => boolean ::
+        Make modules with MODULE-NAMES locally available.
+
+      - add-module url &optional module-name &key systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) => module ::
+        Define a new module, with download location specified by URL, and the module's name
+        either deduced from the URL, or provided via MODULE-NAME.
+
+        When LUST is non-NIL, the module is localised.
 
 ***** Reader macros for add-module
 
 Following reader macro is enabled by install-add-module-reader:
 
-#@"u://r.l"
-#@("u://r.l" &optional module-name &key (lust *auto-lust*))
+: #@"u://r.l"
+: #@("u://r.l" &optional module-name &key (lust *auto-lust*))
 
 *** Less frequently used functions
 
-     - system-definition system repository-path &key (if-does-not-exist :error) => pathname
-     - clear-definitions => <no values>
-     - save-current-definitions &key seal-p => <no values>
-     - load-definitions &key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)) => <no values>
+      - system-definition system repository-path &key (if-does-not-exist :error) => pathname ::
+        Return the pathname of the SYSTEM's definition.
+       
+      - clear-definitions => <no values> ::
+        Forget everything. A subsequent LOAD-DEFINITIONS will be instrumental to continue any productive use.
+
+      - save-current-definitions &key seal => <no values> ::
+        Write out the current idea about the Desire's domain into DEFINITIONS,
+        optionally committing changes, when SEAL is non-NIL.
+       
+      - load-definitions &key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)) => <no values> ::
+        Append definitions currently available in METASTORE to the current idea about
+        Desire's domain.
 
 * Workflow
 *** Streamlined bootstrap
@@ -256,7 +300,7 @@ From the wishmaster point of view (note that this happens the INIT function
 also does:
 
      -  checks that the locally available set of modules covers every module
-        that is claimed to be "well known" to be distributed by our
+        that is claimed to be "well known" to be published by our
         distributor[6], otherwise signalling an error
      -  publishes the informations about non-"well known", converted modules
         in the gate remote's DEFINITIONS file

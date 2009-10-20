@@ -8,7 +8,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2009-10-15 08:00:50 MSD"/>
+<meta name="generated" content="2009-10-20 10:16:31 MSD"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -75,7 +75,7 @@ lang="en" xml:lang="en">
 
 
 <div style="text-align: center">
-<p>October 15, 2009, 08:00
+<p>October 20, 2009, 10:16
 </p>
 </div>
 
@@ -209,7 +209,7 @@ Desire can be obtained at:
 git://git.feelingofgreen.ru/desire
 </p>
 <p>
-but please see <a href="#sec-3">Streamlined bootstrap</a>.
+but please see <a href="#sec-3">streamlined bootstrap</a>.
 </p>
 </div>
 
@@ -419,63 +419,88 @@ converted module redistribution.
 <h3 id="sec-5.1"><span class="section-number-3">5.1</span> Performing knowledge base queries </h3>
 <div class="outline-text-3" id="text-5.1">
 
+<dl>
+<dt>distributor name &amp;key (if-does-not-exist :error) =&gt; distributor</dt><dd>
 
-<ul>
-<li>
-distributor name &amp;key (if-does-not-exist :error) =&gt; distributor
-</li>
-<li>
-remote name &amp;key (if-does-not-exist :error) =&gt; remote
-</li>
-<li>
-module name &amp;key (if-does-not-exist :error) =&gt; module
-</li>
-<li>
-system name &amp;key (if-does-not-exist :error) =&gt; system
-</li>
-<li>
-app name &amp;key (if-does-not-exist :error) =&gt; app
-</li>
-<li>
-locality name &amp;key (if-does-not-exist :error) =&gt; locality
-</li>
-<li>
-master name &amp;key (if-does-not-exist :error) =&gt; locality
+</dd>
+<dt>remote name &amp;key (if-does-not-exist :error) =&gt; remote</dt><dd>
 
-</li>
-<li>
-name object =&gt; symbol
+</dd>
+<dt>module name &amp;key (if-does-not-exist :error) =&gt; module</dt><dd>
 
-</li>
-<li>
-url remote-designator &amp;optional module-specifier =&gt; string
+</dd>
+<dt>system name &amp;key (if-does-not-exist :error) =&gt; system</dt><dd>
 
-</li>
-<li>
-apropos-desr string-designator &amp;optional set-designator =&gt; &lt;no values&gt;
-</li>
-<li>
-apropos-desr-list string-designator &amp;optional set-designator =&gt; desirables
-</li>
-<li>
-list-modules =&gt; &lt;no values&gt;
+</dd>
+<dt>app name &amp;key (if-does-not-exist :error) =&gt; app</dt><dd>
 
-</li>
-<li>
-module-present-p module-designator module &amp;optional (locality (master 'git)) check-when-present-p (check-when-missing-p t) =&gt; boolean
-</li>
-<li>
-system-loadable-p system-designator &amp;optional (locality (master 'git)) =&gt; generalised-boolean
+</dd>
+<dt>locality name &amp;key (if-does-not-exist :error) =&gt; locality</dt><dd>
 
-</li>
-<li>
-module-best-remote module-designator &amp;key (if-does-not-exist :error) =&gt; remote
-</li>
-<li>
-module-best-distributor module-designator &amp;key (if-does-not-exist :error) =&gt; remote
+<p>
+Find objects by name.
+</p>
+</dd>
+<dt>name object =&gt; symbol</dt><dd>
 
-</li>
-</ul>
+<p>
+Yield object's name.
+</p>
+</dd>
+<dt>url remote-designator &amp;optional module-specifier =&gt; string</dt><dd>
+
+<p>
+Compute the URL of a module designated by MODULE-SPECIFIER contained a remote designated by
+REMOTE-DESIGNATOR.
+</p>
+</dd>
+<dt>apropos-desr string-designator &amp;optional set-designator =&gt; &lt;no values&gt;</dt><dd>
+
+<p>
+Like APROPOS, but finds objects from the domain of Desire.
+</p>
+</dd>
+<dt>apropos-desr-list string-designator &amp;optional set-designator =&gt; desirables</dt><dd>
+
+<p>
+Like APROPOS-LIST, but finds objects from the domain of Desire.
+</p>
+</dd>
+<dt>list-modules =&gt; &lt;no values&gt;</dt><dd>
+
+<p>
+List all known modules, with some additional information.
+</p>
+</dd>
+<dt>module-present-p module-designator &amp;optional (locality (gate <code>*self*</code>)) check-when-present-p (check-when-missing-p t) =&gt; boolean</dt><dd>
+
+<p>
+Determine whether module designated by MODULE-DESIGNATOR is present in LOCALITY, which defaults
+to the local gate locality.
+</p>
+</dd>
+<dt>system-loadable-p system-designator &amp;optional (locality (gate <code>*self*</code>)) =&gt; generalised-boolean</dt><dd>
+
+<p>
+Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
+to the local gate locality.
+</p>
+</dd>
+<dt>module-best-remote module-designator &amp;key (if-does-not-exist :error) =&gt; remote</dt><dd>
+
+<p>
+Produce the remote, if any, which will be chosen to satisfy desires for module
+designated by MODULE-DESIGNATOR.
+</p>
+</dd>
+<dt>module-best-distributor module-designator &amp;key (if-does-not-exist :error) =&gt; remote</dt><dd>
+
+<p>
+Produce the distributor, if any, whose remote will be chosen to satisfy desires
+for module designated by MODULE-DESIGNATOR.
+</p>
+</dd>
+</dl>
 </div>
 
 </div>
@@ -485,18 +510,45 @@ module-best-distributor module-designator &amp;key (if-does-not-exist :error) =&
 <div class="outline-text-3" id="text-5.2">
 
 
-<ul>
-<li>
-init path &amp;key as (default-wishmasters (list desr:*default-wishmaster*)) =&gt; boolean
-</li>
-<li>
-lust &amp;rest module-names =&gt; boolean
-</li>
-<li>
-add-module url &amp;optional module-name &amp;key systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) =&gt; module
+<dl>
+<dt>init path &amp;key as (default-wishmasters (list desr:*default-wishmaster*)) =&gt; boolean</dt><dd>
 
-</li>
-</ul>
+<p>
+Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
+</p>
+<p>
+When AS is non-NIL an attempt is made to establish an identity to a defined distributor
+named by the AS keyword.
+</p>
+<p>
+This is performed by checking that the locally available set of modules covers every module
+that is claimed to be "well known" to be published by our distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>. When this check
+fails an error is signalled.
+</p>
+</dd>
+<dt><code>*desire-root*</code></dt><dd>
+
+<p>
+The root directory containing all VCS-specific locations, set during INIT-time.
+</p>
+</dd>
+<dt>lust &amp;rest module-names =&gt; boolean</dt><dd>
+
+<p>
+Make modules with MODULE-NAMES locally available.
+</p>
+</dd>
+<dt>add-module url &amp;optional module-name &amp;key systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) =&gt; module</dt><dd>
+
+<p>
+Define a new module, with download location specified by URL, and the module's name
+either deduced from the URL, or provided via MODULE-NAME.
+</p>
+<p>
+When LUST is non-NIL, the module is localised.
+</p>
+</dd>
+</dl>
 
 </div>
 
@@ -508,6 +560,11 @@ add-module url &amp;optional module-name &amp;key systemlessp (system-type desr:
 <p>
 Following reader macro is enabled by install-add-module-reader:
 </p>
+<pre class="example">
+#@"u://r.l"
+#@("u://r.l" &amp;optional module-name &amp;key (lust *auto-lust*))
+</pre>
+
 
 </div>
 </div>
@@ -519,21 +576,34 @@ Following reader macro is enabled by install-add-module-reader:
 <div class="outline-text-3" id="text-5.3">
 
 
-<ul>
-<li>
-system-definition system repository-path &amp;key (if-does-not-exist :error) =&gt; pathname
-</li>
-<li>
-clear-definitions =&gt; &lt;no values&gt;
-</li>
-<li>
-save-current-definitions &amp;key seal-p =&gt; &lt;no values&gt;
-</li>
-<li>
-load-definitions &amp;key (source <b>self</b>) (force-source (eq source <b>self</b>)) (metastore (meta-path)) =&gt; &lt;no values&gt;
+<dl>
+<dt>system-definition system repository-path &amp;key (if-does-not-exist :error) =&gt; pathname</dt><dd>
 
-</li>
-</ul>
+<p>
+Return the pathname of the SYSTEM's definition.
+</p>
+</dd>
+<dt>clear-definitions =&gt; &lt;no values&gt;</dt><dd>
+
+<p>
+Forget everything. A subsequent LOAD-DEFINITIONS will be instrumental to continue any productive use.
+</p>
+</dd>
+<dt>save-current-definitions &amp;key seal =&gt; &lt;no values&gt;</dt><dd>
+
+<p>
+Write out the current idea about the Desire's domain into DEFINITIONS,
+optionally committing changes, when SEAL is non-NIL.
+</p>
+</dd>
+<dt>load-definitions &amp;key (source <b>self</b>) (force-source (eq source <b>self</b>)) (metastore (meta-path)) =&gt; &lt;no values&gt;</dt><dd>
+
+<p>
+Append definitions currently available in METASTORE to the current idea about
+Desire's domain.
+</p>
+</dd>
+</dl>
 </div>
 </div>
 
@@ -664,8 +734,8 @@ also does:
 <ul>
 <li>
  checks that the locally available set of modules covers every module
-that is claimed to be "well known" to be distributed by our
-distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>, otherwise signalling an error
+that is claimed to be "well known" to be published by our
+distributor<sup><a class="footref" name="fnr.5.2" href="#fn.5">5</a></sup>, otherwise signalling an error
 </li>
 <li>
  publishes the informations about non-"well known", converted modules
@@ -796,7 +866,7 @@ through git://git.feelingofgreen.ru/darcs-to-git
 <p class="author"> Author: Samium Gromoff
 <a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2009-10-15 08:00:50 MSD</p>
+<p class="date"> Date: 2009-10-20 10:16:31 MSD</p>
 <p class="creator">HTML generated by org-mode 6.31a in emacs 23</p>
 </div>
 </div>
