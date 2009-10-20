@@ -764,6 +764,15 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 (defgeneric load-definitions (&key source force-source metastore))
 (defgeneric save-current-definitions (&key seal commit-message metastore))
 
+(defun ensure-root-sanity (directory)
+  (unless (directory-exists-p directory)
+    (error "~@<The specified root at ~S does not exist.~:@>" directory))
+  (let ((gitroot (subdirectory* directory "git")))
+    (when (and (probe-file gitroot) (not (directory-exists-p gitroot)))
+      (error "~@<The specified root at ~S contains a file named 'git', which violates the requirement for a sane root.~:@>" directory))
+    (ensure-directories-exist gitroot))
+  directory)
+
 (defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master))
   "Make Desire fully functional, with PATH chosen as storage location.
 
@@ -776,7 +785,7 @@ locally present modules will be marked as converted."
          (absolute-path (if (pathname-absolute-p path)
                             path
                             (merge-pathnames path))))
-    (setf *desire-root* (parse-namestring absolute-path))
+    (setf *desire-root* (ensure-root-sanity (parse-namestring absolute-path)))
     (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) *desire-root*))
            (meta-path (merge-pathnames #p".meta/" gate-path)))
       (clear-definitions)
