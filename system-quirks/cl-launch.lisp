@@ -23,7 +23,10 @@
 
 (defun make-cl-launch-system (locality-directory)
   (within-directory ((subdirectory* locality-directory "cl-launch"))
-    (make "install_source" `("INSTALL_SOURCE=" ,locality-directory))))
+    (make "install_source" `("INSTALL_SOURCE=" ,locality-directory))
+    (make "install_binary" `("INSTALL_BIN=" ,(subdirectory* *desire-root* "bin")))))
 
 (defmethod module-post-install ((o module) (name (eql 'cl-launch)) (l locality))
-  (make-cl-launch-system (locality-pathname l)))
+  (make-cl-launch-system (locality-pathname l))
+  (sb-posix:putenv (concatenate 'string "PATH=" (sb-posix:getenv "PATH") ":"
+                                (namestring (subdirectory* *desire-root* "bin")))))
