@@ -28,7 +28,8 @@
                             `("INSTALL_IMAGE=" ,(subdirectory* *desire-root* "images"))
                             `("INSTALL_LISP=" ,locality-directory)
                             `("LISP_SOURCE=" ,locality-directory)
-                            `("LISP_SYSTEMS=" ,(subdirectory* locality-directory ".asdf-registry")))))
+                            `("LISP_SYSTEMS=" ,(subdirectory* locality-directory ".asdf-registry"))
+                            `("PATH=" ,(sb-posix:getenv "PATH") ":" ,(subdirectory* *desire-root* "bin")))))
 
 (defmethod satisfy-module :after ((module-name (eql 'xcvb)) &optional locality system-type complete skip-present module-vocabulary system-vocabulary)
   (declare (ignore system-type complete skip-present module-vocabulary system-vocabulary))

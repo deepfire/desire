@@ -28,8 +28,4 @@
 
 (defmethod satisfy-module :after ((module-name (eql 'cl-launch)) &optional locality system-type complete skip-present module-vocabulary system-vocabulary)
   (declare (ignore system-type complete skip-present module-vocabulary system-vocabulary))
-  (make-cl-launch-system (locality-pathname locality))
-  ;; do something real next time, please, ok?
-  #+nil
-  (sb-posix:putenv (concatenate 'string "PATH=" (sb-posix:getenv "PATH") ":"
-                                (namestring (subfile* *desire-root* "bin")))))
+  (make-cl-launch-system (locality-pathname locality)))
