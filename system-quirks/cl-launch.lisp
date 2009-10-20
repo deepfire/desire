@@ -24,9 +24,12 @@
 (defun make-cl-launch-system (locality-directory)
   (within-directory ((subdirectory* locality-directory "cl-launch"))
     (make "install_source" `("INSTALL_SOURCE=" ,locality-directory))
-    (make "install_binary" `("INSTALL_BIN=" ,(subdirectory* *desire-root* "bin")))))
+    (make "install_binary" `("INSTALL_BIN=" ,(subfile* *desire-root* "bin")))))
 
-(defmethod module-post-install ((o module) (name (eql 'cl-launch)) (l locality))
-  (make-cl-launch-system (locality-pathname l))
+(defmethod satisfy-module :after ((module-name (eql 'cl-launch)) &optional locality system-type complete skip-present module-vocabulary system-vocabulary)
+  (declare (ignore system-type complete skip-present module-vocabulary system-vocabulary))
+  (make-cl-launch-system (locality-pathname locality))
+  ;; do something real next time, please, ok?
+  #+nil
   (sb-posix:putenv (concatenate 'string "PATH=" (sb-posix:getenv "PATH") ":"
-                                (namestring (subdirectory* *desire-root* "bin")))))
+                                (namestring (subfile* *desire-root* "bin")))))
