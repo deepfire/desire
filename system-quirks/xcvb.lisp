@@ -21,9 +21,14 @@
 (in-package :desire)
 
 
-(defun make-cl-launch-system (locality-directory)
-  (within-directory ((subdirectory* locality-directory "cl-launch"))
-    (make "install_source" `("INSTALL_SOURCE=" ,locality-directory))))
+(defun make-xcvb-using-asdf (locality-directory)
+  (within-directory ((subdirectory* locality-directory "xcvb"))
+    (cp "doc/configure.mk.example" "configure.mk")
+    (make "xcvb-using-asdf" `("PREFIX=" ,*desire-root*)
+                            `("INSTALL_IMAGE=" ,(subdirectory* *desire-root* "images"))
+                            `("INSTALL_LISP=" ,locality-directory)
+                            `("LISP_SOURCE=" ,locality-directory)
+                            `("LISP_SYSTEMS=" ,(subdirectory* locality-directory ".asdf-registry")))))
 
-(defmethod module-post-install ((o module) (name (eql 'cl-launch)) (l locality))
-  (make-cl-launch-system (locality-pathname l)))
+(defmethod module-post-install ((o module) (name (eql 'xcvb)) (l locality))
+  (make-xcvb-using-asdf (locality-pathname l)))

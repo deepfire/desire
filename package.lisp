@@ -30,7 +30,7 @@
    ;;   types.lisp :: desires
    #:add-desire #:module-desired-p
    ;;   types.lisp :: knobs
-   #:*default-system-type* #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http*
+   #:*default-system-type* #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:*combined-remotes-prefer-native-over-http* #:*desire-root*
    ;;   types.lisp :: conditions
    #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module

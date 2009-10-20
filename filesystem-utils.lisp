@@ -29,7 +29,9 @@
   (define-executable rsync)
   (define-executable git-cvsimport)
   (define-executable git-svn)
-  (define-executable darcs-to-git))
+  (define-executable darcs-to-git)
+  (define-executable cp)
+  (define-executable make))
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))

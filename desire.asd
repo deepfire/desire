@@ -28,6 +28,7 @@
                (:file "desire" :depends-on ("system-loadability"))
                (:file "application" :depends-on ("system-loadability"))
                (:module "system-quirks" :depends-on ("system-loadability")
-                        :components ((:file "cl-launch")))
+                        :components ((:file "cl-launch")
+                                     (:file "xcvb")))
                ))
   
