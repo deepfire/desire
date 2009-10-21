@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-October 20, 2009, 10:16
+October 21, 2009, 16:21
 #+END_CENTER
 
 * About this document
@@ -20,7 +20,7 @@ or, for the Org-mode source:
 * What is desire (supposed to be)?
 
 The domain of desire includes software distribution points, software
-modules and applications. All these terms are represented internally
+modules and applications.  All these terms are represented internally
 in a detailed, comprehensive manner, and full knowledge about them is
 maintained in a PRINT/READ-able form, and is easily transportable[1]
 between desire nodes.
@@ -35,19 +35,24 @@ Desire shares concepts with and provides features like, at least:
      -  mudballs
      -  clbuild
 
+Desire uses the Git distributed version control system to pass around
+the domain-specific information, as well as for software redistribution,
+and tries not to lose the 'distributed' part of it.  Ideally, desire would
+ease distributed, cross-project cooperation and coordinated release making.
+
 * How to obtain desire?
 
 Desire can be obtained at:
 
         git://git.feelingofgreen.ru/desire
 
-        but please see [[Streamlined%20bootstrap][streamlined bootstrap]].
+but please see [[Streamlined%20bootstrap][streamlined bootstrap]].
 
 * Overview of terms
 *** Distributors
 
 The largest unit of software granularity is a 'distributor', which
-corresponds to an internet domain name[3]. Currently, they don't carry
+corresponds to an internet domain name[3].  Currently, they don't carry
 much information beyond just that.
 
 Distributors contain one or more 'remotes', which are typical points
@@ -83,7 +88,7 @@ Remotes combine following concepts:
 ***** Gate remotes
 
 Gate remotes are special remotes which participate in the desire
-protocol. They have a special module called '.meta', which contains
+protocol.  They have a special module called '.meta', which contains
 the containing distributor's idea about the world in a special file
 with name 'DEFINITIONS'.
 
@@ -94,7 +99,7 @@ Distributors recorded in these definitions are considered 'well-known'.
 
 Gate remotes have a second purpose: as parts of well-known wishmasters
 they serve for redistribution of modules converted by those wishmasters
-into a single repository format, currently 'git'. The modules converted
+into a single repository format, currently 'git'.  The modules converted
 in such a way are advertised differently from those which are considered
 'released' by the containing distributor.
 
@@ -105,7 +110,7 @@ and contain the information remaining to complete the information
 provided by less granular concepts to construct a module address.
 
 Modules can be provided by several different remotes of different
-distributors. When retrieval of a module is requested, gate remotes
+distributors.  When retrieval of a module is requested, gate remotes
 are preferred above others.
 
 *** Systems
@@ -123,7 +128,7 @@ can be obscured from the end-user, either intentionally or by unfortunate
 accident[5].
 
 Desire handles all these complications and operates on the full
-inter-module dependency graph. It also doesn't store that graph anywhere,
+inter-module dependency graph.  It also doesn't store that graph anywhere,
 recomputing it instead every time a request for module is performed.
 
 *** Applications
@@ -138,8 +143,9 @@ up and running.
 
 The more general type of 'location' besides remotes also includes
 'localities', which serve the same purpose as remotes, but on the local
-machine. Master localities are canonical locations for module repositories
+machine.  Master localities are canonical locations for module repositories
 managed by a specific VCS type.
+
 The master git locality is a canonical location for both release and
 converted module redistribution.
 
@@ -194,7 +200,7 @@ converted module redistribution.
         named by the AS keyword.
 
         This is performed by checking that the locally available set of modules covers every module
-        that is claimed to be "well known" to be published by our distributor[6]. When this check
+        that is claimed to be "well known" to be published by our distributor[6].  When this check
         fails an error is signalled.
 
       - =*desire-root*= ::
@@ -240,6 +246,10 @@ canonical permanent location is:
 
 	http://www.feelingofgreen.ru/shared/git/desire/climb.sh
 
+Desire revolves around the Git distributed version control system,
+so you need to make sure you have it installed.  Any reasonably
+recent version will do fine.
+
 The first argument should be an empty, writable filesystem location.
 That is, the exact filename must not exist, but its parent must exist,
 and be writable.
@@ -274,7 +284,7 @@ or:
 (This path provided to INIT will henceforth be referred to as $ROOT.)
 
 Unless you already have a '.meta' module, an initial seed version will be
-downloaded for you. Currently the wishmaster chosen for this is
+downloaded for you.  Currently the wishmaster chosen for this is
 git.feelingofgreen.ru.
 
 This procedure also determines the available VCS tools, as well as conversion
@@ -283,7 +293,7 @@ tools, and determines the set of accessible remotes.
 Further, it scans the git locality for known modules, and makes their systems
 registered in the ASDF registry.
 
-***** User aspect
+***** User  aspect
 
 Unless you happen to have some conversion tools, the set of modules available
 to your node is restricted to those available via git remotes.
@@ -316,7 +326,7 @@ The conversion is performed by external programs:
 ***** Extending definitions
 
 ADD-MODULE and the accompanying reader macro #@"u://r.l/" is a one-stop
-point useful for manual extension of the set of known entities. The URI
+point useful for manual extension of the set of known entities.  The URI
 type of the URL must name to the VCS used at the given distribution point,
 that is one of 'git', 'http' (which actually means git+http), 'darcs',
 'cvs' or 'svn'.

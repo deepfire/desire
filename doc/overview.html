@@ -8,7 +8,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2009-10-20 10:16:31 MSD"/>
+<meta name="generated" content="2009-10-21 16:21:22 MSD"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -75,7 +75,7 @@ lang="en" xml:lang="en">
 
 
 <div style="text-align: center">
-<p>October 20, 2009, 10:16
+<p>October 21, 2009, 16:21
 </p>
 </div>
 
@@ -121,7 +121,7 @@ lang="en" xml:lang="en">
 <li><a href="#sec-6.1">6.1 Streamlined bootstrap </a></li>
 <li><a href="#sec-6.2">6.2 Normal, non-bootstrap use </a>
 <ul>
-<li><a href="#sec-6.2.1">6.2.1 User aspect </a></li>
+<li><a href="#sec-6.2.1">6.2.1 User  aspect </a></li>
 <li><a href="#sec-6.2.2">6.2.2 Wishmaster aspect </a></li>
 <li><a href="#sec-6.2.3">6.2.3 Extending definitions </a></li>
 </ul></li>
@@ -160,7 +160,7 @@ or, for the Org-mode source:
 
 <p>
 The domain of desire includes software distribution points, software
-modules and applications. All these terms are represented internally
+modules and applications.  All these terms are represented internally
 in a detailed, comprehensive manner, and full knowledge about them is
 maintained in a PRINT/READ-able form, and is easily transportable<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup>
 between desire nodes.
@@ -193,6 +193,12 @@ There are three sides of desire:
 
 </li>
 </ul>
+
+<p>Desire uses the Git distributed version control system to pass around
+the domain-specific information, as well as for software redistribution,
+and tries not to lose the 'distributed' part of it.  Ideally, desire would
+ease distributed, cross-project cooperation and coordinated release making.
+</p>
 </div>
 
 </div>
@@ -229,7 +235,7 @@ but please see <a href="#sec-3">streamlined bootstrap</a>.
 
 <p>
 The largest unit of software granularity is a 'distributor', which
-corresponds to an internet domain name<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>. Currently, they don't carry
+corresponds to an internet domain name<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>.  Currently, they don't carry
 much information beyond just that.
 </p>
 <p>
@@ -303,7 +309,7 @@ an internet port number
 
 <p>
 Gate remotes are special remotes which participate in the desire
-protocol. They have a special module called '.meta', which contains
+protocol.  They have a special module called '.meta', which contains
 the containing distributor's idea about the world in a special file
 with name 'DEFINITIONS'.
 </p>
@@ -317,7 +323,7 @@ Distributors recorded in these definitions are considered 'well-known'.
 <p>
 Gate remotes have a second purpose: as parts of well-known wishmasters
 they serve for redistribution of modules converted by those wishmasters
-into a single repository format, currently 'git'. The modules converted
+into a single repository format, currently 'git'.  The modules converted
 in such a way are advertised differently from those which are considered
 'released' by the containing distributor.
 </p>
@@ -338,7 +344,7 @@ provided by less granular concepts to construct a module address.
 </p>
 <p>
 Modules can be provided by several different remotes of different
-distributors. When retrieval of a module is requested, gate remotes
+distributors.  When retrieval of a module is requested, gate remotes
 are preferred above others.
 </p>
 </div>
@@ -367,7 +373,7 @@ accident<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>.
 </p>
 <p>
 Desire handles all these complications and operates on the full
-inter-module dependency graph. It also doesn't store that graph anywhere,
+inter-module dependency graph.  It also doesn't store that graph anywhere,
 recomputing it instead every time a request for module is performed.
 </p>
 </div>
@@ -398,8 +404,10 @@ up and running.
 <p>
 The more general type of 'location' besides remotes also includes
 'localities', which serve the same purpose as remotes, but on the local
-machine. Master localities are canonical locations for module repositories
+machine.  Master localities are canonical locations for module repositories
 managed by a specific VCS type.
+</p>
+<p>
 The master git locality is a canonical location for both release and
 converted module redistribution.
 </p>
@@ -522,7 +530,7 @@ named by the AS keyword.
 </p>
 <p>
 This is performed by checking that the locally available set of modules covers every module
-that is claimed to be "well known" to be published by our distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>. When this check
+that is claimed to be "well known" to be published by our distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>.  When this check
 fails an error is signalled.
 </p>
 </dd>
@@ -629,6 +637,11 @@ canonical permanent location is:
 <a href="http://www.feelingofgreen.ru/shared/git/desire/climb.sh">http://www.feelingofgreen.ru/shared/git/desire/climb.sh</a>
 </p>
 <p>
+Desire revolves around the Git distributed version control system,
+so you need to make sure you have it installed.  Any reasonably
+recent version will do fine.
+</p>
+<p>
 The first argument should be an empty, writable filesystem location.
 That is, the exact filename must not exist, but its parent must exist,
 and be writable.
@@ -687,7 +700,7 @@ or:
 </p>
 <p>
 Unless you already have a '.meta' module, an initial seed version will be
-downloaded for you. Currently the wishmaster chosen for this is
+downloaded for you.  Currently the wishmaster chosen for this is
 git.feelingofgreen.ru.
 </p>
 <p>
@@ -702,7 +715,7 @@ registered in the ASDF registry.
 </div>
 
 <div id="outline-container-6.2.1" class="outline-4">
-<h4 id="sec-6.2.1"><span class="section-number-4">6.2.1</span> User aspect </h4>
+<h4 id="sec-6.2.1"><span class="section-number-4">6.2.1</span> User  aspect </h4>
 <div class="outline-text-4" id="text-6.2.1">
 
 
@@ -772,7 +785,7 @@ The conversion is performed by external programs:
 
 <p>
 ADD-MODULE and the accompanying reader macro #@"u://r.l/" is a one-stop
-point useful for manual extension of the set of known entities. The URI
+point useful for manual extension of the set of known entities.  The URI
 type of the URL must name to the VCS used at the given distribution point,
 that is one of 'git', 'http' (which actually means git+http), 'darcs',
 'cvs' or 'svn'.
@@ -866,7 +879,7 @@ through git://git.feelingofgreen.ru/darcs-to-git
 <p class="author"> Author: Samium Gromoff
 <a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2009-10-20 10:16:31 MSD</p>
+<p class="date"> Date: 2009-10-21 16:21:22 MSD</p>
 <p class="creator">HTML generated by org-mode 6.31a in emacs 23</p>
 </div>
 </div>
