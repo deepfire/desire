@@ -29,4 +29,5 @@
 
 (defmethod satisfy-module :after ((module-name (eql 'cl-launch)) &optional locality system-type complete skip-present module-vocabulary system-vocabulary)
   (declare (ignore system-type complete skip-present module-vocabulary system-vocabulary))
-  (make-cl-launch-system (locality-pathname locality)))
+  (make-cl-launch-system (locality-pathname locality))
+  (ensure-module-systems-loadable (module 'cl-launch) locality))
