@@ -364,7 +364,7 @@ they participate in the desire wishmaster protocol or not."
   (let ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w))))
     (setf *original-self-gate-class-name* (class-name (class-of gate))
           (gate w) (change-class gate 'git-locality :pathname (merge-pathnames #p"git/" root))))
-  (update-local-distributor-conversions d))
+  (update-local-distributor-conversions w))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
   (define-local-distributor-locality o *gate-vcs-type* :registrator #'(setf locality)))
