@@ -288,8 +288,12 @@ differ in only slight detail -- gate property, for example."
     (ensure-directories-exist pathname))
   (ensure-directories-exist (cvs-locality-lock-path o) :verbose t))
 
+(defgeneric update-gate-conversions (locality)
+  (:method ((o gate-locality))
+    (setf (gate-converted-module-names o) (mapcar #'name (compute-locality-module-presence o)))))
+
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
-  (setf (gate-converted-module-names o) (mapcar #'name (compute-locality-module-presence o))))
+  (update-gate-conversions o))
 
 (defun locality-asdf-registry-path (locality)
   "Provide the fixed definition of ASDF registry directory,
@@ -337,21 +341,30 @@ be able to use it on all distributors, without keeping track of whether
 they participate in the desire wishmaster protocol or not."
   (gate-converted-module-names (gate distributor)))
 
+(defgeneric update-local-distributor-conversions (distributor &optional scan-gate)
+  (:method ((o local-distributor) &optional scan-gate)
+    (let ((gate (gate o)))
+      (when scan-gate
+        (update-gate-conversions gate))
+      (let ((locally-present-set (gate-converted-module-names gate))
+            ;; The logic here is that if we're engaging in this whole game,
+            ;; we're only releasing via our gate remote, which means that
+            ;; WISHMASTER-RELEASE-MODULES returns the complete set of modules.
+            (release-set (wishmaster-release-modules o))) 
+        (when-let ((missing (set-difference release-set locally-present-set)))
+          (error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" missing (name o) (root o)))
+        (dolist (m-name release-set)
+          (let ((m (module m-name)))
+            (unless (typep m 'origin-module)
+              (change-class m 'origin-module))))
+        (nset-differencef (gate-converted-module-names gate) release-set)))))
+
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
   (let ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w))))
     (setf *original-self-gate-class-name* (class-name (class-of gate))
           (gate w) (change-class gate 'git-locality :pathname (merge-pathnames #p"git/" root))))
-  (let ((locally-present-set (distributor-converted-modules w)) ; was computed by GATE-LOCALITY's :after I-I method
-        ;; The logic here is that if we're engaging in this whole game,
-        ;; we're only releasing via our gate remote (git), which means that
-        ;; WISHMASTER-RELEASE-MODULES returns the complete set of modules.
-        (release-set (wishmaster-release-modules w))) 
-    (when-let ((missing (set-difference release-set locally-present-set)))
-      (error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" missing (name w) (root w)))
-    (dolist (m-name release-set)
-      (change-class (module m-name) 'origin-module))
-    (nset-differencef (gate-converted-module-names (gate w)) release-set)))
+  (update-local-distributor-conversions d))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
   (define-local-distributor-locality o *gate-vcs-type* :registrator #'(setf locality)))
