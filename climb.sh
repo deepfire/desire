@@ -40,6 +40,12 @@ else
     echo "NOTE: choosing a metastore branch different from desire branch: '$METABRANCH'"
 fi
 
+if test ! -z "$DISABLE_DEBUGGER"
+then
+    DISABLE_DEBUGGER="--disable-debugger"
+    echo "NOTE: disabling debugger"
+fi
+
 if test -z "$DEBUG"
 then
     DEBUG=0
@@ -138,7 +144,7 @@ echo "NOTE: all done going into lisp..."
 
 export SBCL_BUILDING_CONTRIB=t
 
-sbcl --noinform \
+sbcl --noinform $DISABLE_DEBUGGER \
      --eval "
 (progn
   (setf (values *compile-verbose* *compile-print* *load-verbose*) (values nil nil nil))
