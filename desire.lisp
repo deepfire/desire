@@ -179,7 +179,10 @@
     (reset-gitbranch-to-remote-branch :master `(,(down-case-name remote) "master") (module-pathname module locality) t)))
 
 (defun update-module (module &optional (locality (gate *self*)))
-  (update-module-using-remote module (module-best-remote module) locality))
+  (let ((best-remote (module-best-remote module)))
+    (report t ";; Fetching module ~A from ~A remote ~A, ~A~%" (name module) (vcs-type best-remote) (name best-remote) (url best-remote module))
+    (update-module-using-remote module best-remote locality)
+    (report t ";; Done fetching module ~A~%" (name module))))
 
 ;; system vocabulary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))
@@ -361,7 +364,7 @@ Defined keywords:
           (for distributor = (distributor distributor-name))
           (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
             (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
-    (let ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires)))
+    (let ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires))) ; currently unused
           (desired-module-names (mapcan #'rest interpreted-desires))
           (module-vocabulary nil)
           (system-vocabulary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
