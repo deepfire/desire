@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-October 22, 2009, 10:10
+October 22, 2009, 13:36
 #+END_CENTER
 
 * About this document
@@ -368,5 +368,4 @@ Some problems which pop out off the top of the head:
 [6] This is tied to the concept of well known release locations and differs
 from the set of modules converted and reexported in the wishmaster
 process.
-[7] Seemingly no longer available at original location, still can be obtained
-   through git://git.feelingofgreen.ru/darcs-to-git
+[7] Available through git://github.com/purcell/darcs-to-git.git/
