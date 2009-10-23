@@ -19,25 +19,66 @@
 ;;; Boston, MA  02111-1307  USA.
 
 (defpackage desire-tests
-  (:use :common-lisp :desire :pergamum)
+  (:use :common-lisp :iterate :alexandria :desire :pergamum :executor)
   (:export
    #:*definitions-path*
    #:run-tests))
 
 (in-package :desire-tests)
 
-(defparameter *definitions-path* (merge-pathnames (make-pathname :name "definitions") #.*compile-file-pathname*))
+(define-executable ssh)
 
-(defun run-tests (&optional (test-root #p"/tmp/desire-tests"))
-  (with-empty-hash-containers (desire::*distributors*
-                               desire::*remotes*
-                               desire::*localities*
-                               desire::*localities-by-path*
-                               desire::*modules*
-                               desire::*leaves*
-                               desire::*nonleaves*
-                               desire::*systems*
-                               desire::*apps*
-                               desire::*masters*)
-    (read-definitions *definitions-path*)
-    (apply #'define-master-localities (mapcar (curry #'subdirectory* test-root) '("git" "hg" "darcs" "cvs" "svn")))))
+(defvar *test-user-account* "empty@betelheise")
+(defvar *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
+
+(defvar *clean-command* "rm -rf climb.sh desr /tmp/empty-*")
+(defvar *download-bootstrapper-command* (format nil "wget ~A" *bootstrap-script-location*))
+(defvar *disable-debugger* "export DISABLE_DEBUGGER=t")
+(defvar *climacs-load-command* "bash climb.sh /home/empty/desr/ climacs")
+(defvar *xcvb-bootstrap-command* "bash climb.sh /home/empty/desr/ xcvb")
+
+(defvar *tests-common* `(,*clean-command*
+                         ,*download-bootstrapper-command*
+                         ,*disable-debugger*))
+
+(defvar *climacs-test* `(,@*tests-common*
+                         ,*climacs-load-command*))
+
+(defvar *xcvb-bootstrap-test* `(,@*tests-common*
+                                ,*xcvb-bootstrap-command*))
+
+(defparameter *test-output-separator* ";; ------------------------  8<  ------------------------------")
+(defvar *test-outputs* nil)
+
+(defun compile-shell-command (commands &aux (output ""))
+  (iter (for command in (butlast commands))
+        (setf output (concatenate 'string output command " &&" #(#\Newline)))
+        (finally
+         (return (concatenate 'string output (lastcar commands))))))
+
+(defun run-remote-test (name commands &optional verbose (account *test-user-account*))
+  (lret (condition
+         output
+         successp)
+    (desire::report t ";; Running test ~A: " name)
+    (with-output-to-string (capture)
+      (let ((*standard-output-direction* capture))
+        (handler-case
+            (setf successp
+                  (with-input-from-string (stream (compile-shell-command commands))
+                    (with-executable-input-stream stream
+                      (ssh account "bash" "-s"))))
+          (serious-condition (c) (setf condition c)))
+        (when (open-stream-p capture)
+          (finish-output capture))
+        (setf output (get-output-stream-string capture))
+        (push output *test-outputs*)))
+    (if (or verbose condition)
+        (desire::report t "~:[failure~;success~].~%;;~%;; The output was:~%~A~%~A~&~A~%~:[~;~:*~@<;; ~@;The condition met was: ~A~:@>~%~]"
+                        successp *test-output-separator* output *test-output-separator* condition)
+        (desire::report t "success.~%"))))
+
+(defun run-tests (&key verbose (account *test-user-account*))
+  (lret ((success t))
+    (setf success (and (run-remote-test :climacs *climacs-test* verbose account) success))
+    (setf success (and (run-remote-test :xcvb-bootstrap *xcvb-bootstrap-test* verbose account) success))))

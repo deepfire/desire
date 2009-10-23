@@ -6,6 +6,6 @@
 (in-package :desire-tests.system)
 
 (defsystem :desire-tests
-  :depends-on (:alexandria :iterate :pergamum :desire)
+  :depends-on (:alexandria :iterate :pergamum :executor :desire)
   :components ((:file "test")))
   
