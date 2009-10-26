@@ -234,7 +234,7 @@ of a module URL and try to deduce name of the module."
              (report t ";; Processing module ~A (~:[missing~;present~]) remote (~A => ~A) ~:[new in this remote~;already present~]~%"
                      name module remote-name real-remote-name present-in-remote))
            (report-module-in-url (name module canonical-remote-uri-type url)
-             (report t ";; Processing module ~A (~:[missing~;present~]) remote of type ~A, URL ~A, totally new~%"
+             (report t ";; Processing module ~A (~:[missing~;present~]) remote of type ~A, URL ~A, previously unknown remote~%"
                      name module canonical-remote-uri-type url)))
       (with-open-file (s filename)
         (iter (for raw-string = (read-line s nil nil))
