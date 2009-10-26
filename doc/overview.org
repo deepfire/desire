@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-October 22, 2009, 13:36
+October 26, 2009, 14:18
 #+END_CENTER
 
 * About this document
@@ -248,29 +248,55 @@ canonical permanent location is:
 
 	http://www.feelingofgreen.ru/shared/git/desire/climb.sh
 
-Desire revolves around the Git distributed version control system,
-so you need to make sure you have it installed.  Any reasonably
-recent version will do fine.
+This script performs following operations:
 
-The first argument should be an empty, writable filesystem location.
-That is, the exact filename must not exist, but its parent must exist,
-and be writable.
+     -  use git to download modules desire depends on, placing them in a
+        subdirectory of /tmp,
+     -  load and perform an initial setup of desire,
+     -  optionally install a desired module and its dependencies;
 
-This location will be registered as root directory for per-VCS localities,
+Climb.sh depends on git and bash. Invoke it like this:
+
+: climb.sh ABSOLUTE-ROOT-PATH [MODULE-NAME [BOOTSTRAP-HOST]]
+
+These arguments have the following semantics:
+
+  1. ABSOLUTE-ROOT-PATH should be an empty, writable filesystem location.
+     That is, the exact filename must not exist, but its parent directory
+     must exist, and be writable by the invoking user.
+
+  2. The optional MODULE-NAME allows automatic retrieval and installation
+     of a certain desired module.  When the module contains a system of
+     the same name, that system will be loaded.  When an application with
+     a same name incidentally exists within the loaded system, that application
+     will be started as well.
+
+  3. BOOTSTRAP-HOST allows choice of a bootstrap host different from
+     the default, git.feelingofgreen.ru.  That other host must contain Desire
+     and its dependencies published via git-daemon.
+
+The root location will be registered as root directory for per-VCS localities,
 serving to satisfy storage needs arising from user module retrieval requests.
 
 The path to the 'git/.asdf-registry/' subdirectory of this root directory
 should be pushed into ASDF:*CENTRAL-REGISTRY*, if ASDF is to have access
-to modules in the desire's pool.
+to modules in the desire's pool after the bootstrap script is exited.
 
-This script when invoked performs following operations:
+A number of environment variables affect the behavior of climb.sh:
 
-     -  use git to download modules desire depends on, placing them in /tmp,
-     -  load desire,
-     -  the most important part, cheer up the user!
-
-The EXPLAIN environment variable, when set, causes the bootstrap script
-to make desire explain some of its actions.
+    - EXPLAIN :: Cause the bootstrap script to make desire explain
+                 invocations of external programs, once it's loaded and active.
+    - VERBOSE :: Further extend desire's verbosity while running external
+                 programs.
+    - BRANCH :: Check out a branch of desire, other than 'master'.
+                A corresponding metastore branch will be checked out.
+    - METABRANCH :: Check out a metastore branch different from either the
+                    default, 'master', or whatever was specified by the
+                    environment variable BRANCH.
+    - =DISABLE_DEBUGGER= :: Print a backtrace and exit with an error status,
+         on errors during operation of desire, once it's loaded.  The default
+         is to invoke a debugger.
+    - DEBUG :: Globally enable optimisation for debug for all compiled Lisp code.
 
 *** Normal, non-bootstrap use
 
