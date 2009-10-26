@@ -831,6 +831,8 @@ locally present modules will be marked as converted."
       (report t ";;; ensuring that present modules have their defined systems accessible~%")
       ;; TODO: make this a method on NOTICE-MODULE-APPEARED
       (ensure-present-module-systems-loadable (gate *self*))
+      (report t ";;; tweaking environment for CL-LAUNCH~%")
+      (sb-posix:putenv "LISP_FASL_CACHE=NIL")
       (report t ";;; all done~%")
       (values))))
 
