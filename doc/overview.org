@@ -243,8 +243,8 @@ Following reader macro is enabled by install-add-module-reader:
 * Workflow
 *** Streamlined bootstrap
 
-To attain maximum ease, desire includes a booststrap script, whose
-canonical permanent location is:
+As another step in achieving user relief, desire includes a booststrap script,
+whose canonical permanent location is:
 
 	http://www.feelingofgreen.ru/shared/git/desire/climb.sh
 
