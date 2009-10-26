@@ -25,7 +25,7 @@
   (ensure-directories-exist (subdirectory* *desire-root* "bin"))
   (within-directory ((subdirectory* locality-directory "cl-launch"))
     (make "install_binary" `("INSTALL_BIN=" ,(subfile* *desire-root* "bin")))
-    (make "install_source" `("INSTALL_SOURCE=" ,locality-directory))))
+    (make "install_source" `("INSTALL_SOURCE=" ,(subfile* locality-directory "cl-launch")))))
 
 (defmethod satisfy-module :after ((module-name (eql 'cl-launch)) &optional locality system-type complete skip-present module-vocabulary system-vocabulary)
   (declare (ignore system-type complete skip-present module-vocabulary system-vocabulary))
