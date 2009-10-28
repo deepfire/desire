@@ -102,7 +102,7 @@
          (cvs-repo-dir (module-pathname module cvs-locality))
          (url (url remote module)))
     (with-explanation ("on behalf of module ~A, rsyncing from cvs remote ~A to ~S" (name module) url cvs-repo-dir)
-      (rsync "-ravPz" (format nil "~A/cvsroot/" url) (namestring cvs-repo-dir)))))
+      (rsync "-ravPz" url (namestring cvs-repo-dir)))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote svn-rsync-remote) module)
   (let ((svn-repo-dir (module-pathname module (local-svn *self*)))
