@@ -47,16 +47,21 @@
     (symbol (string-upcase (symbol-name namespec)))
     (string (string-upcase namespec))))
 
-(defun print-aborted-named-object (stream o)
+(defun print-aborted-named-object (stream o &optional slot-name)
   (declare (type stream stream) (type named o))
-  (format stream "~@<#<aborted printing object of type ~;~A with name ~S~;>~:@>" (type-of o) (when (slot-boundp o 'name) (name o))))
+  (format stream "~@<#<aborted printing object of type ~;~A with name ~S~:[~;, due to missing slot ~:*~A~]~;>~:@>"
+          (type-of o)
+          (if (slot-boundp o 'name)
+              (name o)
+              "#<not bound>")
+          slot-name))
 
 (defmacro slot-or-abort-print-object (stream o slot-name &optional (block 'print-object))
   (with-gensyms (bo bslot-name)
     `(let ((,bslot-name ,slot-name)
            (,bo ,o))
        (unless (slot-boundp ,bo ,bslot-name)
-         (print-aborted-named-object ,stream ,o)
+         (print-aborted-named-object ,stream ,o ,bslot-name)
          (return-from ,block nil))
        (slot-value ,bo ,bslot-name))))
 
