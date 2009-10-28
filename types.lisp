@@ -133,11 +133,17 @@ This notably excludes converted modules."
 (defclass git (vcs-type-mixin)   () (:default-initargs :vcs-type 'git))
 (defclass hg (vcs-type-mixin)    () (:default-initargs :vcs-type 'hg))
 (defclass darcs (vcs-type-mixin) () (:default-initargs :vcs-type 'darcs))
-(defclass cvs (vcs-type-mixin)   () (:default-initargs :vcs-type 'cvs))
+(defclass cvs (vcs-type-mixin)   
+  ((module-modules :accessor cvs-module-modules :initarg :module-modules)) 
+  (:default-initargs :vcs-type 'cvs :module-modules nil))
 (defclass svn (vcs-type-mixin)   () (:default-initargs :vcs-type 'svn))
 
 (defun vcs-enabled-p (type)
   (class-slot type 'enabled-p))
+
+(defun cvs-remote-module-module (remote module-name)
+  (or (cadr (assoc module-name (cvs-module-modules remote) :test #'string=))
+      (downstring module-name)))
 
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
@@ -151,6 +157,7 @@ This notably excludes converted modules."
 (defclass git-native-transport (transport-mixin) () (:default-initargs :transport 'git))
 (defclass http (transport-mixin) () (:default-initargs :transport 'http))
 (defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync))
+(defclass cvs-native-transport (transport-mixin) () (:default-initargs :transport 'cvs))
 
 ;;; exhaustive partition of type product of VCS-TYPE and TRANSPORT-MIXIN
 (defclass git-native (git git-native-transport) ())
@@ -158,6 +165,7 @@ This notably excludes converted modules."
 (defclass hg-http (hg http) ())
 (defclass darcs-http (darcs http) ())
 (defclass cvs-rsync (cvs rsync) ())
+(defclass cvs-native (cvs cvs-native-transport) ())
 (defclass svn-rsync (svn rsync) ())
 
 ;;;;
@@ -210,19 +218,26 @@ a special module called '.meta'."
 ;;;;
 (defclass git-remote (git remote) ())
 
-;;; most specific, exhaustive partition of REMOTE
+;;; almost most specific (due to GATE mixin), exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
 (defclass git-http-remote (git-http git-remote) ())
 (defclass git-combined-remote (git-native git-http git-remote) ())
 (defclass hg-http-remote (hg-http remote) ())
 (defclass darcs-http-remote (darcs-http remote) ())
 (defclass cvs-rsync-remote (cvs-rsync remote) ())
+(defclass cvs-native-remote (cvs-native remote) ())
 (defclass svn-rsync-remote (svn-rsync remote) ())
 
-;;; A special case location*vcs*role extension which is /going/ to be troublesome,
-;;; as it violates the simple world of the directly preceding comment.
+;;; A special case location*vcs*role extension which is /going/ to be
+;;; troublesome, as it violates simplicity.
 (defclass gate-native-remote (gate-remote git-native-remote) ())
 (defclass gate-http-remote (gate-remote git-http-remote) ())
+
+;; Handle remote localisation, for printing purposes.
+(defun remote-canonical-class-name (remote)
+  (or (when (eq (remote-distributor remote) *self*)
+        *original-self-gate-class-name*)
+      (type-of remote)))
 
 (defun remote-type-promote-to-gate (type)
   (ecase type
@@ -232,12 +247,13 @@ a special module called '.meta'."
 (defun uri-type-to-remote-type (uri-type &key gate-p)
   (xform gate-p #'remote-type-promote-to-gate
          (switch (uri-type :test #'string=)
-           ("http" 'git-http-remote)
            ("git" 'git-native-remote)
-           ("git+http" 'git-combined-remote)
+           ("git+http" 'git-http-remote)
+           ("git-and-http" 'git-combined-remote)
            ("darcs" 'darcs-http-remote)
-           ("cvs" 'cvs-rsync-remote)
-           ("svn" 'svn-rsync-remote))))
+           ("cvs+rsync" 'cvs-rsync-remote)
+           ("cvs" 'cvs-native-remote)
+           ("svn+rsync" 'svn-rsync-remote))))
 
 ;; Used for validation of user input in add-module
 (defun remote-types-compatible-p (x y)
