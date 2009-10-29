@@ -177,7 +177,8 @@ stopped."
 ;;;;
 (defun parse-uri (namestring &key slashless-header)
   "Given an URI namestring, produce its constituent schema, username, 
-password, hostname, port and path as multiple values.
+password, hostname, port, split path and a boolean specifying whether
+the path refers to a directory as multiple values.
 The optional SLASHLESS-HEADER keyword turns on a hacky mode allowing
 treating CVS locations as URIs."
   (let* ((colon-pos (or (position #\: namestring :start 1) (error "~@<No colon in URI ~S.~:@>" namestring))))
@@ -201,4 +202,5 @@ treating CVS locations as URIs."
                                      (when (plusp (length port))
                                        (handler-case (parse-integer port)
                                          (error () (error "~@<Not a number in port position of URI ~S.~:@>" namestring))))))
-              (when slash-pos (split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))))))
+              (when slash-pos (split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))
+              (char= #\/ (aref namestring (1- (length namestring))))))))
