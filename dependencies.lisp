@@ -11,7 +11,7 @@
   (finish-output stream))
 
 ;;;;
-;;;; REPORT
+;;;; FADdy
 ;;;;
 (defun pathname-absolute-p (pathname)
   (eq (car (pathname-directory pathname)) :absolute))
@@ -171,3 +171,34 @@ stopped."
             and sum 1 into nr-elts
             until (>= right end)
             finally (return (values subseqs right))))))
+
+;;;;
+;;;; PARSE-URI
+;;;;
+(defun parse-uri (namestring &key slashless-header)
+  "Given an URI namestring, produce its constituent schema, username, 
+password, hostname, port and path as multiple values.
+The optional SLASHLESS-HEADER keyword turns on a hacky mode allowing
+treating CVS locations as URIs."
+  (let* ((colon-pos (or (position #\: namestring :start 1) (error "~@<No colon in URI ~S.~:@>" namestring))))
+    (unless (> (length namestring) (+ colon-pos (if slashless-header 1 3)))
+      (error "~<@URI ~S is too short.~:@>" namestring))
+    (unless (or (and (char= (aref namestring (+ 1 colon-pos)) #\/)
+                     (char= (aref namestring (+ 2 colon-pos)) #\/))
+                slashless-header)
+      (error "~@<URI ~S is malformed.~:@>" namestring))
+    (let* ((main-pos (+ colon-pos (if slashless-header 1 3)))
+           (slash-pos (position #\/ namestring :start main-pos))
+           (at-pos (position #\@ namestring :start main-pos :end slash-pos))
+           (cred-colon-pos (when at-pos (position #\: namestring :start main-pos :end at-pos)))
+           (port-colon-pos (position #\: namestring :start (if at-pos (1+ at-pos) main-pos) :end slash-pos)))
+      (values (subseq namestring 0 colon-pos)
+              (when at-pos (subseq namestring main-pos (or cred-colon-pos at-pos)))
+              (when (and at-pos cred-colon-pos) (subseq namestring (1+ cred-colon-pos) at-pos))
+              (subseq namestring (if at-pos (1+ at-pos) main-pos) (or port-colon-pos slash-pos))
+              (when port-colon-pos (let ((port (subseq namestring (1+ port-colon-pos) slash-pos))
+                                         (*break-on-signals* nil))
+                                     (when (plusp (length port))
+                                       (handler-case (parse-integer port)
+                                         (error () (error "~@<Not a number in port position of URI ~S.~:@>" namestring))))))
+              (when slash-pos (split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))))))

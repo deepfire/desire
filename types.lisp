@@ -450,27 +450,16 @@ to DIRECTORY."
       (with-explanation ("cloning module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
         (git "clone" "-o" (down-case-name remote) module-url)))))
 
-(defun parse-remote-namestring (namestring &key gate-p)
+(defun parse-remote-namestring (namestring &key gate-p slashless)
   "Given a remote NAMESTRING, deduce the remote's type, host, port and path,
 and return them as multiple values.
 Note that http is interpreted as git-http -type remote.
 DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
-  (let* ((colon-pos (or (position #\: namestring) (error "No colon in git remote namestring ~S." namestring)))
-         (typestr (subseq namestring 0 colon-pos))
-         (type (or (uri-type-to-remote-type typestr :gate-p gate-p)
-                   (error "Bad URI type ~S in remote namestring ~S." typestr namestring))))
-    (unless (> (length namestring) (+ colon-pos 3))
-      (error "Git remote namestring ~S is too short." namestring))
-    (unless (and (char= (aref namestring (+ 1 colon-pos)) #\/)
-                 (char= (aref namestring (+ 2 colon-pos)) #\/))
-      (error "Git remote namestring ~S is malformed." namestring))
-    (let* ((maybe-slash3-pos (position #\/ namestring :start (+ 3 colon-pos)))
-           (maybe-colon2-pos (position #\: namestring :start (+ 4 colon-pos) :end maybe-slash3-pos))
-           (host (intern (string-upcase (subseq namestring (+ 3 colon-pos) (or maybe-colon2-pos maybe-slash3-pos)))))
-           (port (when maybe-colon2-pos (parse-integer namestring :start (1+ maybe-colon2-pos) :end maybe-slash3-pos)))
-           (path (when-let ((rest (and maybe-slash3-pos (subseq namestring (1+ maybe-slash3-pos)))))
-                   (split-sequence #\/ rest :remove-empty-subseqs t))))
-      (values type host port path))))
+  (multiple-value-bind (schema user password hostname port path) (parse-uri namestring :slashless-header slashless)
+    (declare (ignore user password))
+    (values (or (uri-type-to-remote-type schema :gate-p gate-p)
+                (error "Bad URI type ~S in remote namestring ~S." schema namestring))
+            hostname port path)))
 
 (defvar *module*)
 (defvar *umbrella*)
