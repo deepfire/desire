@@ -457,16 +457,16 @@ to DIRECTORY."
       (with-explanation ("cloning module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
         (git "clone" "-o" (down-case-name remote) module-url)))))
 
-(defun parse-remote-namestring (namestring &key gate-p slashless)
+(defun parse-remote-namestring (namestring &key gate-p slashless type-hint)
   "Given a remote NAMESTRING, deduce the remote's type, host, port and path,
 and return them as multiple values.
 Note that http is interpreted as git-http -type remote.
 DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
-  (multiple-value-bind (schema user password hostname port path) (parse-uri namestring :slashless-header slashless)
+  (multiple-value-bind (schema user password hostname port path directoryp) (parse-uri namestring :slashless-header slashless)
     (declare (ignore user password))
-    (values (or (uri-type-to-remote-type schema :gate-p gate-p)
+    (values (or (uri-type-to-remote-type schema :gate-p gate-p :hint type-hint)
                 (error "Bad URI type ~S in remote namestring ~S." schema namestring))
-            hostname port path)))
+            hostname port path directoryp)))
 
 (defvar *module*)
 (defvar *umbrella*)
