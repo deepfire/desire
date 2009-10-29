@@ -91,23 +91,53 @@ of a module URL and try to deduce name of the module."
                  last)))
     (make-keyword (string-upcase name))))
 
-(defun module-url-remote (url &optional module-name &key gate-p)
-  (multiple-value-bind (remote-type distributor-name port raw-path) (parse-remote-namestring url :gate-p gate-p)
-    (let* ((module-name (or module-name (guess-module-name distributor-name raw-path)))
-           (downmodname (downstring module-name)))
-      (when-let ((distributor (find-distributor-fuzzy distributor-name)))
-        (values distributor
-                (let* ((downdistname (downstring distributor-name))
-                       (variants (compute-remote-path-variants raw-path downmodname)))
-                  (multiple-value-bind (dist remote-takeover) (string-detect-splitsubst downdistname downmodname '*module*)
-                    (iter (for remote-path-variant in variants)
-                          (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
-                            (when-let ((remote (do-distributor-remotes (r distributor)
-                                                 (when (and (equalp remote-path-variant (remote-path r))
-                                                            (remote-types-compatible-p remote-type (type-of r))
-                                                            (eql port (remote-distributor-port r)))
-                                                   (return r)))))
-                              (return remote)))))))))))
+(defun match-distrbibutor-and-remote (remote-type distributor-name port pathname-component-list &optional module-name)
+  "Given a REMOTE-TYPE, DISTRIBUTOR-NAME, PORT, PATH and an optional
+MODULE-NAME, try to find matching distributor and remote, yielding
+them as multiple values.
+
+Additionally, when no matching remote is present, the best module path
+is determined.
+Further, it is determined if distributor's hostname depends on module
+name.
+These additional values are returned as multiple values."
+  (let* ((module-name (or module-name (guess-module-name distributor-name pathname-component-list)))
+         (downmodname (downstring module-name)))
+    (when-let ((distributor (find-distributor-fuzzy distributor-name)))
+      (let* ((downdistname (downstring distributor-name))
+             (variants (compute-remote-path-variants pathname-component-list downmodname)))
+        (multiple-value-bind (dist remote-takeover) (string-detect-splitsubst downdistname downmodname '*module*)
+          (let ((remote (iter (for remote-path-variant in variants)
+                              (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
+                                (when-let ((remote (do-distributor-remotes (r distributor)
+                                                     (when (and (equalp remote-path-variant (remote-path r))
+                                                                (remote-types-compatible-p remote-type (type-of r))
+                                                                (eql port (remote-distributor-port r)))
+                                                       (return r)))))
+                                  (return remote))))))
+            (values distributor
+                    remote
+                    remote-takeover
+                    ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
+                    (unless remote (lastcar variants)))))))))
+
+(defun make-remote (type domain-name-takeover distributor port path &key name)
+  (flet ((query-remote-name ()
+           (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
+           (finish-output *query-io*)
+           (or (read *query-io*)
+               (return-from make-remote nil))))
+    (make-instance type
+                   :distributor distributor :domain-name-takeover domain-name-takeover :distributor-port port 
+                   :name (or (prog1 name
+                               (when name
+                                 (format t ";; Choosing provided remote name ~S~%" name))) ;
+                             (lret ((default-name (choose-default-remote-name distributor (vcs-type type))))
+                               (when default-name
+                                 (format t ";; Choosing default remote name ~S~%" default-name)))
+                             (query-remote-name))
+                   :module-names nil
+                   :path path)))
 
 (defun add-module-remote (url &optional module-name &key remote-name gate-p)
   "Assume MODULE-NAME is the last path element of URL, unless specified."
@@ -227,51 +257,49 @@ of a module URL and try to deduce name of the module."
                             (get_xach_com 'git.xach.com))))
     (remote remote-name)))
 
-(defun steal-clbuild-projects-file (filename &key print-present)
+(defun steal-clbuild-projects-file (filename)
   (let ((*package* #.*package*)
         (*read-eval* nil))
-    (flet ((report-module-in-remote (name module remote-name real-remote-name present-in-remote)
-             (report t ";; Processing module ~A (~:[missing~;present~]) remote (~A => ~A) ~:[new in this remote~;already present~]~%"
-                     name module remote-name real-remote-name present-in-remote))
-           (report-module-in-url (name module canonical-remote-uri-type url)
-             (report t ";; Processing module ~A (~:[missing~;present~]) remote of type ~A, URL ~A, previously unknown remote~%"
-                     name module canonical-remote-uri-type url)))
-      (with-open-file (s filename)
-        (iter (for raw-string = (read-line s nil nil))
-              (while raw-string)
-              (for string = (subseq raw-string 0 (position #\# raw-string)))
-              (when (zerop (length string))
-                (next-iteration))
-              (for (values module-name offset0) = (read-from-string string nil nil :start 0))
-              (unless module-name
-                (next-iteration))
-              (for module = (module module-name :if-does-not-exist :continue))
-              (for (values remote-name offset1) = (read-from-string string nil nil :start offset0))
-              (unless remote-name
-                (error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
-              (if-let ((remote (recognise-clbuild-remote remote-name)))
-                (let ((presentp (find module-name (location-module-names remote) :test #'string=)))
-                  (when (or (not presentp) print-present)
-                    (report-module-in-remote module-name module remote-name (name remote) presentp)))
-                (let* ((url (subseq string offset1 (position #\Space string :start offset1)))
-                       (dirty-url-type (subseq url 0 (position #\: url))))
-                  (multiple-value-bind (canonical-remote-uri-type typeless-url)
-                      (if (eq remote-name 'get_cvs_full)
-                          (values 'cvs
-                                  (concatenate 'string "://"
-                                               (subseq url (1+ (position #\@ url)) (position #\: url :from-end t))
-                                               (subseq url (1+ (position #\: url :from-end t)))))
-                          (values (case remote-name
-                                    (get_git (if (string= dirty-url-type "http") 'http 'git))
-                                    (get_darcs 'darcs)
-                                    (get_svn 'svn)
-                                    (get_cvs_full 'cvs)
-                                    (t (error "~@<Unhandled remote nickname ~A:~:@>" remote-name)))
-                                  (subseq url (position #\: url))))
-                    (let ((canonicalised-url (concatenate 'string (downstring canonical-remote-uri-type) typeless-url)))
-                      (multiple-value-bind (distributor remote) (module-url-remote canonicalised-url module-name :gate-p nil)
-                        (if remote
-                            (let ((presentp (find module-name (location-module-names remote) :test #'string=)))
-                              (when (or (not presentp) print-present)
-                                (report-module-in-remote module-name module nil (name remote) presentp)))
-                            (report-module-in-url module-name module canonical-remote-uri-type canonicalised-url))))))))))))
+    (with-open-file (s filename)
+      (iter (for raw-string = (read-line s nil nil))
+            (while raw-string)
+            (for string = (subseq raw-string 0 (position #\# raw-string)))
+            (when (zerop (length string))
+              (next-iteration))
+            (for (values module-name offset0) = (read-from-string string nil nil :start 0))
+            (unless module-name
+              (next-iteration))
+            (for module = (module module-name :if-does-not-exist :continue))
+            (for (values remote-name offset1) = (read-from-string string nil nil :start offset0))
+            (unless remote-name
+              (error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
+            (let* ((spacepos (position #\Space string :start offset1))
+                   (url (subseq string offset1 spacepos))
+                   (posturl (let ((*readtable* (copy-readtable)))
+                              (setf (readtable-case *readtable*) :preserve)
+                              (when spacepos (when-let ((posturl (read-from-string string nil nil :start spacepos)))
+                                               (princ-to-string posturl))))))
+              (multiple-value-bind (type hostname port path directoryp) (parse-remote-namestring url
+                                                                                                 :slashless (eq remote-name 'get_cvs_full)
+                                                                                                 :type-hint (case remote-name
+                                                                                                              (get_git 'git)
+                                                                                                              (get_darcs 'darcs)
+                                                                                                              (get_svn 'svn)))
+                (declare (ignore directoryp))
+                ;; (format t "===( ~S => ~S ~S~:[~;~:*~D~]/~S ~S=~%" string type hostname port path posturl)
+                (multiple-value-bind (distributor remote domain-name-takeover deduced-path) (match-distrbibutor-and-remote type hostname port path module-name)
+                  (let ((final-distributor (or distributor
+                                               (format t ";; didn't find a corresponding distributor, creating ~A and a corresponding remote~%" hostname)
+                                               (make-instance 'distributor :name hostname))))
+                    (let ((final-remote (or (recognise-clbuild-remote remote-name)
+                                            (unless distributor
+                                              (format t ";; didn't find a corresponding remote, creating it~%"))
+                                            (make-remote type domain-name-takeover final-distributor port deduced-path))))
+                      (unless (find module-name (location-module-names remote) :test #'string=)
+                        (let ((module (make-instance 'module :name module-name :umbrella module-name)))
+                          (remote-link-module final-remote module)
+                          (when (typep final-remote 'cvs)
+                            (let* ((default-cvs-module-name (downstring module-name))
+                                   (cvs-module-name (or posturl default-cvs-module-name)))
+                              (unless (string= cvs-module-name default-cvs-module-name)
+                                (push (list module-name cvs-module-name) (cvs-module-modules final-remote))))))))))))))))
