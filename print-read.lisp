@@ -94,7 +94,10 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o)))))
   (let ((*print-case* :downcase))
-    (format stream "~@<#R(~;~A ~S~{ ~<~S ~A~:@>~}~;)~:@>"
+    (format stream "~@<#R(~;~A ~S~
+                            ~{ ~<~S ~A~:@>~}~
+                            ~:[~;~:*~<~S ~S~:@>~]~
+                          ~;)~:@>"
             (symbol-name
              (or (when (eq (remote-distributor o) *self*)
                    *original-self-gate-class-name*)
@@ -113,7 +116,9 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (when systemless
                           (list `(:systemless-modules ,(mapcar #'downstring systemless))))
                         (when-let ((converted-names (and (typep o 'gate) (slot-or-abort-print-object stream o 'converted-module-names))))
-                          (list `(:converted-module-names ,(mapcar #'downstring converted-names))))))))))
+                          (list `(:converted-module-names ,(mapcar #'downstring converted-names)))))))
+            (when-let ((module-modules (and (typep o 'cvs) (slot-or-abort-print-object stream o 'module-modules))))
+              `(:module-modules ,module-modules)))))
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject 
