@@ -244,15 +244,22 @@ a special module called '.meta'."
     (git-native-remote 'gate-native-remote)
     (git-http-remote 'gate-http-remote)))
 
-(defun uri-type-to-remote-type (uri-type &key gate-p)
+(defun uri-type-to-remote-type (uri-type &key gate-p hint)
   (xform gate-p #'remote-type-promote-to-gate
          (switch (uri-type :test #'string=)
            ("git" 'git-native-remote)
            ("git+http" 'git-http-remote)
            ("git-and-http" 'git-combined-remote)
            ("darcs" 'darcs-http-remote)
+           ("http" (ecase hint
+                     (git 'git-http-remote)
+                     (darcs 'darcs-http-remote)
+                     (svn 'svn-rsync-remote) ;; this is going to break
+                     ((nil) (error "~@<The 'http' uri type is ambiguous, and there was no hint given.~:@>"))))
            ("cvs+rsync" 'cvs-rsync-remote)
            ("cvs" 'cvs-native-remote)
+           (":pserver" 'cvs-native-remote)
+           ("svn" 'svn-rsync-remote)
            ("svn+rsync" 'svn-rsync-remote))))
 
 ;; Used for validation of user input in add-module
