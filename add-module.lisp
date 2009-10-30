@@ -45,30 +45,35 @@ domain name generation."
         (when (search (down-case-name d) downcase-distname)
           (return d)))))
 
-(defun string-detect-splitsubst (string sub replacement &aux (posn (search sub string)))
+(defun string-detect-splitsubst (string sub replacement &key allowed-separators)
   "Detect whether STRING contains SUB, in which case the string is
 split, on SUB boundaries, with the latter replaced with REPLACEMENT,
 and every part except the first wrapped in remote /-suppressing
 syntax."
-  (if posn
-      (let ((pre-sub (when (plusp posn)
-                       (subseq string 0 posn)))
-            (post-sub (when (< (+ posn (length sub)) (length string))
-                        (subseq string (+ posn (length sub))))))
-        (values (append (if pre-sub
-                            (list pre-sub :no/ replacement)
-                            (list replacement))
-                        (when post-sub
-                          (list :no/ post-sub)))
-                t)) ;; signal that we did deconstruction
-      (list string)))
+  (if-let ((posn (when-let ((posn (search sub string)))
+                   (let ((postposn (+ posn (length sub))))
+                     (if (and (> (length string) postposn) allowed-separators)
+                         (when (member (aref string postposn) allowed-separators :test #'char=)
+                           posn)
+                         posn)))))
+    (let ((pre-sub (when (plusp posn)
+                     (subseq string 0 posn)))
+          (post-sub (when (< (+ posn (length sub)) (length string))
+                      (subseq string (+ posn (length sub))))))
+      (values (append (if pre-sub
+                          (list pre-sub :no/ replacement)
+                          (list replacement))
+                      (when post-sub
+                        (list :no/ post-sub)))
+              t)) ;; signal that we did deconstruction
+    (list string)))
 
 (defun compute-remote-path-variants (raw-path modname)
   "Given a RAW-PATH pathname component list and MODNAME, produce a list
 of pathname component list variants, with MODNAME occurences substituted."
   (lret ((variants (list nil)))
     (iter (for path-elt in raw-path)
-          (for (values pathname-component deconsp) = (string-detect-splitsubst path-elt modname '*module*))
+          (for (values pathname-component deconsp) = (string-detect-splitsubst path-elt modname '*module* :allowed-separators '(#\.)))
           (if deconsp
               (setf variants
                     (append (iter (for av in (copy-list variants))
