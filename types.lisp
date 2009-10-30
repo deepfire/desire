@@ -151,20 +151,21 @@ This notably excludes converted modules."
   (setf (class-slot type 'enabled-p)
         (every #'find-executable (class-slot type 'required-executables))))
 
-(defclass transport-mixin () ((transport :reader transport :initarg :transport)))
+(defclass schema-mixin () ((schema :reader schema :initarg :schema)))
+(defclass transport-mixin (schema-mixin) ((transport :reader transport :initarg :transport)))
 
 ;;; non-exhaustive partition of TRANSPORT-MIXIN
-(defclass native (transport-mixin) ())
-(defclass http (transport-mixin) () (:default-initargs :transport 'http))
-(defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync))
+(defclass native (transport-mixin) () (:default-initargs :transport 'native))
+(defclass http (transport-mixin) () (:default-initargs :transport 'http :schema 'http))
+(defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync :schema 'rsync))
 
 ;;; exhaustive partition of type product of VCS-TYPE and TRANSPORT-MIXIN
-(defclass git-native (git native) () (:default-initargs :transport 'git))
+(defclass git-native (git native) () (:default-initargs :schema 'git))
 (defclass git-http (git http) ())
 (defclass hg-http (hg http) ())
 (defclass darcs-http (darcs http) ())
 (defclass cvs-rsync (cvs rsync) ())
-(defclass cvs-native (cvs native) () (:default-initargs :transport 'cvs))
+(defclass cvs-native (cvs native) () (:default-initargs :schema '|:PSERVER|))
 (defclass svn-rsync (svn rsync) ())
 
 ;;;;
@@ -275,8 +276,8 @@ differ in only slight detail -- gate property, for example."
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
 
-(defmethod vcs-type ((o (eql 'gate-native-remote))) 'git)
-(defmethod vcs-type ((o (eql 'gate-http-remote))) 'git)
+(defmethod vcs-type ((o (eql 'gate-native-remote))) *gate-vcs-type*)
+(defmethod vcs-type ((o (eql 'gate-http-remote))) *gate-vcs-type*)
 (defmethod vcs-type ((o (eql 'git-native-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-http-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-combined-remote))) 'git)
@@ -470,38 +471,6 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                 (error "Bad URI type ~S in remote namestring ~S." schema namestring))
             hostname port path directoryp)))
 
-(defvar *module*)
-(defvar *umbrella*)
-
-(defun url (remote-or-name &optional module-or-name &aux
-            (namep (symbolp module-or-name))
-            (remote (coerce-to-remote remote-or-name))
-            (module (if namep (module module-or-name :if-does-not-exist :continue) module-or-name))
-            (module-name (if namep module-or-name (name module))))
-  (declare (type (or remote symbol) remote) (type (or module symbol) module-or-name))
-  (let* ((remote-path (let ((*module* (when module-name (downstring module-name)))
-                            (*umbrella* (when module (downstring (module-umbrella module)))))
-                        (declare (special *module* *umbrella*))
-                        (funcall (remote-path-fn remote))))
-         (remote-string-list (iter (for insn-spec in remote-path)
-                                   (cond ((eq insn-spec :no/)
-                                          (pop accumulated-path))
-                                         (t
-                                          (when insn-spec
-                                            (collect insn-spec into accumulated-path at beginning)
-                                            (collect "/" into accumulated-path at beginning))))
-                                   (finally (return (nreverse accumulated-path))))))
-    (apply #'concatenate 'simple-base-string
-           (downstring (transport remote)) "://"
-           (unless (remote-domain-name-takeover remote)
-             (down-case-name (remote-distributor remote)))
-           (unless (remote-domain-name-takeover remote)
-             (when-let ((port (remote-distributor-port remote)))
-               (format nil ":~D" port)))
-           (unless (remote-domain-name-takeover remote)
-             "/")
-           remote-string-list)))
-
 ;;;;
 ;;;; Modules
 ;;;;
@@ -572,6 +541,50 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
         (if check-when-missing-p
             (update-presence-in locality)
             nil)))))
+
+(defvar *module*)
+(defvar *umbrella*)
+
+(defun compile-remote-module-path-strings (remote module module-name)
+  (let ((*module* (when module-name (downstring module-name)))
+        (*umbrella* (when module (downstring (module-umbrella module)))))
+    (declare (special *module* *umbrella*))
+    (iter (for insn-spec in (funcall (remote-path-fn remote)))
+          (cond ((eq insn-spec :no/)
+                 (pop accumulated-path))
+                (t
+                 (when insn-spec
+                   (collect insn-spec into accumulated-path at beginning)
+                   (collect "/" into accumulated-path at beginning))))
+          (finally (return (nreverse accumulated-path))))))
+
+(defgeneric url-using-module (remote module)
+  (:method :around ((r remote) module)
+           ;; This module/name weirdness is because we try to support :<module-name>,
+           ;; without supplying an actual module.
+           (let ((path (compile-remote-module-path-strings r
+                                                           (when (typep module 'module) module)
+                                                           (coerce-to-name module))))
+             (apply #'concatenate 'simple-base-string
+                    (downstring (schema r))
+                    (call-next-method)
+                    (unless (remote-domain-name-takeover r)
+                      (down-case-name (remote-distributor r)))
+                    (unless (remote-domain-name-takeover r)
+                      (when-let ((port (remote-distributor-port r)))
+                        (format nil ":~D" port)))
+                    (unless (remote-domain-name-takeover r)
+                      "/")
+                    path)))
+  (:method (r m) "://")
+  (:method ((r cvs-native-remote) m) ":anonymous:anonymous@"))
+
+(defun url (remote-or-name &optional module-or-name)
+  (declare (type (or remote symbol) remote-or-name) (type (or module symbol) module-or-name))
+  (url-using-module (coerce-to-remote remote-or-name)
+                    (or (when (symbolp module-or-name)
+                          (module module-or-name :if-does-not-exist :continue))
+                        module-or-name)))
 
 ;;;;
 ;;;; Systems
