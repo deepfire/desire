@@ -125,14 +125,15 @@ These additional values are returned as multiple values."
   (flet ((query-remote-name ()
            (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
            (finish-output *query-io*)
-           (or (read *query-io*)
+           (or (prog1 (read *query-io*)
+                 (terpri *query-io*))
                (return-from make-remote nil))))
     (make-instance type
                    :distributor distributor :domain-name-takeover domain-name-takeover :distributor-port port 
                    :name (or (prog1 name
                                (when name
                                  (format t ";; Choosing provided remote name ~S~%" name))) ;
-                             (lret ((default-name (choose-default-remote-name distributor (vcs-type type))))
+                             (lret ((default-name (choose-default-remote-name distributor (vcs-type type) (transport type))))
                                (when default-name
                                  (format t ";; Choosing default remote name ~S~%" default-name)))
                              (query-remote-name))
@@ -248,8 +249,8 @@ These additional values are returned as multiple values."
 
 (defun recognise-clbuild-remote (remote-nickname)
   (when-let ((remote-name (case remote-nickname
-                            (get_svn_clnet 'common-lisp.net-svn)
-                            (get_cvs_clnet 'common-lisp.net-cvs)
+                            (get_svn_clnet 'common-lisp.net-svn-rsync)
+                            (get_cvs_clnet 'common-lisp.net-cvs-rsync)
                             (get_ediware 'common-lisp.net-luis-ediware)
                             (get_lichteblau_com 'www.lichteblau.com)
                             (get_b9_com 'b9.com)
