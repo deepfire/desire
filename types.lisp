@@ -849,6 +849,11 @@ locally present modules will be marked as converted."
       (report t ";;; all done~%")
       (values))))
 
+(defun reinit ()
+  "Execute INIT with the arguments that were passed to it last time."
+  (init *desire-root* :as (when (distributor (name *self*) :if-does-not-exist :continue)
+                            (name *self*))))
+
 (defun define-locality (name vcs-type &rest keys &key &allow-other-keys)
   "Define locality of VCS-TYPE at PATH, if one doesn't exist already, 
    in which case an error is signalled."
