@@ -831,7 +831,7 @@ locally present modules will be marked as converted."
            (meta-path (merge-pathnames #p".meta/" gate-path)))
       (clear-definitions)
       (with-class-slot (git hg darcs cvs svn) required-executables
-        (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git) cvs '(rsync git) svn '(rsync git)))
+        (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git wget) cvs '(rsync git) svn '(rsync git)))
       (with-class-slot (git hg darcs cvs svn) enabled-p
         (setf git nil hg nil darcs nil cvs nil svn nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)

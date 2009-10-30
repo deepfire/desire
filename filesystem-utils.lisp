@@ -31,7 +31,8 @@
   (define-executable git-svn)
   (define-executable darcs-to-git)
   (define-executable cp)
-  (define-executable make))
+  (define-executable make)
+  (define-executable wget))
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))
