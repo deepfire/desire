@@ -683,22 +683,23 @@ Find out whether SYSTEM is hidden."
   (or (find-if (of-type 'gate) remotes)
       (first remotes)))
 
-(defun module-best-remote (module &key (if-does-not-exist :error))
+(defun module-best-remote (module &key (if-does-not-exist :error) allow-self)
   "Find the best-suited remote occuring to provide MODULE.
 Obviously, gates are preferred."
   (let ((module (coerce-to-module module)))
     (or (choose-gate-or-else (do-remotes (r)
                                (when (and (remote-defines-module-p r module)
-                                          (not (eq (remote-distributor r) *self*)))
+                                          (or allow-self
+                                              (not (eq (remote-distributor r) *self*))))
                                  (collect r))))
         (ecase if-does-not-exist
           (:error (error 'insatiable-desire :desire module))
           (:continue nil)))))
 
-(defun module-best-distributor (module &key (if-does-not-exist :error))
+(defun module-best-distributor (module &key (if-does-not-exist :error) allow-self)
   "Find the best-suited distributor occuring to provide MODULE.
 Those distributors with a gate best-remote are preferred, obviously."
-  (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist)))
+  (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist :allow-self allow-self)))
     (remote-distributor r)))
 
 (defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
