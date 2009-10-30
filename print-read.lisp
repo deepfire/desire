@@ -62,7 +62,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 
 (defmethod print-object ((o distributor) stream)
   (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>"
-          (string (name o)) :remotes (distributor-remotes o)))
+          (string (name o)) :remotes (sort (copy-list (distributor-remotes o)) #'string< :key (compose #'string #'name))))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
@@ -110,13 +110,13 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (when-let ((port (remote-distributor-port o)))
                           (list `(:distributor-port ,port)))
                         (when complex
-                          (list `(:complex-modules ,(mapcar #'downstring complex))))
+                          (list `(:complex-modules ,(sort (mapcar #'downstring complex) #'string<))))
                         (when systemful
-                          (list `(:simple-modules ,(mapcar #'downstring systemful))))
+                          (list `(:simple-modules ,(sort (mapcar #'downstring systemful) #'string<))))
                         (when systemless
-                          (list `(:systemless-modules ,(mapcar #'downstring systemless))))
+                          (list `(:systemless-modules ,(sort (mapcar #'downstring systemless) #'string<))))
                         (when-let ((converted-names (and (typep o 'gate) (slot-or-abort-print-object stream o 'converted-module-names))))
-                          (list `(:converted-module-names ,(mapcar #'downstring converted-names)))))))
+                          (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<)))))))
             (when-let ((module-modules (and (typep o 'cvs) (slot-or-abort-print-object stream o 'module-modules))))
               `(:module-modules ,module-modules)))))
 
@@ -216,9 +216,9 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                           (unless (and first (null other-systems) (system-simple-p first) (eq (name first) (name o)))
                             (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
                               (values (when simple
-                                        (list :systems (mapcar #'name simple)))
+                                        (list :systems (sort (mapcar #'name simple) #'string< :key #'string)))
                                       (when complex
-                                        (list :complex-systems (mapcar #'name complex)))))))
+                                        (list :complex-systems (sort (mapcar #'name complex) #'string< :key #'string)))))))
                         (when-let ((whitelist (module-system-path-whitelist o)))
                           (list :path-whitelist whitelist))
                         (when-let ((blacklist (module-system-path-blacklist o)))
@@ -254,7 +254,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                   (and (system-relativity o) (list :relativity (system-relativity o)))
                   (and (system-search-restriction o) (list :search-restriction (system-search-restriction o)))
                   (and (system-definition-pathname-name o) (list :definition-pathname-name (system-definition-pathname-name o)))
-                  (and (system-applications o) (list :applications (system-applications o))))))
+                  (and (system-applications o) (list :applications (sort (copy-list (system-applications o)) #'string< :key (compose #'string #'name)))))))
 
 (defun system-reader (stream &optional char sharp)
   (declare (ignore char sharp))
