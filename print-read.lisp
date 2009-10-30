@@ -92,7 +92,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
            (and (endp (rest (module-systems module)))
                 (system-simple-p (first (module-systems module)))))))
 
-(defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o)))))
+(defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o) (transport o)))))
   (let ((*print-case* :downcase))
     (format stream "~@<#R(~;~A ~S~
                             ~{ ~<~S ~A~:@>~}~
@@ -160,7 +160,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
   (destructuring-bind (type path-components &key name distributor-port complex-modules simple-modules systemless-modules converted-module-names module-modules) (read stream nil nil)
     `(let* ((source *read-time-merge-source-distributor*)
             (owner *read-time-enclosing-distributor*)
-            (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type)))) ; note that the vcs type doesn't change due to type merging
+            (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
             (subject (find predicted-name (distributor-remotes owner) :key #'name))
             (type (merge-remote-type source owner subject ',type))
             (module-names (merge-slot-value source owner subject 'module-names ',(append complex-modules simple-modules systemless-modules)))

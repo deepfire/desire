@@ -343,7 +343,7 @@ differ in only slight detail -- gate property, for example."
   (:method ((o local-distributor) vcs-type &rest arguments)
     (setf (slot-value o vcs-type)
           (apply #'make-instance (find-class (format-symbol #.*package* "~A-LOCALITY" vcs-type))
-                 :name (default-remote-name (name o) vcs-type) :distributor o
+                 :name (default-remote-name (name o) vcs-type 'native) :distributor o
                  :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))
                  arguments))))
 
@@ -399,20 +399,21 @@ they participate in the desire wishmaster protocol or not."
   (if *combined-remotes-prefer-native-over-http*
       'git 'http))
 
-(defun default-remote-name (distributor-name vcs-type)
-  "Compute a default name for remote with VCS-TYPE in DISTRIBUTOR-NAME."
+(defun default-remote-name (distributor-name vcs-type transport)
+  "Compute a default name for remote with VCS-TYPE and TRANSPORT in
+DISTRIBUTOR-NAME."
   (if (eq vcs-type *gate-vcs-type*)
       distributor-name
-      (format-symbol (symbol-package distributor-name) "~A~:[-~A~;~]" distributor-name (eq vcs-type *gate-vcs-type*) vcs-type)))
+      (format-symbol (symbol-package distributor-name) "~A~:[-~A-~A~;~]" distributor-name (eq vcs-type *gate-vcs-type*) vcs-type transport)))
 
-(defun choose-default-remote-name (distributor vcs-type)
-  "Try choose a default name for a remote with VCS-TYPE on DISTRIBUTOR.
-When there's a name clash NIL is returned."
-  (let ((default-name (default-remote-name (name distributor) vcs-type)))
+(defun choose-default-remote-name (distributor vcs-type transport)
+  "Try choose a default name for a remote with VCS-TYPE and TRANSPORT
+on DISTRIBUTOR.  When there's a name clash NIL is returned."
+  (let ((default-name (default-remote-name (name distributor) vcs-type transport)))
     (when-let ((non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
       default-name)))
 
-(defun init-time-select-remote-name (distributor vcs-type &optional specified-name)
+(defun init-time-select-remote-name (distributor vcs-type transport &optional specified-name)
   "Provide a mechanism for init-time name selection for REMOTE with 
    DISTRIBUTOR-NAME, and optionally SPECIFIED-NAME.
 
@@ -426,12 +427,12 @@ When there's a name clash NIL is returned."
     (cond (specified-name (if (null (find specified-name (distributor-remotes distributor) :key #'name))
                               specified-name
                               (error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
-          (t (or (choose-default-remote-name distributor vcs-type)
+          (t (or (choose-default-remote-name distributor vcs-type transport)
                  (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
                         vcs-type distributor-name))))))
 
-(defmethod initialize-instance :before ((o remote) &key distributor vcs-type name &allow-other-keys)
-  (setf (name o) (init-time-select-remote-name distributor vcs-type name)))
+(defmethod initialize-instance :before ((o remote) &key distributor vcs-type transport name &allow-other-keys)
+  (setf (name o) (init-time-select-remote-name distributor vcs-type transport name)))
 
 (defmethod initialize-instance :after ((o remote) &key distributor path &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o))
