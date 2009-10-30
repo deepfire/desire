@@ -52,7 +52,7 @@
    ;; add-module.lisp
    #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader
    ;; apropos.lisp
-   #:apropor-desr-list #:apropos-desr #:list-modules))
+   #:apropos-desr-list #:apropos-desr #:list-modules))
 
 (in-package :desire)
 
