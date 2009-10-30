@@ -61,13 +61,13 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
         (union (slot-value subject 'module-names) source-proposed-value))))
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A ~@<~S ~S~:@>~;)~:@>"
-          (string (name o)) :remotes (sort (copy-list (distributor-remotes o)) #'string< :key (compose #'string #'name))))
+  (format stream "~@<#D(~;~A~{ ~S~}~;)~:@>"
+          (string (name o)) (sort (copy-list (distributor-remotes o)) #'string< :key (compose #'string #'name))))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (let ((input-form (read stream nil nil t)))
-    (destructuring-bind (name &key wishmaster remotes) input-form
+    (destructuring-bind (name &rest remotes) input-form
       `(let* ((owner (distributor ',name :if-does-not-exist :continue))
               (subject owner))
          (lret* ((d (or subject (make-instance 'distributor :name ',name
