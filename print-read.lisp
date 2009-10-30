@@ -109,6 +109,8 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                           (list `(:name ,(string (name o)))))
                         (when-let ((port (remote-distributor-port o)))
                           (list `(:distributor-port ,port)))
+                        (when (remote-domain-name-takeover o)
+                          (list `(:domain-name-takeover t)))
                         (when complex
                           (list `(:complex-modules ,(sort (mapcar #'downstring complex) #'string<))))
                         (when systemful
@@ -157,7 +159,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type path-components &key name distributor-port complex-modules simple-modules systemless-modules converted-module-names module-modules) (read stream nil nil)
+  (destructuring-bind (type path-components &key name distributor-port domain-name-takeover complex-modules simple-modules systemless-modules converted-module-names module-modules) (read stream nil nil)
     `(let* ((source *read-time-merge-source-distributor*)
             (owner *read-time-enclosing-distributor*)
             (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
@@ -167,7 +169,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
             (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
             (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
        (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject type))
-                                                (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port
+                                                (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port :domain-name-takeover ',domain-name-takeover
                                                                :path ',path-components :module-names module-names
                                                                :last-sync-time ,*read-universal-time* :synchronised-p t
                                                                ,@(when module-modules `(:module-modules ',module-modules))))))
