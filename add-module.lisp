@@ -229,10 +229,6 @@ These additional values are returned as multiple values."
   (format t "~:[~;injecting apps:~]~:*~{ ~A~}~:*~:[~;~%~]" (mapcar #'name a))
   (dolist (a a) (setf (app         (name a)) a)))
 
-(defun location-add-module (location module-name)
-  (lret ((m ))
-    (remote-link-module location m)))
-
 (defun add-module (url &optional module-name &key systemlessp remote-name path-whitelist path-blacklist (system-type *default-system-type*) (lust *auto-lust*))
   (with-tracked-desirable-additions (deduced-module-name added-d added-r added-m added-s added-a)
       (multiple-value-bind (module-name distributor remote) (add-module-remote url module-name :remote-name remote-name)
