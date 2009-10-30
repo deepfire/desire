@@ -96,7 +96,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
   (let ((*print-case* :downcase))
     (format stream "~@<#R(~;~A ~S~
                             ~{ ~<~S ~A~:@>~}~
-                            ~:[~;~:*~<~S ~S~:@>~]~
+                            ~:[~; ~:*~<~S ~S~:@>~]~
                           ~;)~:@>"
             (symbol-name
              (or (when (eq (remote-distributor o) *self*)
@@ -170,7 +170,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                                                 (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port
                                                                :path ',path-components :module-names module-names
                                                                :last-sync-time ,*read-universal-time* :synchronised-p t
-                                                               ,@(when module-modules `(:module-modules ,module-modules))))))
+                                                               ,@(when module-modules `(:module-modules ',module-modules))))))
          (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
          (when (typep *read-time-enclosing-remote* 'gate)
            (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))
