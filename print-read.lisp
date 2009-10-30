@@ -67,11 +67,10 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (let ((input-form (read stream nil nil t)))
-    (destructuring-bind (name &key wishmaster remotes) input-form
+    (destructuring-bind (name &key remotes) input-form
       `(let* ((owner (distributor ',name :if-does-not-exist :continue))
               (subject owner))
-         (lret* ((d (or subject (make-instance 'distributor :name ',name
-                                               :last-sync-time ,*read-universal-time* :synchronised-p t)))
+         (lret* ((d (or subject (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t)))
                  (*read-time-enclosing-distributor* d))
            ,@remotes
            (when (wishmasterp d)
