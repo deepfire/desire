@@ -154,18 +154,17 @@ This notably excludes converted modules."
 (defclass transport-mixin () ((transport :reader transport :initarg :transport)))
 
 ;;; non-exhaustive partition of TRANSPORT-MIXIN
-(defclass git-native-transport (transport-mixin) () (:default-initargs :transport 'git))
+(defclass native (transport-mixin) ())
 (defclass http (transport-mixin) () (:default-initargs :transport 'http))
 (defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync))
-(defclass cvs-native-transport (transport-mixin) () (:default-initargs :transport 'cvs))
 
 ;;; exhaustive partition of type product of VCS-TYPE and TRANSPORT-MIXIN
-(defclass git-native (git git-native-transport) ())
+(defclass git-native (git native) () (:default-initargs :transport 'git))
 (defclass git-http (git http) ())
 (defclass hg-http (hg http) ())
 (defclass darcs-http (darcs http) ())
 (defclass cvs-rsync (cvs rsync) ())
-(defclass cvs-native (cvs cvs-native-transport) ())
+(defclass cvs-native (cvs native) () (:default-initargs :transport 'cvs))
 (defclass svn-rsync (svn rsync) ())
 
 ;;;;
@@ -283,16 +282,18 @@ differ in only slight detail -- gate property, for example."
 (defmethod vcs-type ((o (eql 'git-combined-remote))) 'git)
 (defmethod vcs-type ((o (eql 'hg-http-remote))) 'hg)
 (defmethod vcs-type ((o (eql 'darcs-http-remote))) 'darcs)
+(defmethod vcs-type ((o (eql 'cvs-native-remote))) 'cvs)
 (defmethod vcs-type ((o (eql 'cvs-rsync-remote))) 'cvs)
 (defmethod vcs-type ((o (eql 'svn-rsync-remote))) 'svn)
 
-(defmethod transport ((o (eql 'gate-native))) 'git-native)
+(defmethod transport ((o (eql 'gate-native-remote))) 'native)
 (defmethod transport ((o (eql 'gate-http-remote))) 'http)
-(defmethod transport ((o (eql 'git-native-remote))) 'git-native)
+(defmethod transport ((o (eql 'git-native-remote))) 'native)
 (defmethod transport ((o (eql 'git-http-remote))) 'http)
-(defmethod transport ((o (eql 'git-combined-remote))) (if *combined-remotes-prefer-native-over-http* 'git 'http))
-(defmethod transport ((o (eql 'hg-http-remote))) 'hg-native)
+(defmethod transport ((o (eql 'git-combined-remote))) (if *combined-remotes-prefer-native-over-http* 'native 'http))
+(defmethod transport ((o (eql 'hg-http-remote))) 'native)
 (defmethod transport ((o (eql 'darcs-http-remote))) 'http)
+(defmethod transport ((o (eql 'cvs-native-remote))) 'native)
 (defmethod transport ((o (eql 'cvs-rsync-remote))) 'rsync)
 (defmethod transport ((o (eql 'svn-rsync-remote))) 'rsync)
 
