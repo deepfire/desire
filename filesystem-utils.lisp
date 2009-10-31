@@ -32,7 +32,8 @@
   (define-executable darcs-to-git)
   (define-executable cp)
   (define-executable make)
-  (define-executable wget))
+  (define-executable wget)
+  (define-executable cvs))
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))
