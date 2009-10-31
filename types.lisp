@@ -623,7 +623,11 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
            (values (call-next-method)
                    (cvs-remote-module-module r (when module (name module)))))
   (:method (r m) "://")
-  (:method ((r cvs-native-remote) m) ":anonymous:anonymous@"))
+  (:method ((r cvs-native-remote) m)
+    (let ((c (cred (module-credentials r (name m)))))
+      (if c
+          (format nil ":~A~:[~;~:*:~A~]@" (cred-username c) (cred-password c))
+          ":anonymous@"))))
 
 (defun url (remote-or-name &optional module-or-name)
   (declare (type (or remote symbol) remote-or-name) (type (or module symbol) module-or-name))
