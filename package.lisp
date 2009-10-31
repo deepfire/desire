@@ -25,7 +25,7 @@
    #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module
    #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor #:module-fetch-url
-   #:distributor-module-enabled-remote #:module-locally-present-p
+   #:touch-module #:distributor-module-enabled-remote #:module-locally-present-p
    ;;   types.lisp :: system
    #:system-hidden-p
    ;;   types.lisp :: desires

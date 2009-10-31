@@ -760,8 +760,8 @@ Find out whether SYSTEM is hidden."
       (first remotes)))
 
 (defun module-best-remote (module &key (if-does-not-exist :error) allow-self)
-  "Find the best-suited remote occuring to provide MODULE.
-Obviously, gates are preferred."
+  "Return the preferred remote among those providing MODULE.
+Currently implements a static 'gates are preferred' policy."
   (let ((module (coerce-to-module module)))
     (or (choose-gate-or-else (do-remotes (r)
                                (when (and (remote-defines-module-p r module)
@@ -779,11 +779,17 @@ Those distributors with a gate best-remote are preferred, obviously."
     (remote-distributor r)))
 
 (defun module-fetch-url (module &key allow-self)
-  "Return the URL which is to be used while fetching MODULE.
+  "Return the URL which is to be used while fetching MODULE,
+that is the location of MODULE in the preferred remote.
 When ALLOW-SELF is specified, and non-NIL, remotes within *SELF* are
 not discarded from consideration."
   (let ((module (coerce-to-module module)))
     (url (module-best-remote module :allow-self allow-self) module)))
+
+(defun touch-module (module &aux (module (coerce-to-module module)))
+  "Try 'access' MODULE via its preferred remote and return
+whether the attempt was successful."
+  (touch-remote-module (module-best-remote module) module))
 
 (defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
   "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
