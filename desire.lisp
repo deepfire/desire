@@ -84,7 +84,9 @@
   (:method ((o git-remote) name)
     (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)
-    (with-valid-exit-codes ((8 nil)) (wget "--spider" `(,(url o name) "_darcs/inventory")))))
+    (with-valid-exit-codes ((8 nil)) (wget "--spider" `(,(url o name) "_darcs/inventory"))))
+  (:method ((o svn-http-remote) name)
+    (with-valid-exit-codes ((8 nil)) (wget "--spider" (url o name)))))
 
 (defgeneric fetch-remote (locality remote module))
 
