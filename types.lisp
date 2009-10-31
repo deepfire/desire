@@ -713,6 +713,12 @@ Find out whether SYSTEM is hidden."
     (when (credentials-match-p c username password)
       (return c))))
 
+(defun canonicalise-module-name (name)
+  "Given a module's NAME, whether in form of a string, keyword or a symbol
+in any other package, return the canonical module name, as a symbol 
+in the 'DESIRE' package.."
+  (name (module name)))
+
 (defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
   (do-distributor-remotes (r d)
     (do-remove-remote r))

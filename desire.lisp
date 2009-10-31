@@ -397,7 +397,7 @@ Defined keywords:
           (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
             (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires))) ; currently unused
-          (desired-module-names (mapcan #'rest interpreted-desires))
+          (desired-module-names (mapcar #'canonicalise-module-name (mapcan #'rest interpreted-desires)))
           (module-vocabulary nil)
           (system-vocabulary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
       (report t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
