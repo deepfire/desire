@@ -35,15 +35,15 @@
 ;;;
 ;;; Globals
 ;;;
-(defparameter *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
-(defparameter *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
-(defparameter *localities*         (make-hash-table :test #'equal) "Map names to localities.")
-(defparameter *localities-by-path* (make-hash-table :test #'equal) "Map paths to localities.")
-(defparameter *modules*            (make-hash-table :test #'equal) "Map module names to modules.")
-(defparameter *leaves*             (make-hash-table :test #'equal) "Map module names to leaf modules.")
-(defparameter *nonleaves*          (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
-(defparameter *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
-(defparameter *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
+(defvar *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
+(defvar *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
+(defvar *localities*         (make-hash-table :test #'equal) "Map names to localities.")
+(defvar *localities-by-path* (make-hash-table :test #'equal) "Map paths to localities.")
+(defvar *modules*            (make-hash-table :test #'equal) "Map module names to modules.")
+(defvar *leaves*             (make-hash-table :test #'equal) "Map module names to leaf modules.")
+(defvar *nonleaves*          (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
+(defvar *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
+(defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 
 (defvar *desire-root* nil "Absolute pathname of a directory containing master localities and installed tools.")
 
