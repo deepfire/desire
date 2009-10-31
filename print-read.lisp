@@ -93,7 +93,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o) (transport o)))))
   (let ((*print-case* :downcase))
-    (format stream "~@<#R(~;~A ~S~
+    (format stream "~@<#R(~;~A~:[~; ~:*~A~] ~S~
                             ~{ ~<~S ~A~:@>~}~
                             ~:[~; ~:*~<~S ~S~:@>~]~
                           ~;)~:@>"
@@ -101,11 +101,11 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
              (or (when (eq (remote-distributor o) *self*)
                    *original-self-gate-class-name*)
                  (type-of o)))
+            (unless (equal default-remote-name (name o))
+              (string (name o)))
             (slot-or-abort-print-object stream o 'path)
             (multiple-value-bind (systemful systemless) (unzip #'module-systems (slot-or-abort-print-object stream o 'module-names) :key #'module)
-              (append (unless (equal default-remote-name (name o))
-                        (list `(:name ,(string (name o)))))
-                      (when-let ((port (remote-distributor-port o)))
+              (append (when-let ((port (remote-distributor-port o)))
                         (list `(:distributor-port ,port)))
                       (when (remote-domain-name-takeover o)
                         (list `(:domain-name-takeover t)))
@@ -155,38 +155,44 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type path-components &key name distributor-port domain-name-takeover modules systemless-modules converted-module-names cvs-module-modules) (read stream nil nil)
-    `(let* ((source *read-time-merge-source-distributor*)
-            (owner *read-time-enclosing-distributor*)
-            (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
-            (subject (find predicted-name (distributor-remotes owner) :key #'name))
-            (type (merge-remote-type source owner subject ',type))
-            (module-names (merge-slot-value source owner subject 'module-names ',(append modules systemless-modules)))
-            (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
-            (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
-       (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject type))
-                                                (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port :domain-name-takeover ',domain-name-takeover
-                                                               :path ',path-components :module-names module-names
-                                                               :last-sync-time ,*read-universal-time* :synchronised-p t
-                                                               ,@(when cvs-module-modules `(:module-modules ',cvs-module-modules))))))
-         (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
-         (when (typep *read-time-enclosing-remote* 'gate)
-           (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))
-         (when subject
-           (dolist (m modules-for-disconnection)
-             (when-let ((m (module m :if-does-not-exist :continue)))
-               (remote-unlink-module subject m))))
-         (let ((amended-modules (intersection module-names ',modules))
-               (amended-systemless-modules (intersection module-names ',systemless-modules)))
-           (dolist (m-name (intersection module-names (append amended-modules amended-systemless-modules)))
-             (lret ((m (or (module m-name :if-does-not-exist :continue)
-                           (make-instance 'module :name m-name :umbrella m-name
-                                          :last-sync-time ,*read-universal-time* :synchronised-p t))))
-               (remote-link-module *read-time-enclosing-remote* m)
-               (unless (or (system m-name :if-does-not-exist :continue)
-                           (member m-name amended-systemless-modules))
-                 (make-instance *default-system-type* :name m-name :module m
-                                :last-sync-time ,*read-universal-time* :synchronised-p t)))))))))
+  (let* ((remote-form (read stream nil nil))
+         (type (first remote-form)))
+    (multiple-value-bind (name path-components more-args) (let ((maybe-name (second remote-form)))
+                                                            (if (consp maybe-name)
+                                                                (values nil maybe-name (cddr remote-form))
+                                                                (values maybe-name (third remote-form) (cdddr remote-form))))
+      (destructuring-bind (&key distributor-port domain-name-takeover modules systemless-modules converted-module-names cvs-module-modules) more-args
+        `(let* ((source *read-time-merge-source-distributor*)
+                (owner *read-time-enclosing-distributor*)
+                (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
+                (subject (find predicted-name (distributor-remotes owner) :key #'name))
+                (type (merge-remote-type source owner subject ',type))
+                (module-names (merge-slot-value source owner subject 'module-names ',(append modules systemless-modules)))
+                (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
+                (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
+           (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject type))
+                                                    (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port :domain-name-takeover ',domain-name-takeover
+                                                                   :path ',path-components :module-names module-names
+                                                                   :last-sync-time ,*read-universal-time* :synchronised-p t
+                                                                   ,@(when cvs-module-modules `(:module-modules ',cvs-module-modules))))))
+             (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
+             (when (typep *read-time-enclosing-remote* 'gate)
+               (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))
+             (when subject
+               (dolist (m modules-for-disconnection)
+                 (when-let ((m (module m :if-does-not-exist :continue)))
+                   (remote-unlink-module subject m))))
+             (let ((amended-modules (intersection module-names ',modules))
+                   (amended-systemless-modules (intersection module-names ',systemless-modules)))
+               (dolist (m-name (intersection module-names (append amended-modules amended-systemless-modules)))
+                 (lret ((m (or (module m-name :if-does-not-exist :continue)
+                               (make-instance 'module :name m-name :umbrella m-name
+                                              :last-sync-time ,*read-universal-time* :synchronised-p t))))
+                   (remote-link-module *read-time-enclosing-remote* m)
+                   (unless (or (system m-name :if-does-not-exist :continue)
+                               (member m-name amended-systemless-modules))
+                     (make-instance *default-system-type* :name m-name :module m
+                                    :last-sync-time ,*read-universal-time* :synchronised-p t)))))))))))
 
 #+(or)
 (defun locality-master-p (o)
