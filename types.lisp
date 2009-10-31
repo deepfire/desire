@@ -698,10 +698,11 @@ Find out whether SYSTEM is hidden."
     (do-remove-system s))
   (%remove-module (name m)))
 
-(defun remove-module (module-designator &aux (m (coerce-to-module module-designator)))
-  (do-remotes (r)
-    (when (remote-defines-module-p r m)
-      (removef (location-module-names r) (name m))))
+(defun remove-module (module-designator &key keep-localities &aux (m (coerce-to-module module-designator)))
+  (unless keep-localities
+    (do-remotes (r)
+      (when (remote-defines-module-p r m)
+        (removef (location-module-names r) (name m)))))
   (do-remove-module m))
 
 (defun do-remove-system (s)
