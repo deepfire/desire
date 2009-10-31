@@ -418,10 +418,13 @@ DISTRIBUTOR-NAME."
 
 (defun choose-default-remote-name (distributor vcs-type transport)
   "Try choose a default name for a remote with VCS-TYPE and TRANSPORT
-on DISTRIBUTOR.  When there's a name clash NIL is returned."
-  (let ((default-name (default-remote-name (name distributor) vcs-type transport)))
-    (when-let ((non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
-      default-name)))
+on DISTRIBUTOR.  When there's a name clash NIL is returned as the primary
+value, and the computed default name is returned as the secondary value
+instead."
+  (let* ((default-name (default-remote-name (name distributor) vcs-type transport))
+         (non-conflicting-p (null (find default-name (distributor-remotes distributor) :key #'name))))
+    (values (when non-conflicting-p default-name)
+            (unless non-conflicting-p default-name))))
 
 (defun init-time-select-remote-name (distributor vcs-type transport &optional specified-name)
   "Provide a mechanism for init-time name selection for REMOTE with 
