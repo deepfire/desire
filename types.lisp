@@ -196,6 +196,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
    (domain-name-takeover :accessor remote-domain-name-takeover :initarg :domain-name-takeover :documentation "Specified.")
    (distributor-port :accessor remote-distributor-port :type (or null (integer 0 65536)) :initarg :distributor-port :documentation "Specified, rarely.")
+   (module-credentials :accessor remote-module-credentials :type list :initarg :credentials :documentation "Specified, rarely.")
    (path :accessor remote-path :initarg :path :documentation "Specified.")
    (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Generated from above.")
    (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Image-only property: not serialised."))
@@ -203,7 +204,26 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :registrator #'(setf remote)
    :disabled-p nil
    :distributor-port nil
-   :domain-name-takeover nil))
+   :domain-name-takeover nil
+   :credentials nil))
+
+(defstruct (credentials (:conc-name cred-) (:constructor make-cred (name &key username password)))
+  (name (error "~@<Won't create an unnamed credential.~:@>") :type symbol)
+  (username (error "~@<Won't create a credential without a username.~:@>") :type string)
+  (password (error "~@<Won't create a credential without a password.~:@>") :type (or null string)))
+
+(defvar *credentials* (alist-hash-table `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous :username "anonymous" :password "anonymous"))
+                                          (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil)))
+                                        :test #'equal)
+  "Credentials, by name. Not intended to be secure.")
+
+(defun credentials-match-p (credentials username password)
+  "Determine whether supplied USERNAME and PASSWORD match CREDENTIALS."
+  (and (equal username (cred-username credentials))
+       (equal password (cred-password credentials))))
+
+(defun module-credentials (remote module-name)
+  (cadr (assoc module-name (remote-module-credentials remote) :test #'string=)))
 
 (defun wishmasterp (distributor)
   "See whether DISTRIBUTOR participates in the DESIRE protocol,
@@ -677,7 +697,14 @@ Find out whether SYSTEM is hidden."
 (define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
 (define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-root-container *localities*     locality      :type locality :mapper map-localities :if-exists :error)
+(define-root-container *credentials*    cred          :type credentials :iterator do-credentials :if-exists :error)
 (define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
+
+(defun match-credentials (username password)
+  "Find a named credentials entry with matching USERNAME and PASSWORD."
+  (do-credentials (c)
+    (when (credentials-match-p c username password)
+      (return c))))
 
 (defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
   (do-distributor-remotes (r d)

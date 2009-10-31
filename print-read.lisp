@@ -114,7 +114,9 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                       (when systemless
                         (list `(:systemless-modules ,(sort (mapcar #'downstring systemless) #'string<))))
                       (when-let ((converted-names (and (typep o 'gate) (slot-or-abort-print-object stream o 'converted-module-names))))
-                        (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<))))))
+                        (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<))))
+                      (when-let ((credentials (remote-module-credentials o)))
+                        (list `(:credentials ,credentials)))))
             (when-let ((cvs-module-modules (and (typep o 'cvs) (slot-or-abort-print-object stream o 'module-modules))))
               `(:cvs-module-modules ,cvs-module-modules)))))
 
@@ -161,7 +163,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                                                             (if (consp maybe-name)
                                                                 (values nil maybe-name (cddr remote-form))
                                                                 (values maybe-name (third remote-form) (cdddr remote-form))))
-      (destructuring-bind (&key distributor-port domain-name-takeover modules systemless-modules converted-module-names cvs-module-modules) more-args
+      (destructuring-bind (&key distributor-port domain-name-takeover modules systemless-modules converted-module-names credentials cvs-module-modules) more-args
         `(let* ((source *read-time-merge-source-distributor*)
                 (owner *read-time-enclosing-distributor*)
                 (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
@@ -174,6 +176,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                                                     (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port :domain-name-takeover ',domain-name-takeover
                                                                    :path ',path-components :module-names module-names
                                                                    :last-sync-time ,*read-universal-time* :synchronised-p t
+                                                                   ,@(when credentials `(:credentials ',credentials))
                                                                    ,@(when cvs-module-modules `(:module-modules ',cvs-module-modules))))))
              (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
              (when (typep *read-time-enclosing-remote* 'gate)

@@ -18,6 +18,7 @@
    #:wishmasterp #:do-wishmasters #:do-distributor-remotes #:do-distributor-modules #:compute-distributor-modules
    ;;   types.lisp :: remote
    #:url #:parse-remote-namestring #:remote-disabled-p
+   #:credentials #:cred-name #:cred-username #:cred-password #:cred
    ;;   types.lisp :: global UI
    #:clear-definitions #:init #:vcs-enabled-p #:*unsaved-definition-changes-p*
    ;;   types.lisp :: locality
