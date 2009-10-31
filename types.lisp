@@ -514,15 +514,27 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (break))
   (call-next-method))
 
-(defun remote-link-module (remote module)
-  "Establish a 'provides' relationship between REMOTE and MODULE."
-  (pushnew (name module) (location-module-names remote))
-  (pushnew remote (module-remotes module)))
+(defgeneric remote-link-module (remote module &key &allow-other-keys)
+  (:documentation
+   "Establish a 'provides' relationship between REMOTE and MODULE.")
+  (:method ((r remote) (m module) &key &allow-other-keys)
+    (pushnew (name m) (location-module-names r))
+    (pushnew r (module-remotes m)))
+  (:method ((r cvs-remote) (m module) &key module-module)
+    (when (and module-module
+               (not (string= module-module (down-case-name m))))
+      (push (cons (name m) module-module) (cvs-module-modules r)))
+    (call-next-method)))
 
-(defun remote-unlink-module (remote module)
-  "Undo a 'provides' relationship between REMOTE and MODULE."
-  (removef (location-module-names remote) (name module))
-  (removef (module-remotes module) remote))
+(defgeneric remote-unlink-module (remote module)
+  (:documentation
+   "Undo a 'provides' relationship between REMOTE and MODULE.")
+  (:method ((r remote) (m module))
+    (removef (location-module-names r) (name m))
+    (removef (module-remotes m) r))
+  (:method ((r cvs-remote) (m module))
+    (removef (cvs-module-modules r) (name m) :key #'car)
+    (call-next-method)))
 
 (defun remote-defines-module-p (remote module)
   "See whether MODULE is defined for REMOTE."
