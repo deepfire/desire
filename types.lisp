@@ -217,16 +217,20 @@ a special module called '.meta'."
 ;;;; Location * VCS
 ;;;;
 (defclass git-remote (git remote) ())
+(defclass darcs-remote (darcs remote) ())
+(defclass hg-remote (hg remote) ())
+(defclass cvs-remote (cvs remote) ())
+(defclass svn-remote (svn remote) ())
 
 ;;; almost most specific (due to GATE mixin), exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
 (defclass git-http-remote (git-http git-remote) ())
 (defclass git-combined-remote (git-native git-http git-remote) ())
-(defclass hg-http-remote (hg-http remote) ())
-(defclass darcs-http-remote (darcs-http remote) ())
-(defclass cvs-rsync-remote (cvs-rsync remote) ())
-(defclass cvs-native-remote (cvs-native remote) ())
-(defclass svn-rsync-remote (svn-rsync remote) ())
+(defclass hg-http-remote (hg-http hg-remote) ())
+(defclass darcs-http-remote (darcs-http darcs-remote) ())
+(defclass cvs-rsync-remote (cvs-rsync cvs-remote) ())
+(defclass cvs-native-remote (cvs-native cvs-remote) ())
+(defclass svn-rsync-remote (svn-rsync svn-remote) ())
 
 ;;; A special case location*vcs*role extension which is /going/ to be
 ;;; troublesome, as it violates simplicity.
