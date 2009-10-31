@@ -497,10 +497,12 @@ and return them as multiple values.
 Note that http is interpreted as git-http -type remote.
 DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (multiple-value-bind (schema user password hostname port path directoryp) (parse-uri namestring :slashless-header slashless)
-    (declare (ignore user password))
-    (values (or (uri-type-to-remote-type schema :gate-p gate-p :hint type-hint)
-                (error "Bad URI type ~S in remote namestring ~S." schema namestring))
-            hostname port path directoryp)))
+    (let ((cred (when user
+                  (or (match-credentials user password)
+                      (error "~@<Credentials were provided in an URI namestring ~S, but were not recognised.~:@>" namestring)))))
+      (values (or (uri-type-to-remote-type schema :gate-p gate-p :hint type-hint)
+                  (error "Bad URI type ~S in remote namestring ~S." schema namestring))
+              cred hostname port path directoryp))))
 
 ;;;;
 ;;;; Modules
@@ -624,9 +626,10 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                    (cvs-remote-module-module r (when module (name module)))))
   (:method (r m) "://")
   (:method ((r cvs-native-remote) m)
-    (let ((c (cred (module-credentials r (name m)))))
+    (let ((c (module-credentials r (name m))))
       (if c
-          (format nil ":~A~:[~;~:*:~A~]@" (cred-username c) (cred-password c))
+          (let ((cred (cred c)))
+            (format nil ":~A~:[~;~:*:~A~]@" (cred-username cred) (cred-password cred)))
           ":anonymous@"))))
 
 (defun url (remote-or-name &optional module-or-name)
@@ -814,8 +817,8 @@ The value returned is the list of found modules."
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out."
   (within-directory locality-pathname
-    (multiple-value-bind (type host port path) (parse-remote-namestring url)
-      (declare (ignore type port path))
+    (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
+      (declare (ignore type cred port path))
       (let ((remote-name (string-downcase host))
             (meta-dir (subdirectory* locality-pathname ".meta")))
         (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
