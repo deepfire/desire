@@ -118,8 +118,8 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                           (list `(:systemless-modules ,(sort (mapcar #'downstring systemless) #'string<))))
                         (when-let ((converted-names (and (typep o 'gate) (slot-or-abort-print-object stream o 'converted-module-names))))
                           (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<)))))))
-            (when-let ((module-modules (and (typep o 'cvs) (slot-or-abort-print-object stream o 'module-modules))))
-              `(:module-modules ,module-modules)))))
+            (when-let ((cvs-module-modules (and (typep o 'cvs) (slot-or-abort-print-object stream o 'module-modules))))
+              `(:cvs-module-modules ,cvs-module-modules)))))
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject 
@@ -158,7 +158,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 
 (defun remote-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type path-components &key name distributor-port domain-name-takeover complex-modules simple-modules systemless-modules converted-module-names module-modules) (read stream nil nil)
+  (destructuring-bind (type path-components &key name distributor-port domain-name-takeover complex-modules simple-modules systemless-modules converted-module-names cvs-module-modules) (read stream nil nil)
     `(let* ((source *read-time-merge-source-distributor*)
             (owner *read-time-enclosing-distributor*)
             (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
@@ -171,7 +171,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                                                 (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port :domain-name-takeover ',domain-name-takeover
                                                                :path ',path-components :module-names module-names
                                                                :last-sync-time ,*read-universal-time* :synchronised-p t
-                                                               ,@(when module-modules `(:module-modules ',module-modules))))))
+                                                               ,@(when cvs-module-modules `(:module-modules ',cvs-module-modules))))))
          (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
          (when (typep *read-time-enclosing-remote* 'gate)
            (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))
