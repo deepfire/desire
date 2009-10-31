@@ -126,6 +126,17 @@
     (with-explanation ("on behalf of module ~A, rsyncing from svn remote ~A to ~S" (name module) url svn-repo-dir)
       (rsync "-ravPz" url (namestring svn-repo-dir)))))
 
+(defmethod fetch-remote ((locality git-locality) (svn svn-http-remote) module)
+  (let* ((repo-dir (module-pathname module locality))
+         (exists-p (directory-exists-p repo-dir))
+         (url (url svn module)))
+    (within-directory (repo-dir :if-does-not-exist :create)
+      (unless exists-p
+        (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" (name module) url *default-pathname-defaults*)
+          (git "svn" `("-T" ,url))))
+      (with-explanation ("on behalf of module ~A, importing from ~S in ~S" (name module) url *default-pathname-defaults*)
+        (git "svn" "fetch")))))
+
 (defmethod fetch-remote :around (locality remote module)
   (with-error-resignaling (executable-failure
                            ((cond) 'fetch-failure :remote remote :module module :execution-error (format nil "~A" cond)))
@@ -148,6 +159,8 @@
   (fetch-remote to from module))
 
 (defmethod fetch ((locality git-locality) (remote git-remote) module))
+(defmethod fetch ((locality git-locality) (remote cvs-native-remote) module))
+(defmethod fetch ((locality git-locality) (remote svn-http-remote) module))
 
 #+(or)
 (defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
