@@ -93,7 +93,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o) (transport o)))))
   (let ((*print-case* :downcase))
-    (format stream "~@<#R(~;~A~:[~; ~:*~A~] ~S~
+    (format stream "~@<#R(~;~A~:[~; ~:*~(~A~)~] ~S~
                             ~{ ~<~S ~A~:@>~}~
                             ~:[~; ~:*~<~S ~S~:@>~]~
                           ~;)~:@>"
