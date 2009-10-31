@@ -57,7 +57,7 @@
   (:method ((o remote) &optional (stream *standard-output*))
     (format stream "~A, remote, ~A" (name o) (url o :<module-name>)))
   (:method ((o module) &optional (stream *standard-output*))
-    (format stream "~A, module, ~:[systemless~;~:*~D system~:P~], ~A" (name o) (when (module-systems o) (length (module-systems o))) (url (module-best-remote o :allow-self t) o)))
+    (format stream "~A, module, ~:[systemless~;~:*~D system~:P~], ~A" (name o) (when (module-systems o) (length (module-systems o))) (module-fetch-url o :allow-self t)))
   (:method ((o system) &optional (stream *standard-output*))
     (format stream "~A, system, loadable: ~:[no~;yes~]" (name o) (system-loadable-p o)))
   (:method ((o application) &optional (stream *standard-output*))
