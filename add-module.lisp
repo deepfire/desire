@@ -96,39 +96,45 @@ of a module URL and try to deduce name of the module."
                  last)))
     (make-keyword (string-upcase name))))
 
-(defun match-distrbibutor-and-remote (remote-type distributor-name port pathname-component-list &optional module-name)
+
+
+(defun match-module-url-components-against-remote-set (raw-distributor-name port pcl raw-module-name remotes)
+  (multiple-value-bind (dist domain-name-takeover) (string-detect-splitsubst raw-distributor-name raw-module-name '*module*)
+    (let* ((variants (compute-remote-path-variants pcl raw-module-name))
+           (remote (iter (for remote-path-variant in variants)
+                         (let ((remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
+                           (when-let ((remote (dolist (r remotes)
+                                                (when (and (equalp remote-path-variant (remote-path r))
+                                                           (eql port (remote-distributor-port r)))
+                                                  (return r)))))
+                             (return remote))))))
+      (values remote
+              domain-name-takeover
+              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
+              (unless remote (append (when domain-name-takeover dist) (lastcar variants)))))))
+
+(defun module-ensure-distributor-match-remote (remote-type distributor-name port pathname-component-list &optional module-name)
   "Given a REMOTE-TYPE, DISTRIBUTOR-NAME, PORT, PATH and an optional
-MODULE-NAME, try to find matching distributor and remote, yielding
-them as multiple values.
+MODULE-NAME, try to first find matching distributor, creating it, if it
+doesn't exist and then, match the remote, yielding them as multiple values.
 
 Additionally, when no matching remote is present, the best module path
 is determined.
 Further, it is determined if distributor's hostname depends on module
 name.
 These additional values are returned as multiple values."
-  (let* ((module-name (or module-name (guess-module-name distributor-name pathname-component-list)))
-         (downmodname (downstring module-name)))
-    (when-let ((distributor (find-distributor-fuzzy distributor-name)))
-      (let* ((downdistname (downstring distributor-name))
-             (variants (compute-remote-path-variants pathname-component-list downmodname)))
-        (multiple-value-bind (dist remote-takeover) (string-detect-splitsubst downdistname downmodname '*module*)
-          (let ((remote (iter (for remote-path-variant in variants)
-                              (let ((remote-path-variant (append (when remote-takeover dist) remote-path-variant)))
-                                (when-let ((remote (do-distributor-remotes (r distributor)
-                                                     (when (and (equalp remote-path-variant (remote-path r))
-                                                                (remote-types-compatible-p remote-type (type-of r))
-                                                                (eql port (remote-distributor-port r)))
-                                                       (return r)))))
-                                  (return remote))))))
-            (values distributor
-                    remote
-                    remote-takeover
-                    ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
-                    (unless remote (lastcar variants)))))))))
+  (let ((module-name (or module-name (guess-module-name distributor-name pathname-component-list))))
+    (multiple-value-bind (distributor created-distributor-p) (or (find-distributor-fuzzy distributor-name)
+                                                                 (values (make-instance 'distributor :name (read-from-string distributor-name)) t))
+      (multiple-value-call #'values
+        distributor created-distributor-p
+        (match-module-url-components-against-remote-set
+         distributor-name port pathname-component-list (downstring module-name)
+         (remove-if-not (curry #'remote-types-compatible-p remote-type) (distributor-remotes distributor)))))))
 
 (defun make-remote (type domain-name-takeover distributor port path &key name)
-  (flet ((query-remote-name ()
-           (format *query-io* "No matching remote found, has to create a new one, but the default name is occupied. Enter the new remote name, or NIL to abort: ")
+  (flet ((query-remote-name (default-name)
+           (format *query-io* "No matching remote found, has to create a new one, but the default name (~A) is occupied. Enter the new remote name, or NIL to abort: " default-name)
            (finish-output *query-io*)
            (or (prog1 (read *query-io*)
                  (terpri *query-io*))
@@ -137,11 +143,12 @@ These additional values are returned as multiple values."
                    :distributor distributor :domain-name-takeover domain-name-takeover :distributor-port port 
                    :name (or (prog1 name
                                (when name
-                                 (format t ";; Choosing provided remote name ~S~%" name))) ;
-                             (lret ((default-name (choose-default-remote-name distributor (vcs-type type) (transport type))))
-                               (when default-name
-                                 (format t ";; Choosing default remote name ~S~%" default-name)))
-                             (query-remote-name))
+                                 (format t ";; Choosing provided remote name ~S~%" name)))
+                             (multiple-value-bind (default-name conflicted-default-name) (choose-default-remote-name distributor (vcs-type type) (transport type))
+                               (if default-name
+                                   (progn (format t ";; Choosing default remote name ~S~%" default-name)
+                                          default-name)
+                                   (query-remote-name conflicted-default-name))))
                    :module-names nil
                    :path path)))
 
@@ -261,54 +268,77 @@ These additional values are returned as multiple values."
 
 (defun steal-clbuild-projects-file (filename)
   (let ((*package* #.*package*)
-        (*read-eval* nil))
-    (with-open-file (s filename)
-      (iter (for raw-string = (read-line s nil nil))
-            (while raw-string)
-            (for string = (subseq raw-string 0 (position #\# raw-string)))
-            (when (zerop (length string))
-              (next-iteration))
-            (for (values module-name offset0) = (read-from-string string nil nil :start 0))
-            (unless module-name
-              (next-iteration))
-            (for module = (module module-name :if-does-not-exist :continue))
-            (for (values remote-name offset1) = (read-from-string string nil nil :start offset0))
-            (for known-remote = (recognise-clbuild-remote remote-name))
-            (unless remote-name
-              (error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
-            (let* ((spacepos (position #\Space string :start offset1))
-                   (url (subseq string offset1 spacepos))
-                   (posturl (let ((*readtable* (copy-readtable)))
-                              (setf (readtable-case *readtable*) :preserve)
-                              (when spacepos (when-let ((posturl (read-from-string string nil nil :start spacepos)))
-                                               (princ-to-string posturl))))))
-              ;; (format t "===( ~S => ~S ~S~%" string url posturl)
-              (let ((remote (or known-remote
-                                (multiple-value-bind (type hostname port path) (parse-remote-namestring url
-                                                                                                        :slashless (eq remote-name 'get_cvs_full)
-                                                                                                        :type-hint (case remote-name
-                                                                                                                     (get_git 'git)
-                                                                                                                     (get_darcs 'darcs)
-                                                                                                                     (get_svn 'svn)))
-                                  (multiple-value-bind (distributor remote domain-name-takeover deduced-path)
-                                      (match-distrbibutor-and-remote type hostname port path module-name)
-                                    ;; (format t "===( ~S => ~S ~S~:[~;~:*~D~]/~S ~S=~%" string type hostname port path posturl)
-                                    (let ((final-distributor (or distributor
-                                                                 (format t ";; didn't find distributor at ~A, creating it~%" hostname)
-                                                                 (make-instance 'distributor :name (read-from-string hostname)))))
+        (*read-eval* nil)
+        (new-remotes (make-hash-table)))
+    (with-container new-remotes (new-remotes :type list :iterator do-new-remotes :iterator-bind-key t :if-does-not-exist :continue :if-exists :continue)
+      (with-open-file (s filename)
+        (iter (for raw-string = (read-line s nil nil))
+              (while raw-string)
+              (for string = (subseq raw-string 0 (position #\# raw-string)))
+              (when (zerop (length string))
+                (next-iteration))
+              (for (values module-name offset0) = (read-from-string string nil nil :start 0))
+              (unless module-name
+                (next-iteration))
+              (for module = (module module-name :if-does-not-exist :continue))
+              (for (values remote-name offset1) = (read-from-string string nil nil :start offset0))
+              (for known-remote = (recognise-clbuild-remote remote-name))
+              (unless remote-name
+                (error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
+              (let* ((spacepos (position #\Space string :start offset1))
+                     (url (subseq string offset1 spacepos))
+                     (posturl (let ((*readtable* (copy-readtable)))
+                                (setf (readtable-case *readtable*) :preserve)
+                                (when spacepos (when-let ((posturl (read-from-string string nil nil :start spacepos)))
+                                                 (princ-to-string posturl))))))
+                (let ((remote (or known-remote
+                                  (multiple-value-bind (type hostname port path) (parse-remote-namestring url
+                                                                                                          :slashless (eq remote-name 'get_cvs_full)
+                                                                                                          :type-hint (case remote-name
+                                                                                                                       (get_git 'git)
+                                                                                                                       (get_darcs 'darcs)
+                                                                                                                       (get_svn 'svn)))
+                                    ;; (format t "===( ~S ~S ~S, m ~S~%" type hostname path module-name)
+                                    (multiple-value-bind (distributor created-distributor-p remote domain-name-takeover deduced-path)
+                                        (module-ensure-distributor-match-remote type hostname port path module-name)
+                                      (unless (and module (or known-remote remote))
+                                        (syncformat t ";; =======================================~%"))
+                                      (when created-distributor-p
+                                        (format t ";; didn't find distributor at ~A, creating it~%" hostname))
+                                      ;; (format t "===( ~S => ~S ~S~:[~;(taken over)~]~:[~;~:*~D~]/~S ~S=~%" string type hostname domain-name-takeover port path posturl)
                                       (or remote
-                                          (format t "~@<;; ~@;didn't find a remote for ~S (deduced path ~S) on ~A, creating it~:@>~%" url deduced-path (name final-distributor))
-                                          (make-remote type domain-name-takeover final-distributor port deduced-path)
-                                          (format t "~@<;; ~@;required remote for ~A on ~A not created, skipping module~:@>~%" deduced-path (name final-distributor))
-                                          (next-iteration))))))))
-                (unless (find module-name (location-module-names remote) :test #'string=)
-                  (let ((module (or (module module-name :if-does-not-exist :continue)
-                                    (format t "~@<;; ~@;didn't find module ~A, creating it~:@>~%" module-name)
-                                    (make-instance 'module :name module-name :umbrella module-name))))
-                    (remote-link-module remote module)
-                    (format t "~@<;; ~@;linking module ~A to remote ~A on ~A~:@>~%" module-name (name remote) (name (remote-distributor remote)))
-                    (when (typep remote 'cvs)
-                      (let* ((default-cvs-module-name (downstring module-name))
-                             (cvs-module-name (or posturl default-cvs-module-name)))
-                        (unless (string= cvs-module-name default-cvs-module-name)
-                          (push (list module-name cvs-module-name) (cvs-module-modules remote)))))))))))))
+                                          (progn
+                                            (format t "~@<;; ~@;didn't find a remote for ~S (path ~S) on ~A, creating it~:@>~%" url (or deduced-path path) (name distributor))
+                                            (when-lret ((new-remote (make-remote type domain-name-takeover distributor port (or deduced-path path))))
+                                              (push (list new-remote url module-name) (new-remotes distributor))))
+                                          (format t "~@<;; ~@;required remote for ~A on ~A not created, skipping module~:@>~%" path (name distributor))
+                                          (next-iteration)))))))
+                  (unless (find module-name (location-module-names remote) :test #'string=)
+                    (let ((module (or (module module-name :if-does-not-exist :continue)
+                                      (format t "~@<;; ~@;didn't find module ~A, creating it~:@>~%" module-name)
+                                      (make-instance 'module :name module-name :umbrella module-name))))
+                      (remote-link-module remote module)
+                      (format t "~@<;; ~@;linking module ~A to remote ~A on ~A~:@>~%" module-name (name remote) (name (remote-distributor remote)))
+                      (when (typep remote 'cvs)
+                        (let* ((default-cvs-module-name (downstring module-name))
+                               (cvs-module-name (or posturl default-cvs-module-name)))
+                          (unless (string= cvs-module-name default-cvs-module-name)
+                            (push (list module-name cvs-module-name) (cvs-module-modules remote)))))))))))
+      (do-new-remotes (distributor new-remotes)
+        (flet ((module-url-reformulable (name url current remotes)
+                 (multiple-value-bind (type hostname port path) (parse-remote-namestring url :slashless (typep current 'cvs-native-remote) :type-hint (vcs-type current))
+                   (match-module-url-components-against-remote-set
+                    hostname port path (downstring name)
+                    (remove-if-not (curry #'remote-types-compatible-p type) remotes)))))
+          (iter (for (new-remote module-url module-name) in new-remotes)
+                (when-let* ((module-name (when (null (rest (location-module-names new-remote))) ;; we're after single-module remotes
+                                           (first (location-module-names new-remote))))
+                            (better-remote (module-url-reformulable module-name module-url new-remote
+                                                                    (remove new-remote (mapcar #'car new-remotes)))))
+                  (syncformat t ";; =======================================~%")
+                  (format t "~@<;; ~@;remote ~A is excessive, its module (~A) is better reformulated in ~A/~S~:@>~%"
+                          (name new-remote) module-name (name better-remote) (remote-path better-remote))
+                  (remote-link-module better-remote (module module-name)
+                                      :module-module (when (typep new-remote 'cvs)
+                                                       (cvs-remote-module-module new-remote module-name)))
+                  (remove-remote new-remote :keep-modules t))))))))
