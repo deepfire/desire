@@ -50,7 +50,7 @@
    #:fetch #:desire
    #:purge-module-binaries
    ;; add-module.lisp
-   #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader
+   #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader #:steal-clbuild-projects-file
    ;; apropos.lisp
    #:apropos-desr-list #:apropos-desr #:list-modules))
 
