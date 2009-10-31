@@ -599,6 +599,9 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                     (unless (remote-domain-name-takeover r)
                       "/")
                     path)))
+  (:method :around ((r cvs-remote) module)
+           (values (call-next-method)
+                   (cvs-remote-module-module r (when module (name module)))))
   (:method (r m) "://")
   (:method ((r cvs-native-remote) m) ":anonymous:anonymous@"))
 
