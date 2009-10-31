@@ -666,15 +666,17 @@ Find out whether SYSTEM is hidden."
     (do-remove-remote r))
   (%remove-distributor (name d)))
 
-(defun do-remove-remote (r)
+(defun do-remove-remote (r &key keep-modules)
   (dolist (m (location-module-names r))
     (when-let ((m (module m :if-does-not-exist :continue)))
-      (do-remove-module (module m))))
+      (if keep-modules
+          (remote-unlink-module r m)
+          (do-remove-module (module m)))))
   (%remove-remote (name r)))
 
-(defun remove-remote (remote-designator &aux (r (coerce-to-remote remote-designator)))
+(defun remove-remote (remote-designator &key keep-modules &aux (r (coerce-to-remote remote-designator)))
   (removef (distributor-remotes (remote-distributor r)) r)
-  (do-remove-remote r))
+  (do-remove-remote r :keep-modules keep-modules))
 
 (defun do-remove-module (m)
   (dolist (s (module-systems m))
