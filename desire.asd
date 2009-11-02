@@ -25,6 +25,7 @@
                (:file "apropos" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
                ;; Tier 5
+               (:file "xcvb" :depends-on ("system-loadability"))
                (:file "desire" :depends-on ("system-loadability"))
                (:file "application" :depends-on ("system-loadability"))
                (:module "system-quirks" :depends-on ("system-loadability")
