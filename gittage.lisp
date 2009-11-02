@@ -58,7 +58,7 @@
 
 (defun git-repository-reset-hard (&optional ref directory)
   (maybe-within-directory directory
-    (with-explanation ("hard-resetting repository in ~S to ~:[master~;~:*~S~]" *default-pathname-defaults* ref)
+    (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" *default-pathname-defaults* ref)
       (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
 
 (defun (setf git-repository-bare-p) (val directory)
@@ -123,29 +123,6 @@
       (git (list "config" "--replace-all" (string-downcase (symbol-name var)) val)))))
 
 ;;;
-;;; Branches
-;;;
-(defun gitbranches (&optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
-      (let ((output (execution-output-string 'git "branch")))
-        (remove :* (mapcar (compose #'make-keyword #'string-upcase) 
-                           (mapcan (curry #'split-sequence #\Space)
-                                   (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
-
-(defun gitbranch-present-p (name &optional directory)
-  (member name (gitbranches directory) :test #'string=))
-
-(defun add-gitbranch (name ref &optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("adding a git branch ~A tracking ~S in ~S" name ref *default-pathname-defaults*)
-      (git "branch" (downstring name) (flatten-path-list ref)))))
-
-(defun ensure-gitbranch (name ref &optional directory)
-  (unless (gitbranch-present-p name directory)
-    (add-gitbranch name ref directory)))
-
-;;;
 ;;; Remotes
 ;;;
 (defun gitremotes (&optional directory)
@@ -173,19 +150,26 @@
       (git "fetch" (downstring remote-name)))))
 
 ;;;
-;;; Refs
+;;; Raw refs
 ;;;
-(defun ref-path (ref directory)
+(defun ref-path (ref &optional directory)
   (subfile directory (list* ".git" "refs" (if (ref-shortp ref)
                                               (list* "heads" ref)
                                               ref))))
 
-(defun read-ref (pathname)
-  (let ((*read-base* #x10)
-        (*read-eval* nil))
-    (lret ((refval (read-from-string (file-as-string pathname))))
-      (unless (and (integerp refval) (not (minusp refval)))
-        (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval)))))
+(defun path-ref (pathname directory)
+  (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
+    (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
+
+(defun %read-ref (pathname)
+  (lret ((refval (parse-integer (file-as-string pathname) :radix #x10)))
+    (unless (not (minusp refval))
+      (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval))))
+
+(defun parse-refval (string)
+  (if (equalp (subseq string 0 5) "ref: ")
+      (values (split-sequence #\/ (subseq string 5)))
+      (values nil (parse-integer string :radix #x10))))
 
 (defun ref-shortp (ref)
   (endp (rest ref)))
@@ -196,13 +180,9 @@
 (defun ref-remotep (ref)
   (and (not (ref-shortp ref)) (string= "remotes" (first ref))))
 
-(defun full-ref-to-pathname (ref directory)
-  (merge-pathnames (make-pathname :directory (list* :relative ".git" "refs" (butlast ref)) :name (lastcar ref)) directory))
-
-(defun pathname-to-full-ref (pathname directory)
-  (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
-    (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
-
+;;;
+;;; Raw refs
+;;;
 (defun head-pathnames (directory)
   (remove nil (directory (subwild directory `(".git" "refs" "heads") :name :wild :type :wild)
                          #+sbcl :resolve-symlinks #+sbcl nil)
@@ -217,10 +197,6 @@
   (remove-if (lambda (p &aux (name (pathname-name p))) (or (null name) (string= name "HEAD")))
              (directory (subwild directory `(".git" "refs" "remotes" ,(downstring remote)) :name :wild :type :wild)
                         #+sbcl :resolve-symlinks #+sbcl nil)))
-
-(defun remote-head-ref (remote directory)
-  (file-as-string (subfile directory `(".git" "refs" "remotes" ,(downstring remote) "HEAD"))
-                  :position 5))
 
 (defmacro do-packed-refs ((ref refval directory) &body body)
   (with-gensyms (packed-refs-path s line 1read-offt)
@@ -245,17 +221,31 @@
 (defun ref-value (ref directory &key (if-does-not-exist :error))
   (let ((path (ref-path ref directory)))
     (if (probe-file path)
-        (read-ref path)
+        (%read-ref path)
         (or (car (remove nil (map-packed-refs (lambda (r v) (when (string= "master" (first r)) v)) #'identity directory)))
             (ecase if-does-not-exist
               (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref directory))
               (:continue nil))))))
 
+(defun reffile-value-full (pathname &optional directory)
+  (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
+    (let* ((normalised-ref (rest ref)) ; strip the "refs" component
+           (refval (or refval (ref-value normalised-ref directory))))
+      (values refval normalised-ref))))
+
+(defun set-reffile-value-full (pathname value)
+  (with-output-to-file (reffile pathname)
+    (format reffile "~:[~40,'0X~;ref: ~A~]" (consp value) (if (consp value)
+                                                              (flatten-path-list (cons "refs" value))
+                                                              value))))
+
+;;;
+;;; From now on, we're fully enabled to read, write and properly interpret refs
+;;;
+
 (defun map-pathnames-full-refs (fn pathnames directory)
   (iter (for pathname in pathnames)
-        (let ((ref (pathname-to-full-ref pathname directory))
-              (val (read-ref pathname)))
-          (collect (funcall fn ref val)))))
+        (collect (funcall fn (path-ref pathname directory) (%read-ref pathname)))))
 
 (defun map-heads (fn directory)
   (append (map-pathnames-full-refs fn (head-pathnames directory) directory)
@@ -273,6 +263,64 @@
   (flet ((ref-if-= (r v) (when (= v refval) r)))
     (remove nil (append (map-heads #'ref-if-= directory)
                         (map-all-remote-heads #'ref-if-= directory)))))
+
+;;;
+;;; HEADs
+;;;
+(defun head-pathname (&optional directory remote)
+  (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
+
+(defun get-head (&optional directory remote)
+  (reffile-value-full (head-pathname directory remote) directory))
+
+(defun set-head (new-value &optional directory remote)
+  (declare (type (or cons (integer 0)) new-value))
+  (with-output-to-file (head (head-pathname directory remote))
+    (set-reffile-value-full head new-value)))
+
+(defun git-detach-head (&optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("detaching HEAD in ~S" *default-pathname-defaults*)
+      (set-head (get-head)))))
+
+(defun invoke-with-detached-head (fn directory)
+  (within-directory directory
+    (let ((current-head (get-head)))
+      (unwind-protect (progn (git-detach-head)
+                             (funcall fn))
+        (when current-head
+          (set-head current-head))))))
+
+(defmacro with-detached-head ((&optional directory) &body body)
+  `(invoke-with-detached-head (lambda () ,@body) ,directory))
+
+;;;
+;;; Branches
+;;;
+(defun gitbranches (&optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
+      (let ((output (execution-output-string 'git "branch")))
+        (remove :* (mapcar (compose #'make-keyword #'string-upcase) 
+                           (mapcan (curry #'split-sequence #\Space)
+                                   (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
+
+(defun gitbranch-present-p (name &optional directory)
+  (member name (gitbranches directory) :test #'string=))
+
+(defun add-gitbranch (name ref &optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("adding a git branch ~A tracking ~S in ~S" name ref *default-pathname-defaults*)
+      (git "branch" (downstring name) (flatten-path-list ref)))))
+
+(defun ensure-gitbranch (name ref &optional directory)
+  (unless (gitbranch-present-p name directory)
+    (add-gitbranch name ref directory)))
+
+(defun git-ensure-noncurrent-branch (branchname refvalue &optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("moving non-current ref '~A' to ~A in ~S" branchname refvalue *default-pathname-defaults*)
+      (git "branch" "-f" (downstring branchname) refvalue))))
 
 (defun git-checkout-ref (ref &optional directory &key (if-changes :error))
   "This assumes that the local 'master' branch is present."
