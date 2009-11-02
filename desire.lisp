@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 ;;;
-;;;  (c) copyright 2007-2008 by
+;;;  (c) copyright 2007-2009 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -355,9 +355,15 @@
              (multiple-value-prog1
                  (if new-deps-from-this-module
                      (satisfy-modules new-deps-from-this-module locality system-type complete skip-present new-module-vocabulary new-system-vocabulary)
-                     (values new-module-vocabulary new-system-vocabulary))
-               (report t "~&~@<;; ~@;Done processing ~S, ~D left~:@>~%" name (count-if-not #'cddr new-module-vocabulary))
-               (setf (cdr cell) :done)))))))))
+                     (values new-module-vocabulary new-system-vocabulary)))))))))
+  (:method :around ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary)
+    (declare (ignore locality system-type complete skip-present module-vocabulary system-vocabulary))
+    (multiple-value-bind (new-module-vocabulary new-system-vocabulary) (call-next-method)
+      (let ((cell (cdr (assoc name new-module-vocabulary))))
+        (assert cell)
+        (report t "~&~@<;; ~@;Done processing ~S, ~D left~:@>~%" name (count-if-not #'cddr new-module-vocabulary))
+        (setf (cdr cell) :done)
+        (values new-module-vocabulary new-system-vocabulary)))))
 
 (defun satisfy-modules (module-names locality system-type complete skip-present module-vocabulary system-vocabulary &optional toplevel)
   (iter (for module-name in module-names)
