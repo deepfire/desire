@@ -929,6 +929,10 @@ locally present modules will be marked as converted."
                      (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
                        (report t ";;; establishing self as non-well-known distributor ~A~%" local-name)
                        (make-instance 'local-distributor :name local-name :root *desire-root* :omit-registration t))))
+      (unless (gitvar 'user.name)
+        (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
+          (report t ";;; setting git user name to ~S~%" username)
+          (setf (gitvar 'user.name nil t) username)))
       (reestablish-metastore-subscriptions meta-path)
       (when merge-remote-wishmasters
         (report t ";;; merging definitions from remote wishmasters...~%")
