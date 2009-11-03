@@ -485,7 +485,8 @@ to DIRECTORY."
     (fetch-gitremote (name remote))))
 
 (defun git-clone-remote (remote module-name &optional locality-pathname)
-  "Clone REMOTE, with working directory optionally changed to LOCALITY-PATHNAME."
+  "Clone REMOTE, with working directory optionally changed to
+LOCALITY-PATHNAME."
   (maybe-within-directory locality-pathname
     (let ((module-url (url remote module-name)))
       (with-explanation ("cloning module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
