@@ -828,20 +828,21 @@ The value returned is the list of found modules."
 (defun clone-metastore (url locality-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out."
-  (within-directory locality-pathname
+  (within-directory (locality-pathname)
     (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
       (declare (ignore type cred port path))
       (let ((remote-name (string-downcase host))
             (meta-dir (subdirectory* locality-pathname ".meta")))
         (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
           (git "clone" "-o" remote-name (concatenate 'string url "/.meta")))
-        (within-directory meta-dir
-          (ensure-gitbranch :master '("HEAD"))
+        (within-directory (meta-dir)
+          (unless (gitbranch-present-p :master)
+            (add-gitbranch :master '("HEAD")))
           (git-checkout-ref '("master"))
           (git-repository-reset-hard `("remotes" ,remote-name ,(downstring branch))))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
-  (within-directory metastore-pathname
+  (within-directory (metastore-pathname)
     (iter (for (nil remote-name branch-name) in (remove-if-not #'ref-remotep (refs-by-value (ref-value '("master") metastore-pathname)
                                                                                             metastore-pathname)))
           (for d = (distributor (string-upcase remote-name) :if-does-not-exist :continue))

@@ -21,15 +21,6 @@
 (in-package :desire)
 
 
-(defun invoke-maybe-within-directory (fn &optional directory)
-  (if directory
-      (within-directory directory
-        (funcall fn))
-      (funcall fn)))
-
-(defmacro maybe-within-directory (directory &body body)
-  `(invoke-maybe-within-directory (lambda () ,@body) ,directory))
-
 (define-condition vcs-condition ()
   ((vcs :accessor condition-vcs :initarg :vcs)))
 
@@ -62,7 +53,7 @@
       (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
 
 (defun (setf git-repository-bare-p) (val directory)
-  (within-directory directory
+  (within-directory (directory)
     (if val
         (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory)
         (progn
@@ -284,7 +275,7 @@
       (set-head (get-head)))))
 
 (defun invoke-with-detached-head (fn directory)
-  (within-directory directory
+  (within-directory (directory)
     (let ((current-head (get-head)))
       (unwind-protect (progn (git-detach-head)
                              (funcall fn))
@@ -313,9 +304,6 @@
     (with-explanation ("adding a git branch ~A tracking ~S in ~S" name ref *default-pathname-defaults*)
       (git "branch" (downstring name) (flatten-path-list ref)))))
 
-(defun ensure-gitbranch (name ref &optional directory)
-  (unless (gitbranch-present-p name directory)
-    (add-gitbranch name ref directory)))
 
 (defun git-ensure-noncurrent-branch (branchname refvalue &optional directory)
   (maybe-within-directory directory
