@@ -102,16 +102,19 @@
 (defun gitvar (var &optional directory)
   (declare (type symbol var))
   (maybe-within-directory directory
-    (multiple-value-bind (status output)
-        (with-explanation ("getting value of git variable ~A" (symbol-name var))
-          (git (list "config" (string-downcase (symbol-name var))) :valid-exit-codes `((0 . nil) (1 . :unset)) :output t))
-      (or status (string-right-trim '(#\Return #\Newline) output)))))
+    (with-captured-executable-output
+      (multiple-value-bind (setp output)
+          (with-explanation ("getting value of git variable ~A" (symbol-name var))
+            (with-shell-predicate
+              (git "config" (string-downcase (symbol-name var)))))
+        (when setp
+          (string-right-trim '(#\Return #\Newline) output))))))
 
-(defun (setf gitvar) (val var &optional directory)
+(defun (setf gitvar) (val var &optional directory globalp)
   (declare (type symbol var) (type string val))
   (maybe-within-directory directory
     (with-explanation ("setting git variable ~A to ~A" (symbol-name var) val)
-      (git (list "config" "--replace-all" (string-downcase (symbol-name var)) val)))))
+      (apply #'git "config" (xform globalp (curry #'cons "--global") (list "--replace-all" (string-downcase (symbol-name var)) val))))))
 
 ;;;
 ;;; Remotes
