@@ -326,7 +326,9 @@
   "This assumes that the local 'master' branch is present."
   (let ((ref (ensure-cons ref)))
     (maybe-within-directory directory
-      (with-retry-restarts ((hardreset-repository () (git-repository-reset-hard)))
+      (with-retry-restarts ((hardreset-repository ()
+                                                  :report "Clear all uncommitted (staged and unstaged) changes."
+                                                  (git-repository-reset-hard)))
         (unless (eq if-changes :ignore)
           (when (git-repository-changes-p directory)
             (ecase if-changes
