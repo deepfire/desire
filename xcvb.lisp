@@ -47,14 +47,15 @@
 (defmacro with-file-from-www ((filename url) &body body)
   `(invoke-with-file-from-www ,filename ,url (lambda () ,@body)))
 
-(defun apply-diff (filename &optional directory &key inhibit-rejects (if-fails :error))
+(defun apply-diff (filename &optional directory &key inhibit-backups (if-fails :error))
   (maybe-within-directory directory
     (cond ((with-valid-exit-codes ((1 nil)
                                    (2 nil))
              (with-explanation ("applying diff ~S in ~S" filename *default-pathname-defaults*)
-               (apply #'patch "-p1" "-i" filename (when inhibit-rejects
-                                                    '(#-win32 "--global-rejects-file=/dev/null"
-                                                      #+win32 "nul"))))))
+               (apply #'patch "-p1" "-i" filename (when inhibit-backups
+                                                            '(#-win32 "--global-reject-file=/dev/null"
+                                                              #+win32 "nul"
+                                                              "--no-backup-if-mismatch"))))))
           (t
            (git-repository-reset-hard)
            (ecase if-fails
@@ -65,10 +66,12 @@
   (update-module module)       ; leaves the repo in inconsistent state
   (within-directory ((module-pathname module))
     (git-repository-reset-hard)
+    (checkout-gitbranch :master *default-pathname-defaults*)
     (set-gitbranch :xcvbify *default-pathname-defaults*)
     (checkout-gitbranch :xcvbify *default-pathname-defaults*)
     (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
-      (unless (apply-diff ".xcvbifier.diff" nil :inhibit-rejects t :if-fails :continue)
+      (unless (apply-diff ".xcvbifier.diff" nil :inhibit-backups t :if-fails :continue)
+        (checkout-gitbranch :master *default-pathname-defaults*)
         (remove-gitbranch :xcvbify)
         (format t ";; failed to apply XCVBification diff to ~A" (name module))))
     (with-explanation ("committing xcvbification change")
