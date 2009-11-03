@@ -27,6 +27,11 @@
   (or (car (rassoc type *system-pathname-typemap* :test #'eq))
       (error "~@<Unknown system type ~S.~:@>" type)))
 
+(defparameter *asdf-system-blacklist* '("trivial-features-tests"))
+
+(defun asdf-system-name-blacklisted-p (name)
+  (member name *asdf-system-blacklist* :test #'equal))
+
 ;;;;
 ;;;; Backends
 ;;;;
@@ -38,13 +43,14 @@
         (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c))))
   (:method ((s xcvb-system)))
   (:method ((s mudball-system)))
-  (:method ((s asdf-system))
-    (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system (down-case-name s))))))
-          (for sanitised-depname = (string-upcase (string (xform-if #'consp #'second depname)))) ;; Drop version on the floor.
-          (if-let ((depsystem (system sanitised-depname :if-does-not-exist :continue)))
-            (collect depsystem into known-systems)
-            (collect sanitised-depname into unknown-names))
-          (finally (return (values known-systems unknown-names))))))
+  (:method ((s asdf-system) &aux (name (down-case-name s)))
+    (unless (asdf-system-name-blacklisted-p name)
+      (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system name)))))
+            (for sanitised-depname = (string-upcase (string (xform-if #'consp #'second depname)))) ;; Drop version on the floor.
+            (if-let ((depsystem (system sanitised-depname :if-does-not-exist :continue)))
+              (collect depsystem into known-systems)
+              (collect sanitised-depname into unknown-names))
+            (finally (return (values known-systems unknown-names)))))))
 
 (defgeneric system-definition-registry-symlink-path (system &optional locality)
   (:method :around (system &optional locality)
@@ -72,9 +78,11 @@
   (:method ((o asdf-system) &optional (locality (gate *self*)))
     (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
                               (system-definition o (module-pathname (system-module o) locality) :if-does-not-exist :continue))
-                       (asdf:find-system (down-case-name o) nil))
+                       (let ((name (down-case-name o)))
+                         (or (asdf-system-name-blacklisted-p name)
+                             (asdf:find-system name nil))))
       (asdf:missing-dependency () ;; CXML...
-        (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY during ASDF:FIND-SYSTEM~:@>" 'system)
+        (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY signalled during ASDF:FIND-SYSTEM~:@>" 'system)
         t))))
 
 (defun asdf-hidden-system-names (system &aux (name (name system)))
@@ -86,8 +94,10 @@ differently from that system's name."
     (unwind-protect
          (progn
            (setf asdf::*defined-systems* test)
-           (handler-case (let ((*break-on-signals* nil))
-                           (asdf:find-system name))
+           (handler-case (let ((*break-on-signals* nil)
+                               (name (downstring name)))
+                           (unless (asdf-system-name-blacklisted-p name)
+                             (asdf:find-system name)))
              (error (c)
                (format t "~@<; ~@;WARNING: error while querying ASDF about hidden names of system ~S: ~A~:@>~%" (name system) c)))
            (mapcar (compose #'string-upcase #'asdf:component-name)
