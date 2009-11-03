@@ -165,6 +165,11 @@
       (values (split-sequence #\/ (subseq string 5)))
       (values nil (parse-integer string :radix #x10))))
 
+(defun cook-refval (refvalue &optional prepend-refs)
+  (etypecase refvalue
+    (integer (format nil "~40,'0X" refvalue))
+    (list (flatten-path-list (xform prepend-refs (curry #'cons "refs") refvalue)))))
+
 (defun ref-shortp (ref)
   (endp (rest ref)))
 
@@ -175,7 +180,7 @@
   (and (not (ref-shortp ref)) (string= "remotes" (first ref))))
 
 ;;;
-;;; Raw refs
+;;; Raw refs & iteration
 ;;;
 (defun head-pathnames (directory)
   (remove nil (directory (subwild directory `(".git" "refs" "heads") :name :wild :type :wild)
@@ -212,31 +217,6 @@
     (when (funcall predicate ref refval)
       (collect (funcall fn ref refval)))))
 
-(defun ref-value (ref directory &key (if-does-not-exist :error))
-  (let ((path (ref-path ref directory)))
-    (if (probe-file path)
-        (%read-ref path)
-        (or (car (remove nil (map-packed-refs (lambda (r v) (when (string= "master" (first r)) v)) #'identity directory)))
-            (ecase if-does-not-exist
-              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref directory))
-              (:continue nil))))))
-
-(defun reffile-value-full (pathname &optional directory)
-  (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
-    (let* ((normalised-ref (rest ref)) ; strip the "refs" component
-           (refval (or refval (ref-value normalised-ref directory))))
-      (values refval normalised-ref))))
-
-(defun set-reffile-value-full (pathname value)
-  (with-output-to-file (reffile pathname)
-    (format reffile "~:[~40,'0X~;ref: ~A~]" (consp value) (if (consp value)
-                                                              (flatten-path-list (cons "refs" value))
-                                                              value))))
-
-;;;
-;;; From now on, we're fully enabled to read, write and properly interpret refs
-;;;
-
 (defun map-pathnames-full-refs (fn pathnames directory)
   (iter (for pathname in pathnames)
         (collect (funcall fn (path-ref pathname directory) (%read-ref pathname)))))
@@ -258,8 +238,28 @@
     (remove nil (append (map-heads #'ref-if-= directory)
                         (map-all-remote-heads #'ref-if-= directory)))))
 
+(defun ref-value (ref directory &key (if-does-not-exist :error))
+  (let ((path (ref-path ref directory)))
+    (if (probe-file path)
+        (%read-ref path)
+        (or (car (remove nil (map-packed-refs (lambda (r v) (when (string= "master" (first r)) v)) #'identity directory)))
+            (ecase if-does-not-exist
+              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref directory))
+              (:continue nil))))))
+
+(defun reffile-value-full (pathname &optional directory)
+  (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
+    (let* ((normalised-ref (rest ref)) ; strip the "refs" component
+           (refval (or refval (ref-value normalised-ref directory))))
+      (values refval normalised-ref))))
+
+(defun set-reffile-value-full (pathname value)
+  (with-output-to-file (reffile pathname)
+    (when (consp value)
+      (write-string "ref: " reffile))
+    (write-string (cook-refval value t) reffile)))
 ;;;
-;;; HEADs
+;;; HEAD operation
 ;;;
 (defun head-pathname (&optional directory remote)
   (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
@@ -269,8 +269,7 @@
 
 (defun set-head (new-value &optional directory remote)
   (declare (type (or cons (integer 0)) new-value))
-  (with-output-to-file (head (head-pathname directory remote))
-    (set-reffile-value-full head new-value)))
+  (set-reffile-value-full (head-pathname directory remote) new-value))
 
 (defun git-detach-head (&optional directory)
   (maybe-within-directory directory
@@ -299,33 +298,44 @@
                            (mapcan (curry #'split-sequence #\Space)
                                    (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
 
+
 (defun gitbranch-present-p (name &optional directory)
   (member name (gitbranches directory) :test #'string=))
 
 (defun add-gitbranch (name ref &optional directory)
   (maybe-within-directory directory
     (with-explanation ("adding a git branch ~A tracking ~S in ~S" name ref *default-pathname-defaults*)
-      (git "branch" (downstring name) (flatten-path-list ref)))))
+      (nth-value 0 (git "branch" (downstring name) (flatten-path-list ref))))))
 
+(defun remove-gitbranch (name &optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("removing git branch ~A in ~S" name *default-pathname-defaults*)
+      (nth-value 0 (git "branch" "-d" (downstring name))))))
 
-(defun git-ensure-noncurrent-branch (branchname refvalue &optional directory)
+(defun git-set-noncurrent-gitbranch (branchname &optional directory (refvalue (get-head directory)))
+  (declare (type (or list (integer 0)) refvalue))
   (maybe-within-directory directory
     (with-explanation ("moving non-current ref '~A' to ~A in ~S" branchname refvalue *default-pathname-defaults*)
-      (git "branch" "-f" (downstring branchname) refvalue))))
+      (nth-value 0 (git "branch" "-f" (downstring branchname) (cook-refval refvalue))))))
+
+(defun set-gitbranch (branchname &optional directory (refvalue (get-head directory)))
+  (with-detached-head (directory)
+    (git-set-noncurrent-gitbranch branchname directory refvalue)))
 
 (defun git-checkout-ref (ref &optional directory &key (if-changes :error))
   "This assumes that the local 'master' branch is present."
-  (maybe-within-directory directory
-    (with-retry-restarts ((hardreset-repository () (git-repository-reset-hard)))
-      (unless (eq if-changes :ignore)
-        (when (git-repository-changes-p directory)
-          (ecase if-changes
-            (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
-                         (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
-            (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
-                               (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory))))))
-      (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
-        (git "checkout" (flatten-path-list ref))))))
+  (let ((ref (ensure-cons ref)))
+    (maybe-within-directory directory
+      (with-retry-restarts ((hardreset-repository () (git-repository-reset-hard)))
+        (unless (eq if-changes :ignore)
+          (when (git-repository-changes-p directory)
+            (ecase if-changes
+              (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
+                           (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
+              (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
+                                 (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory))))))
+        (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
+          (git "checkout" (flatten-path-list ref)))))))
 
 (defmacro with-git-ref (ref &body body)
   `(unwind-protect (progn (git-checkout-ref ,ref)
