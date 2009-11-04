@@ -27,7 +27,7 @@
   (or (car (rassoc type *system-pathname-typemap* :test #'eq))
       (error "~@<Unknown system type ~S.~:@>" type)))
 
-(defparameter *asdf-system-blacklist* '("trivial-features-tests"))
+(defparameter *asdf-system-blacklist* '("cffi-tests" "trivial-features-tests"))
 
 (defun asdf-system-name-blacklisted-p (name)
   (member name *asdf-system-blacklist* :test #'equal))
