@@ -217,6 +217,9 @@ converted module redistribution.
 
         When LUST is non-NIL, the module is localised.
 
+      - update-module module-specifier &optional (locality (gate *self*)) => <no values> ::
+        Update a module designated by MODULE-SPECIFIER, possibly specifying the target LOCALITY.
+
 ***** Reader macros for add-module
 
 Following reader macro is enabled by install-add-module-reader:

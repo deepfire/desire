@@ -288,10 +288,12 @@
     (reset-gitbranch-to-remote-branch :master `(,(down-case-name remote) "master") (module-pathname module locality) t)))
 
 (defun update-module (module &optional (locality (gate *self*)))
-  (let ((best-remote (module-best-remote module)))
+  (let* ((module (coerce-to-module module))
+         (best-remote (module-best-remote module)))
     (report t ";; Fetching module ~A from ~A remote ~A, ~A~%" (name module) (vcs-type best-remote) (name best-remote) (url best-remote module))
     (update-module-using-remote module best-remote locality)
-    (report t ";; Done fetching module ~A~%" (name module))))
+    (report t ";; Done fetching module ~A~%" (name module))
+    (values)))
 
 ;; system vocabulary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))
