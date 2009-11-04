@@ -523,7 +523,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 ;;;;
 ;;;; Modules
 ;;;;
-(defclass module (registered depobj synchronisable)
+(defclass module (registered synchronisable)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (system-path-whitelist :accessor module-system-path-whitelist :initarg :path-whitelist :documentation "Specified.")
