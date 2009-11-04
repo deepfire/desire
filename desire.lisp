@@ -87,13 +87,13 @@
   (:method ((o git-remote) name)
     (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)
-    (with-valid-exit-codes ((8 nil)) (wget "--spider" `(,(url o name) "_darcs/inventory"))))
+    (touch-www-file `(,(url o name) "_darcs/inventory")))
   (:method ((o rsync) name)
     (with-valid-exit-codes ((23 nil)) (rsync "--list-only" (url o name))))
   (:method ((o cvs-native-remote) name)
     (with-valid-exit-codes ((1 nil)) (cvs "-d" (url o name) "history")))
   (:method ((o svn-http-remote) name)
-    (with-valid-exit-codes ((8 nil)) (wget "--spider" (url o name)))))
+    (touch-www-file (url o name))))
 
 (defgeneric fetch-remote (locality remote module))
 
