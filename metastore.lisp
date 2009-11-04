@@ -56,7 +56,8 @@
                                        ,@(remove-from-plist open-options :element-type :if-does-not-exist :if-exists :commit-p :commit-message))
            ,@body)
        ,@(when commit-p
-           `((when ,commit-p
+           `((when (and ,commit-p
+                        (git-repository-changes-p ,metastore-directory))
                (commit-metafile ,name ,metastore-directory ,@(maybecall commit-message #'list commit-message))))))))
 
 (defmacro appending-to-metafile ((stream name metastore-directory &rest open-options) &body body)
