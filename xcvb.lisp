@@ -42,22 +42,23 @@
   (update-module module)       ; leaves the repo in inconsistent state
   (within-directory ((module-pathname module))
     (git-repository-reset-hard)
-    (checkout-gitbranch :master *default-pathname-defaults*)
-    (set-gitbranch :xcvbify *default-pathname-defaults*)
-    (checkout-gitbranch :xcvbify *default-pathname-defaults*)
-    (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
-      (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" nil t nil)
-        (cond (successp
-               (with-explanation ("committing xcvbification change")
-                 (git "commit" "-m" "Xcvbify.")))
-              (t
-               (checkout-gitbranch :master *default-pathname-defaults*)
-               (remove-gitbranch :xcvbify)
-               (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
-                 (if break-on-patch-failure
-                     (break control-string (name module) output)
-                     (format t control-string (name module) output)))
-               (values nil output)))))))
+    (checkout-gitbranch :master)
+    (set-gitbranch :xcvbify)
+    (checkout-gitbranch :xcvbify)
+    (unless (file-exists-p "build.xcvb")
+      (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
+        (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" nil t nil)
+          (cond (successp
+                 (with-explanation ("committing xcvbification change")
+                   (git "commit" "-m" "Xcvbify.")))
+                (t
+                 (checkout-gitbranch :master)
+                 (remove-gitbranch :xcvbify)
+                 (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
+                   (if break-on-patch-failure
+                       (break control-string (name module) output)
+                       (format t control-string (name module) output)))
+                 (values nil output))))))))
 
 (defun update-xcvbification (&optional break-on-patch-failure)
   (find-executable 'patch)

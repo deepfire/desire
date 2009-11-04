@@ -344,13 +344,13 @@
                           ,@body)
      (git-checkout-ref '("master"))))
 
-(defun checkout-gitbranch (name directory &optional reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
+(defun checkout-gitbranch (name &optional directory reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
   (unless (gitbranch-present-p name directory)
     (ecase if-does-not-exist 
-      (:error (git-error "~@<Asked to check out a nonexistent branch ~A in ~S~:@>" name directory))
+      (:error (git-error "~@<Asked to check out a nonexistent branch ~A in ~S~:@>" name (or directory *default-pathname-defaults*)))
       (:create (if default-ref
                    (add-gitbranch name default-ref directory)
-                   (git-error "~@<While checking out branch ~A in ~S: branch doesn't exist and the default ref was not provided.~:@>" name directory)))))
+                   (git-error "~@<While checking out branch ~A in ~S: branch doesn't exist and the default ref was not provided.~:@>" name (or directory *default-pathname-defaults*))))))
   (when reset-before-checkout
     (git-repository-reset-hard nil directory))
   (git-checkout-ref `(,(downstring name)) directory :if-changes if-changes))
