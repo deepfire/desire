@@ -222,11 +222,13 @@ treating CVS locations as URIs."
 ;;;
 ;;; WWW
 ;;;
+(defun get-url-contents-as-string (url)
+  (with-explanation ("retrieving ~S" url)
+    (nth-value 1 (with-captured-executable-output
+                   (wget url "-O" "-")))))
+
 (defun list-www-directory (url)
-  (with-explanation ("listing contents of WWW directory ~S" url)
-    (let ((output (nth-value 1 (with-captured-executable-output
-                                 (wget url "-O" "-")))))
-      (nthcdr 5 (extract-delimited-substrings output "HREF=\"" #\")))))
+  (nthcdr 5 (extract-delimited-substrings (get-url-contents-as-string url) "HREF=\"" #\")))
 
 (defun invoke-with-file-from-www (filename url fn)
   (unwind-protect (with-explanation ("retrieving ~A" url)
