@@ -196,7 +196,7 @@
                      (localised-tarball (concatenate 'string "../../tmp/" (subseq url (1+ slash-pos)))))
                 (with-file-from-www (localised-tarball url)
                   (with-explanation ("on behalf of module ~A, importing tarball version ~A" (name module) (princ-version-to-string next-version))
-                    (git "import-orig" localised-tarball))))))))))
+                    (git "import-orig" localised-tarball)))))))))
 
 (defmethod fetch-remote :around (locality remote module)
   (with-error-resignaling (executable-failure
