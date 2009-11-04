@@ -20,14 +20,15 @@
                ;; Tier 3
                (:file "types" :depends-on ("metastore"))
                ;; Tier 4
-               (:file "system-loadability" :depends-on ("types"))
                (:file "add-module" :depends-on ("types"))
                (:file "apropos" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
+               (:file "system-loadability" :depends-on ("types"))
                ;; Tier 5
-               (:file "xcvb" :depends-on ("system-loadability"))
-               (:file "desire" :depends-on ("system-loadability"))
                (:file "application" :depends-on ("system-loadability"))
+               (:file "clbuild" :depends-on ("add-module"))
+               (:file "desire" :depends-on ("system-loadability"))
+               (:file "xcvb" :depends-on ("system-loadability"))
                (:module "system-quirks" :depends-on ("system-loadability")
                         :components ((:file "cl-launch")
                                      (:file "xcvb")))
