@@ -21,6 +21,9 @@
 (in-package :desire)
 
 
+(defvar *auto-lust* nil
+  "Whether to automatically LUST the modules during ADD-MODULE.")
+
 (defun add-distributor (type hostname port path &key gate-p)
   "Make a distributor residing at HOSTNAME, with a remote of TYPE,
 accesible at PORT and PATH. 
@@ -188,11 +191,10 @@ The values returned are:
     (when credentials
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
-(defparameter *auto-lust* nil)
-
 (defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist vcs-type (lust *auto-lust*))
   (multiple-value-bind (remote cred module-name created-remote-p) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
     (declare (ignore created-remote-p))
+    
     (if remote
         (lret ((module (ensure-remote-module remote module-name :credentials cred :path-whitelist path-whitelist :path-blacklist path-blacklist)))
           (when lust
