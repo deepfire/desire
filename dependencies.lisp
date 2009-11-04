@@ -204,3 +204,69 @@ treating CVS locations as URIs."
                                          (error () (error "~@<Not a number in port position of URI ~S.~:@>" namestring))))))
               (when slash-pos (split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))
               (char= #\/ (aref namestring (1- (length namestring))))))))
+
+;;;
+;;; Strings
+;;;
+(defun extract-delimited-substrings (string start-delim-string end-delim-char)
+  (iter (with posn = 0)
+        (for href-posn = (search start-delim-string string :start2 posn))
+        (while href-posn)
+        (for start-posn = (+ href-posn (length start-delim-string)))
+        (for close-posn = (position end-delim-char string :start start-posn))
+        (when close-posn
+          (collect (subseq string start-posn close-posn))
+          (setf posn (1+ close-posn)))
+        (while close-posn)))
+
+;;;
+;;; WWW
+;;;
+(defun list-www-directory (url)
+  (with-explanation ("listing contents of WWW directory ~S" url)
+    (let ((output (nth-value 1 (with-captured-executable-output
+                                 (wget url "-O" "-")))))
+      (nthcdr 5 (extract-delimited-substrings output "HREF=\"" #\")))))
+
+(defun invoke-with-file-from-www (filename url fn)
+  (unwind-protect (with-explanation ("retrieving ~A" url)
+                    (wget url "-O" filename)
+                    (funcall fn))
+    (delete-file filename)))
+
+(defmacro with-file-from-www ((filename url) &body body)
+  `(invoke-with-file-from-www ,filename ,url (lambda () ,@body)))
+
+(defun touch-www-file (url)
+  (with-valid-exit-codes ((8 nil)) (wget "--spider" url)))
+
+;;;
+;;; Versions
+;;;
+(defun princ-version-to-string (version)
+  "Return a textual representation of VERSION."
+  (flatten-path-list (mapcar #'princ-to-string version) nil nil "."))
+
+(defun bump-version-component (version n mode)
+  "Increase Nth component of VERSION, counting from tail, by one, or, when
+TEN-CEILING is non-NIL, just enough to make the component rounded by 10."
+  (let ((last (butlast version n)))
+    (case mode
+      (:incf (incf (lastcar last)))
+      (:ten-ceiling (setf (lastcar last) (* 10 (ceiling (1+ (lastcar last)) 10))))
+      (:mult-ten (setf (lastcar last) (* 10 (lastcar last)))))
+    (append last (make-list n :initial-element 0))))
+
+(defun next-version-variants (version)
+  "Produce plausible variants of versions following VERSION,
+in order of strictly decreasing likelihood."
+  (remove-duplicates (iter (for i from 0 below (length version))
+                           (collect (append version (list 1)))
+                           (collect (bump-version-component version i :incf))
+                           (unless (= i (1- (length version)))
+                             (let ((10-bumped (bump-version-component version i :ten-ceiling)))
+                               (collect 10-bumped)
+                               (collect (bump-version-component version i :mult-ten))
+                               (appending (iter (for j from 0 below (1+ i))
+                                                (collect (butlast 10-bumped j)))))))
+                     :test #'equal))
