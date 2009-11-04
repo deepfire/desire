@@ -296,6 +296,7 @@ a special module called '.meta'."
            ("cvs" 'cvs-native-remote)
            (":pserver" 'cvs-native-remote)
            ("svn" 'svn-native-remote)
+           ("svn+http" 'svn-http-remote)
            ("svn+rsync" 'svn-rsync-remote))))
 
 ;; Used for validation of user input in add-module
