@@ -75,12 +75,13 @@ SAVE-CURRENT-DEFINITIONS was called.")
    :relationships nil))
 
 (defclass local-distributor (distributor)
-  ((root   :accessor root        :initarg :root :documentation "Root of all desires.")
-   (git    :accessor local-git   :documentation "Transitory git locality of a locally-accessible distributor.")
-   (hg     :accessor local-hg    :documentation "Transitory hg locality of a locally-accessible distributor.")
-   (darcs  :accessor local-darcs :documentation "Transitory darcs locality of a locally-accessible distributor.")
-   (cvs    :accessor local-cvs   :documentation "Transitory cvs locality of a locally-accessible distributor.")
-   (svn    :accessor local-svn   :documentation "Transitory svn locality of a locally-accessible distributor.")))
+  ((root    :accessor root          :initarg :root :documentation "Root of all desires.")
+   (git     :accessor local-git     :documentation "Transitory git locality of a locally-accessible distributor.")
+   (hg      :accessor local-hg      :documentation "Transitory hg locality of a locally-accessible distributor.")
+   (darcs   :accessor local-darcs   :documentation "Transitory darcs locality of a locally-accessible distributor.")
+   (cvs     :accessor local-cvs     :documentation "Transitory cvs locality of a locally-accessible distributor.")
+   (svn     :accessor local-svn     :documentation "Transitory svn locality of a locally-accessible distributor.")
+   (tarball :accessor local-tarball :documentation "Transitory tarball locality of a locally-accessible distributor.")))
 
 (defmacro do-wishmasters ((var) &body body)
   `(do-distributors (,var)
@@ -126,24 +127,27 @@ This notably excludes converted modules."
 ;;;;
 (defclass vcs-type-mixin () ((vcs-type :reader vcs-type :initarg :vcs-type)))
 
-(defvar *supported-vcs-types* '(git hg darcs cvs svn))
+(defvar *supported-vcs-types* '(git hg darcs cvs svn tarball))
 (defvar *gate-vcs-type* 'git)
 
+(defclass wrinkle-mixin ()
+  ((wrinkles :accessor wrinkles :initarg :wrinkles))
+  (:default-initargs :wrinkles nil))
+
 ;;; exhaustive partition of VCS-TYPE-MIXIN
-(defclass git (vcs-type-mixin)   () (:default-initargs :vcs-type 'git))
-(defclass hg (vcs-type-mixin)    () (:default-initargs :vcs-type 'hg))
-(defclass darcs (vcs-type-mixin) () (:default-initargs :vcs-type 'darcs))
-(defclass cvs (vcs-type-mixin)   
-  ((module-modules :accessor cvs-module-modules :initarg :module-modules)) 
-  (:default-initargs :vcs-type 'cvs :module-modules nil))
-(defclass svn (vcs-type-mixin)   () (:default-initargs :vcs-type 'svn))
+(defclass git (vcs-type-mixin)               () (:default-initargs :vcs-type 'git))
+(defclass hg (vcs-type-mixin)                () (:default-initargs :vcs-type 'hg))
+(defclass darcs (vcs-type-mixin)             () (:default-initargs :vcs-type 'darcs))
+(defclass cvs (vcs-type-mixin wrinkle-mixin) () (:default-initargs :vcs-type 'cvs))
+(defclass svn (vcs-type-mixin wrinkle-mixin) () (:default-initargs :vcs-type 'svn))
+(defclass tarball (vcs-type-mixin)           () (:default-initargs :vcs-type 'tarball))
 
 (defun vcs-enabled-p (type)
   (class-slot type 'enabled-p))
 
-(defun cvs-remote-module-module (remote module-name)
-  (or (cadr (assoc module-name (cvs-module-modules remote) :test #'string=))
-      (downstring module-name)))
+(defgeneric remote-module-wrinkle (remote module-name)
+  (:method ((r wrinkle-mixin) module-name)
+    (cadr (assoc module-name (wrinkles r) :test #'string=))))
 
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
@@ -169,6 +173,8 @@ This notably excludes converted modules."
 (defclass svn-rsync (svn rsync) ())
 (defclass svn-http (svn http) ())
 (defclass svn-native (svn native) () (:default-initargs :schema 'svn))
+(defclass tarball-http (tarball http)
+  ((initial-version :accessor initial-tarball-version :initarg :initial-version)))
 
 ;;;;
 ;;;; Location
@@ -243,6 +249,7 @@ a special module called '.meta'."
 (defclass hg-remote (hg remote) ())
 (defclass cvs-remote (cvs remote) ())
 (defclass svn-remote (svn remote) ())
+(defclass tarball-remote (tarball remote) ())
 
 ;;; almost most specific (due to GATE mixin), exhaustive partition of REMOTE
 (defclass git-native-remote (git-native git-remote) ())
@@ -255,6 +262,7 @@ a special module called '.meta'."
 (defclass svn-rsync-remote (svn-rsync svn-remote) ())
 (defclass svn-http-remote (svn-http svn-remote) ())
 (defclass svn-native-remote (svn-native svn-remote) ())
+(defclass tarball-http-remote (tarball-http tarball-remote) ())
 
 ;;; A special case location*vcs*role extension which is /going/ to be
 ;;; troublesome, as it violates simplicity.
@@ -303,6 +311,7 @@ differ in only slight detail -- gate property, for example."
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
+(defclass tarball-locality (tarball locality) ())
 
 (defmethod vcs-type ((o (eql 'gate-native-remote))) *gate-vcs-type*)
 (defmethod vcs-type ((o (eql 'gate-http-remote))) *gate-vcs-type*)
@@ -316,6 +325,7 @@ differ in only slight detail -- gate property, for example."
 (defmethod vcs-type ((o (eql 'svn-rsync-remote))) 'svn)
 (defmethod vcs-type ((o (eql 'svn-http-remote))) 'svn)
 (defmethod vcs-type ((o (eql 'svn-native-remote))) 'svn)
+(defmethod vcs-type ((o (eql 'tarball-http-remote))) 'tarball)
 
 (defmethod transport ((o (eql 'gate-native-remote))) 'native)
 (defmethod transport ((o (eql 'gate-http-remote))) 'http)
@@ -329,6 +339,7 @@ differ in only slight detail -- gate property, for example."
 (defmethod transport ((o (eql 'svn-rsync-remote))) 'rsync)
 (defmethod transport ((o (eql 'svn-http-remote))) 'http)
 (defmethod transport ((o (eql 'svn-native-remote))) 'native)
+(defmethod transport ((o (eql 'tarball-http-remote))) 'http)
 
 ;;;
 ;;; Locality methods
@@ -547,10 +558,10 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (:method ((r remote) (m module) &key &allow-other-keys)
     (pushnew (name m) (location-module-names r))
     (pushnew r (module-remotes m)))
-  (:method ((r cvs-remote) (m module) &key module-module)
-    (when (and module-module
-               (not (string= module-module (down-case-name m))))
-      (push (cons (name m) module-module) (cvs-module-modules r)))
+  (:method :around ((r wrinkle-mixin) (m module) &key wrinkle)
+    (when (and wrinkle
+               (not (string= wrinkle (down-case-name m))))
+      (push (cons (name m) wrinkle) (wrinkles r)))
     (call-next-method)))
 
 (defgeneric remote-unlink-module (remote module)
@@ -560,7 +571,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (removef (location-module-names r) (name m))
     (removef (module-remotes m) r))
   (:method ((r cvs-remote) (m module))
-    (removef (cvs-module-modules r) (name m) :key #'car)
+    (removef (wrinkles r) (name m) :key #'car)
     (call-next-method)))
 
 (defun remote-defines-module-p (remote module)
@@ -626,9 +637,9 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                     (unless (remote-domain-name-takeover r)
                       "/")
                     path)))
-  (:method :around ((r cvs-remote) module)
+  (:method :around ((r wrinkle-mixin) module)
            (values (call-next-method)
-                   (cvs-remote-module-module r (when module (name module)))))
+                   (remote-module-wrinkle r (when module (name module)))))
   (:method (r m) "://")
   (:method ((r cvs-native-remote) m)
     (let ((c (module-credentials r (name m))))
@@ -919,10 +930,10 @@ locally present modules will be marked as converted."
     (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) *desire-root*))
            (meta-path (merge-pathnames #p".meta/" gate-path)))
       (clear-definitions)
-      (with-class-slot (git hg darcs cvs svn) required-executables
-        (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git wget) cvs '(rsync git) svn '(rsync git)))
-      (with-class-slot (git hg darcs cvs svn) enabled-p
-        (setf git nil hg nil darcs nil cvs nil svn nil))
+      (with-class-slot (git hg darcs cvs svn tarball) required-executables
+        (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git wget) cvs '(rsync git) svn '(rsync git) tarball '(git)))
+      (with-class-slot (git hg darcs cvs svn tarball) enabled-p
+        (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
         (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
       (unless (metastore-present-p meta-path '(definitions))
@@ -972,22 +983,16 @@ locally present modules will be marked as converted."
 ;;;
 (define-condition desire-condition (condition) ())
 (define-condition desire-error (desire-condition error) ())
+(define-condition remote-error (desire-error)
+  ((remote :accessor condition-remote :initarg :remote)))
 (define-condition repository-error (desire-error)
   ((locality :accessor condition-locality :initarg :locality)
    (module :accessor condition-module :initarg :module)))
-(define-condition remote-error (desire-error)
-  ((remote :accessor condition-remote :initarg :remote)))
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))
   (:report (desire)
            "~@<It is not known to me how to satisfy the desire for ~S.~:@>" desire))
-
-(define-reported-condition fetch-failure (remote-error)
-  ((module :accessor condition-module :initarg :module)
-   (execution-error :accessor condition-execution-error :initarg :execution-error))
-  (:report (remote module execution-error)
-           "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (name module) remote execution-error))
 
 ;;;
 ;;; Desires.

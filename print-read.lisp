@@ -115,10 +115,12 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (list `(:systemless-modules ,(sort (mapcar #'downstring systemless) #'string<))))
                       (when-let ((converted-names (and (typep o 'gate) (slot-or-abort-print-object stream o 'converted-module-names))))
                         (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<))))
+                      (when-let ((initial-version (and (typep o 'tarball) (slot-or-abort-print-object stream o 'initial-version))))
+                        (list `(:initial-version ,initial-version)))
                       (when-let ((credentials (remote-module-credentials o)))
                         (list `(:credentials ,credentials)))))
-            (when-let ((cvs-module-modules (and (typep o 'cvs) (slot-or-abort-print-object stream o 'module-modules))))
-              `(:cvs-module-modules ,cvs-module-modules)))))
+            (when-let ((wrinkles (and (typep o 'wrinkle-mixin) (slot-or-abort-print-object stream o 'wrinkles))))
+              `(:wrinkles ,wrinkles)))))
 
 (defun system-implied-p (system)
   "See it the definition of SYSTEM is implied, and is therefore subject 
@@ -163,7 +165,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                                                             (if (consp maybe-name)
                                                                 (values nil maybe-name (cddr remote-form))
                                                                 (values maybe-name (third remote-form) (cdddr remote-form))))
-      (destructuring-bind (&key distributor-port domain-name-takeover modules systemless-modules converted-module-names credentials cvs-module-modules) more-args
+      (destructuring-bind (&key distributor-port domain-name-takeover modules systemless-modules converted-module-names credentials wrinkles initial-version) more-args
         `(let* ((source *read-time-merge-source-distributor*)
                 (owner *read-time-enclosing-distributor*)
                 (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
@@ -177,7 +179,8 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                                                                    :path ',path-components :module-names module-names
                                                                    :last-sync-time ,*read-universal-time* :synchronised-p t
                                                                    ,@(when credentials `(:credentials ',credentials))
-                                                                   ,@(when cvs-module-modules `(:module-modules ',cvs-module-modules))))))
+                                                                   ,@(when wrinkles `(:wrinkles ',wrinkles))
+                                                                   ,@(when initial-version `(:initial-version ',initial-version))))))
              (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
              (when (typep *read-time-enclosing-remote* 'gate)
                (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))

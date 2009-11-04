@@ -327,7 +327,7 @@ These additional values are returned as multiple values."
                         (let* ((default-cvs-module-name (downstring module-name))
                                (cvs-module-name (or posturl default-cvs-module-name)))
                           (unless (string= cvs-module-name default-cvs-module-name)
-                            (push (list module-name cvs-module-name) (cvs-module-modules remote)))))))))))
+                            (push (list module-name cvs-module-name) (wrinkles remote)))))))))))
       (do-new-remotes (distributor new-remotes)
         (flet ((module-url-reformulable (name url current remotes)
                  (multiple-value-bind (type cred hostname port path) (parse-remote-namestring url :slashless (typep current 'cvs-native-remote) :type-hint (vcs-type current))

@@ -370,18 +370,16 @@ SAVE-CURRENT-DEFINITIONS writes out changes into
 
 * Shortcomings
 
-Some problems which pop out off the top of the head:
+Some known problems:
 
-     -  SBCL-only
-     -  ASDF-only
-     -  Linux-only (might work on other unices)
-     -  has a non-trivial amount of CL library dependencies, half of them
-        not exactly being common
-     -  calls out to an obscene amount of external executables, thereby only
-        being able to guess about failure reasons
-     -  can not do anything with software released as tarballs 
-     -  is git-centric (probably not a big issue)
-     -  obviously has rough edges
+     - consumers of DEFINITIONS execute remote code, essentially
+     - SBCL-only
+     - ASDF-only
+     - Linux-only (might work on other unices)
+     - has a non-trivial amount of CL library dependencies, half of them
+       not exactly being common
+     - calls out to an obscene amount of external executables, thereby only
+       being able to guess about failure reasons
 
 -----
 
