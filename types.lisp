@@ -895,7 +895,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
   (let ((gitroot (subdirectory* directory "git")))
     (when (and (probe-file gitroot) (not (directory-exists-p gitroot)))
       (error "~@<The specified root at ~S contains a file named 'git', which violates the requirement for a sane root.~:@>" directory))
-    (ensure-directories-exist gitroot))
+    (ensure-directories-exist gitroot)
+    (ensure-directories-exist (subdirectory* directory "tmp")))
   directory)
 
 (defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master))
