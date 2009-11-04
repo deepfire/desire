@@ -220,6 +220,17 @@ converted module redistribution.
       - update-module module-specifier &optional (locality (gate *self*)) => <no values> ::
         Update a module designated by MODULE-SPECIFIER, possibly specifying the target LOCALITY.
 
+      - =*silently-reset-dirty-repositories*= => boolean ::
+        Whenever a dirty repository comes up in a situation which requires a clean one to proceed, quietly reset, or otherwise cleanup the repository,
+        without raising any signals.  Defaults to T.
+
+      - =*auto-lust*= => boolean ::
+        Whether to automatically LUST the modules during ADD-MODULE.  Defaults to NIL.
+
+      - =*fetch-errors-serious*= => boolean ::
+        Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE-MODULE.
+        Defaults to NIL.
+
 ***** Reader macros for add-module
 
 Following reader macro is enabled by install-add-module-reader:

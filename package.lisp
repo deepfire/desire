@@ -45,7 +45,7 @@
    #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
    #:module-bare-p #:module-locally-present-p #:do-present-modules #:module-world-readable-p
    ;; desire.lisp
-   #:*register-happy-matches* #:*fetch-errors-serious* #:*register-all-martians*
+   #:*fetch-errors-serious* #:*silently-reset-dirty-repositories*
    #:desire #:lust
    #:define-application 
    #:fetch #:desire

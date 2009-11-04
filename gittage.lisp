@@ -332,6 +332,7 @@
         (unless (eq if-changes :ignore)
           (when (git-repository-changes-p directory)
             (ecase if-changes
+              (:reset (git-repository-reset-hard))
               (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
                            (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
               (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"

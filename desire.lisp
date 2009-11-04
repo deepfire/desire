@@ -21,46 +21,16 @@
 (in-package :desire)
 
 
+(defparameter *silently-reset-dirty-repositories* t
+  "Whenever a dirty repository comes up in a situation which requires
+a clean one to proceed, quietly reset, or otherwise cleanup the repository,
+without raising any signals.")
+
 (defparameter *implementation-provided-systems*
   #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
   #-sbcl nil)
 
-;;;
-;;; Remote update-ness:
-;;;
-;;; git: peek-remote, contents of HEAD
-;;; svn: rsync, mod date of db/current
-;;; cvs: rsync, mod date of CVSROOT/history (anything better?)
-;;; darcs: no wai? (http header wootery?)
-;;;
-
-;; (defgeneric time-identity (repo)
-;;   (:method-combination primary-method-not-required)
-;;   (:method :around ((o symbol))
-;;     (get-time-identity (module o)))
-;;   (:method :around ((o module))
-;;     (get-time-identity (module-master-repository o)))
-;;   (:method :around ((o repository))
-;;     (file-write-date (merge-pathnames (call-next-method) (path o))))
-;;   (:method ((o local-git-repository))
-;;     (make-pathname :directory '(:relative ".git" "refs" "heads") :name "master"))
-;;   (:method ((o local-darcs-repository))
-;;     (make-pathname :directory '(:relative "_darcs" "patches")))
-;;   (:method ((o local-cvs-repository))
-;;     (make-pathname :directory '(:relative "CVSROOT") :name "history"))
-;;   (:method ((o local-svn-repository))
-;;     (make-pathname :directory '(:relative "db") :name "current")))
-
-;;;   (multiple-value-bind (primary backups) (url from)
-;;;     (with-condition-restart-binding ((executable-failure continue))
-;;;       (iter (for url in (cons primary backups))
-;;;             (restart-bind ((continue (lambda (cond) (declare (ignore cond)) (format t "failed to fetch from ~S~%" url) (next-iteration))
-;;;                              :report-function (lambda (stream) (format stream "Try fetching from other backup URLs."))))
-;;;               (call-next-method o :url url)
-;;;               (return-from fetch-module t))
-;;;             (finally (warn 'module-fetch-failed :module o)))))
-
-(defvar *purgeworth-binaries* 
+(defparameter *purgeworth-binaries* 
   '("dfsl"        ;; OpenMCL
     "ppcf" "x86f" ;; CMUCL
     "fasl"        ;; SBCL
@@ -112,7 +82,9 @@
       (if (directory-created-p)
           (with-explanation ("initialising git repository of module ~A in ~S" (name module) *default-pathname-defaults*)
             (git "init-db"))
-          (git-checkout-ref "master"))
+          (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
+                                                         :reset
+                                                         :error)))
       (git-fetch-remote remote (name module)))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
@@ -135,7 +107,9 @@
   (let ((repo-dir (module-pathname module locality)))
     (multiple-value-bind (url cvs-module-name) (url cvs module)
       (within-directory (repo-dir :if-does-not-exist :create)
-        (git-checkout-ref "master")
+        (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
+                                                       :reset
+                                                       :error))
         (git "cvsimport" "-d" url (or cvs-module-name (down-case-name module)))))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote svn-rsync-remote) module)
@@ -150,7 +124,9 @@
       (if (directory-created-p)
           (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" (name module) url *default-pathname-defaults*)
             (git "svn" `("init" ,url ,wrinkle)))
-          (git-checkout-ref "master"))
+          (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
+                                                         :reset
+                                                         :error)))
       (with-explanation ("on behalf of module ~A, importing from ~S in ~S" (name module) url *default-pathname-defaults*)
         (git "svn" "fetch")))))
 
@@ -237,7 +213,9 @@
     (purge-binaries git-repo-dir)
     (within-directory (git-repo-dir :if-does-not-exist :create)
       (when (directory-existed-p)
-        (git-checkout-ref "master"))
+        (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
+                                                       :reset
+                                                       :error)))
       (with-explanation ("on behalf of module ~A, converting from darcs to git: ~S => ~S" (name module) darcs-repo-dir *default-pathname-defaults*)
         (with-condition-recourses dirt-files-in-repository
             (multiple-value-bind (successp output) (with-shell-predicate
@@ -258,7 +236,9 @@
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config") :if-exists :supersede)
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (when (git-repository-present-p git-repo-dir)
-      (git-checkout-ref "master" git-repo-dir))
+      (git-checkout-ref "master" git-repo-dir :if-changes (if *silently-reset-dirty-repositories*
+                                                              :reset
+                                                              :error)))
     (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module module :locality git-locality))
       (with-explanation ("on behalf of module ~A, converting from cvs to git: ~S => ~S" (name module) cvs-repo-dir git-repo-dir)
         (git "cvsimport" "-v" "-C" (namestring git-repo-dir) "-d" (format nil ":local:~A" (string-right-trim "/" (namestring cvs-repo-dir))) name)))))
@@ -272,7 +252,9 @@
         (if (directory-created-p)
             (with-explanation ("on behalf of module ~A, setting up svn to git conversion: ~S => ~S" (name module) svn-repo-dir *default-pathname-defaults*)
               (git "svn" "init" `("file://" ,(namestring svn-repo-dir) ,wrinkle))) ;; gratuitious SVN complication
-            (git-checkout-ref "master")))
+            (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
+                                                           :reset
+                                                           :error))))
       (within-directory (git-repo-dir :lisp nil)
         (with-explanation ("on behalf of module ~A, converting from svn to git: ~S => ~S" (name module) svn-repo-dir *default-pathname-defaults*)
           (git "svn" "fetch"))))))
