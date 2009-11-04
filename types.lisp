@@ -168,6 +168,7 @@ This notably excludes converted modules."
 (defclass cvs-native (cvs native) () (:default-initargs :schema '|:PSERVER|))
 (defclass svn-rsync (svn rsync) ())
 (defclass svn-http (svn http) ())
+(defclass svn-native (svn native) () (:default-initargs :schema 'svn))
 
 ;;;;
 ;;;; Location
@@ -253,6 +254,7 @@ a special module called '.meta'."
 (defclass cvs-native-remote (cvs-native cvs-remote) ())
 (defclass svn-rsync-remote (svn-rsync svn-remote) ())
 (defclass svn-http-remote (svn-http svn-remote) ())
+(defclass svn-native-remote (svn-native svn-remote) ())
 
 ;;; A special case location*vcs*role extension which is /going/ to be
 ;;; troublesome, as it violates simplicity.
@@ -285,7 +287,7 @@ a special module called '.meta'."
            ("cvs+rsync" 'cvs-rsync-remote)
            ("cvs" 'cvs-native-remote)
            (":pserver" 'cvs-native-remote)
-           ("svn" 'svn-rsync-remote)
+           ("svn" 'svn-native-remote)
            ("svn+rsync" 'svn-rsync-remote))))
 
 ;; Used for validation of user input in add-module
@@ -313,6 +315,7 @@ differ in only slight detail -- gate property, for example."
 (defmethod vcs-type ((o (eql 'cvs-rsync-remote))) 'cvs)
 (defmethod vcs-type ((o (eql 'svn-rsync-remote))) 'svn)
 (defmethod vcs-type ((o (eql 'svn-http-remote))) 'svn)
+(defmethod vcs-type ((o (eql 'svn-native-remote))) 'svn)
 
 (defmethod transport ((o (eql 'gate-native-remote))) 'native)
 (defmethod transport ((o (eql 'gate-http-remote))) 'http)
@@ -325,6 +328,7 @@ differ in only slight detail -- gate property, for example."
 (defmethod transport ((o (eql 'cvs-rsync-remote))) 'rsync)
 (defmethod transport ((o (eql 'svn-rsync-remote))) 'rsync)
 (defmethod transport ((o (eql 'svn-http-remote))) 'http)
+(defmethod transport ((o (eql 'svn-native-remote))) 'native)
 
 ;;;
 ;;; Locality methods

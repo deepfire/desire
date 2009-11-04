@@ -135,16 +135,20 @@
     (with-explanation ("on behalf of module ~A, rsyncing from svn remote ~A to ~S" (name module) url svn-repo-dir)
       (rsync "-ravPz" url (namestring svn-repo-dir)))))
 
-(defmethod fetch-remote ((locality git-locality) (svn svn-http-remote) module)
-  (let* ((repo-dir (module-pathname module locality))
-         (url (url svn module)))
-    (within-directory (repo-dir :if-does-not-exist :create)
+(defun fetch-svn-direct (locality remote module)
+  (multiple-value-bind (url wrinkle) (url remote module)
+    (within-directory ((module-pathname module locality) :if-does-not-exist :create)
       (if (directory-created-p)
           (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" (name module) url *default-pathname-defaults*)
-            (git "svn" "init" `("-T" ,url)))
+            (git "svn" `("init" ,url ,wrinkle)))
           (git-checkout-ref "master"))
       (with-explanation ("on behalf of module ~A, importing from ~S in ~S" (name module) url *default-pathname-defaults*)
         (git "svn" "fetch")))))
+
+(defmethod fetch-remote ((locality git-locality) (svn svn-http-remote) module)
+  (fetch-svn-direct locality svn module))
+(defmethod fetch-remote ((locality git-locality) (svn svn-native-remote) module)
+  (fetch-svn-direct locality svn module))
 
 (defmethod fetch-remote :around (locality remote module)
   (with-error-resignaling (executable-failure
@@ -167,9 +171,11 @@
 (defmethod fetch ((to git-locality) (from git-locality) module)
   (fetch-remote to from module))
 
+;; These are direct, handled by FETCH-REMOTE.
 (defmethod fetch ((locality git-locality) (remote git-remote) module))
 (defmethod fetch ((locality git-locality) (remote cvs-native-remote) module))
 (defmethod fetch ((locality git-locality) (remote svn-http-remote) module))
+(defmethod fetch ((locality git-locality) (remote svn-native-remote) module))
 
 #+(or)
 (defmethod fetch ((git-locality git-locality) (remote hg-http-remote) module)
