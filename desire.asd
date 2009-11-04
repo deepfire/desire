@@ -7,7 +7,7 @@
 
 (defsystem :desire
   :depends-on (:alexandria :iterate :cl-fad
-               :pergamum :semi-precious :executor)
+               :pergamum :executor)
   :components ((:file "package")
                ;; Tier #
                (:file "dependencies" :depends-on ("package"))

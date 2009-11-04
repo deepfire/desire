@@ -75,7 +75,7 @@ EOF
     exit
 fi
 
-desire_deps="alexandria asdf cl-fad executor pergamum iterate semi-precious"
+desire_deps="alexandria asdf cl-fad executor pergamum iterate"
 if test -f ~/.climb-seed
 then
     seed="$(cat ~/.climb-seed)"

@@ -2,7 +2,7 @@
 
 (defpackage desire
   (:nicknames :desr)
-  (:use :common-lisp :alexandria :pergamum :iterate :depsolver :executor)
+  (:use :common-lisp :alexandria :pergamum :iterate :executor)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
   (:export
