@@ -109,10 +109,10 @@
 (defmethod fetch-remote ((locality git-locality) (remote git) module)
   (let ((repo-dir (module-pathname module locality)))
     (within-directory (repo-dir :if-does-not-exist :create)
-      (if (directory-exists-p repo-dir)
-          (git-checkout-ref "master")
+      (if (directory-created-p)
           (with-explanation ("initialising git repository of module ~A in ~S" (name module) *default-pathname-defaults*)
-            (git "init-db")))
+            (git "init-db"))
+          (git-checkout-ref "master"))
       (git-fetch-remote remote (name module)))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
