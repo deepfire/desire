@@ -28,6 +28,7 @@
                (:file "application" :depends-on ("system-loadability"))
                (:file "clbuild" :depends-on ("add-module"))
                (:file "desire" :depends-on ("system-loadability"))
+               (:file "libcl" :depends-on ("add-module"))
                (:file "xcvb" :depends-on ("system-loadability"))
                (:module "system-quirks" :depends-on ("system-loadability")
                         :components ((:file "cl-launch")
