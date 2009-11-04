@@ -315,7 +315,7 @@
 (defun git-set-noncurrent-gitbranch (branchname &optional directory (refvalue (get-head directory)))
   (declare (type (or list (integer 0)) refvalue))
   (maybe-within-directory directory
-    (with-explanation ("moving non-current ref '~A' to ~A in ~S" branchname refvalue *default-pathname-defaults*)
+    (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S" branchname (consp refvalue) refvalue *default-pathname-defaults*)
       (nth-value 0 (git "branch" "-f" (downstring branchname) (cook-refval refvalue))))))
 
 (defun set-gitbranch (branchname &optional directory (refvalue (get-head directory)))
@@ -327,7 +327,7 @@
   (let ((ref (ensure-cons ref)))
     (maybe-within-directory directory
       (with-retry-restarts ((hardreset-repository ()
-                                                  :report "Clear all uncommitted (staged and unstaged) changes."
+                                                  :report "Clear all uncommitted changes, both staged and unstaged."
                                                   (git-repository-reset-hard)))
         (unless (eq if-changes :ignore)
           (when (git-repository-changes-p directory)
