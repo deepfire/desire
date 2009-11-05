@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 5, 2009, 03:07
+November 5, 2009, 03:16
 #+END_CENTER
 
 * About this document
@@ -190,6 +190,14 @@ converted module redistribution.
       - module-best-distributor module-designator &key (if-does-not-exist :error) => remote ::
         Produce the distributor, if any, whose remote will be chosen to satisfy desires
         for module designated by MODULE-DESIGNATOR.
+
+      - module-fetch-url module &key allow-self => string ::
+        Return the URL which is to be used while fetching MODULE, that is the location of MODULE in the preferred remote.
+        When ALLOW-SELF is specified, and non-NIL, remotes within =*SELF*= are not discarded from consideration.
+
+      - touch-module module => boolean, string ::
+        Try 'access' MODULE via its preferred remote and return whether the attempt was successful as the primary value,
+        and the output of the toucher executable as the secondary value.
 
 *** Initial chores & storage location choice
 
