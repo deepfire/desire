@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-October 26, 2009, 14:18
+November 5, 2009, 03:07
 #+END_CENTER
 
 * About this document
