@@ -71,9 +71,10 @@ syntax."
               t)) ;; signal that we did deconstruction
     (list string)))
 
-(defun compute-remote-path-variants (raw-path modname)
-  "Given a RAW-PATH pathname component list and MODNAME, produce a list
-of pathname component list variants, with MODNAME occurences substituted."
+(defun compute-remote-path-variants (raw-path dirp modname)
+  "Given a RAW-PATH pathname component list, a boolean specifier DIRP denoting
+whether RAW-PATH designates a directory and MODNAME, produce a list of
+pathname component list variants, with MODNAME occurences substituted."
   (lret ((variants (list nil)))
     (iter (for path-elt in raw-path)
           (for (values pathname-component deconsp) = (string-detect-splitsubst path-elt modname '*module* :allowed-separators '(#\.)))
@@ -87,7 +88,9 @@ of pathname component list variants, with MODNAME occurences substituted."
                                   (collect (append v pathname-component)))))
               (setf variants
                     (iter (for v in variants)
-                          (collect (append v pathname-component))))))))
+                          (collect (append v pathname-component))))))
+    (unless dirp
+      (setf variants (mapcar (rcurry #'append '(:no/)) variants)))))
 
 (defun guess-module-name (distributor-name pathname-component-list)
   "Interpret DISTRIBUTOR-NAME and PATHNAME-COMPONENT-LIST as components
@@ -101,9 +104,9 @@ of a module URL and try to deduce name of the module."
 
 
 
-(defun match-module-url-components-against-remote-set (raw-distributor-name port pcl raw-module-name remotes)
+(defun match-module-url-components-against-remote-set (raw-distributor-name port pcl dirp raw-module-name remotes)
   (multiple-value-bind (dist domain-name-takeover) (string-detect-splitsubst raw-distributor-name raw-module-name '*module*)
-    (let* ((variants (compute-remote-path-variants pcl raw-module-name))
+    (let* ((variants (compute-remote-path-variants pcl dirp raw-module-name))
            (remote (iter (for remote-path-variant in variants)
                          (let ((remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
                            (when-let ((remote (dolist (r remotes)
@@ -116,8 +119,8 @@ of a module URL and try to deduce name of the module."
               ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
               (unless remote (append (when domain-name-takeover dist) (lastcar variants)))))))
 
-(defun module-ensure-distributor-match-remote (remote-type distributor-name port pathname-component-list &optional module-name)
-  "Given a REMOTE-TYPE, DISTRIBUTOR-NAME, PORT, PATH and an optional
+(defun module-ensure-distributor-match-remote (remote-type distributor-name port pathname-component-list dirp &optional module-name)
+  "Given a REMOTE-TYPE, DISTRIBUTOR-NAME, PORT, PATH, DIRP and an optional
 MODULE-NAME, try to first find matching distributor, creating it, if it
 doesn't exist and then, match the remote, yielding them as multiple values.
 
@@ -132,7 +135,7 @@ These additional values are returned as multiple values."
       (multiple-value-call #'values
         distributor created-distributor-p
         (match-module-url-components-against-remote-set
-         distributor-name port pathname-component-list (downstring module-name)
+         distributor-name port pathname-component-list dirp (downstring module-name)
          (remove-if-not (curry #'remote-types-compatible-p remote-type) (distributor-remotes distributor)))))))
 
 (defun make-remote (type domain-name-takeover distributor port path &key name)
@@ -169,10 +172,10 @@ The values returned are:
    - the module name, which was either deduced, or specified, and
    - a boolean specifying, when a remote is returned, whether it was
      created anew."
-  (multiple-value-bind (type cred hostname port path) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
+  (multiple-value-bind (type cred hostname port path dirp) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
     (let ((module-name (or module-name (guess-module-name hostname path))))
       (multiple-value-bind (dist created-dist-p remote domain-name-takeover deduced-path) (module-ensure-distributor-match-remote
-                                                                                           type hostname port path module-name)
+                                                                                           type hostname port path dirp module-name)
         (when created-dist-p
           (format t ";; didn't find distributor at ~A, creating it~%" hostname))
         (let ((new-remote (unless remote
