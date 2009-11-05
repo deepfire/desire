@@ -191,21 +191,28 @@ The values returned are:
     (when credentials
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
-(defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist vcs-type (lust *auto-lust*))
+(defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*))
   (multiple-value-bind (remote cred module-name created-remote-p) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
-    (declare (ignore created-remote-p))
-    
     (if remote
-        (lret ((module (ensure-remote-module remote module-name :credentials cred :path-whitelist path-whitelist :path-blacklist path-blacklist)))
-          (when lust
-            (let ((*fetch-errors-serious* t))
-              (lust (name module)))))
+        (multiple-value-bind (successp output) (touch-remote-module remote module-name)
+          (unless successp
+            (when (and created-remote-p (not (member if-touch-fails '(:warn :continue))))
+              (remove-remote remote))
+            (case if-touch-fails
+              (:error (error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
+              (:abort (return-from add-module nil))
+              (:warn (format t "~@<;; ~@;Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
+              (:continue)))
+          (lret ((module (ensure-remote-module remote module-name :credentials cred :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+            (when lust
+              (let ((*fetch-errors-serious* t))
+                (lust (name module))))))
         (format t "~@<;; ~@;remote for ~A was not created~:@>~%" url))))
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
-    (add-module url name :lust lust :remote-name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+  (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (if-touch-fails t) (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
+    (add-module url name :if-touch-fails if-touch-fails :lust lust :remote-name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char #'add-module-reader *readtable*))
