@@ -140,7 +140,7 @@ These additional values are returned as multiple values."
 
 (defun make-remote (type domain-name-takeover distributor port path &key name)
   (flet ((query-remote-name (default-name)
-           (format *query-io* "No matching remote found, has to create a new one, but the default name (~A) is occupied. %
+           (format *query-io* "No matching remote found, has to create a new one, but the default name (~A) is occupied.~%~
                                Enter the new remote name, or NIL to abort: " default-name)
            (finish-output *query-io*)
            (or (prog1 (read *query-io*)
