@@ -97,9 +97,12 @@ pathname component list variants, with MODNAME occurences substituted."
 of a module URL and try to deduce name of the module."
   (declare (ignore distributor-name))
   (let* ((last (lastcar pathname-component-list))
-         (name (if-let ((tail (search ".git" last)))
-                 (subseq last 0 tail)
-                 last)))
+         (name (cond ((when-let ((tail (search ".git" last)))
+                        (subseq last 0 tail)))
+                     ((member last '("svn" "cvsroot") :test #'equal)
+                      (first (last pathname-component-list 2)))
+                     (t
+                      last))))
     (make-keyword (string-upcase name))))
 
 
