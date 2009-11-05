@@ -640,10 +640,10 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                     path)))
   (:method :around ((r wrinkle-mixin) module)
            (values (call-next-method)
-                   (remote-module-wrinkle r (when module (name module)))))
+                   (remote-module-wrinkle r (when module (coerce-to-name module)))))
   (:method (r m) "://")
   (:method ((r cvs-native-remote) m)
-    (let ((c (module-credentials r (name m))))
+    (let ((c (module-credentials r (coerce-to-name m))))
       (if c
           (let ((cred (cred c)))
             (format nil ":~A~:[~;~:*:~A~]@" (cred-username cred) (cred-password cred)))
