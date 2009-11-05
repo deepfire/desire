@@ -58,11 +58,6 @@ without raising any signals.")
            "~@<Dirt files ~S prevented from importing ~A in ~S.~@:>" dirt-files (coerce-to-name module) (module-pathname module locality)))
 
 (defgeneric touch-remote-module (remote module)
-  (:method :around ((o remote) (m module))
-           (multiple-value-bind (successp output) (touch-remote-module o (name m))
-             (unless successp
-               (format t "~@<Failed to touch module ~A on remote ~A, toucher output:~%~A~:@>~%" (name m) (name o) output))
-             successp))
   (:method ((o git-remote) name)
     (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)
