@@ -246,6 +246,17 @@ Following reader macro is enabled by install-add-module-reader:
       - clear-definitions => <no values> ::
         Forget everything. A subsequent LOAD-DEFINITIONS will be instrumental to continue any productive use.
 
+      - remove-remote remote-designator &key keep-modules => nil ::
+        Forget everything associated with a remote specified by REMOTE-DESIGNATOR, optionally, when KEEP-MODULES
+        is non-NIL, keeping modules referred by it.
+
+      - remove-module module-designator &key keep-localities => nil ::
+        Forget everything associated with module specified by MODULE-DESIGNATOR, including
+        its systems and applications.
+
+      - remove-system system-designator => nil ::
+        Forget everything associated with the system specified by SYSTEM-DESIGNATOR.
+
       - save-current-definitions &key seal => <no values> ::
         Write out the current idea about the Desire's domain into DEFINITIONS,
         optionally committing changes, when SEAL is non-NIL.
