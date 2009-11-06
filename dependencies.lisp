@@ -4,13 +4,6 @@
 
 
 ;;;;
-;;;; REPORT
-;;;;
-(defun report (stream format-control &rest args)
-  (apply #'format stream format-control args)
-  (finish-output stream))
-
-;;;;
 ;;;; FADdy
 ;;;;
 (defun pathname-absolute-p (pathname)

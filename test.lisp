@@ -60,7 +60,7 @@
   (lret (condition
          output
          successp)
-    (desire::report t ";; Running test ~A: " name)
+    (syncformat t ";; Running test ~A: " name)
     (with-output-to-string (capture)
       (let ((*standard-output-direction* capture))
         (handler-case
@@ -74,9 +74,9 @@
         (setf output (get-output-stream-string capture))
         (push output *test-outputs*)))
     (if (or verbose condition)
-        (desire::report t "~:[failure~;success~].~%;;~%;; The output was:~%~A~%~A~&~A~%~:[~;~:*~@<;; ~@;The condition met was: ~A~:@>~%~]"
+        (syncformat t "~:[failure~;success~].~%;;~%;; The output was:~%~A~%~A~&~A~%~:[~;~:*~@<;; ~@;The condition met was: ~A~:@>~%~]"
                         successp *test-output-separator* output *test-output-separator* condition)
-        (desire::report t "success.~%"))))
+        (syncformat t "success.~%"))))
 
 (defun run-tests (&key verbose (account *test-user-account*))
   (lret ((success t))

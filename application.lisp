@@ -26,7 +26,7 @@
     (unless (system-loadable-p s)
       (error "~@<Can't launch ~A, as its primary system, ~A, isn't loadable.~:@>" (name a) (name s)))
     (unless (find-package (app-package a))
-      (report t "; Package containing primary function of app ~A not found, requiring the respective system...~%"
-              (name a))
+      (syncformat t "; Package containing primary function of app ~A not found, requiring the respective system...~%"
+                  (name a))
       (require (name s)))
     (apply (symbol-function (find-symbol (string (app-function a)) (app-package a))) (or parameters (app-default-parameters a)))))
