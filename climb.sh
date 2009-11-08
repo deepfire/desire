@@ -1,7 +1,7 @@
 #!/bin/bash
 argv0_url="http://www.feelingofgreen.ru/shared/git/desire/climb.sh"            #
 ################################################################################
-function handle-self-update() {
+handle_self_update() {
     if test ! "${climb_updated_p}"
     then
         if wget "${argv0_url}" -O "$0" > /dev/null 2>&1
@@ -28,7 +28,7 @@ argv0="$(basename $0)"
 default_bootstrap_node="git.feelingofgreen.ru"
 default_desire_branch="master"
 
-function print-version-and-die() {
+print_version_and_die() {
     cat <<EOF
 climb.sh ${version}
 Copyright (C) 2009 Samium Gromoff.
@@ -39,7 +39,7 @@ EOF
     exit 0
 }
 
-function print-help-and-die() {
+print_help_and_die() {
     cat <<EOF
 Usage:  ${argv0} [OPTION]... [STORAGE-ROOT]
 Bootstrap, update or perform other actions on a desire installation
@@ -67,8 +67,8 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
 During first step storage root location is determined, as follows:
 
 When the -u switch is provided, $0 is updated using wget from the
-canonical location at ${argv0_url}, and then execution is continued,
-using the updated version.
+canonical location at ${argv0_url},
+and then execution is continued, using the updated version.
 
 When STORAGE-ROOT is not specified, look up ~/.climb-root and see if it
 refers to a writable directory containing a writable 'git' subdirectory.
@@ -110,7 +110,7 @@ EOF
 while getopts :un:b:t:m:s:a:x:dnevVh opt
 do
     case $opt in
-        u)  handle-self-update "$@";;
+        u)  handle_self_update "$@";;
         n)  BOOTSTRAP_NODE="$OPTARG";;
         b)  DESIRE_BRANCH="$OPTARG";;
         t)  METASTORE_BRANCH="$OPTARG";;
@@ -122,15 +122,15 @@ do
         n)  DISABLE_DEBUGGER="--disable-debugger";;
         e)  EXPLAIN="t";;
         v)  VERBOSE="t";;
-        V)  print-version-and-die;;
+        V)  print_version_and_die;;
         h) 
-            print-help-and-die 0;;
+            print_help_and_die 0;;
         :)
             echo -e "\nERROR: required option '-$OPTARG' lacks an argument\n"
-            print-help-and-die 1;;
+            print_help_and_die 1;;
         ?)
             echo -e "\nERROR: invalid option '-$OPTARG' provided\n"
-            print-help-and-die 1;;
+            print_help_and_die 1;;
     esac
 done
 shift $((OPTIND - 1))
