@@ -45,7 +45,8 @@ Usage:  ${argv0} [OPTION]... [STORAGE-ROOT]
 Bootstrap, update or perform other actions on a desire installation
 in either STORAGE-ROOT, or a location specified in ~/.climb-root
 
-  -u          Self-update.
+  -u          Self-update and continue processing other options, using
+                the updated version.
   -n HOSTNAME Use HOSTNAME as a bootstrap node.
                 HOSTNAME must refer to a node participating in desire protocol.
   -b BRANCH   Check out BRANCH of desire other than 'master'.
