@@ -1,6 +1,10 @@
 #!/bin/bash
 argv0_url="http://www.feelingofgreen.ru/shared/git/desire/climb.sh"            #
 ################################################################################
+fail() {
+    echo "ERROR: $*"
+    exit 1
+}
 handle_self_update() {
     if test ! "${climb_updated_p}"
     then
@@ -10,8 +14,7 @@ handle_self_update() {
             bash $0 "$@"
             exit $?
         else
-            echo "ERROR: failed to self-update using ${argv0_url}"
-            exit 1
+            fail "failed to self-update using ${argv0_url}"
         fi
     else
         echo "NOTE: insiduous self-update successful, continuing."
@@ -65,33 +68,36 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -V          Print version.
   -h          Display this help message.
 
-During first step storage root location is determined, as follows:
+As step zero, when the -u switch is provided, climb.sh is updated using wget
+from the canonical location at ${argv0_url},
+and then normal processing is continued, using the updated version.
 
-When the -u switch is provided, $0 is updated using wget from the
-canonical location at ${argv0_url},
-and then execution is continued, using the updated version.
+During the first step, a storage root location is either created or validated.
+The storage root must be a writable directory containing a writable 'git'
+subdirectory.
 
-When STORAGE-ROOT is not specified, look up ~/.climb-root and see if it
-refers to a writable directory containing a writable 'git' subdirectory.
-If this condition is met, that directory is accepted as STORAGE-ROOT,
-otherwise an error is signalled.
+When STORAGE-ROOT is not specified, ~/.climb-root is looked up for an
+absolute pathname referring to a valid storage location.  If this condition
+is met, that directory is accepted as STORAGE-ROOT, otherwise an error
+is signalled.
 
-When STORAGE-ROOT is specified, it must refer to a non-occupied filesystem
-location, with a present, writable parent directory.
+When STORAGE-ROOT is specified, it must be either an absolute pathname
+referring to a valid storage location, or it must denote a non-occupied
+filesystem location, with a writable parent directory.
 
 During the second step, desire and its dependencies are either retrieved,
-or updated, when they are already present in STORAGE-ROOT.
+or updated, in the case when they are already present in STORAGE-ROOT.
 
-Next, when -b is specified, a branch of desire other than the default one
-(${default_desire_branch}) is checked out.
+Next, a specific branch of desire is checked out, configurable with the
+-d option and defaulting to "${default_desire_branch}".
 
-Further, the -n and -t options specify, correspondingly, the hostname
+Further, the -n and -t options alter, correspondingly, the hostname
 of the desire node used for bootstrap, and a branch of that node's metastore
 to use.  These options default to ${default_bootstrap_node} and
-the branch of desire, accordingly.
+the name of the branch of desire, accordingly.
 
-Then a lisp is started and desire initialisation is attempted, with
-determined hostname and metastore branch.
+During the next step a lisp is started and desire initialisation is attempted,
+with the above determined values of hostname and metastore branch.
 
 Once the initialisation is complete, MODULE, SYSTEM and APP provide
 optional convenience shortcuts for module installation, system loading
@@ -112,13 +118,13 @@ while getopts :un:b:t:m:s:a:x:dnevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
-        n)  BOOTSTRAP_NODE="$OPTARG";;
-        b)  DESIRE_BRANCH="$OPTARG";;
-        t)  METASTORE_BRANCH="$OPTARG";;
-        m)  MODULE="$OPTARG";;
-        s)  SYSTEM="$OPTARG";;
-        a)  APP="$OPTARG";;
-        x)  EXPR="$OPTARG";;
+        n)  BOOTSTRAP_NODE="${OPTARG}";;
+        b)  DESIRE_BRANCH="${OPTARG}";;
+        t)  METASTORE_BRANCH="${OPTARG}";;
+        m)  MODULE="${OPTARG}";;
+        s)  SYSTEM="${OPTARG}";;
+        a)  APP="${OPTARG}";;
+        x)  EXPR="${OPTARG}";;
         d)  DEBUG="3";;
         n)  DISABLE_DEBUGGER="--disable-debugger";;
         e)  EXPLAIN="t";;
@@ -127,10 +133,10 @@ do
         h) 
             print_help_and_die 0;;
         :)
-            echo -e "\nERROR: required option '-$OPTARG' lacks an argument\n"
+            echo -e "\nERROR: required option '-${OPTARG}' lacks an argument\n"
             print_help_and_die 1;;
         ?)
-            echo -e "\nERROR: invalid option '-$OPTARG' provided\n"
+            echo -e "\nERROR: invalid option '-${OPTARG}' provided\n"
             print_help_and_die 1;;
     esac
 done
@@ -138,30 +144,30 @@ shift $((OPTIND - 1))
 
 ROOT="$1"
 shift 1
-test "$@" && echo "ERROR: unknown arguments: $@" && exit 1
+test "$@" && fail "unknown arguments: $@"
 
-test "$VERBOSE" -a "$BOOTSTRAP_NODE" && echo "NOTE: choosing an alternate bootstrap node: '$BOOTSTRAP_NODE'"
+test "${VERBOSE}" -a "${BOOTSTRAP_NODE}" && echo "NOTE: choosing an alternate bootstrap node: '${BOOTSTRAP_NODE}'"
 BOOTSTRAP_NODE=${BOOTSTRAP_NODE:-${default_bootstrap_node}}
-test "$VERBOSE" -a "$DESIRE_BRANCH" && echo "NOTE: choosing an alternate branch of desire: '$DESIRE_BRANCH'"
+test "${VERBOSE}" -a "${DESIRE_BRANCH}" && echo "NOTE: choosing an alternate branch of desire: '${DESIRE_BRANCH}'"
 DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
-test "$VERBOSE" -a "$METASTORE_BRANCH" && echo "NOTE: choosing a specific metastore branch: '$METASTORE_BRANCH'"
-METASTORE_BRANCH=${METASTORE_BRANCH:-$DESIRE_BRANCH}
+test "${VERBOSE}" -a "${METASTORE_BRANCH}" && echo "NOTE: choosing a specific metastore branch: '${METASTORE_BRANCH}'"
+METASTORE_BRANCH=${METASTORE_BRANCH:-${DESIRE_BRANCH}}
 
-test "$VERBOSE" -a "$MODULE" && echo "NOTE: will install or update $MODULE, along with dependencies"
+test "${VERBOSE}" -a "${MODULE}" && echo "NOTE: will install or update ${MODULE}, along with dependencies"
 MODULE=${MODULE:-nil}
-test "$VERBOSE" -a "$SYSTEM" && echo "NOTE: will load $SYSTEM, after installing or updating relevant module"
+test "${VERBOSE}" -a "${SYSTEM}" && echo "NOTE: will load ${SYSTEM}, after installing or updating relevant module"
 SYSTEM=${SYSTEM:-nil}
-test "$VERBOSE" -a "$APP"    && echo "NOTE: will launch $APP, after updating/loading relevant module/system"
+test "${VERBOSE}" -a "${APP}"    && echo "NOTE: will launch ${APP}, after updating/loading relevant module/system"
 APP=${APP:-nil}
 
-test "$VERBOSE" -a "$EXPR" && echo "NOTE: will execute $EXPR, in the end of it all"
+test "${VERBOSE}" -a "${EXPR}" && echo "NOTE: will execute ${EXPR}, in the end of it all"
 EXPR=${EXPR:-nil}
 
-test "$VERBOSE" -a "$DEBUG" && echo echo "NOTE: optimising for debug"
+test "${VERBOSE}" -a "${DEBUG}" && echo echo "NOTE: optimising for debug"
 DEBUG=${DEBUG:-1}
-test "$VERBOSE" -a "$DISABLE_DEBUGGER" && echo "NOTE: disabling debugger"
+test "${VERBOSE}" -a "${DISABLE_DEBUGGER}" && echo "NOTE: disabling debugger"
 
-test "$VERBOSE" -a "$EXPLAIN" && echo "NOTE: turning on execution explanation feature of desire"
+test "${VERBOSE}" -a "${EXPLAIN}" && echo "NOTE: turning on execution explanation feature of desire"
 EXPLAIN=${EXPLAIN:-nil}
 
 #######################################################
@@ -171,54 +177,79 @@ EXPLAIN=${EXPLAIN:-nil}
 #######################################################
 desire_deps="alexandria asdf cl-fad executor pergamum iterate"
 
+writable_absolute_directory_p() {
+    local path="$1"
+    test "${path:0:1}" == "/" || fail "${path} is not an absolute pathname"
+    test -d "${path}" || fail "${path} does not refer to a directory"
+    test -w "${path}" || fail "${path} is not writable"
+    return 0
+}
+
+valid_storage_location_p() {
+    local path="$1"
+    writable_absolute_directory_p "${path}" || return 1
+    test -d "${path}/git" || fail "\"${path}/git\" does not exist"
+    test -w "${path}/git" || fail "\"${path}/git\" is not writable"
+    return 0
+}
+
+clone_dependencies() {
+    local root="$1"
+    for desire_dep in ${desire_deps} desire
+    do
+        test "${VERBOSE}" && echo -n "      ${desire_dep}: "
+        git clone git://${BOOTSTRAP_NODE}/${desire_dep} "${root}/git/${desire_dep}" >/dev/null || \
+            fail "failed to retrieve ${desire_dep}"
+        test "${VERBOSE}" && echo "ok"
+    done
+}
+
+update_dependencies() {
+    local root="$1"
+    for desire_dep in ${desire_deps} desire
+    do
+        test "${VERBOSE}" && echo -n "      $desire_dep: "
+        (cd "${root}/git/$desire_dep" && git fetch origin >/dev/null 2>&1 && git reset --hard remotes/origin/master >/dev/null) || \
+            fail "failed to update $desire_dep"
+        test "${VERBOSE}" && echo "ok"
+    done
+}
 ###
 ### See if there is anything we can remember...
 ###
 root="$(cat ~/.climb-root 2>/dev/null)"
-if test ! "$ROOT" -a -d "$root" -a -w "$root" -a "${root:0:1}" == "/" && \
-   test -d "$root/git" -a -w "$root/git"
+if test -z "${ROOT}" -a "${root}" -a -d "${root}" &&
+    echo "NOTE: found ~/.climb-root, trying to validate its contents as storage location" && valid_storage_location_p "${root}"
 then
-    ROOT="$root"
-    test "$VERBOSE" && echo "NOTE: found traces of previous bootstrap in $ROOT, updating and reusing that:"
-    for desire_dep in $desire_deps desire
-    do
-        test "$VERBOSE" && echo -n "      $desire_dep: "
-        (cd "$ROOT/git/$desire_dep" && git fetch origin >/dev/null 2>&1 && git reset --hard remotes/origin/master >/dev/null) || \
-            { echo "ERROR: failed to update $desire_dep"; exit 1; }
-        test "$VERBOSE" && echo "ok"
-    done
+    ROOT="${root}"
+    test "${VERBOSE}" && echo "NOTE: found traces of previous bootstrap in ${ROOT}, updating and reusing that:"
+    update_dependencies "${ROOT}"
 else
-    test "$ROOT" || \
-        { echo "ERROR: ~/.climb-root did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue"; exit 1; }
+    test "${ROOT}" || \
+        fail "~/.climb-root did not refer to a writable directory, containing a writable 'git' subdirectory, nor was STORAGE-ROOT specified, cannot continue"
 
-    test "${ROOT:0:1}" == "/" || \
-        { echo "ERROR: \$ROOT is not an absolute path"; exit 1; }
-
-    test "$ROOT" -a -d "$(dirname $ROOT)" -a -w "$(dirname $ROOT)" -a ! -x "$ROOT" || \
-        { echo "ERROR: the first argument must be an non-occupied pathname with a writable parent directory"; exit 1; }
-
-    test "$VERBOSE" && echo "NOTE: validated \"$ROOT\" as new storage location, updating ~/.climb-root"
-    echo -n "$ROOT" > ~/.climb-root
-
-    mkdir "$ROOT" "$ROOT/git" "$ROOT/darcs" "$ROOT/cvs" "$ROOT/svn" || \
-        { echo "ERROR: unable to initialise the storage location at \"$ROOT\", exiting"; exit 1; }
-
-    test "$VERBOSE" && echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
-
-    for desire_dep in $desire_deps desire
-    do
-        test "$VERBOSE" && echo -n "      $desire_dep: "
-        git clone git://$BOOTSTRAP_NODE/$desire_dep "$ROOT/git/$desire_dep" >/dev/null || \
-            { echo "ERROR: failed to retrieve $desire_dep"; exit 1; }
-        test "$VERBOSE" && echo "ok"
-    done
+    if test -e "${ROOT}"
+    then
+        valid_storage_location_p "${ROOT}" || \
+            fail "failed to validate an occupied filesystem location at \"${ROOT}\" as a storage location"
+        update_dependencies "${ROOT}"
+    else
+        writable_absolute_directory_p "$(dirname ${ROOT})" || \
+            fail "\"${ROOT}\" does not exist, and its parent is not a writable directory"
+        test "${VERBOSE}" && echo "NOTE: validated \"${ROOT}\" as new storage location, updating ~/.climb-root"
+        echo -n "${ROOT}" > ~/.climb-root
+        mkdir "${ROOT}" "${ROOT}/git" || \
+            fail "unable to initialise the storage location at \"${ROOT}\", exiting"
+        test "${VERBOSE}" && echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
+        clone_dependencies "${ROOT}"
+    fi
 fi
 
-test "$VERBOSE" && echo "NOTE: checking out '$DESIRE_BRANCH' branch of desire..."
-( cd $ROOT/git/desire && git reset --hard origin/$DESIRE_BRANCH ) || \
-    { echo "ERROR: failed to check out branch '$DESIRE_BRANCH' of desire"; exit 1; }
+test "${VERBOSE}" && echo "NOTE: checking out '${DESIRE_BRANCH}' branch of desire..."
+( cd ${ROOT}/git/desire && git reset --hard origin/${DESIRE_BRANCH} ) || \
+    fail "failed to check out branch '${DESIRE_BRANCH}' of desire"
 
-test "$VERBOSE" && echo "NOTE: cranking up verbosity"
+test "${VERBOSE}" && echo "NOTE: cranking up verbosity"
 VERBOSE=${VERBOSE:-nil}
 
 #######################################################
@@ -226,14 +257,14 @@ VERBOSE=${VERBOSE:-nil}
 ### Shrug off chains of POSIX...                      #
 ###                                                   #
 #######################################################
-test "$VERBOSE" == "t" && echo "NOTE: all done going into lisp..."
+test "${VERBOSE}" == "t" && echo "NOTE: all done going into lisp..."
 CONGRATULATING_MESSAGE="\"
 
 
    Congratulations! You have reached a point where you can wish for any package
   desire knows about. Just type (lust 'desiree) and it will happen.
   You can link desire's pool of packages into ASDF by ensuring that
-  #p\\\"$ROOT/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*
+  #p\\\"${ROOT}/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*
 
   To see what's possible, issue:
     (apropos-desr 'clim)
@@ -244,7 +275,7 @@ CONGRATULATING_MESSAGE="\"
 
 \""
 export SBCL_BUILDING_CONTRIB=t
-sbcl --noinform $DISABLE_DEBUGGER \
+sbcl --noinform ${DISABLE_DEBUGGER} \
      --eval "
 (progn
   ;; disable compiler verbosity

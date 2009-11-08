@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 8, 2009, 08:35
+November 9, 2009, 02:19
 #+END_CENTER
 
 * About this document
@@ -293,7 +293,6 @@ only SBCL is supported).  Invoke it like this:
 
 #+BEGIN_EXAMPLE
   climb.sh [OPTION]... [STORAGE-ROOT]
-
 Bootstrap, update or perform other actions on a desire installation
 in either STORAGE-ROOT, or a location specified in ~/.climb-root
 
@@ -315,36 +314,39 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -e          Enable explanations about external program invocations.
   -v          Crank up verbosity.
   -V          Print version.
-  -h          Display this help message.
+  -h          Display a help message.
 #+END_EXAMPLE
 
 As step zero, when the -u switch is provided, climb.sh is updated using wget
 from the canonical location at http://www.feelingofgreen.ru/shared/git/desire/climb.sh,
 and then normal processing is continued, using the updated version.
 
-During first step storage root location is determined, as follows:
+During the first step, a storage root location is either created or validated.
+The storage root must be a writable directory containing a writable 'git'
+subdirectory.
 
-When STORAGE-ROOT is not specified, look up ~/.climb-root and see if it
-refers to a writable directory containing a writable 'git' subdirectory.
-If this condition is met, that directory is accepted as STORAGE-ROOT,
-otherwise an error is signalled.
+When STORAGE-ROOT is not specified, ~/.climb-root is looked up for an
+absolute pathname referring to a valid storage location.  If this condition
+is met, that directory is accepted as STORAGE-ROOT, otherwise an error
+is signalled.
 
-When STORAGE-ROOT is specified, it must refer to a non-occupied filesystem
-location, with a present, writable parent directory.
+When STORAGE-ROOT is specified, it must be either an absolute pathname
+referring to a valid storage location, or it must denote a non-occupied
+filesystem location, with a writable parent directory.
 
 During the second step, desire and its dependencies are either retrieved,
-or updated, when they are already present in STORAGE-ROOT.
+or updated, in the case when they are already present in STORAGE-ROOT.
 
-Next, when -b is specified, a branch of desire other than the default one
-(master) is checked out.
+Next, a specific branch of desire is checked out, configurable with the
+-d option and defaulting to "master".
 
-Further, the -n and -t options specify, correspondingly, the hostname
+Further, the -n and -t options alter, correspondingly, the hostname
 of the desire node used for bootstrap, and a branch of that node's metastore
-to use.  These options default to ${default_bootstrap_node} and
-the branch of desire, accordingly.
+to use.  These options default to git.feelingofgreen.ru and
+the name of the branch of desire, accordingly.
 
-Then a lisp is started and desire initialisation is attempted, with
-determined hostname and metastore branch.
+During the next step a lisp is started and desire initialisation is attempted,
+with the above determined values of hostname and metastore branch.
 
 Once the initialisation is complete, MODULE, SYSTEM and APP provide
 optional convenience shortcuts for module installation, system loading
