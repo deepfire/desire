@@ -1,17 +1,51 @@
 #!/bin/bash
-version="9.11.0"
+argv0_url="http://www.feelingofgreen.ru/shared/git/desire/climb.sh"            #
+################################################################################
+function handle-self-update() {
+    if test ! "${climb_updated_p}"
+    then
+        if wget "${argv0_url}" -O "$0" > /dev/null 2>&1
+        then
+            export climb_updated_p="t"
+            bash $0 "$@"
+            exit $?
+        else
+            echo "ERROR: failed to self-update using ${argv0_url}"
+            exit 1
+        fi
+    else
+        echo "NOTE: insiduous self-update successful, continuing."
+    fi
+}
+###
+### Don't change the amount of characters above this comment.
+###
+
+version="9.11.1"
 
 argv0="$(basename $0)"
 
 default_bootstrap_node="git.feelingofgreen.ru"
 default_desire_branch="master"
 
-function print_help_and_die() {
+function print-version-and-die() {
+    cat <<EOF
+climb.sh ${version}
+Copyright (C) 2009 Samium Gromoff.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+EOF
+    exit 0
+}
+
+function print-help-and-die() {
     cat <<EOF
 Usage:  ${argv0} [OPTION]... [STORAGE-ROOT]
 Bootstrap, update or perform other actions on a desire installation
 in either STORAGE-ROOT, or a location specified in ~/.climb-root
 
+  -u          Self-update.
   -n HOSTNAME Use HOSTNAME as a bootstrap node.
                 HOSTNAME must refer to a node participating in desire protocol.
   -b BRANCH   Check out BRANCH of desire other than 'master'.
@@ -27,9 +61,14 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
                 instead of entering the debugger.
   -e          Enable explanations about external program invocations.
   -v          Crank up verbosity.
+  -V          Print version.
   -h          Display this help message.
 
 During first step storage root location is determined, as follows:
+
+When the -u switch is provided, $0 is updated using wget from the
+canonical location at ${argv0_url}, and then execution is continued,
+using the updated version.
 
 When STORAGE-ROOT is not specified, look up ~/.climb-root and see if it
 refers to a writable directory containing a writable 'git' subdirectory.
@@ -68,9 +107,10 @@ EOF
     exit $1
 }
 
-while getopts :m:s:a:enb:t:ndvh opt
+while getopts :un:b:t:m:s:a:x:dnevVh opt
 do
     case $opt in
+        u)  handle-self-update "$@";;
         n)  BOOTSTRAP_NODE="$OPTARG";;
         b)  DESIRE_BRANCH="$OPTARG";;
         t)  METASTORE_BRANCH="$OPTARG";;
@@ -82,22 +122,22 @@ do
         n)  DISABLE_DEBUGGER="--disable-debugger";;
         e)  EXPLAIN="t";;
         v)  VERBOSE="t";;
+        V)  print-version-and-die;;
         h) 
-            print_help_and_die 0;;
+            print-help-and-die 0;;
         :)
             echo -e "\nERROR: required option '-$OPTARG' lacks an argument\n"
-            print_help_and_die 1;;
+            print-help-and-die 1;;
         ?)
             echo -e "\nERROR: invalid option '-$OPTARG' provided\n"
-            print_help_and_die 1;;
+            print-help-and-die 1;;
     esac
 done
 shift $((OPTIND - 1))
-echo rest: $@
 
 ROOT="$1"
 shift 1
-test "$@" && echo "ERROR: unknown arguments: ~@" && exit 1
+test "$@" && echo "ERROR: unknown arguments: $@" && exit 1
 
 test "$VERBOSE" -a "$BOOTSTRAP_NODE" && echo "NOTE: choosing an alternate bootstrap node: '$BOOTSTRAP_NODE'"
 BOOTSTRAP_NODE=${BOOTSTRAP_NODE:-${default_bootstrap_node}}
@@ -114,7 +154,7 @@ test "$VERBOSE" -a "$APP"    && echo "NOTE: will launch $APP, after updating/loa
 APP=${APP:-nil}
 
 test "$VERBOSE" -a "$EXPR" && echo "NOTE: will execute $EXPR, in the end of it all"
-APP=${APP:-nil}
+EXPR=${EXPR:-nil}
 
 test "$VERBOSE" -a "$DEBUG" && echo echo "NOTE: optimising for debug"
 DEBUG=${DEBUG:-1}
@@ -122,9 +162,6 @@ test "$VERBOSE" -a "$DISABLE_DEBUGGER" && echo "NOTE: disabling debugger"
 
 test "$VERBOSE" -a "$EXPLAIN" && echo "NOTE: turning on execution explanation feature of desire"
 EXPLAIN=${EXPLAIN:-nil}
-test "$VERBOSE" && echo "NOTE: cranking up verbosity"
-VERBOSE=${VERBOSE:-nil}
-
 
 #######################################################
 ###                                                   #
@@ -136,56 +173,59 @@ desire_deps="alexandria asdf cl-fad executor pergamum iterate"
 ###
 ### See if there is anything we can remember...
 ###
-root="$(cat ~/.climb-root)"
+root="$(cat ~/.climb-root 2>/dev/null)"
 if test ! "$ROOT" -a -d "$root" -a -w "$root" -a "${root:0:1}" == "/" && \
    test -d "$root/git" -a -w "$root/git"
 then
     ROOT="$root"
-    echo "NOTE: found traces of previous bootstrap in $ROOT, updating and reusing that:"
+    test "$VERBOSE" && echo "NOTE: found traces of previous bootstrap in $ROOT, updating and reusing that:"
     for desire_dep in $desire_deps desire
     do
-        echo -n "      $desire_dep: "
-        ( cd "$ROOT/$desire_dep" && git fetch origin >/dev/null 2>&1 && git reset --hard remotes/origin/master >/dev/null || \
-            echo "ERROR: failed to update $desire_dep" && exit 1 )
-        echo "ok"
+        test "$VERBOSE" && echo -n "      $desire_dep: "
+        (cd "$ROOT/git/$desire_dep" && git fetch origin >/dev/null 2>&1 && git reset --hard remotes/origin/master >/dev/null) || \
+            { echo "ERROR: failed to update $desire_dep"; exit 1; }
+        test "$VERBOSE" && echo "ok"
     done
 else
     test "$ROOT" || \
-        echo "ERROR: ~/.climb-root did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue" && exit 1
+        { echo "ERROR: ~/.climb-root did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue"; exit 1; }
 
     test "${ROOT:0:1}" == "/" || \
-        echo "ERROR: \$ROOT is not an absolute path" && exit 1
+        { echo "ERROR: \$ROOT is not an absolute path"; exit 1; }
 
     test "$ROOT" -a -d "$(dirname $ROOT)" -a -w "$(dirname $ROOT)" -a ! -x "$ROOT" || \
-        echo "ERROR: the first argument must be an non-occupied pathname with a writable parent directory" && exit 1
+        { echo "ERROR: the first argument must be an non-occupied pathname with a writable parent directory"; exit 1; }
 
-    echo "NOTE: validated \"$ROOT\" as new storage location, updating ~/.climb-root"
+    test "$VERBOSE" && echo "NOTE: validated \"$ROOT\" as new storage location, updating ~/.climb-root"
     echo -n "$ROOT" > ~/.climb-root
 
     mkdir "$ROOT" "$ROOT/git" "$ROOT/darcs" "$ROOT/cvs" "$ROOT/svn" || \
-        echo "ERROR: unable to initialise the storage location at \"$ROOT\", exiting" && exit 1
+        { echo "ERROR: unable to initialise the storage location at \"$ROOT\", exiting"; exit 1; }
 
-    echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
+    test "$VERBOSE" && echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
 
     for desire_dep in $desire_deps desire
     do
-        echo -n "      $desire_dep: "
-        git clone git://$BOOTSTRAP_NODE/$desire_dep "$ROOT/$desire_dep" >/dev/null || \
-            echo "ERROR: failed to retrieve $desire_dep" && exit 1
-        echo "ok"
+        test "$VERBOSE" && echo -n "      $desire_dep: "
+        git clone git://$BOOTSTRAP_NODE/$desire_dep "$ROOT/git/$desire_dep" >/dev/null || \
+            { echo "ERROR: failed to retrieve $desire_dep"; exit 1; }
+        test "$VERBOSE" && echo "ok"
     done
 fi
 
-echo "NOTE: checking out '$DESIRE_BRANCH' branch of desire..."
-( cd $ROOT/desire;  git reset --hard origin/$DESIRE_BRANCH; )
+test "$VERBOSE" && echo "NOTE: checking out '$DESIRE_BRANCH' branch of desire..."
+( cd $ROOT/git/desire && git reset --hard origin/$DESIRE_BRANCH ) || \
+    { echo "ERROR: failed to check out branch '$DESIRE_BRANCH' of desire"; exit 1; }
 
+test "$VERBOSE" && echo "NOTE: cranking up verbosity"
+VERBOSE=${VERBOSE:-nil}
 
 #######################################################
 ###                                                   #
 ### Shrug off chains of POSIX...                      #
 ###                                                   #
 #######################################################
-echo "NOTE: all done going into lisp..."
+test "$VERBOSE" == "t" && echo "NOTE: all done going into lisp..."
 CONGRATULATING_MESSAGE="\"
 
 
@@ -211,17 +251,17 @@ sbcl --noinform $DISABLE_DEBUGGER \
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
-  (load (compile-file \"${ROOT}/asdf/asdf.lisp\")))" \
+  (load (compile-file \"${ROOT}/git/asdf/asdf.lisp\")))" \
      --eval "
 (progn
-  (defparameter *root* (pathname-directory (parse-namestring \"${ROOT}/\")))
+  (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/git/\")))
   (defun basic-root-modules-search (system)
     (let* ((name (asdf::coerce-name system))
-           (file (make-pathname :directory (append *root* (list name)) :name name :type \"asd\" :case :local)))
+           (file (make-pathname :directory (append *asdf-root* (list name)) :name name :type \"asd\" :case :local)))
       (when (and file (probe-file file))
         file)))
-  (push 'basic-root-modules-search asdf:*system-definition-search-functions*)
-  (asdf:operate 'asdf:load-op 'desire :verbose nil)
+  (push (quote basic-root-modules-search) asdf:*system-definition-search-functions*)
+  (asdf:operate (quote asdf:load-op) :desire :verbose nil)
   (in-package :desr))" \
      --eval "
 (progn
@@ -229,14 +269,14 @@ sbcl --noinform $DISABLE_DEBUGGER \
   (setf executor:*execute-explanatory* ${EXPLAIN} executor:*execute-verbosely* ${VERBOSE})
   (init \"${ROOT}/\" :wishmaster-branch :${METASTORE_BRANCH})
   (format t ${CONGRATULATING_MESSAGE})
-  (let* ((app (app '${APP} :if-does-not-exist :continue))
+  (let* ((app (app (quote ${APP}) :if-does-not-exist :continue))
          (system  (if app
                       (app-system app)
-                      (system '${SYSTEM} :if-does-not-exist :continue)))
+                      (system (quote ${SYSTEM}) :if-does-not-exist :continue)))
          (module (if system
                      (system-module system)
-                     (module '${MODULE} :if-does-not-exist :continue)))
-         (desire (or '${MODULE} '${SYSTEM} '${APP})))
+                     (module (quote ${MODULE}) :if-does-not-exist :continue)))
+         (desire (or (quote ${MODULE}) (quote ${SYSTEM}) (quote ${APP}))))
     (when (and desire (not module))
       (error \"~@<~S was desired, but no such entity (application, system or module) is known.~:@>\"
              desire))
@@ -246,5 +286,5 @@ sbcl --noinform $DISABLE_DEBUGGER \
       (require (down-case-name system)))
     (when app
       (run app))
-    (when '${EXPR}
+    (when (quote ${EXPR})
       ${EXPR})))"
