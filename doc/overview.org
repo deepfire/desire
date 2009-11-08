@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 8, 2009, 07:17
+November 8, 2009, 08:35
 #+END_CENTER
 
 * About this document
@@ -318,11 +318,11 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -h          Display this help message.
 #+END_EXAMPLE
 
-During first step storage root location is determined, as follows:
+As step zero, when the -u switch is provided, climb.sh is updated using wget
+from the canonical location at http://www.feelingofgreen.ru/shared/git/desire/climb.sh,
+and then normal processing is continued, using the updated version.
 
-When the -u switch is provided, climb.sh is updated using wget from the
-canonical location at http://www.feelingofgreen.ru/shared/git/desire/climb.sh,
-and then execution is continued, using the updated version.
+During first step storage root location is determined, as follows:
 
 When STORAGE-ROOT is not specified, look up ~/.climb-root and see if it
 refers to a writable directory containing a writable 'git' subdirectory.
