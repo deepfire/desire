@@ -6,6 +6,8 @@
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
   (:export
+   ;; dependencies.lisp
+   #:name
    ;; types.lisp
    #:distributor #:location #:remote #:locality #:gate #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
