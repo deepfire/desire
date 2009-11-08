@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 5, 2009, 03:16
+November 8, 2009, 07:17
 #+END_CENTER
 
 * About this document
@@ -288,48 +288,71 @@ This script performs following operations:
      -  load and perform an initial setup of desire,
      -  optionally install a desired module and its dependencies;
 
-Climb.sh depends on git and bash. Invoke it like this:
+climb.sh depends on git, a POSIX shell and, obviously, a lisp (currently,
+only SBCL is supported).  Invoke it like this:
 
-: climb.sh ABSOLUTE-ROOT-PATH [MODULE-NAME [BOOTSTRAP-HOST]]
+#+BEGIN_EXAMPLE
+  climb.sh [OPTION]... [STORAGE-ROOT]
 
-These arguments have the following semantics:
+Bootstrap, update or perform other actions on a desire installation
+in either STORAGE-ROOT, or a location specified in ~/.climb-root
 
-  1. ABSOLUTE-ROOT-PATH should be an empty, writable filesystem location.
-     That is, the exact filename must not exist, but its parent directory
-     must exist, and be writable by the invoking user.
+  -u          Self-update and continue processing other options, using
+                the updated version.
+  -n HOSTNAME Use HOSTNAME as a bootstrap node.
+                HOSTNAME must refer to a node participating in desire protocol.
+  -b BRANCH   Check out BRANCH of desire other than 'master'.
+  -t BRANCH   Check out BRANCH of metastore on the bootstrap node other than
+                the default.  The default is the same as the used branch
+                of desire.
+  -m MODULE   Retrieve MODULE, once ready.
+  -s SYSTEM   Install or update the module relevant to SYSTEM, then load it.
+  -a APP      Load system containing APP, as per -s, then launch it.
+  -x EXPR     Evaluate an expression, in the end of it all.
+  -d          Enable debug optimisation of Lisp code.
+  -n          Disable debugger, causing desire dump stack and abort on errors,
+                instead of entering the debugger.
+  -e          Enable explanations about external program invocations.
+  -v          Crank up verbosity.
+  -V          Print version.
+  -h          Display this help message.
+#+END_EXAMPLE
 
-  2. The optional MODULE-NAME allows automatic retrieval and installation
-     of a certain desired module.  When the module contains a system of
-     the same name, that system will be loaded.  When an application with
-     a same name incidentally exists within the loaded system, that application
-     will be started as well.
+During first step storage root location is determined, as follows:
 
-  3. BOOTSTRAP-HOST allows choice of a bootstrap host different from
-     the default, git.feelingofgreen.ru.  That other host must contain Desire
-     and its dependencies published via git-daemon.
+When the -u switch is provided, climb.sh is updated using wget from the
+canonical location at http://www.feelingofgreen.ru/shared/git/desire/climb.sh,
+and then execution is continued, using the updated version.
 
-The root location will be registered as root directory for per-VCS localities,
-serving to satisfy storage needs arising from user module retrieval requests.
+When STORAGE-ROOT is not specified, look up ~/.climb-root and see if it
+refers to a writable directory containing a writable 'git' subdirectory.
+If this condition is met, that directory is accepted as STORAGE-ROOT,
+otherwise an error is signalled.
 
-The path to the 'git/.asdf-registry/' subdirectory of this root directory
-should be pushed into ASDF:*CENTRAL-REGISTRY*, if ASDF is to have access
-to modules in the desire's pool after the bootstrap script is exited.
+When STORAGE-ROOT is specified, it must refer to a non-occupied filesystem
+location, with a present, writable parent directory.
 
-A number of environment variables affect the behavior of climb.sh:
+During the second step, desire and its dependencies are either retrieved,
+or updated, when they are already present in STORAGE-ROOT.
 
-    - EXPLAIN :: Cause the bootstrap script to make desire explain
-                 invocations of external programs, once it's loaded and active.
-    - VERBOSE :: Further extend desire's verbosity while running external
-                 programs.
-    - BRANCH :: Check out a branch of desire, other than 'master'.
-                A corresponding metastore branch will be checked out.
-    - METABRANCH :: Check out a metastore branch different from either the
-                    default, 'master', or whatever was specified by the
-                    environment variable BRANCH.
-    - =DISABLE_DEBUGGER= :: Print a backtrace and exit with an error status,
-         on errors during operation of desire, once it's loaded.  The default
-         is to invoke a debugger.
-    - DEBUG :: Globally enable optimisation for debug for all compiled Lisp code.
+Next, when -b is specified, a branch of desire other than the default one
+(master) is checked out.
+
+Further, the -n and -t options specify, correspondingly, the hostname
+of the desire node used for bootstrap, and a branch of that node's metastore
+to use.  These options default to ${default_bootstrap_node} and
+the branch of desire, accordingly.
+
+Then a lisp is started and desire initialisation is attempted, with
+determined hostname and metastore branch.
+
+Once the initialisation is complete, MODULE, SYSTEM and APP provide
+optional convenience shortcuts for module installation, system loading
+and application launching.  Any of these can be omitted, as the required
+information is easily deduced.  Note that the more granular objects
+determine the objects of lower granularity.
+
+After all these steps, EXPR is executed, if it was provided.
 
 *** Normal, non-bootstrap use
 
