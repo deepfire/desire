@@ -105,35 +105,71 @@
 (defvar *default-buildslave-master* :git.feelingofgreen.ru)
 
 (defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
-(defparameter *clean-command* "rm -rf desr")
-(defparameter *download-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
-(defparameter *run-tests-command* (format nil "bash climb.sh -v -s desire-buildbot -x '(progn (desire-buildbot::test-all-converted-modules) (sb-ext:quit))' ~~/desr"))
+(defparameter *purge-command* "rm -rf desr")
+(defparameter *purge-metastore-command* "rm -rf desr/git/.meta")
+(defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
 
-(defparameter *buildslave-commands* `(,*clean-command*
-                                      ,*download-bootstrapper-command*
-                                      ,*run-tests-command*))
-
-(defun test-module (m)
-  (multiple-value-bind (fetch-error fetch-successp)
-      (let ((*fetch-errors-serious* t))
+(defun invoke-with-status-recording (fn)
+  (with-output-to-string (output)
+    (multiple-value-bind (condition successp)
         (with-collected-conditions (error)
-          (lust m)))
-    (multiple-value-bind (load-error load-successp)
-        (when fetch-successp
-          (with-collected-conditions (error)
-            (require (name m))))
-      (let ((condition (or fetch-error load-error)))
-        (list* :fetch-successp fetch-successp :load-successp load-successp
-               (when condition
-                 `(:condition ,condition)))))))
+          (let ((*standard-output* output)
+                (*error-output* output))
+            (funcall fn)))
+      (finish-output output)
+      (return-from invoke-with-status-recording
+        (list* :status successp :output (get-output-stream-string output)
+               (when condition `(:condition ,(format nil "\"~A\"" condition))))))))
 
-(defun test-all-converted-modules ()
-  (let ((converted-modules (mapcar #'module (desire::distributor-converted-modules (distributor *buildslave-master*)))))
+(defmacro with-recorded-status (() &body body)
+  `(invoke-with-status-recording (lambda () ,@body)))
+
+(defun module-test-fetchability (m)
+  (let ((*fetch-errors-serious* t))
+    (with-recorded-status ()
+      (desr::update-module m)
+      t)))
+
+(defun module-test-loadability (m)
+  (with-recorded-status ()
+    (not (null (asdf:oos 'asdf:load-op (name m))))))
+
+(defun test-converted-modules ()
+  (let ((converted-modules (mapcar #'module (desire::distributor-converted-modules (distributor *default-buildslave-master*)))))
     (syncformat t "~&~S~%" :beginning-of-test-results-marker)
     (iter (for m in converted-modules)
-          (syncformat t "~S~%" (list* (name m) (test-module m))))))
+          (syncformat t "(:name ~S :mode :fetch " (name m))
+          (syncformat t "~{ ~S~})~%" (module-test-fetchability m)))
+    (iter (for m in converted-modules)
+          (syncformat t "(:name ~S :mode :load " (name m))
+          (syncformat t "~{ ~S~})~%" (module-test-loadability m)))
+    #+(or)
+    (iter (for m in converted-modules)
+          (syncformat t "(:name ~S :mode :test" (name m))
+          (when (module-has-tests-p m)
+            (syncformat t "~{ ~S~})~%" (module-run-tests m))))))
 
-(defun run-build-tests (&key (purge nil) (hostname *default-buildslave-host*) (username *default-buildslave-username*))
+(defun run-build-tests (&key purge purge-metastore (hostname *default-buildslave-host*) (username *default-buildslave-username*)
+                        branch metastore-branch
+                        disable-debugger
+                        verbose)
   (find-executable 'ssh)
-  (watch-remote-commands hostname username (xform (not purge) #'rest *buildslave-commands*))
+  (watch-remote-commands hostname username (remove nil
+                                                   (list
+                                                    (when purge
+                                                      *purge-command*)
+                                                    (when purge-metastore
+                                                      *purge-metastore-command*)
+                                                    *update-bootstrapper-command*
+                                                    (format nil "bash climb.sh ~:[~;-v ~]~
+                                                                      ~:[~;-b ~:*~(~A~) ~] ~:[~;-t ~:*~(~A~) ~]~
+                                                                      ~:[~;-g ~]~
+                                                                      -x '(progn (desr:ensure-module-systems-loadable :desire) ~
+                                                                                 (require :desire-buildbot) ~
+                                                                                 (funcall (find-symbol \"TEST-CONVERTED-MODULES\" :desire-buildbot)) ~
+                                                                                 (sb-ext:quit))' ~
+                                                                      ~~/desr"
+                                                            verbose
+                                                            branch metastore-branch
+                                                            disable-debugger))))
   (values))

@@ -61,7 +61,7 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -a APP      Load system containing APP, as per -s, then launch it.
   -x EXPR     Evaluate an expression, in the end of it all.
   -d          Enable debug optimisation of Lisp code.
-  -n          Disable debugger, causing desire dump stack and abort on errors,
+  -g          Disable debugger, causing desire dump stack and abort on errors,
                 instead of entering the debugger.
   -e          Enable explanations about external program invocations.
   -v          Crank up verbosity.
@@ -114,7 +114,7 @@ EOF
     exit $1
 }
 
-while getopts :un:b:t:m:s:a:x:dnevVh opt
+while getopts :un:b:t:m:s:a:x:dgevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
@@ -126,7 +126,7 @@ do
         a)  APP="${OPTARG}";;
         x)  EXPR="${OPTARG}";;
         d)  DEBUG="3";;
-        n)  DISABLE_DEBUGGER="--disable-debugger";;
+        g)  DISABLE_DEBUGGER="--disable-debugger";;
         e)  EXPLAIN="t";;
         v)  VERBOSE="t";;
         V)  print_version_and_die;;
