@@ -28,7 +28,7 @@ version="9.11.1"
 
 argv0="$(basename $0)"
 
-default_bootstrap_node="git.feelingofgreen.ru"
+default_wishmaster="git.feelingofgreen.ru"
 default_desire_branch="master"
 
 print_version_and_die() {
@@ -93,7 +93,7 @@ Next, a specific branch of desire is checked out, configurable with the
 
 Further, the -n and -t options alter, correspondingly, the hostname
 of the desire node used for bootstrap, and a branch of that node's metastore
-to use.  These options default to ${default_bootstrap_node} and
+to use.  These options default to ${default_wishmaster} and
 the name of the branch of desire, accordingly.
 
 During the next step a lisp is started and desire initialisation is attempted,
@@ -118,7 +118,7 @@ while getopts :un:b:t:m:s:a:x:dnevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
-        n)  BOOTSTRAP_NODE="${OPTARG}";;
+        n)  WISHMASTER="${OPTARG}";;
         b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
         m)  MODULE="${OPTARG}";;
@@ -146,8 +146,8 @@ ROOT="$1"
 shift 1
 test "$@" && fail "unknown arguments: $@"
 
-test "${VERBOSE}" -a "${BOOTSTRAP_NODE}" && echo "NOTE: choosing an alternate bootstrap node: '${BOOTSTRAP_NODE}'"
-BOOTSTRAP_NODE=${BOOTSTRAP_NODE:-${default_bootstrap_node}}
+test "${VERBOSE}" -a "${WISHMASTER}" && echo "NOTE: choosing an alternate bootstrap wishmaster: '${WISHMASTER}'"
+WISHMASTER=${WISHMASTER:-${default_wishmaster}}
 test "${VERBOSE}" -a "${DESIRE_BRANCH}" && echo "NOTE: choosing an alternate branch of desire: '${DESIRE_BRANCH}'"
 DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
 test "${VERBOSE}" -a "${METASTORE_BRANCH}" && echo "NOTE: choosing a specific metastore branch: '${METASTORE_BRANCH}'"
@@ -198,7 +198,7 @@ clone_dependencies() {
     for desire_dep in ${desire_deps} desire
     do
         test "${VERBOSE}" && echo -n "      ${desire_dep}: "
-        git clone git://${BOOTSTRAP_NODE}/${desire_dep} "${root}/git/${desire_dep}" >/dev/null || \
+        git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/git/${desire_dep}" >/dev/null || \
             fail "failed to retrieve ${desire_dep}"
         test "${VERBOSE}" && echo "ok"
     done
@@ -209,7 +209,7 @@ update_dependencies() {
     for desire_dep in ${desire_deps} desire
     do
         test "${VERBOSE}" && echo -n "      $desire_dep: "
-        (cd "${root}/git/$desire_dep" && git fetch origin >/dev/null 2>&1 && git reset --hard remotes/origin/master >/dev/null) || \
+        (cd "${root}/git/$desire_dep" && git fetch "${WISHMASTER}" >/dev/null 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >/dev/null) || \
             fail "failed to update $desire_dep"
         test "${VERBOSE}" && echo "ok"
     done
@@ -246,7 +246,7 @@ else
 fi
 
 test "${VERBOSE}" && echo "NOTE: checking out '${DESIRE_BRANCH}' branch of desire..."
-( cd ${ROOT}/git/desire && git reset --hard origin/${DESIRE_BRANCH} ) || \
+( cd ${ROOT}/git/desire && git reset --hard "${WISHMASTER}/${DESIRE_BRANCH}" ) || \
     fail "failed to check out branch '${DESIRE_BRANCH}' of desire"
 
 test "${VERBOSE}" && echo "NOTE: cranking up verbosity"
