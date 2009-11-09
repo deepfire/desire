@@ -179,7 +179,7 @@ desire_deps="alexandria asdf cl-fad executor pergamum iterate"
 
 writable_absolute_directory_p() {
     local path="$1"
-    test "${path:0:1}" == "/" || fail "${path} is not an absolute pathname"
+    test "${path##/}" != "${path}" || fail "${path} is not an absolute pathname"
     test -d "${path}" || fail "${path} does not refer to a directory"
     test -w "${path}" || fail "${path} is not writable"
     return 0
