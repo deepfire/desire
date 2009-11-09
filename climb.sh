@@ -317,6 +317,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
     (when system
       (require (down-case-name system)))
     (when app
-      (run app))
-    (when (quote ${EXPR})
-      ${EXPR})))"
+      (run app))))" \
+     --eval "
+(when (quote ${EXPR})
+  ${EXPR})" 
