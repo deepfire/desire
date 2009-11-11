@@ -266,7 +266,7 @@ a special module called '.meta'."
 
 ;;; A special case location*vcs*role extension which is /going/ to be
 ;;; troublesome, as it violates simplicity.
-(defclass gate-native-remote (gate-remote git-native-remote) ())
+(defclass gate-native-remote (gate-remote git-native) ())
 (defclass gate-http-remote (gate-remote git-http-remote) ())
 
 ;; Handle remote localisation, for printing purposes.
