@@ -239,7 +239,7 @@ a special module called '.meta'."
   (find-if (of-type 'gate) (distributor-remotes distributor)))
 
 (defclass gate-remote (gate remote) ())
-(defclass gate-locality (locality gate-remote) ())
+(defclass gate-locality (gate-remote locality) ())
 
 ;;;;
 ;;;; Location * VCS
