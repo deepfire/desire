@@ -73,13 +73,13 @@ SAVE-CURRENT-DEFINITIONS was called.")
    :relationships nil))
 
 (defclass local-distributor (distributor)
-  ((root    :accessor root          :initarg :root :documentation "Root of all desires.")
-   (git     :accessor local-git     :documentation "Transitory git locality of a locally-accessible distributor.")
-   (hg      :accessor local-hg      :documentation "Transitory hg locality of a locally-accessible distributor.")
-   (darcs   :accessor local-darcs   :documentation "Transitory darcs locality of a locally-accessible distributor.")
-   (cvs     :accessor local-cvs     :documentation "Transitory cvs locality of a locally-accessible distributor.")
-   (svn     :accessor local-svn     :documentation "Transitory svn locality of a locally-accessible distributor.")
-   (tarball :accessor local-tarball :documentation "Transitory tarball locality of a locally-accessible distributor.")))
+  ((root        :reader   root          :initarg :root :documentation "Root of all desires.")
+   (git         :accessor local-git     :documentation "Transitory git locality of a locally-accessible distributor.")
+   (hg          :accessor local-hg      :documentation "Transitory hg locality of a locally-accessible distributor.")
+   (darcs       :accessor local-darcs   :documentation "Transitory darcs locality of a locally-accessible distributor.")
+   (cvs         :accessor local-cvs     :documentation "Transitory cvs locality of a locally-accessible distributor.")
+   (svn         :accessor local-svn     :documentation "Transitory svn locality of a locally-accessible distributor.")
+   (tarball     :accessor local-tarball :documentation "Transitory tarball locality of a locally-accessible distributor.")))
 
 (defmacro do-wishmasters ((var) &body body)
   `(do-distributors (,var)
@@ -124,6 +124,7 @@ This notably excludes converted modules."
 ;;;; VCS nomenclature
 ;;;;
 (defclass vcs-type-mixin () ((vcs-type :reader vcs-type :initarg :vcs-type)))
+(defmethod vcs-type ((s symbol)) nil)
 
 (defvar *supported-vcs-types* '(git hg darcs cvs svn tarball))
 (defvar *gate-vcs-type* 'git)
@@ -237,7 +238,9 @@ a special module called '.meta'."
   (find-if (of-type 'gate) (distributor-remotes distributor)))
 
 (defclass gate-remote (gate remote) ())
-(defclass gate-locality (gate-remote locality) ())
+(defclass gate-locality (gate-remote locality) 
+  ((unpublished-module-names :accessor gate-unpublished-module-names :initarg :unpublished-module-names :documentation "Complex computation.")
+   (hidden-module-names :accessor gate-hidden-module-names :initarg :hidden-module-names :documentation "Complex computation.")))
 
 ;;;;
 ;;;; Location * VCS
@@ -305,13 +308,18 @@ differ in only slight detail -- gate property, for example."
        (eq (transport x) (transport y))))
 
 ;;; most specific, exhaustive partition of LOCALITY
-(defclass git-locality (gate-locality gate-native-remote) ())
+(defclass git-locality (git locality) ())
 (defclass hg-locality (hg locality) ())
 (defclass darcs-locality (darcs locality) ())
 (defclass cvs-locality (cvs locality) ())
 (defclass svn-locality (svn locality) ())
 (defclass tarball-locality (tarball locality) ())
 
+(defclass git-gate-locality (gate-native-remote git-locality gate-locality) ())
+
+;;;
+;;; Welcome to layers of crap upon layers of crap.
+;;;
 (defmethod vcs-type ((o (eql 'gate-native-remote))) *gate-vcs-type*)
 (defmethod vcs-type ((o (eql 'gate-http-remote))) *gate-vcs-type*)
 (defmethod vcs-type ((o (eql 'git-native-remote))) 'git)
@@ -340,13 +348,22 @@ differ in only slight detail -- gate property, for example."
 (defmethod transport ((o (eql 'svn-native-remote))) 'native)
 (defmethod transport ((o (eql 'tarball-http-remote))) 'http)
 
+(defmethod vcs-type ((o (eql 'git-locality))) 'git)
+(defmethod vcs-type ((o (eql 'hg-locality))) 'hg)
+(defmethod vcs-type ((o (eql 'darcs-locality))) 'darcs)
+(defmethod vcs-type ((o (eql 'cvs-locality))) 'cvs)
+(defmethod vcs-type ((o (eql 'svn-locality))) 'svn)
+(defmethod vcs-type ((o (eql 'tarball-locality))) 'tarball)
+(defmethod vcs-type ((o (eql 'git-gate-locality))) 'git)
+
 ;;;
 ;;; Locality methods
 ;;;
-(defmethod initialize-instance :after ((o locality) &key pathname &allow-other-keys)
+(defmethod initialize-instance :after ((o locality) &key pathname omit-registration-by-path &allow-other-keys)
   (unless pathname
     (error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
-  (setf (locality-by-path pathname) o)
+  (unless omit-registration-by-path
+    (setf (locality-by-path pathname) o))
   (unless (directory-exists-p pathname)
     (ensure-directories-exist pathname)))
 
@@ -357,7 +374,10 @@ differ in only slight detail -- gate property, for example."
 
 (defgeneric update-gate-conversions (locality)
   (:method ((o gate-locality))
-    (setf (gate-converted-module-names o) (mapcar #'name (compute-locality-module-presence o)))))
+    (multiple-value-bind (publishable unpublishable hidden) (compute-locality-module-presence o)
+      (setf (gate-converted-module-names o) (mapcar #'name publishable)
+            (gate-unpublished-module-names o) (mapcar #'name unpublishable)
+            (gate-hidden-module-names o) (mapcar #'name hidden)))))
 
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
   (update-gate-conversions o))
@@ -382,18 +402,24 @@ differ in only slight detail -- gate property, for example."
 ;;;
 ;;; Local distributor methods
 ;;;
-(defgeneric define-local-distributor-locality (local-distributor vcs-type &rest arguments)
+(defgeneric define-local-distributor-locality (local-distributor name-qualifier type-or-vcs-type &rest arguments)
   (:documentation "Define a locality of VCS-TYPE in a subdirectory of LOCAL-DISTIBUTOR's root.")
-  (:method ((o local-distributor) vcs-type &rest arguments)
-    (setf (slot-value o vcs-type)
-          (apply #'make-instance (find-class (format-symbol #.*package* "~A-LOCALITY" vcs-type))
-                 :name (default-remote-name (name o) vcs-type 'native) :distributor o
-                 :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))
-                 arguments))))
+  (:method ((o local-distributor) name-qualifier type-or-vcs-type &rest arguments)
+    (multiple-value-bind (locality-type vcs-type) (if-let ((vcs-type (vcs-type type-or-vcs-type))) ;; fully qualified (approx)?
+                                                    (values type-or-vcs-type
+                                                            vcs-type)
+                                                    (values (format-symbol #.*package* "~A-LOCALITY" type-or-vcs-type)
+                                                            type-or-vcs-type))
+      (setf (slot-value o vcs-type)
+            (apply #'make-instance (find-class locality-type) :distributor o
+                   :name (format-symbol #.*package* "~A~:[~;-~:*~A~]"
+                                        (default-remote-name (name o) vcs-type 'native) name-qualifier)
+                   :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))
+                   arguments)))))
 
 (defmethod shared-initialize :after ((o local-distributor) slot-names &key &allow-other-keys)
-  ;; The locality typed *gate-vcs-type* need to be produced differently between make-instance/change-class.
-  (mapc (curry #'define-local-distributor-locality o) (remove *gate-vcs-type* *supported-vcs-types*)))
+  ;; The locality typed *gate-vcs-type* needs to be constructed differently between make-instance/change-class.
+  (mapc (curry #'define-local-distributor-locality o nil) (remove *gate-vcs-type* *supported-vcs-types*)))
 
 (defun wishmaster-release-modules (wishmaster)
   "Return the list of names of modules released by WISHMASTER via its gate.
@@ -408,33 +434,42 @@ be able to use it on all distributors, without keeping track of whether
 they participate in the desire wishmaster protocol or not."
   (gate-converted-module-names (gate distributor)))
 
-(defgeneric update-local-distributor-conversions (distributor &optional scan-gate)
-  (:method ((o local-distributor) &optional scan-gate)
+(defgeneric update-local-distributor-conversions (distributor)
+  (:method ((o local-distributor))
     (let ((gate (gate o)))
-      (when scan-gate
-        (update-gate-conversions gate))
-      (let ((locally-present-set (gate-converted-module-names gate))
+      (let ((converted (gate-converted-module-names gate))
+            (unpublished (gate-unpublished-module-names gate))
+            (hidden (gate-hidden-module-names gate))
             ;; The logic here is that if we're engaging in this whole game,
             ;; we're only releasing via our gate remote, which means that
             ;; WISHMASTER-RELEASE-MODULES returns the complete set of modules.
-            (release-set (wishmaster-release-modules o))) 
-        (when-let ((missing (set-difference release-set locally-present-set)))
-          (error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" missing (name o) (root o)))
-        (dolist (m-name release-set)
-          (let ((m (module m-name)))
-            (unless (typep m 'origin-module)
-              (change-class m 'origin-module))))
-        (nset-differencef (gate-converted-module-names gate) release-set)))))
+            (release-set (wishmaster-release-modules o)))
+        (let* ((missing (set-difference release-set converted))
+               (new-unpublished (intersection missing unpublished))
+               (new-hidden (intersection missing hidden))
+               (mia (set-difference missing (append new-unpublished new-hidden))))
+          (when new-unpublished
+            (format t ";; Following modules were demoted to unpublished:~{ ~A~}~%" new-unpublished))
+          (when new-hidden
+            (format t ";; Following modules were demoted to hidden:~{ ~A~}~%" new-hidden))
+          (when mia
+            (error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" mia (name o) (root o)))
+          (let ((new-release-set (set-difference release-set (append new-unpublished new-hidden))))
+            (dolist (m-name release-set)
+              (let ((m (module m-name)))
+                (unless (typep m 'origin-module)
+                  (change-class m 'origin-module))))
+            (nset-differencef (gate-converted-module-names gate) release-set)))))))
 
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
   (let ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w))))
     (setf *original-self-gate-class-name* (class-name (class-of gate))
-          (gate w) (change-class gate 'git-locality :pathname (merge-pathnames #p"git/" root))))
+          (gate w) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root))))
   (update-local-distributor-conversions w))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
-  (define-local-distributor-locality o *gate-vcs-type* :registrator #'(setf locality)))
+  (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf locality)))
 
 ;;;
 ;;; Remote methods
@@ -551,11 +586,17 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
     (break))
   (call-next-method))
 
+(defun location-link-module (location module)
+  (pushnew (name module) (location-module-names location)))
+
+(defun location-unlink-module (location module)
+  (removef (location-module-names location) (name module)))
+
 (defgeneric remote-link-module (remote module &key &allow-other-keys)
   (:documentation
-   "Establish a 'provides' relationship between REMOTE and MODULE.")
+   "Establish a 'publishes' relationship between REMOTE and MODULE.")
   (:method ((r remote) (m module) &key &allow-other-keys)
-    (pushnew (name m) (location-module-names r))
+    (location-link-module r m)
     (pushnew r (module-remotes m)))
   (:method :around ((r wrinkle-mixin) (m module) &key wrinkle)
     (when (and wrinkle
@@ -565,9 +606,9 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defgeneric remote-unlink-module (remote module)
   (:documentation
-   "Undo a 'provides' relationship between REMOTE and MODULE.")
+   "Undo a 'publishes' relationship between REMOTE and MODULE.")
   (:method ((r remote) (m module))
-    (removef (location-module-names r) (name m))
+    (location-unlink-module r m)
     (removef (module-remotes m) r))
   (:method ((r cvs-remote) (m module))
     (removef (wrinkles r) (name m) :key #'car)
@@ -579,28 +620,36 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
       (when (typep remote 'gate)
         (not (null (find (name module) (gate-converted-module-names remote)))))))
 
-(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
-                         &aux (module (coerce-to-module module-or-name)))
-  "See if MODULE's presence cache is positive for LOCALITY, failing that check the
-   repository, and update the cache, accordingly to the result.
+(defun compute-module-presence (module &optional (locality (gate *self*)))
+  (git-repository-present-p (module-pathname module locality)))
 
-   CHECK-WHEN-PRESENT-P determines if presence check is performed when MODULE's cache
-   is positive.
-   CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
-   cache results."
+(defun update-module-presence (module &optional (locality (gate *self*)) (force-to nil forcep))
+  "Recompute MODULE's presence in LOCALITY, updating MODULE's presence cache.
+Optionally, when FORCE-TO is specified, the actual check is omitted and the
+value of FORCE-TO is assumed."
   (with-slots (scan-positive-localities) module
-    (labels ((update-presence-in (locality)
-               (lret ((presence (git-repository-present-p (module-pathname module locality))))
-                 (if presence
-                     (pushnew locality scan-positive-localities)
-                     (removef scan-positive-localities locality)))))
-      (if-let ((cache-hit (find locality scan-positive-localities)))
-        (if check-when-present-p
-            (update-presence-in locality)
-            t)
-        (if check-when-missing-p
-            (update-presence-in locality)
-            nil)))))
+    (lret ((presence (if forcep
+                         force-to
+                         (compute-module-presence module locality))))
+      (if presence
+          (pushnew locality scan-positive-localities)
+          (removef scan-positive-localities locality)))))
+
+(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
+                                 &aux (module (coerce-to-module module-or-name)))
+  "See if MODULE's presence cache is positive for LOCALITY, failing that perform
+actual repository check and update the presence cache.
+CHECK-WHEN-PRESENT-P determines if presence check is forced when MODULE's cache
+is positive.
+CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
+cache results."
+  (if-let ((cache-hit (find locality (module-scan-positive-localities module))))
+    (if check-when-present-p
+        (update-module-presence module locality)
+        t)
+    (if check-when-missing-p
+        (update-module-presence module locality)
+        nil)))
 
 (defvar *module*)
 (defvar *umbrella*)
@@ -825,13 +874,55 @@ whether the attempt was successful."
   "Return the path to the meta directory."
   (subdirectory* (locality-pathname (gate local-distributor)) ".meta"))
 
+(defun hide-module (module &optional (locality (gate *self*)) &aux
+                    (module (coerce-to-module module))
+                    (name (name module)))
+  "Stop advertising MODULE in definitions, as well as make it inaccessible
+to general public within LOCALITY."
+  (removef (location-module-names locality) name)
+  (removef (gate-converted-module-names locality) name)
+  (removef (gate-unpublished-module-names locality) name)
+  (pushnew name (gate-hidden-module-names locality))
+  (setf (git-repository-world-readable-p (module-pathname module locality)) nil))
+
+(defun make-module-unpublished (module &optional (locality (gate *self*)) &aux
+                                (module (coerce-to-module module))
+                                (name (name module)))
+  "Stop advertising MODULE in definitions, without completely hiding it.
+If it is hidden, unhide it."
+  (removef (location-module-names locality) name)
+  (removef (gate-converted-module-names locality) name)
+  (pushnew name (gate-unpublished-module-names locality))
+  (setf (git-repository-world-readable-p (module-pathname module locality)) t)
+  (removef (gate-hidden-module-names locality) name))
+
+(defun module-hidden-p (module &optional (locality (gate *self*)))
+  "Determine whether MODULE is hidden, with regard to LOCALITY.
+This is a function of MODULE repository's anonymous accessibility."
+  (not (git-repository-world-readable-p (module-pathname (coerce-to-module module) locality))))
+
+(defun module-publishable-p (module &optional (locality (gate *self*)))
+  "Determine whether MODULE is publishable via gate LOCALITY.
+This is a function of intent expressed by MODULE's membership
+in non-unpublished remotes."
+  (not (null (or (find (name module) (location-module-names locality))
+                 (find (name module) (gate-converted-module-names locality))))))
+
 (defun compute-locality-module-presence (&optional (locality (gate *self*)))
   "Scan LOCALITY for known modules and update its and those modules's idea
 about their relationship.
 The value returned is the list of found modules."
   (do-modules (module)
-    (when (module-locally-present-p module locality t)
-      (collect module))))
+    (when (update-module-presence module locality)
+      (cond ((module-hidden-p module locality)
+             (collect module into hidden-modules))
+            ((not (module-publishable-p module locality))
+             (collect module into unpublishable-modules))
+            (t
+             (collect module into publishable-modules))))
+    (finally (return (values publishable-modules
+                             unpublishable-modules
+                             hidden-modules)))))
 
 (defmacro do-present-modules ((module &optional (locality '(gate *self*))) &body body)
   "Iterate the BODY over all modules cached as present in LOCALITY, with MODULE specifying

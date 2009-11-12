@@ -26,6 +26,7 @@
 (defvar *read-time-enclosing-remote*)
 (defvar *read-time-force-source* nil)
 (defvar *read-time-merge-source-distributor*)
+(defparameter *printing-local-definitions* nil)
 
 (defgeneric merge-slot-value (source owner subject subject-slot source-proposed-value)
   (:documentation
@@ -109,11 +110,20 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (list `(:distributor-port ,port)))
                       (when (remote-domain-name-takeover o)
                         (list `(:domain-name-takeover t)))
-                      (when systemful
+                      (when (and systemful
+                                 (not *printing-local-definitions*))
                         (list `(:modules ,(sort (mapcar #'downstring systemful) #'string<))))
-                      (when systemless
+                      (when (and systemless
+                                 (not *printing-local-definitions*))
                         (list `(:systemless-modules ,(sort (mapcar #'downstring systemless) #'string<))))
-                      (when-let ((converted-names (and (typep o 'gate) (slot-or-abort-print-object stream o 'converted-module-names))))
+                      (when-let ((unpublished-names (and (typep o 'gate) *printing-local-definitions*
+                                                         (slot-or-abort-print-object stream o 'unpublished-module-names))))
+                        (list `(:unpublished-module-names ,(sort (mapcar #'downstring unpublished-names) #'string<))))
+                      (when-let ((hidden-names (and (typep o 'gate) *printing-local-definitions*
+                                                    (slot-or-abort-print-object stream o 'hidden-module-names))))
+                        (list `(:hidden-module-names ,(sort (mapcar #'downstring hidden-names) #'string<))))
+                      (when-let ((converted-names (and (typep o 'gate) (not *printing-local-definitions*)
+                                                       (slot-or-abort-print-object stream o 'converted-module-names))))
                         (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<))))
                       (when-let ((initial-version (and (typep o 'tarball) (slot-or-abort-print-object stream o 'initial-version))))
                         (list `(:initial-version ,initial-version)))
