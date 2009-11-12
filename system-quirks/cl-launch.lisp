@@ -22,10 +22,10 @@
 
 
 (defun make-cl-launch-system (locality-directory)
-  (ensure-directories-exist (subdirectory* *desire-root* "bin"))
+  (ensure-directories-exist (subdirectory* (root *self*) "bin"))
   (within-directory ((subdirectory* locality-directory "cl-launch"))
     (with-explanation ("installing CL-LAUNCH binary")
-      (make "install_binary" `("INSTALL_BIN=" ,(subfile* *desire-root* "bin"))))
+      (make "install_binary" `("INSTALL_BIN=" ,(subfile* (root *self*) "bin"))))
     (with-explanation ("installing CL-LAUNCH source")
       (make "install_source" `("INSTALL_SOURCE=" ,(subfile* locality-directory "cl-launch"))))))
 

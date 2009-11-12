@@ -45,8 +45,6 @@
 (defvar *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
 (defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 
-(defvar *desire-root* nil "Absolute pathname of a directory containing master localities and installed tools.")
-
 (defvar *unsaved-definition-changes-p* nil
   "Whether the idea about the world changed, since INIT was performed, or
 SAVE-CURRENT-DEFINITIONS was called.")
@@ -927,8 +925,8 @@ locally present modules will be marked as converted."
          (absolute-path (if (pathname-absolute-p path)
                             path
                             (merge-pathnames path))))
-    (setf *desire-root* (ensure-root-sanity (parse-namestring absolute-path)))
-    (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) *desire-root*))
+    (ensure-root-sanity (parse-namestring absolute-path))
+    (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) absolute-path))
            (meta-path (merge-pathnames #p".meta/" gate-path)))
       (clear-definitions)
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
@@ -944,10 +942,10 @@ locally present modules will be marked as converted."
       (load-definitions :force-source t :metastore meta-path)
       (setf *self* (if-let ((d (and as (distributor as))))
                      (progn (syncformat t ";;; trying to establish self as ~A~%" as)
-                            (change-class d 'local-distributor :root *desire-root*))
+                            (change-class d 'local-distributor :root absolute-path))
                      (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
                        (syncformat t ";;; establishing self as non-well-known distributor ~A~%" local-name)
-                       (make-instance 'local-distributor :name local-name :root *desire-root* :omit-registration t))))
+                       (make-instance 'local-distributor :name local-name :root absolute-path :omit-registration t))))
       (unless (gitvar 'user.name)
         (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
           (syncformat t ";;; setting git user name to ~S~%" username)
@@ -971,7 +969,7 @@ locally present modules will be marked as converted."
 
 (defun reinit ()
   "Execute INIT with the arguments that were passed to it last time."
-  (init *desire-root* :as (when (distributor (name *self*) :if-does-not-exist :continue)
+  (init (root *self*) :as (when (distributor (name *self*) :if-does-not-exist :continue)
                             (name *self*))))
 
 (defun define-locality (name vcs-type &rest keys &key &allow-other-keys)

@@ -8,7 +8,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2009-11-09 02:19:03 MSK"/>
+<meta name="generated" content="2009-11-12 03:19:20 MSK"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -75,7 +75,7 @@ lang="en" xml:lang="en">
 
 
 <div style="text-align: center">
-<p>November 9, 2009, 02:19
+<p>November 12, 2009, 03:19
 </p>
 </div>
 
@@ -107,8 +107,8 @@ lang="en" xml:lang="en">
 </li>
 <li><a href="#sec-5">5 API (aka end-user interface) </a>
 <ul>
-<li><a href="#sec-5.1">5.1 Performing knowledge base queries </a></li>
-<li><a href="#sec-5.2">5.2 Initial chores &amp; storage location choice </a></li>
+<li><a href="#sec-5.1">5.1 Initial chores &amp; storage location choice </a></li>
+<li><a href="#sec-5.2">5.2 Performing knowledge base queries </a></li>
 <li><a href="#sec-5.3">5.3 Making wishes </a>
 <ul>
 <li><a href="#sec-5.3.1">5.3.1 Reader macros for add-module </a></li>
@@ -425,8 +425,46 @@ converted module redistribution.
 </div>
 
 <div id="outline-container-5.1" class="outline-3">
-<h3 id="sec-5.1"><span class="section-number-3">5.1</span> Performing knowledge base queries </h3>
+<h3 id="sec-5.1"><span class="section-number-3">5.1</span> Initial chores &amp; storage location choice </h3>
 <div class="outline-text-3" id="text-5.1">
+
+
+<dl>
+<dt>init path &amp;key as (default-wishmasters (list desr:*default-wishmaster*)) =&gt; &lt;no values&gt;</dt><dd>
+
+<p>
+Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
+</p>
+<p>
+When AS is non-NIL an attempt is made to establish an identity to a defined distributor
+named by the AS keyword.
+</p>
+<p>
+This is performed by checking that the locally available set of modules covers every module
+that is claimed to be "well known" to be published by our distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>.  When this check
+fails an error is signalled.
+</p>
+</dd>
+<dt><code>*self*</code> =&gt; distributor</dt><dd>
+
+<p>
+The local distributor set up during INIT, be it well-known or not.
+</p>
+</dd>
+<dt>root local-distributor =&gt; pathname</dt><dd>
+
+<p>
+The root directory containing all VCS-specific locations of LOCAL-DISTRIBUTOR, chosen during INIT-time.
+</p>
+</dd>
+</dl>
+</div>
+
+</div>
+
+<div id="outline-container-5.2" class="outline-3">
+<h3 id="sec-5.2"><span class="section-number-3">5.2</span> Performing knowledge base queries </h3>
+<div class="outline-text-3" id="text-5.2">
 
 <dl>
 <dt>distributor name &amp;key (if-does-not-exist :error) =&gt; distributor</dt><dd>
@@ -521,38 +559,6 @@ When ALLOW-SELF is specified, and non-NIL, remotes within <code>*SELF*</code> ar
 <p>
 Try 'access' MODULE via its preferred remote and return whether the attempt was successful as the primary value,
 and the output of the toucher executable as the secondary value.
-</p>
-</dd>
-</dl>
-</div>
-
-</div>
-
-<div id="outline-container-5.2" class="outline-3">
-<h3 id="sec-5.2"><span class="section-number-3">5.2</span> Initial chores &amp; storage location choice </h3>
-<div class="outline-text-3" id="text-5.2">
-
-
-<dl>
-<dt>init path &amp;key as (default-wishmasters (list desr:*default-wishmaster*)) =&gt; boolean</dt><dd>
-
-<p>
-Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
-</p>
-<p>
-When AS is non-NIL an attempt is made to establish an identity to a defined distributor
-named by the AS keyword.
-</p>
-<p>
-This is performed by checking that the locally available set of modules covers every module
-that is claimed to be "well known" to be published by our distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>.  When this check
-fails an error is signalled.
-</p>
-</dd>
-<dt><code>*desire-root*</code></dt><dd>
-
-<p>
-The root directory containing all VCS-specific locations, set during INIT-time.
 </p>
 </dd>
 </dl>
@@ -832,8 +838,7 @@ or:
 <p>
 The specified root directory will contain all VCS-specific master localities,
 as well as anything module's post-install scripts choose to deliver.
-This specified pathname will be stored in the <code>*DESIRE-ROOT*</code> global variable,
-and will henceforth be referred as such.
+This pathname is available in <code>*SELF*</code>, using the ROOT reader.
 </p>
 <p>
 Unless you already have a '.meta' module, an initial seed version will be
@@ -933,7 +938,7 @@ or created on the spot.
 </p>
 <p>
 SAVE-CURRENT-DEFINITIONS writes out changes into
-&lt;value-of-*DESIRE-ROOT*&gt;/git/.meta/DEFINITIONS
+&lt;value-of-(ROOT <code>*SELF*</code>)&gt;/git/.meta/DEFINITIONS
 </p>
 </div>
 </div>
@@ -1009,7 +1014,7 @@ process.
 <p class="author"> Author: Samium Gromoff
 <a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2009-11-09 02:19:03 MSK</p>
+<p class="date"> Date: 2009-11-12 03:19:20 MSK</p>
 <p class="creator">HTML generated by org-mode 6.32b in emacs 23</p>
 </div>
 </div>

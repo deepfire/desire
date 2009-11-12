@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 9, 2009, 02:19
+November 12, 2009, 03:19
 #+END_CENTER
 
 * About this document
@@ -150,6 +150,24 @@ The master git locality is a canonical location for both release and
 converted module redistribution.
 
 * API (aka end-user interface)
+*** Initial chores & storage location choice
+
+      - init path &key as (default-wishmasters (list desr:*default-wishmaster*)) => <no values> ::
+        Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
+       
+        When AS is non-NIL an attempt is made to establish an identity to a defined distributor
+        named by the AS keyword.
+
+        This is performed by checking that the locally available set of modules covers every module
+        that is claimed to be "well known" to be published by our distributor[6].  When this check
+        fails an error is signalled.
+
+      - =*self*= => distributor ::
+        The local distributor set up during INIT, be it well-known or not.
+
+      - root local-distributor => pathname ::
+        The root directory containing all VCS-specific locations of LOCAL-DISTRIBUTOR, chosen during INIT-time.
+
 *** Performing knowledge base queries
       - distributor name &key (if-does-not-exist :error) => distributor ::
       - remote name &key (if-does-not-exist :error) => remote ::
@@ -198,21 +216,6 @@ converted module redistribution.
       - touch-module module => boolean, string ::
         Try 'access' MODULE via its preferred remote and return whether the attempt was successful as the primary value,
         and the output of the toucher executable as the secondary value.
-
-*** Initial chores & storage location choice
-
-      - init path &key as (default-wishmasters (list desr:*default-wishmaster*)) => boolean ::
-        Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
-       
-        When AS is non-NIL an attempt is made to establish an identity to a defined distributor
-        named by the AS keyword.
-
-        This is performed by checking that the locally available set of modules covers every module
-        that is claimed to be "well known" to be published by our distributor[6].  When this check
-        fails an error is signalled.
-
-      - =*desire-root*= ::
-        The root directory containing all VCS-specific locations, set during INIT-time.
 
 *** Making wishes
 
@@ -369,8 +372,7 @@ or:
 
 The specified root directory will contain all VCS-specific master localities,
 as well as anything module's post-install scripts choose to deliver.
-This specified pathname will be stored in the =*DESIRE-ROOT*= global variable,
-and will henceforth be referred as such.
+This pathname is available in =*SELF*=, using the ROOT reader.
 
 Unless you already have a '.meta' module, an initial seed version will be
 downloaded for you.  Currently the wishmaster chosen for this is
@@ -424,7 +426,7 @@ The required super-entities are either found among current definitions,
 or created on the spot.
 
 SAVE-CURRENT-DEFINITIONS writes out changes into
-<value-of-*DESIRE-ROOT*>/git/.meta/DEFINITIONS
+<value-of-(ROOT =*SELF*=)>/git/.meta/DEFINITIONS
 
 * Shortcomings
 
