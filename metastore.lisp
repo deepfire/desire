@@ -52,8 +52,8 @@
 (defmacro with-output-to-new-metafile ((stream name metastore-directory &rest open-options &key commit-p commit-message &allow-other-keys) &body body)
   (once-only (name metastore-directory)
     `(prog1
-         (with-output-to-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character :if-does-not-exist :error
-                                       ,@(remove-from-plist open-options :element-type :if-does-not-exist :if-exists :commit-p :commit-message))
+         (with-output-to-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character
+                                       ,@(remove-from-plist open-options :element-type :if-exists :commit-p :commit-message))
            ,@body)
        ,@(when commit-p
            `((when (and ,commit-p
