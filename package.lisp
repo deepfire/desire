@@ -43,7 +43,7 @@
    ;;   types.lisp :: origin-module
    #:module-status #:module-public-packages #:module-hidden-p
    ;; print-read.lisp
-   #:serialise-definitions #:read-definitions #:save-definitions #:load-definitions
+   #:serialise-definitions #:read-definitions #:save-definitions #:read-definitions #:read-local-definitions
    ;; system-loadability.lisp
    #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error

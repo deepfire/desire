@@ -27,6 +27,13 @@
 (defvar *read-time-force-source* nil)
 (defvar *read-time-merge-source-distributor*)
 (defparameter *printing-local-definitions* nil)
+(defvar *desirable-interpreter-dispatch-table*)
+
+(defun interpret-desirable (desirable-form)
+  (destructuring-bind (token &rest args) desirable-form
+    (apply (or (cdr (assoc token *desirable-interpreter-dispatch-table*))
+               (definition-error "~@<Unknown object token ~A in definition stream.~:@>" token))
+           args)))
 
 (defgeneric merge-slot-value (source owner subject subject-slot source-proposed-value)
   (:documentation
@@ -65,17 +72,17 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
   (format stream "~@<#D(~;~A~{ ~S~}~;)~:@>"
           (string (name o)) (sort (copy-list (distributor-remotes o)) #'string< :key (compose #'string #'name))))
 
-(defun distributor-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (let ((input-form (read stream nil nil t)))
-    (destructuring-bind (name &rest remotes) input-form
-      `(let* ((owner (distributor ',name :if-does-not-exist :continue))
-              (subject owner))
-         (lret* ((d (or subject (make-instance 'distributor :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t)))
-                 (*read-time-enclosing-distributor* d))
-           ,@remotes
-           (when (wishmasterp d)
-             (setf (gate d) (find-if (of-type 'gate) (distributor-remotes d)))))))))
+(defun read-distributor (name &rest remotes)
+  (let* ((owner (distributor name :if-does-not-exist :continue))
+         (subject owner))
+    (lret* ((d (or subject (make-instance 'distributor :name name :last-sync-time *read-universal-time* :synchronised-p t)))
+            (*read-time-enclosing-distributor* d)
+            (*desirable-interpreter-dispatch-table* '((remote . read-remote))))
+      (setf (distributor-remotes d)
+            (iter (for remote-form in remotes)
+                  (collect (interpret-desirable remote-form))))
+      (when (wishmasterp d)
+        (setf (gate d) (find-if (of-type 'gate) (distributor-remotes d)))))))
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
@@ -159,48 +166,41 @@ The value returned is the merged type for SUBJECT-REMOTE.")
   (:method ((s distributor) (o distributor) (r remote) source-proposed-type)
     source-proposed-type))
 
-(defun remote-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (let* ((remote-form (read stream nil nil))
-         (type (first remote-form)))
-    (multiple-value-bind (name path-components more-args) (let ((maybe-name (second remote-form)))
-                                                            (if (consp maybe-name)
-                                                                (values nil maybe-name (cddr remote-form))
-                                                                (values maybe-name (third remote-form) (cdddr remote-form))))
-      (destructuring-bind (&key distributor-port domain-name-takeover modules systemless-modules converted-module-names credentials wrinkles initial-version) more-args
-        `(let* ((source *read-time-merge-source-distributor*)
-                (owner *read-time-enclosing-distributor*)
-                (predicted-name (or ',name (default-remote-name (name owner) ',(vcs-type type) ',(transport type)))) ; note that the vcs type doesn't change due to type merging
-                (subject (find predicted-name (distributor-remotes owner) :key #'name))
-                (type (merge-remote-type source owner subject ',type))
-                (module-names (merge-slot-value source owner subject 'module-names ',(append modules systemless-modules)))
-                (modules-for-disconnection (when subject (set-difference module-names (location-module-names subject))))
-                (converted-module-names (merge-slot-value source owner subject 'converted-module-names ',converted-module-names)))
-           (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject type))
-                                                    (make-instance type ,@(when name `(:name ',name)) :distributor owner :distributor-port ,distributor-port :domain-name-takeover ',domain-name-takeover
-                                                                   :path ',path-components :module-names module-names
-                                                                   :last-sync-time ,*read-universal-time* :synchronised-p t
-                                                                   ,@(when credentials `(:credentials ',credentials))
-                                                                   ,@(when wrinkles `(:wrinkles ',wrinkles))
-                                                                   ,@(when initial-version `(:initial-version ',initial-version))))))
-             (setf (slot-value *read-time-enclosing-remote* 'module-names) module-names)
-             (when (typep *read-time-enclosing-remote* 'gate)
-               (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) converted-module-names))
-             (when subject
-               (dolist (m modules-for-disconnection)
-                 (when-let ((m (module m :if-does-not-exist :continue)))
-                   (remote-unlink-module subject m))))
-             (let ((amended-modules (intersection module-names ',modules))
-                   (amended-systemless-modules (intersection module-names ',systemless-modules)))
-               (dolist (m-name (intersection module-names (append amended-modules amended-systemless-modules)))
-                 (lret ((m (or (module m-name :if-does-not-exist :continue)
-                               (make-instance 'module :name m-name :umbrella m-name
-                                              :last-sync-time ,*read-universal-time* :synchronised-p t))))
-                   (remote-link-module *read-time-enclosing-remote* m)
-                   (unless (or (system m-name :if-does-not-exist :continue)
-                               (member m-name amended-systemless-modules))
-                     (make-instance *default-system-type* :name m-name :module m
-                                    :last-sync-time ,*read-universal-time* :synchronised-p t)))))))))))
+(defun read-remote (type name path-components &key distributor-port domain-name-takeover modules systemless-modules converted-module-names credentials wrinkles initial-version)
+  (let* ((source *read-time-merge-source-distributor*)
+         (owner *read-time-enclosing-distributor*)
+         (predicted-name (or name (default-remote-name (name owner) (vcs-type type) (transport type)))) ; note that the vcs type doesn't change due to type merging
+         (subject (find predicted-name (distributor-remotes owner) :key #'name))
+         (merged-type (merge-remote-type source owner subject type))
+         (merged-module-names (merge-slot-value source owner subject 'module-names (append modules systemless-modules)))
+         (modules-for-disconnection (when subject (set-difference merged-module-names (location-module-names subject))))
+         (merged-converted-modules (merge-slot-value source owner subject 'converted-module-names converted-module-names)))
+    (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject merged-type))
+                                             (apply #'make-instance merged-type :distributor owner :distributor-port distributor-port :domain-name-takeover domain-name-takeover
+                                                    :path path-components :module-names merged-module-names
+                                                    :last-sync-time *read-universal-time* :synchronised-p t
+                                                    (append (when name `(:name ,name))
+                                                            (when credentials `(:credentials ,credentials))
+                                                            (when wrinkles `(:wrinkles ,wrinkles))
+                                                            (when initial-version `(:initial-version ,initial-version)))))))
+      (setf (slot-value *read-time-enclosing-remote* 'module-names) merged-module-names)
+      (when (typep *read-time-enclosing-remote* 'gate)
+        (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) merged-converted-modules))
+      (when subject
+        (dolist (m modules-for-disconnection)
+          (when-let ((m (module m :if-does-not-exist :continue)))
+            (remote-unlink-module subject m))))
+      (let ((amended-modules (intersection merged-module-names modules))
+            (amended-systemless-modules (intersection merged-module-names systemless-modules)))
+        (dolist (m-name (intersection merged-module-names (append amended-modules amended-systemless-modules)))
+          (lret ((m (or (module m-name :if-does-not-exist :continue)
+                        (make-instance 'module :name m-name :umbrella m-name
+                                       :last-sync-time *read-universal-time* :synchronised-p t))))
+            (remote-link-module *read-time-enclosing-remote* m)
+            (unless (or (system m-name :if-does-not-exist :continue)
+                        (member m-name amended-systemless-modules))
+              (make-instance *default-system-type* :name m-name :module m
+                             :last-sync-time *read-universal-time* :synchronised-p t))))))))
 
 (defun print-gate-local-definitions (gate stream)
   (let ((*print-case* :downcase))
@@ -215,17 +215,16 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                (when-let ((hidden-names (slot-or-abort-print-object stream gate 'hidden-module-names)))
                  (list `(:hidden ,(sort (mapcar #'downstring hidden-names) #'string<)))))))))
 
-(defun gate-local-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (destructuring-bind (name &key unpublished hidden) (read stream nil nil)
-    (let ((gate (gate *self*)))
-      (unless (eq name (name gate))
-        (definition-error "~@<Local definitions claim to apply to gate ~A, whereas we are ~A.~:@>" name (name gate)))
-      (unless (every #'symbolp unpublished)
-        (definition-error "~@<Non-symbols in list of unpublished modules: ~S~:@>" unpublished))
-      (unless (every #'symbolp hidden)
-        (definition-error "~@<Non-symbols in list of hidden modules: ~S~:@>" hidden))
-      `(,unpublished ,hidden))))
+(defun read-gate-local (name &key unpublished hidden)
+  (let ((gate (gate *self*)))
+    (unless (eq name (name gate))
+      (definition-error "~@<Local definitions claim to apply to gate ~A, whereas we are ~A.~:@>" name (name gate)))
+    (unless (every #'symbolp unpublished)
+      (definition-error "~@<Non-symbols in list of unpublished modules: ~S~:@>" unpublished))
+    (unless (every #'symbolp hidden)
+      (definition-error "~@<Non-symbols in list of hidden modules: ~S~:@>" hidden))
+    (setf (gate-unpublished-module-names gate) unpublished
+          (gate-hidden-module-names gate) hidden)))
 
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~(~S ~S~)~:@>~}~;)~:@>" (symbol-name (name o))
@@ -246,29 +245,25 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                         (when (module-essential-p o)
                           (list :essential-p (module-essential-p o)))))))
 
-(defun emit-make-simple-system-form (type module-name name)
-  `(or (system ',name :if-does-not-exist :continue)
-       (make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module-name))))
+(defun read-simple-system (type module-name name)
+  (or (system name :if-does-not-exist :continue)
+      (make-instance type :name name :last-sync-time *read-universal-time* :synchronised-p t :module (module module-name))))
 
-(defun module-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key (umbrella name) (systems nil systems-specified-p) complex-systems path-whitelist path-blacklist &allow-other-keys)
-      (read stream nil nil t)
-    `(lret ((m (or (when-let ((existing-module (module ',name :if-does-not-exist :continue)))
-                     (remove-module existing-module :keep-localities t)
-                     nil)                   
-                   (make-instance 'module :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :umbrella ',umbrella
-                                  ,@(when path-whitelist `(:path-whitelist ',path-whitelist))
-                                  ,@(when path-blacklist `(:path-blacklist ',path-blacklist))
-                                  ,@(remove-from-plist initargs :umbrella :systems :complex-systems :path-whitelist :path-blacklist)))))
-       (do-remotes (r)
-         (when (remote-defines-module-p r m)
-           (pushnew r (module-remotes m))))
-       ,@(if systems-specified-p
-             (mapcar (curry #'emit-make-simple-system-form *default-system-type* name) systems)
-             ;; Existence of complex systems implies absence of simple systems, by default.
-             (unless complex-systems
-               `(,(emit-make-simple-system-form *default-system-type* name name)))))))
+(defun read-module (name &key (umbrella name) (systems nil systems-specified-p) complex-systems path-whitelist path-blacklist)
+  (lret ((m (or (when-let ((existing-module (module name :if-does-not-exist :continue)))
+                  (remove-module existing-module :keep-localities t)
+                  nil)                   
+                (apply #'make-instance 'module :name name :last-sync-time *read-universal-time* :synchronised-p t :umbrella umbrella
+                       (append (when path-whitelist `(:path-whitelist ,path-whitelist))
+                               (when path-blacklist `(:path-blacklist ,path-blacklist)))))))
+    (do-remotes (r)
+      (when (remote-defines-module-p r m)
+        (pushnew r (module-remotes m))))
+    (if systems-specified-p
+        (mapcar (curry #'read-simple-system *default-system-type* name) systems)
+        ;; Existence of complex systems implies absence of simple systems, by default.
+        (unless complex-systems
+          (read-simple-system *default-system-type* name name)))))
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
@@ -278,27 +273,26 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                   (and (system-definition-pathname-name o) (list :definition-pathname-name (system-definition-pathname-name o)))
                   (and (system-applications o) (list :applications (sort (copy-list (system-applications o)) #'string< :key (compose #'string #'name)))))))
 
-(defun system-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key module relativity search-restriction &allow-other-keys) (read stream nil nil t)
-    `(or (system ',name :if-does-not-exist :continue)
-         (make-instance *default-system-type* :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :module (module ',module) :relativity ',relativity
-                        ,@(when search-restriction `(:search-restriction ',search-restriction))
-                        ,@(remove-from-plist initargs :module :applications :relativity :search-restriction)))))
+(defun read-system (name &key module relativity search-restriction definition-pathname-name)
+  (or (system name :if-does-not-exist :continue)
+      (make-instance *default-system-type* :name name :last-sync-time *read-universal-time* :synchronised-p t :module (module module)
+                     :relativity relativity
+                     :definition-pathname-name definition-pathname-name
+                     :search-restriction search-restriction)))
 
 (defmethod print-object ((o application) stream)
   (format stream "~@<#A(~;~A~{ ~S ~S~}~;)~:@>" (symbol-name (name o))
           (list :system (name (app-system o)) :package (app-package o) :function (app-function o)
                 :default-parameters (app-default-parameters o))))
 
-(defun application-reader (stream &optional char sharp)
-  (declare (ignore char sharp))
-  (destructuring-bind (name &rest initargs &key system package function default-parameters &allow-other-keys) (read stream nil nil t)
-    `(or (app ',name :if-does-not-exist :continue)
-         (make-instance 'application :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t
-                        :system (system ',system) :package ',package :function ',function :default-parameters ',default-parameters
-                        ,@(remove-from-plist initargs :system :package :function :default-parameters)))))
+(defun read-application (name &key system package function default-parameters)
+  (or (app name :if-does-not-exist :continue)
+      (make-instance 'application :name name :last-sync-time *read-universal-time* :synchronised-p t
+                     :system (system system) :package package :function function :default-parameters default-parameters)))
 
+;;;
+;;; READ path
+;;;
 (defmacro with-definition-read-context (&body body)
   `(let ((*readtable* (copy-readtable))
          (*read-eval* nil)
@@ -306,23 +300,78 @@ The value returned is the merged type for SUBJECT-REMOTE.")
          (*package* #.*package*))
      ,@body))
 
-(defun read-definitions (stream &optional local)
+(defun distributor-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  `(distributor ,@(read stream nil nil t)))
+
+(defun remote-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  (let* ((remote-form (read stream nil nil t))
+         (type (first remote-form)))
+    (multiple-value-bind (name path-components more-args) (let ((maybe-name (second remote-form)))
+                                                            (if (consp maybe-name)
+                                                                (values nil maybe-name (cddr remote-form))
+                                                                (values maybe-name (third remote-form) (cdddr remote-form))))
+      `(remote ,type ,name ,path-components ,@more-args))))
+
+(defun gate-local-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  `(gate-local ,@(read stream nil nil t)))
+
+(defun module-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  `(module ,@(read stream nil nil t)))
+
+(defun system-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  `(system ,@(read stream nil nil t)))
+
+(defun application-reader (stream &optional char sharp)
+  (declare (ignore char sharp))
+  `(application ,@(read stream nil nil t)))
+
+(defun read-definitions-from-stream (stream &optional local)
   "Unserialise global definitions from STREAM."
   (with-definition-read-context
     (cond (local
            (set-dispatch-macro-character #\# #\L 'gate-local-reader *readtable*)
-           (destructuring-bind (unpublished hidden) (read stream nil nil)
-             (let ((gate (gate *self*)))
-               (setf (gate-unpublished-module-names gate) unpublished
-                     (gate-hidden-module-names gate) hidden))))
+           (if-let ((local-gate-def (read stream nil nil)))
+             (let ((*desirable-interpreter-dispatch-table*
+                    `((gate-local . read-gate-local))))
+               (interpret-desirable local-gate-def))
+             (definition-error "~@<Premature EOF in local gate definitions.~:@>")))
           (t
            (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
            (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
            (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
            (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
            (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
-           (load stream)))))
+           (let ((*desirable-interpreter-dispatch-table*
+                  `((distributor . read-distributor)
+                    (module . read-module)
+                    (system . read-system)
+                    (application . read-application))))
+             (iter (for spec = (read stream nil nil))
+                   (while spec)
+                   (interpret-desirable spec)))))))
 
+(defmethod read-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta *self*)))
+  "Load definitions of the world from METASTORE."
+  (let ((*read-time-merge-source-distributor* source)
+        (*read-time-force-source* force-source))
+    (with-open-metafile (definitions 'definitions metastore)
+      (read-definitions-from-stream definitions))
+    (values)))
+
+(defmethod read-local-definitions (&key (metastore (localmeta *self*)))
+  "Load local definitions from METASTORE."
+  (with-open-metafile (definitions 'definitions metastore)
+    (read-definitions-from-stream definitions t))
+  (values))
+
+;;;
+;;; PRINT path
+;;;
 (defun serialise-definitions (&optional stream)
   "Serialise global definitions to STREAM."
   (let ((*print-case* :downcase)
@@ -343,20 +392,6 @@ The value returned is the merged type for SUBJECT-REMOTE.")
         (*package* #.*package*))
     (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Gate unpublished & hidden:~%;;;~%")
     (print-gate-local-definitions (gate *self*) stream)))
-
-(defmethod load-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta *self*)))
-  "Load definitions of the world from METASTORE."
-  (let ((*read-time-merge-source-distributor* source)
-        (*read-time-force-source* force-source))
-    (with-open-metafile (definitions 'definitions metastore)
-      (read-definitions definitions))
-    (values)))
-
-(defmethod load-local-definitions (&key (metastore (localmeta *self*)))
-  "Load local definitions from METASTORE."
-  (with-open-metafile (definitions 'definitions metastore)
-    (read-definitions definitions t))
-  (values))
 
 (defmethod save-definitions (&key seal (commit-message "Updated DEFINITIONS"))
   "Save current model of the world within METASTORE.

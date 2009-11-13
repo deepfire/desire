@@ -998,8 +998,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
   (do-present-modules (module locality)
     (ensure-module-systems-loadable module locality)))
 
-(defgeneric load-definitions (&key source force-source metastore))
-(defgeneric load-local-definitions (&key metastore))
+(defgeneric read-definitions (&key source force-source metastore))
+(defgeneric read-local-definitions (&key metastore))
 (defgeneric save-current-definitions (&key seal commit-message))
 
 (defun ensure-root-sanity (directory)
@@ -1039,7 +1039,7 @@ locally present modules will be marked as converted."
         (syncformat t ";;; no metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
         (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))
       (syncformat t ";;; loading definitions from ~S~%" (metafile-path 'definitions meta-path))
-      (load-definitions :force-source t :metastore meta-path)
+      (read-definitions :force-source t :metastore meta-path)
       (setf *self* (if-let ((d (and as (distributor as))))
                      (progn (syncformat t ";;; trying to establish self as ~A~%" as)
                             (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
@@ -1048,7 +1048,7 @@ locally present modules will be marked as converted."
                        (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
                                       :omit-registration t))))
       (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
-      (load-local-definitions :metastore localmeta-path)
+      (read-local-definitions :metastore localmeta-path)
       (unless (gitvar 'user.name)
         (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
           (syncformat t ";;; setting git user name to ~S~%" username)
