@@ -74,3 +74,24 @@
     (briefly-describe m)
     (terpri))
   (values))
+
+(defun local-summary (&optional (stream *standard-output*))
+  "Produce a summary about locally available modules."
+  (let* ((gate (gate *self*))
+         (origin (location-module-names gate))
+         (converted (gate-converted-module-names gate))
+         (unpublished (gate-unpublished-module-names gate))
+         (hidden (gate-hidden-module-names gate)))
+    (format stream "~A is a ~:[local~;well-known~] distributor.~%~
+                    The local gate contains a total of ~D known modules, among which are:~%"
+            (name *self*) (distributor (name *self*) :if-does-not-exist :continue)
+            (+ (length origin) (length converted) (length unpublished) (length hidden)))
+    (when origin
+      (format stream "~3,' D released:   ~@<~{ ~A~}~:@>~%" (length origin) origin))
+    (when converted
+      (format stream "~3,' D converted:  ~@<~{ ~A~}~:@>~%" (length converted) converted))
+    (when unpublished
+      (format stream "~3,' D unpublished:~@<~{ ~A~}~:@>~%" (length unpublished) unpublished))
+    (when hidden
+      (format stream "~3,' D hidden:     ~@<~{ ~A~}~:@>~%" (length hidden) hidden)))
+  (values))

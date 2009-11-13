@@ -60,7 +60,7 @@
    #:*auto-lust*
    #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader #:steal-clbuild-projects-file
    ;; apropos.lisp
-   #:apropos-desr-list #:apropos-desr #:list-modules))
+   #:apropos-desr-list #:apropos-desr #:list-modules #:local-summary))
 
 (in-package :desire)
 
