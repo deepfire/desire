@@ -74,6 +74,8 @@ SAVE-CURRENT-DEFINITIONS was called.")
 
 (defclass local-distributor (distributor)
   ((root        :reader   root          :initarg :root :documentation "Root of all desires.")
+   (meta        :reader   meta          :initarg :meta :documentation "Metastore path.")
+   (localmeta   :reader   localmeta     :initarg :localmeta :documentation "Local metastore path.")
    (git         :accessor local-git     :documentation "Transitory git locality of a locally-accessible distributor.")
    (hg          :accessor local-hg      :documentation "Transitory hg locality of a locally-accessible distributor.")
    (darcs       :accessor local-darcs   :documentation "Transitory darcs locality of a locally-accessible distributor.")
@@ -870,10 +872,6 @@ whether the attempt was successful."
      (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
        (collect r)))))
 
-(defun meta-path (&optional (local-distributor *self*))
-  "Return the path to the meta directory."
-  (subdirectory* (locality-pathname (gate local-distributor)) ".meta"))
-
 (defun hide-module (module &optional (locality (gate *self*)) &aux
                     (module (coerce-to-module module))
                     (name (name module)))
@@ -957,22 +955,23 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
           (set-rel d *self* rel)
           (set-rel *self* d rel))))
 
-(defmacro within-wishmaster-meta ((wishmaster branch &key (metastore '(meta-path)) update-p) &body body)
-  (once-only (wishmaster metastore)
-    `(within-directory (,metastore)
+(defmacro within-wishmaster-meta ((wishmaster branch &key update-p) &body body)
+  (once-only (wishmaster)
+    `(within-directory ((meta *self*))
        ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
        (with-git-ref (list "remotes" (down-case-name ,wishmaster) ,branch)
          ,@body))))
 
-(defun merge-remote-wishmaster (wishmaster &optional (metastore (meta-path)))
+(defun merge-remote-wishmaster (wishmaster)
   "Merge definitions from WISHMASTER."
   (let ((branch (if-let ((r (rel *self* wishmaster)))
                   (rel-branch r)
-                  "master")))
+                  "master"))
+        (metastore (meta *self*)))
     (within-wishmaster-meta (wishmaster branch :metastore metastore :update-p t)
       (load-definitions :source wishmaster :force-source nil :metastore metastore))))
 
-(defun merge-remote-wishmasters (&optional (metastore (meta-path)))
+(defun merge-remote-wishmasters (&aux (metastore (meta *self*)))
   (do-wishmasters (w)
     (unless (eq w *self*)
       (merge-remote-wishmaster w metastore))))
@@ -992,7 +991,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
     (ensure-module-systems-loadable module locality)))
 
 (defgeneric load-definitions (&key source force-source metastore))
-(defgeneric save-current-definitions (&key seal commit-message metastore))
+(defgeneric load-local-definitions (&key metastore))
+(defgeneric save-current-definitions (&key seal commit-message))
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
@@ -1018,7 +1018,8 @@ locally present modules will be marked as converted."
                             (merge-pathnames path))))
     (ensure-root-sanity (parse-namestring absolute-path))
     (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) absolute-path))
-           (meta-path (merge-pathnames #p".meta/" gate-path)))
+           (meta-path (merge-pathnames #p".meta/" gate-path))
+           (localmeta-path (merge-pathnames #p".meta-local/" gate-path)))
       (clear-definitions)
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
         (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
@@ -1033,10 +1034,13 @@ locally present modules will be marked as converted."
       (load-definitions :force-source t :metastore meta-path)
       (setf *self* (if-let ((d (and as (distributor as))))
                      (progn (syncformat t ";;; trying to establish self as ~A~%" as)
-                            (change-class d 'local-distributor :root absolute-path))
+                            (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
                      (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
                        (syncformat t ";;; establishing self as non-well-known distributor ~A~%" local-name)
-                       (make-instance 'local-distributor :name local-name :root absolute-path :omit-registration t))))
+                       (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
+                                      :omit-registration t))))
+      (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
+      (load-local-definitions :metastore localmeta-path)
       (unless (gitvar 'user.name)
         (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
           (syncformat t ";;; setting git user name to ~S~%" username)
@@ -1078,6 +1082,11 @@ locally present modules will be marked as converted."
 (define-condition repository-error (desire-error)
   ((locality :accessor condition-locality :initarg :locality)
    (module :accessor condition-module :initarg :module)))
+(define-condition definition-error (desire-error) ())
+
+(define-simple-error remote-error)
+(define-simple-error repository-error)
+(define-simple-error definition-error)
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))

@@ -37,11 +37,13 @@
    #:*default-system-type* #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:root
    #:*combined-remotes-prefer-native-over-http*
    ;;   types.lisp :: conditions
-   #:desire-condition #:desire-error #:insatiable-desire #:module-systems-unloadable-error
+   #:desire-condition #:desire-error #:remote-error #:repository-error #:definition-error
+   #:simple-remote-error #:simple-repository-error #:simple-definition-error
+   #:insatiable-desire #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module
    #:module-status #:module-public-packages #:module-hidden-p
    ;; print-read.lisp
-   #:serialise-definitions #:read-definitions #:save-current-definitions #:load-definitions
+   #:serialise-definitions #:read-definitions #:save-definitions #:load-definitions
    ;; system-loadability.lisp
    #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error

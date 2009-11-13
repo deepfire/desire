@@ -34,8 +34,8 @@
 in the context of SOURCE distributor proposing SOURCE-PROPOSED-VALUE.
 The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
   (:method (source owner subject subject-slot source-proposed-value)
-    (error "~@<Fell through to default method in MERGE-SLOT-VALUE: ~S wants ~S => into slot ~S of ~S/~S.~:@>"
-           (when source (name source)) source-proposed-value subject-slot (when owner (name owner)) (when subject (name subject))))
+    (definition-error "~@<Fell through to default method in MERGE-SLOT-VALUE: ~S wants ~S => into slot ~S of ~S/~S.~:@>"
+        (when source (name source)) source-proposed-value subject-slot (when owner (name owner)) (when subject (name subject))))
   (:method :around ((source distributor) owner subject subject-slot source-proposed-value)
     (if *read-time-force-source*
         source-proposed-value
@@ -110,19 +110,11 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (list `(:distributor-port ,port)))
                       (when (remote-domain-name-takeover o)
                         (list `(:domain-name-takeover t)))
-                      (when (and systemful
-                                 (not *printing-local-definitions*))
+                      (when (and systemful)
                         (list `(:modules ,(sort (mapcar #'downstring systemful) #'string<))))
-                      (when (and systemless
-                                 (not *printing-local-definitions*))
+                      (when (and systemless)
                         (list `(:systemless-modules ,(sort (mapcar #'downstring systemless) #'string<))))
-                      (when-let ((unpublished-names (and (typep o 'gate) *printing-local-definitions*
-                                                         (slot-or-abort-print-object stream o 'unpublished-module-names))))
-                        (list `(:unpublished-module-names ,(sort (mapcar #'downstring unpublished-names) #'string<))))
-                      (when-let ((hidden-names (and (typep o 'gate) *printing-local-definitions*
-                                                    (slot-or-abort-print-object stream o 'hidden-module-names))))
-                        (list `(:hidden-module-names ,(sort (mapcar #'downstring hidden-names) #'string<))))
-                      (when-let ((converted-names (and (typep o 'gate) (not *printing-local-definitions*)
+                      (when-let ((converted-names (and (typep o 'gate)
                                                        (slot-or-abort-print-object stream o 'converted-module-names))))
                         (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<))))
                       (when-let ((initial-version (and (typep o 'tarball) (slot-or-abort-print-object stream o 'initial-version))))
@@ -151,8 +143,8 @@ The value returned is the merged type for SUBJECT-REMOTE.")
         (type-of subject-remote)
         (call-next-method)))
   (:method (source owner subject-remote source-proposed-type)
-    (error "~@<Fell through to default method in MERGE-REMOTE-TYPE: distributor ~S wants type ~S for remote ~S of distributor ~S.~:@>"
-           (when source (name source)) source-proposed-type (when subject-remote (name subject-remote)) (when owner (name owner))))
+    (definition-error "~@<Fell through to default method in MERGE-REMOTE-TYPE: distributor ~S wants type ~S for remote ~S of distributor ~S.~:@>"
+        (when source (name source)) source-proposed-type (when subject-remote (name subject-remote)) (when owner (name owner))))
   (:method ((s null) (o distributor) (r null) source-proposed-type)
     "Special case for initial load of DEFINITIONS."
     source-proposed-type)
@@ -210,22 +202,30 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                      (make-instance *default-system-type* :name m-name :module m
                                     :last-sync-time ,*read-universal-time* :synchronised-p t)))))))))))
 
-#+(or)
-(defun locality-master-p (o)
-  (error "~@<Not implemented.~:@>"))
+(defun print-gate-local-definitions (gate stream)
+  (let ((*print-case* :downcase))
+    (block print-object
+      (format stream "~@<#L(~;~A~
+                              ~{ ~<~S ~A~:@>~}~
+                            ~;)~:@>"
+              (string (name gate))
+              (append
+               (when-let ((unpublished-names (slot-or-abort-print-object stream gate 'unpublished-module-names)))
+                 (list `(:unpublished ,(sort (mapcar #'downstring unpublished-names) #'string<))))
+               (when-let ((hidden-names (slot-or-abort-print-object stream gate 'hidden-module-names)))
+                 (list `(:hidden ,(sort (mapcar #'downstring hidden-names) #'string<)))))))))
 
-#+(or)
-(defmethod print-object ((o locality) stream)
-  (format stream "~@<#L(~;~A ~A ~S~{ ~<~S ~S~:@>~}~;)~:@>"
-          (symbol-name (type-of o)) (string (name o)) (locality-pathname o)
-          (append (when (locality-master-p o) (list (list :master-p t)))
-                  (when (locality-scan-p o) (list (list :scan-p t))))))
-
-#+(or)
-(defun locality-reader (stream &optional char sharp)
+(defun gate-local-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (type name path &rest initargs &key &allow-other-keys) (read stream nil nil)
-    `(make-instance ',type :name ',name :last-sync-time ,*read-universal-time* :synchronised-p t :pathname ,path ,@(remove-from-plist initargs :path :modules))))
+  (destructuring-bind (name &key unpublished hidden) (read stream nil nil)
+    (let ((gate (gate *self*)))
+      (unless (eq name (name gate))
+        (definition-error "~@<Local definitions claim to apply to gate ~A, whereas we are ~A.~:@>" name (name gate)))
+      (unless (every #'symbolp unpublished)
+        (definition-error "~@<Non-symbols in list of unpublished modules: ~S~:@>" unpublished))
+      (unless (every #'symbolp hidden)
+        (definition-error "~@<Non-symbols in list of hidden modules: ~S~:@>" hidden))
+      `(,unpublished ,hidden))))
 
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~(~S ~S~)~:@>~}~;)~:@>" (symbol-name (name o))
@@ -306,16 +306,22 @@ The value returned is the merged type for SUBJECT-REMOTE.")
          (*package* #.*package*))
      ,@body))
 
-(defun read-definitions (stream)
+(defun read-definitions (stream &optional local)
   "Unserialise global definitions from STREAM."
   (with-definition-read-context
-    (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
-    (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
-    (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
-    (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
-    (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
-    #+(or) (set-dispatch-macro-character #\# #\L 'locality-reader *readtable*)
-    (load stream)))
+    (cond (local
+           (set-dispatch-macro-character #\# #\L 'gate-local-reader *readtable*)
+           (destructuring-bind (unpublished hidden) (read stream nil nil)
+             (let ((gate (gate *self*)))
+               (setf (gate-unpublished-module-names gate) unpublished
+                     (gate-hidden-module-names gate) hidden))))
+          (t
+           (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
+           (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
+           (set-dispatch-macro-character #\# #\S 'system-reader *readtable*)
+           (set-dispatch-macro-character #\# #\A 'application-reader *readtable*)
+           (set-dispatch-macro-character #\# #\R 'remote-reader *readtable*)
+           (load stream)))))
 
 (defun serialise-definitions (&optional stream)
   "Serialise global definitions to STREAM."
@@ -332,7 +338,13 @@ The value returned is the merged type for SUBJECT-REMOTE.")
       (format stream "~%~%;;;~%;;; Applications~%;;;")
       (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream)))))
 
-(defmethod load-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)))
+(defun serialise-local-definitions (&optional stream)
+  (let ((*print-case* :downcase)
+        (*package* #.*package*))
+    (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Gate unpublished & hidden:~%;;;~%")
+    (print-gate-local-definitions (gate *self*) stream)))
+
+(defmethod load-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta *self*)))
   "Load definitions of the world from METASTORE."
   (let ((*read-time-merge-source-distributor* source)
         (*read-time-force-source* force-source))
@@ -340,11 +352,22 @@ The value returned is the merged type for SUBJECT-REMOTE.")
       (read-definitions definitions))
     (values)))
 
-(defmethod save-current-definitions (&key seal (commit-message "Updated DEFINITIONS") (metastore (meta-path)))
+(defmethod load-local-definitions (&key (metastore (localmeta *self*)))
+  "Load local definitions from METASTORE."
+  (with-open-metafile (definitions 'definitions metastore)
+    (read-definitions definitions t))
+  (values))
+
+(defmethod save-definitions (&key seal (commit-message "Updated DEFINITIONS"))
   "Save current model of the world within METASTORE.
 When SEAL-P is non-NIL, the changes are committed."
-  (with-output-to-new-metafile (definitions 'definitions metastore :commit-p seal :commit-message commit-message)
-    (serialise-definitions definitions)
-    (terpri definitions))
-  (setf *unsaved-definition-changes-p* nil)
-  (values))
+  (let ((meta (meta *self*))
+        (localmeta (localmeta *self*)))
+    (with-output-to-new-metafile (definitions 'definitions meta :commit-p seal :commit-message commit-message)
+      (serialise-definitions definitions)
+      (terpri definitions))
+    (with-output-to-new-metafile (definitions 'definitions localmeta :commit-p seal :commit-message commit-message)
+      (serialise-local-definitions definitions)
+      (terpri definitions))
+    (setf *unsaved-definition-changes-p* nil)
+    (values)))
