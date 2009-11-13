@@ -4,7 +4,7 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 12, 2009, 03:19
+November 13, 2009, 17:30
 #+END_CENTER
 
 * About this document
@@ -432,7 +432,6 @@ SAVE-CURRENT-DEFINITIONS writes out changes into
 
 Some known problems:
 
-     - consumers of DEFINITIONS execute remote code, essentially
      - SBCL-only
      - ASDF-only
      - Linux-only (might work on other unices)
