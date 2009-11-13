@@ -78,10 +78,10 @@
 (defun local-summary (&optional (stream *standard-output*))
   "Produce a summary about locally available modules."
   (let* ((gate (gate *self*))
-         (origin (location-module-names gate))
-         (converted (gate-converted-module-names gate))
-         (unpublished (gate-unpublished-module-names gate))
-         (hidden (gate-hidden-module-names gate)))
+         (origin (sort (copy-list (location-module-names gate)) #'string<))
+         (converted (sort (copy-list (gate-converted-module-names gate)) #'string<))
+         (unpublished (sort (copy-list (gate-unpublished-module-names gate)) #'string<))
+         (hidden (sort (copy-list (gate-hidden-module-names gate)) #'string<)))
     (format stream "~A is a ~:[local~;well-known~] distributor.~%~
                     The local gate contains a total of ~D known modules, among which are:~%"
             (name *self*) (distributor (name *self*) :if-does-not-exist :continue)
