@@ -58,12 +58,20 @@ SAVE-CURRENT-DEFINITIONS was called.")
 (defvar *original-self-gate-class-name* nil)
 
 ;;;;
+;;;; Base
+;;;;
+(defclass desirable (registered synchronisable)
+  ()
+  (:documentation
+   "Base class for all desire objects."))
+
+;;;;
 ;;;; Distributor
 ;;;;
 ;;;
 ;;; Note: distributor name is its hostname.
 ;;;
-(defclass distributor (registered synchronisable)
+(defclass distributor (desirable)
   ((remotes :accessor distributor-remotes :initarg :remotes :documentation "Specified.")
    (modules :accessor distributor-modules :documentation "Cache.")
    (git :accessor gate :documentation "Manually managed.")
@@ -180,7 +188,7 @@ This notably excludes converted modules."
 ;;;;
 ;;;; Location
 ;;;;
-(defclass location (registered synchronisable)
+(defclass location (desirable)
   ((module-names :accessor location-module-names :initarg :module-names :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs
    :registrator #'(setf locality)
@@ -559,7 +567,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 ;;;;
 ;;;; Modules
 ;;;;
-(defclass module (registered synchronisable)
+(defclass module (desirable)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (system-path-whitelist :accessor module-system-path-whitelist :initarg :path-whitelist :documentation "Specified.")
@@ -715,7 +723,7 @@ cache results."
 (defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
 (defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
 
-(defclass system (registered synchronisable)
+(defclass system (desirable)
   ((module :accessor system-module :initarg :module :documentation "Specified.")
    (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
    (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
@@ -748,7 +756,7 @@ Find out whether SYSTEM is hidden."
 ;;;;
 ;;;; Applications
 ;;;;
-(defclass application (registered synchronisable)
+(defclass application (desirable)
   ((system :accessor app-system :initarg :system :documentation "Specified.")
    (package :accessor app-package :initarg :package :documentation "Specified.")
    (function :accessor app-function :initarg :function :documentation "Specified.")
@@ -1019,7 +1027,7 @@ locally present modules will be marked as converted."
     (ensure-root-sanity (parse-namestring absolute-path))
     (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) absolute-path))
            (meta-path (merge-pathnames #p".meta/" gate-path))
-           (localmeta-path (merge-pathnames #p".meta-local/" gate-path)))
+           (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
       (clear-definitions)
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
         (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))

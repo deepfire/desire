@@ -9,7 +9,7 @@
    ;; dependencies.lisp
    #:name
    ;; types.lisp
-   #:distributor #:location #:remote #:locality #:gate #:module #:system #:application #:app
+   #:desirable #:distributor #:location #:remote #:locality #:gate #:module #:system #:application #:app
    #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
    ;;   types.lisp :: direct knowledge base manipulation
    #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
