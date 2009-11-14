@@ -60,7 +60,7 @@
 
 (defun print-aborted-named-object (stream o &optional slot-name)
   (declare (type stream stream) (type named o))
-  (format stream "~@<#<aborted printing object of type ~;~A with name ~S~:[~;, due to missing slot ~:*~A~]~;>~:@>"
+  (format stream "~@<#<aborted printing object of type ~;~A with name ~S~:[~;, due to unbound or missing slot ~:*~A~]~;>~:@>"
           (type-of o)
           (if (slot-boundp o 'name)
               (name o)

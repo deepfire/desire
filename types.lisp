@@ -47,7 +47,7 @@
 
 (defvar *unsaved-definition-changes-p* nil
   "Whether the idea about the world changed, since INIT was performed, or
-SAVE-CURRENT-DEFINITIONS was called.")
+SAVE-DEFINITIONS was called.")
 
 (defun clear-definitions ()
   "Empty all global definitions."
@@ -277,7 +277,7 @@ a special module called '.meta'."
 
 ;;; A special case location*vcs*role extension which is /going/ to be
 ;;; troublesome, as it violates simplicity.
-(defclass gate-native-remote (gate-remote git-native) ())
+(defclass gate-native-remote (gate-remote git-native-remote) ())
 (defclass gate-http-remote (gate-remote git-http-remote) ())
 
 ;; Handle remote localisation, for printing purposes.
@@ -976,13 +976,13 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
                   (rel-branch r)
                   "master"))
         (metastore (meta *self*)))
-    (within-wishmaster-meta (wishmaster branch :metastore metastore :update-p t)
-      (load-definitions :source wishmaster :force-source nil :metastore metastore))))
+    (within-wishmaster-meta (wishmaster branch :update-p t)
+      (read-definitions :source wishmaster :force-source nil :metastore metastore))))
 
-(defun merge-remote-wishmasters (&aux (metastore (meta *self*)))
+(defun merge-remote-wishmasters ()
   (do-wishmasters (w)
     (unless (eq w *self*)
-      (merge-remote-wishmaster w metastore))))
+      (merge-remote-wishmaster w))))
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
@@ -1000,7 +1000,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 
 (defgeneric read-definitions (&key source force-source metastore))
 (defgeneric read-local-definitions (&key metastore))
-(defgeneric save-current-definitions (&key seal commit-message))
+(defgeneric save-definitions (&key seal commit-message))
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
@@ -1056,7 +1056,7 @@ locally present modules will be marked as converted."
       (reestablish-metastore-subscriptions meta-path)
       (when merge-remote-wishmasters
         (syncformat t ";;; merging definitions from remote wishmasters...~%")
-        (merge-remote-wishmasters meta-path))
+        (merge-remote-wishmasters))
       (setf *unsaved-definition-changes-p* nil)
       (syncformat t ";;; determining available tools and deducing accessible remotes~%")
       (determine-tools-and-update-remote-accessibility)

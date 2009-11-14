@@ -74,7 +74,7 @@ without raising any signals.")
 
 (defgeneric fetch-remote (locality remote module))
 
-(defmethod fetch-remote ((locality git-locality) (remote git) module)
+(defmethod fetch-remote ((locality git-locality) (remote git-remote) module)
   (let ((repo-dir (module-pathname module locality)))
     (within-directory (repo-dir :if-does-not-exist :create)
       (if (directory-created-p)
@@ -471,7 +471,7 @@ Defined keywords:
       (satisfy-modules desired-module-names (gate *self*) *default-system-type* complete skip-present module-vocabulary system-vocabulary :sure-as-hell))
     (when (and *unsaved-definition-changes-p* seal)
       (syncformat t "; Definitions modified and sealing was requested, committing changes.~%")
-      (save-current-definitions :seal t))
+      (save-definitions :seal t))
     (syncformat t "; All done.~%")
     t))
 

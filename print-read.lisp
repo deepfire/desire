@@ -338,11 +338,10 @@ The value returned is the merged type for SUBJECT-REMOTE.")
   (with-definition-read-context
     (cond (local
            (set-dispatch-macro-character #\# #\L 'gate-local-reader *readtable*)
-           (if-let ((local-gate-def (read stream nil nil)))
+           (when-let ((local-gate-def (read stream nil nil)))
              (let ((*desirable-interpreter-dispatch-table*
                     `((gate-local . read-gate-local))))
-               (interpret-desirable local-gate-def))
-             (definition-error "~@<Premature EOF in local gate definitions.~:@>")))
+               (interpret-desirable local-gate-def))))
           (t
            (set-dispatch-macro-character #\# #\D 'distributor-reader *readtable*)
            (set-dispatch-macro-character #\# #\M 'module-reader *readtable*)
