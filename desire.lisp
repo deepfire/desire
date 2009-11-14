@@ -266,9 +266,13 @@ without raising any signals.")
 
 (defgeneric update-module-using-remote (module remote &optional locality)
   (:method (module remote &optional (locality (gate *self*)))
-    (fetch locality remote module))
-  (:method :after (module (remote git-remote) &optional locality)
-    (reset-gitbranch-to-remote-branch :master `(,(down-case-name remote) "master") (module-pathname module locality) t)))
+    (fetch locality remote module)
+    (let ((repository-path (module-pathname module locality)))
+      (cond ((typep remote 'git)
+             (reset-git-branch-to-remote-branch :master `(,(down-case-name remote) "master") repository-path t))
+            (t
+             (git-set-branch :master repository-path)
+             (git-set-head-index-tree '("master")))))))
 
 (defun update-module (module &optional (locality (gate *self*)))
   (let* ((module (coerce-to-module module))
