@@ -8,7 +8,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2009-11-13 17:30:27 MSK"/>
+<meta name="generated" content="2009-11-14 03:54:37 MSK"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -75,7 +75,7 @@ lang="en" xml:lang="en">
 
 
 <div style="text-align: center">
-<p>November 13, 2009, 17:30
+<p>November 14, 2009, 03:53
 </p>
 </div>
 
@@ -89,20 +89,30 @@ lang="en" xml:lang="en">
 <li><a href="#sec-3">3 How to obtain desire? </a></li>
 <li><a href="#sec-4">4 Overview of terms </a>
 <ul>
-<li><a href="#sec-4.1">4.1 Distributors </a>
+<li><a href="#sec-4.1">4.1 DEFINITIONS </a></li>
+<li><a href="#sec-4.2">4.2 Distributors </a>
 <ul>
-<li><a href="#sec-4.1.1">4.1.1 Wishmaster </a></li>
+<li><a href="#sec-4.2.1">4.2.1 Wishmasters </a></li>
 </ul>
 </li>
-<li><a href="#sec-4.2">4.2 Remotes </a>
+<li><a href="#sec-4.3">4.3 Locations </a>
 <ul>
-<li><a href="#sec-4.2.1">4.2.1 Gate remotes </a></li>
+<li><a href="#sec-4.3.1">4.3.1 Remotes </a>
+<ul>
+<li><a href="#sec-4.3.1.1">4.3.1.1 Non-gate remotes </a></li>
+<li><a href="#sec-4.3.1.2">4.3.1.2 Gate remotes, or gates </a></li>
+<li><a href="#sec-4.3.1.3">4.3.1.3 Localities </a></li>
+<li><a href="#sec-4.3.1.4">4.3.1.4 Local gate, or gate locality </a></li>
+</ul></li>
 </ul>
 </li>
-<li><a href="#sec-4.3">4.3 Modules </a></li>
-<li><a href="#sec-4.4">4.4 Systems </a></li>
-<li><a href="#sec-4.5">4.5 Applications </a></li>
-<li><a href="#sec-4.6">4.6 Localities </a></li>
+<li><a href="#sec-4.4">4.4 Modules </a>
+<ul>
+<li><a href="#sec-4.4.1">4.4.1 Pseudo-modules </a></li>
+</ul>
+</li>
+<li><a href="#sec-4.5">4.5 Systems </a></li>
+<li><a href="#sec-4.6">4.6 Applications </a></li>
 </ul>
 </li>
 <li><a href="#sec-5">5 API (aka end-user interface) </a>
@@ -123,7 +133,11 @@ lang="en" xml:lang="en">
 <li><a href="#sec-6.2">6.2 Normal, non-bootstrap use </a>
 <ul>
 <li><a href="#sec-6.2.1">6.2.1 User  aspect </a></li>
-<li><a href="#sec-6.2.2">6.2.2 Wishmaster aspect </a></li>
+<li><a href="#sec-6.2.2">6.2.2 Wishmaster aspect </a>
+<ul>
+<li><a href="#sec-6.2.2.1">6.2.2.1 External executables required for module conversion </a></li>
+</ul>
+</li>
 <li><a href="#sec-6.2.3">6.2.3 Extending definitions </a></li>
 </ul></li>
 </ul>
@@ -160,28 +174,32 @@ or, for the Org-mode source:
 
 
 <p>
-The domain of desire includes software distribution points, software
-modules and applications.  All these terms are represented internally
-in a detailed, comprehensive manner, and full knowledge about them is
-maintained in a PRINT/READ-able form, and is easily transportable<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup>
-between desire nodes.
+Desire is a package management substrate.
 </p>
 <p>
-There are three sides of desire:
+The domain of Desire includes software distribution points and software
+modules, but carefully avoids module internals, leaving that to system
+definition facilities.  The domain-specific information is represented
+in a both human- and machine-readable form and is shared, by the means
+of a distributed VCS, within a loose aggregation that could be called a network
+of Desire nodes.
+</p>
+<p>
+There are three sides of Desire:
 </p><ul>
 <li>
- a knowledge base about world of software,
+ a knowledge base about world of software distributors and modules,
 </li>
 <li>
- maximally streamlined software retrieval, and
+ an end-user software retrieval system, and
 </li>
 <li>
- redistribution.
+ (re)distribution.
 
 </li>
 </ul>
 
-<p>Desire shares concepts with and provides features like, at least:
+<p>Desire shares concepts with and provides some features of, at least:
 </p><ul>
 <li>
  asdf-install
@@ -197,8 +215,9 @@ There are three sides of desire:
 
 <p>Desire uses the Git distributed version control system to pass around
 the domain-specific information, as well as for software redistribution,
-and tries not to lose the 'distributed' part of it.  Ideally, desire would
-ease distributed, cross-project cooperation and coordinated release making.
+and tries not to lose the 'distributed' part of it.  Ideally, Desire could
+be used to ease distributed, cross-project cooperation and coordinated
+release making.
 </p>
 </div>
 
@@ -216,7 +235,7 @@ Desire can be obtained at:
 git://git.feelingofgreen.ru/desire
 </p>
 <p>
-but please see <a href="#sec-3">streamlined bootstrap</a>.
+but please see the "Streamlined bootstrap" section below.
 </p>
 </div>
 
@@ -230,103 +249,73 @@ but please see <a href="#sec-3">streamlined bootstrap</a>.
 </div>
 
 <div id="outline-container-4.1" class="outline-3">
-<h3 id="sec-4.1"><span class="section-number-3">4.1</span> Distributors </h3>
+<h3 id="sec-4.1"><span class="section-number-3">4.1</span> DEFINITIONS </h3>
 <div class="outline-text-3" id="text-4.1">
 
 
 <p>
-The largest unit of software granularity is a 'distributor', which
-corresponds to an internet domain name<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>.  Currently, they don't carry
-much information beyond just that.
+This is the term you will often see mentioned, as it is central to
+the process of distribution of information about the domain.
 </p>
 <p>
-Distributors contain one or more 'remotes', which are typical points
-of distribution corresponding to sets of similarly-named repositories.
+For the moment it would suffice to say that this is a text file
+containing forms (which are READable using Desire-provided readers) which
+carry information about terms covered in this section.
 </p>
-
-</div>
-
-<div id="outline-container-4.1.1" class="outline-4">
-<h4 id="sec-4.1.1"><span class="section-number-4">4.1.1</span> Wishmaster </h4>
-<div class="outline-text-4" id="text-4.1.1">
-
-
-<p>
-'Wishmaster' is a subtype of distributor which participates in the
-desire network, in the form of having a 'gate remote', upon which
-we will elaborate further below.
-</p>
-<p>
-This participation is twofold &ndash; information passing and module
-conversion (better term?).
-</p>
-<p>
-The information exchanged is that of wishmaster ideas about the world
-of software, that is, about all terms covered in this section.
-</p>
-<p>
-The module conversion serves to simplify life of average desire users
-by repackaging modules available through a variety of distribution
-means into a common DVCS format.
-</p>
-</div>
 </div>
 
 </div>
 
 <div id="outline-container-4.2" class="outline-3">
-<h3 id="sec-4.2"><span class="section-number-3">4.2</span> Remotes </h3>
+<h3 id="sec-4.2"><span class="section-number-3">4.2</span> Distributors </h3>
 <div class="outline-text-3" id="text-4.2">
 
 
 <p>
-The concept of remote serves (or actually, the more general type of
-location does) as a point of distribution for a group of modules.
+The largest unit of software granularity is a <i>distributor</i>, which
+corresponds to an internet domain name<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup>.  Currently, they don't carry
+much information beyond just that.
 </p>
 <p>
-Remotes combine following concepts:
-</p><ul>
-<li>
-version control system type (git, darcs, cvs or svn)
-</li>
-<li>
-transport type (native, http or rsync)
-</li>
-<li>
-simple pattern for matching module pathes on the distributor
-</li>
-<li>
-an internet port number
-
-</li>
-</ul>
+Distributors contain one or more <i>remotes</i>, which correspond to points
+of distribution of sets of similarly-accessible modules.
+</p>
 
 </div>
 
 <div id="outline-container-4.2.1" class="outline-4">
-<h4 id="sec-4.2.1"><span class="section-number-4">4.2.1</span> Gate remotes </h4>
+<h4 id="sec-4.2.1"><span class="section-number-4">4.2.1</span> Wishmasters </h4>
 <div class="outline-text-4" id="text-4.2.1">
 
 
 <p>
-Gate remotes are special remotes which participate in the desire
-protocol.  They have a special module called '.meta', which contains
-the containing distributor's idea about the world in a special file
-with name 'DEFINITIONS'.
+<i>Wishmaster</i> is a subtype of distributor which participates in the
+desire network, in the form of being recorded in <i>DEFINITIONS</i>, as well as
+by maintaining a <i>gate</i> (a subtype of remotes upon which we will elaborate
+further below).  When applied to <i>wishmasters</i>, the virtue of being
+registered in <i>some</i> DEFINITIONS is otherwise referred to as property
+of being <i>well-known</i>.
 </p>
 <p>
-The information in this file is subject to propagation in the network
-of hosts participating in the desire protocol.
+Two important processes naturally growing out of this are:
+</p><ul>
+<li>
+exchange of DEFINITIONS, be it among well-known wishmasters, or
+as a process of informing a client node, and
+</li>
+<li>
+upstream module conversion, which ends up populating the <i>gate</i>;
+
+</li>
+</ul>
+
+<p>The upstream module conversion process serves to simplify life of average
+desire users by repackaging modules available through a variety
+of distribution means<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup> into a common DVCS format.
 </p>
 <p>
-Distributors recorded in these definitions are considered 'well-known'.
-</p>
-<p>
-Gate remotes have a second purpose: as parts of well-known wishmasters
-they serve for redistribution of modules converted by those wishmasters
-into a single repository format, currently 'git'.  The modules converted
-in such a way are advertised differently from those which are considered
-'released' by the containing distributor.
+The wishmaster corresponding to the local Desire instance is available
+through the variable called <code>*SELF*</code>.
 </p>
 </div>
 </div>
@@ -334,83 +323,260 @@ in such a way are advertised differently from those which are considered
 </div>
 
 <div id="outline-container-4.3" class="outline-3">
-<h3 id="sec-4.3"><span class="section-number-3">4.3</span> Modules </h3>
+<h3 id="sec-4.3"><span class="section-number-3">4.3</span> Locations </h3>
 <div class="outline-text-3" id="text-4.3">
 
 
 <p>
-Modules represent units of software, as released by the distributor,
-and contain the information remaining to complete the information
-provided by less granular concepts to construct a module address.
+<i>Location</i> is a general term for objects storing <i>module</i> repositories,
+and are either local, in which case they are <i>localities</i>, or non-local,
+in which case they are, unsurprisingly, /remotes/<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup>.
+</p>
+
+</div>
+
+<div id="outline-container-4.3.1" class="outline-4">
+<h4 id="sec-4.3.1"><span class="section-number-4">4.3.1</span> Remotes </h4>
+<div class="outline-text-4" id="text-4.3.1">
+
+
+<p>
+The concept of <i>remote</i> serves as a point of distribution for a group of <i>modules</i>.
 </p>
 <p>
-Modules can be provided by several different remotes of different
-distributors.  When retrieval of a module is requested, gate remotes
-are preferred above others.
+In general, all remotes carry the following information:
+</p><ul>
+<li>
+version control system type (git, darcs, cvs or svn),
+</li>
+<li>
+transport type (native, http or rsync),
+</li>
+<li>
+simple pattern for matching module paths on the distributor,
+</li>
+<li>
+an internet port number, and
+</li>
+<li>
+some additional quirks necessary to access the remote repository;
+
+</li>
+</ul>
+
+</div>
+
+<div id="outline-container-4.3.1.1" class="outline-5">
+<h5 id="sec-4.3.1.1"><span class="section-number-5">4.3.1.1</span> Non-gate remotes </h5>
+<div class="outline-text-5" id="text-4.3.1.1">
+
+
+<p>
+<i>Non-gate remotes</i> represent distribution points of non-wishmasters, that is,
+nodes not participating in the Desire protocol.
 </p>
+</div>
+
+</div>
+
+<div id="outline-container-4.3.1.2" class="outline-5">
+<h5 id="sec-4.3.1.2"><span class="section-number-5">4.3.1.2</span> Gate remotes, or gates </h5>
+<div class="outline-text-5" id="text-4.3.1.2">
+
+
+<p>
+<i>Gate remotes</i>, or <i>gates</i> are special remotes which are instrumental
+to participation in the Desire protocol.  They carry a special module called
+<b>.meta</b>, which records the containing distributor's idea about the domain
+in aforementioned DEFINITIONS.
+</p>
+<p>
+The information in this file is subject to propagation in the network
+of hosts participating in the desire protocol.
+</p>
+<p>
+Gate remotes have a second purpose: as parts of well-known wishmasters
+they serve for redistribution of modules converted by those wishmasters
+into a single repository format, currently <i>git</i>.  The modules converted
+in such a way are advertised differently from those which are considered
+'released' by the containing distributor.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-4.3.1.3" class="outline-5">
+<h5 id="sec-4.3.1.3"><span class="section-number-5">4.3.1.3</span> Localities </h5>
+<div class="outline-text-5" id="text-4.3.1.3">
+
+
+<p>
+<i>Localities</i> serve to express module storage on the local machine.
+<i>Master localities</i> (except the <i>local gate</i>, about which see below)
+are canonical transitory locations used for conversion of modules
+retrieved from remotes of specific VCS types.
+</p>
+<p>
+<i>The master git locality</i>, also the <i>local gate</i> or a <i>gate locality</i>, is
+described in the next section, and is supposed to be a canonical storage
+location for all modules used on the Desire node.
+</p>
+<p>
+A scrupulous reader might note that the above description leaves open
+a possibility of existence for <i>non-master localities</i>.  While it is true,
+and purposefully so, this concept is not currently employed.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-4.3.1.4" class="outline-5">
+<h5 id="sec-4.3.1.4"><span class="section-number-5">4.3.1.4</span> Local gate, or gate locality </h5>
+<div class="outline-text-5" id="text-4.3.1.4">
+
+
+<p>
+<code>*SELF*</code> always contains a special location, a <i>local gate</i> or a <i>gate locality</i>,
+which is both a remote and a locality and serves a threefold purpose:
+</p>
+<ul>
+<li>
+storage of incoming modules for local consumption,
+</li>
+<li>
+export of the aforementioned converted modules, and
+</li>
+<li>
+distribution point for modules released by the local distributor.
+
+</li>
+</ul>
+
+<p>Naturally, the last two points only apply to well-known wishmasters.
+</p>
+</div>
+</div>
 </div>
 
 </div>
 
 <div id="outline-container-4.4" class="outline-3">
-<h3 id="sec-4.4"><span class="section-number-3">4.4</span> Systems </h3>
+<h3 id="sec-4.4"><span class="section-number-3">4.4</span> Modules </h3>
 <div class="outline-text-3" id="text-4.4">
 
 
 <p>
-Descending further down we meet systems.
+<i>Modules</i> represent versioned, atomic units of software, as released
+by the distributor, and, from the point of Desire, carry the additional
+information necessary to complete the information provided by
+the less granular concepts to obtain the module from its containing remote.
+</p>
+<p>
+Modules can be provided by several different remotes of different
+distributors.  When the end-user requests retrieval of a module, gate remotes
+are preferred above others.
+</p>
+<p>
+Locally, all incoming modules end up in the local gate, which
+always exists, nevermind the dominant operation mode of the Desire node.
+Once in the local gate, the module becomes /locally available/<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>, and is
+made loadable through the preferred local system definition facility.
+</p>
+<p>
+Locally available modules can be classified into one of the four
+categories, the first two of which are only applicable to well-known
+wishmasters:
+</p>
+<ul>
+<li>
+released, for modules advertised through DEFINITIONS to be released
+through the distributor corresponding to <code>*SELF*</code>;
+</li>
+<li>
+converted, for module originating elsewhere, but advertised in
+DEFINITIONS as being converted in the gate of <code>*SELF*</code>;
+</li>
+<li>
+unpublished, modules accessible through the gate, yet unadvertised
+in DEFINITIONS;
+</li>
+<li>
+hidden, modules physically present in the local gate, but made
+unavailable to anonymous remote clients<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>.
+
+</li>
+</ul>
+
+</div>
+
+<div id="outline-container-4.4.1" class="outline-4">
+<h4 id="sec-4.4.1"><span class="section-number-4">4.4.1</span> Pseudo-modules </h4>
+<div class="outline-text-4" id="text-4.4.1">
+
+
+<p>
+<i>Pseudo-modules</i> refer to repositories stored in gates used for Desire-specific
+information storage and exchange.  Currently there are two common pseudo-modules:
+</p>
+<ul>
+<li>
+<b>.meta</b>, the aforementioned domain-specific information junction point, and
+</li>
+<li>
+<b>.local-meta</b>, a hidden repository used to store local information, which
+currently amounts to tracking unpublished and hidden modules.
+
+</li>
+</ul>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-4.5" class="outline-3">
+<h3 id="sec-4.5"><span class="section-number-3">4.5</span> Systems </h3>
+<div class="outline-text-3" id="text-4.5">
+
+
+<p>
+Descending further down we meet <i>systems</i>.
 Systems are objects only meant to be relevant in the domain of Common Lisp
 software, and more precisely &ndash; to backend system definition facilities,
-such as ASDF, XCVB, Mudballs or others<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup>.
+such as ASDF, XCVB, Mudballs or others<sup><a class="footref" name="fnr.6" href="#fn.6">6</a></sup>.
 </p>
 <p>
 The concept of system introduces inter-system dependencies, which cross
 module boundaries, producing inter-module dependencies.
 </p>
 <p>
-Evidently, there can be several systems per module, and also those
-can be obscured from the end-user, either intentionally or by unfortunate
-accident<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>.
+Evidently, there can be several systems per module, and also those can be
+obscured from the end-user, either intentionally or by unfortunate
+accident<sup><a class="footref" name="fnr.7" href="#fn.7">7</a></sup>.
 </p>
 <p>
 Desire handles all these complications and operates on the full
 inter-module dependency graph.  It also doesn't store that graph anywhere,
-recomputing it instead every time a request for module is performed.
+recomputing it, instead, every time a request for a module is performed.
 </p>
-</div>
-
-</div>
-
-<div id="outline-container-4.5" class="outline-3">
-<h3 id="sec-4.5"><span class="section-number-3">4.5</span> Applications </h3>
-<div class="outline-text-3" id="text-4.5">
-
-
 <p>
-Applications are simple extensions of systems, providing some very
-preliminary support for launching applications, potentially simplifiable
-to the point of the end-user being able to say "run climacs" and
-have everything downloaded, required systems loaded and the application
-up and running.
+It should be noted, that there is no requirement for modules to have systems,
+which enables end-users to manage (and provide) gittified non-Lisp software
+for local (and not-so-local) needs.
 </p>
 </div>
 
 </div>
 
 <div id="outline-container-4.6" class="outline-3">
-<h3 id="sec-4.6"><span class="section-number-3">4.6</span> Localities </h3>
+<h3 id="sec-4.6"><span class="section-number-3">4.6</span> Applications </h3>
 <div class="outline-text-3" id="text-4.6">
 
 
 <p>
-The more general type of 'location' besides remotes also includes
-'localities', which serve the same purpose as remotes, but on the local
-machine.  Master localities are canonical locations for module repositories
-managed by a specific VCS type.
-</p>
-<p>
-The master git locality is a canonical location for both release and
-converted module redistribution.
+Applications are simple extensions of systems, providing some very
+preliminary support for launching programs.  They are intended to simplify
+end-user experience by making requests such as "run climacs" expressible
+and actionable.
 </p>
 </div>
 </div>
@@ -441,8 +607,8 @@ named by the AS keyword.
 </p>
 <p>
 This is performed by checking that the locally available set of modules covers every module
-that is claimed to be "well known" to be published by our distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>.  When this check
-fails an error is signalled.
+that is claimed to be to be published by our distributor<sup><a class="footref" name="fnr.8" href="#fn.8">8</a></sup>, according to the local
+DEFINITIONS.  When this check fails an error is signalled.
 </p>
 </dd>
 <dt><code>*self*</code> =&gt; distributor</dt><dd>
@@ -519,6 +685,12 @@ Like APROPOS-LIST, but finds objects from the domain of Desire.
 List all known modules, with some additional information.
 </p>
 </dd>
+<dt>module-hidden-p module-designator &amp;optional (locality (gate <code>*self*</code>)) =&gt; boolean</dt><dd>
+
+<p>
+See whether whether module designated by MODULE-DESIGNATOR is unavailable to anonymous remote clients.
+</p>
+</dd>
 <dt>module-present-p module-designator &amp;optional (locality (gate <code>*self*</code>)) check-when-present-p (check-when-missing-p t) =&gt; boolean</dt><dd>
 
 <p>
@@ -526,11 +698,10 @@ Determine whether module designated by MODULE-DESIGNATOR is present in LOCALITY,
 to the local gate locality.
 </p>
 </dd>
-<dt>system-loadable-p system-designator &amp;optional (locality (gate <code>*self*</code>)) =&gt; generalised-boolean</dt><dd>
+<dt>local-summary &amp;optional (stream <code>*standard-output*</code>) =&gt; &lt;no values&gt;</dt><dd>
 
 <p>
-Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
-to the local gate locality.
+Print a summary about modules within the local gate to STREAM.
 </p>
 </dd>
 <dt>module-best-remote module-designator &amp;key (if-does-not-exist :error) =&gt; remote</dt><dd>
@@ -559,6 +730,13 @@ When ALLOW-SELF is specified, and non-NIL, remotes within <code>*SELF*</code> ar
 <p>
 Try 'access' MODULE via its preferred remote and return whether the attempt was successful as the primary value,
 and the output of the toucher executable as the secondary value.
+</p>
+</dd>
+<dt>system-loadable-p system-designator &amp;optional (locality (gate <code>*self*</code>)) =&gt; generalised-boolean</dt><dd>
+
+<p>
+Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
+to the local gate locality.
 </p>
 </dd>
 </dl>
@@ -592,6 +770,20 @@ When LUST is non-NIL, the module is localised.
 
 <p>
 Update a module designated by MODULE-SPECIFIER, possibly specifying the target LOCALITY.
+</p>
+</dd>
+<dt>make-module-unpublished module-designator &amp;optional (locality (gate <code>*self*</code>))</dt><dd>
+
+<p>
+Stop advertising MODULE in DEFINITIONS, without completely hiding it.
+If it is hidden, unhide it.
+</p>
+</dd>
+<dt>hide-module module-designator &amp;optional (locality (gate <code>*self*</code>))</dt><dd>
+
+<p>
+Stop advertising MODULE in DEFINITIONS, as well as make it inaccessible
+to general public through LOCALITY.
 </p>
 </dd>
 <dt><code>*silently-reset-dirty-repositories*</code> =&gt; boolean</dt><dd>
@@ -890,21 +1082,28 @@ also does:
 <li>
  checks that the locally available set of modules covers every module
 that is claimed to be "well known" to be published by our
-distributor<sup><a class="footref" name="fnr.5.2" href="#fn.5">5</a></sup>, otherwise signalling an error
+distributor<sup><a class="footref" name="fnr.8.2" href="#fn.8">8</a></sup>, otherwise signalling an error
 </li>
 <li>
  publishes the informations about non-"well known", converted modules
 in the gate remote's DEFINITIONS file
 
 </li>
-<li id="sec-6.2.2.1">External executables required for module conversion <br/>
+</ul>
+
+</div>
+
+<div id="outline-container-6.2.2.1" class="outline-5">
+<h5 id="sec-6.2.2.1"><span class="section-number-5">6.2.2.1</span> External executables required for module conversion </h5>
+<div class="outline-text-5" id="text-6.2.2.1">
+
 
 <p>
 The conversion is performed by external programs:
 </p>
 <ul>
 <li>
- darcs-to-git<sup><a class="footref" name="fnr.6" href="#fn.6">6</a></sup>
+ darcs-to-git<sup><a class="footref" name="fnr.9" href="#fn.9">9</a></sup>
 </li>
 <li>
  git cvs, debian package git-cvs
@@ -914,8 +1113,7 @@ The conversion is performed by external programs:
 
 </li>
 </ul>
-</li>
-</ul>
+</div>
 </div>
 
 </div>
@@ -986,24 +1184,36 @@ being able to guess about failure reasons
 
 
 
+
+
+
+
 </div>
 </div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
-<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> Not entirely, but some merging functionality is already in place.
+<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> Actually, sometimes a group of domain names, like in case of sourceforge.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> Actually, sometimes a group of domain names, like in case of sourceforge.
+<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> Currently supported release mechanisms are: git, darcs, cvs, svn and tarballs.
+Additionally, this is extended by some transport variety, like, for example, rsync.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.3" href="#fnr.3">3</a></sup> Currently, the only backend system implemented is ASDF.
+<p class="footnote"><sup><a class="footnum" name="fn.3" href="#fnr.3">3</a></sup> The term is borrowed from the git terminology.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.4" href="#fnr.4">4</a></sup> Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
+<p class="footnote"><sup><a class="footnum" name="fn.4" href="#fnr.4">4</a></sup> As per MODULE-LOCALLY-PRESENT-P.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.5" href="#fnr.5">5</a></sup> This is tied to the concept of well known release locations and differs
+<p class="footnote"><sup><a class="footnum" name="fn.5" href="#fnr.5">5</a></sup> In git this is accomplished by ensuring that the relevant repository lacks
+a .git/git-daemon-export-ok file.
+</p>
+<p class="footnote"><sup><a class="footnum" name="fn.6" href="#fnr.6">6</a></sup> Currently, the only backend system implemented is ASDF.
+</p>
+<p class="footnote"><sup><a class="footnum" name="fn.7" href="#fnr.7">7</a></sup> Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
+</p>
+<p class="footnote"><sup><a class="footnum" name="fn.8" href="#fnr.8">8</a></sup> This is tied to the concept of well known release locations and differs
 from the set of modules converted and reexported in the wishmaster
 process.
 </p>
-<p class="footnote"><sup><a class="footnum" name="fn.6" href="#fnr.6">6</a></sup> Available through git://github.com/purcell/darcs-to-git.git/
+<p class="footnote"><sup><a class="footnum" name="fn.9" href="#fnr.9">9</a></sup> Available through git://github.com/purcell/darcs-to-git.git/
 </p>
 </div>
 </div>
@@ -1011,7 +1221,7 @@ process.
 <p class="author"> Author: Samium Gromoff
 <a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2009-11-13 17:30:27 MSK</p>
+<p class="date"> Date: 2009-11-14 03:54:37 MSK</p>
 <p class="creator">HTML generated by org-mode 6.32b in emacs 23</p>
 </div>
 </div>

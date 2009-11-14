@@ -1,10 +1,11 @@
 ### -*- mode: org; -*-
 #+STARTUP: hidestars #+STARTUP: odd #+STARTUP: logdone #+STARTUP: nofninline
 #+STYLE: <link rel="stylesheet" type="text/css" href="style.css" />
+#+OPTIONS: H:7
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 13, 2009, 17:30
+November 14, 2009, 03:53
 #+END_CENTER
 
 * About this document
@@ -19,26 +20,30 @@ or, for the Org-mode source:
 
 * What is desire (supposed to be)?
 
-The domain of desire includes software distribution points, software
-modules and applications.  All these terms are represented internally
-in a detailed, comprehensive manner, and full knowledge about them is
-maintained in a PRINT/READ-able form, and is easily transportable[1]
-between desire nodes.
+Desire is a package management substrate.
+  
+The domain of Desire includes software distribution points and software
+modules, but carefully avoids module internals, leaving that to system
+definition facilities.  The domain-specific information is represented
+in a both human- and machine-readable form and is shared, by the means
+of a distributed VCS, within a loose aggregation that could be called a network
+of Desire nodes.
 
-There are three sides of desire:
-     -  a knowledge base about world of software,
-     -  maximally streamlined software retrieval, and
-     -  redistribution.
+There are three sides of Desire:
+     -  a knowledge base about world of software distributors and modules,
+     -  an end-user software retrieval system, and
+     -  (re)distribution.
 
-Desire shares concepts with and provides features like, at least:
+Desire shares concepts with and provides some features of, at least:
      -  asdf-install
      -  mudballs
      -  clbuild
 
 Desire uses the Git distributed version control system to pass around
 the domain-specific information, as well as for software redistribution,
-and tries not to lose the 'distributed' part of it.  Ideally, desire would
-ease distributed, cross-project cooperation and coordinated release making.
+and tries not to lose the 'distributed' part of it.  Ideally, Desire could
+be used to ease distributed, cross-project cooperation and coordinated
+release making.
 
 * How to obtain desire?
 
@@ -46,108 +51,178 @@ Desire can be obtained at:
 
         git://git.feelingofgreen.ru/desire
 
-but please see [[Streamlined%20bootstrap][streamlined bootstrap]].
+but please see the "Streamlined bootstrap" section below.
 
 * Overview of terms
+*** DEFINITIONS
+
+This is the term you will often see mentioned, as it is central to
+the process of distribution of information about the domain.
+
+For the moment it would suffice to say that this is a text file
+containing forms (which are READable using Desire-provided readers) which
+carry information about terms covered in this section.
+
 *** Distributors
 
-The largest unit of software granularity is a 'distributor', which
-corresponds to an internet domain name[3].  Currently, they don't carry
+The largest unit of software granularity is a /distributor/, which
+corresponds to an internet domain name[fn:1].  Currently, they don't carry
 much information beyond just that.
 
-Distributors contain one or more 'remotes', which are typical points
-of distribution corresponding to sets of similarly-named repositories.
+Distributors contain one or more /remotes/, which correspond to points
+of distribution of sets of similarly-accessible modules.
 
-***** Wishmaster
+***** Wishmasters
 
-'Wishmaster' is a subtype of distributor which participates in the
-desire network, in the form of having a 'gate remote', upon which
-we will elaborate further below.
+/Wishmaster/ is a subtype of distributor which participates in the
+desire network, in the form of being recorded in /DEFINITIONS/, as well as
+by maintaining a /gate/ (a subtype of remotes upon which we will elaborate
+further below).  When applied to /wishmasters/, the virtue of being
+registered in /some/ DEFINITIONS is otherwise referred to as property
+of being /well-known/.
 
-This participation is twofold -- information passing and module
-conversion (better term?).
+Two important processes naturally growing out of this are:
+    - exchange of DEFINITIONS, be it among well-known wishmasters, or
+      as a process of informing a client node, and
+    - upstream module conversion, which ends up populating the /gate/;
 
-The information exchanged is that of wishmaster ideas about the world
-of software, that is, about all terms covered in this section.
+The upstream module conversion process serves to simplify life of average
+desire users by repackaging modules available through a variety
+of distribution means[fn:2] into a common DVCS format.
 
-The module conversion serves to simplify life of average desire users
-by repackaging modules available through a variety of distribution
-means into a common DVCS format.
+The wishmaster corresponding to the local Desire instance is available
+through the variable called =*SELF*=.
 
-*** Remotes
+*** Locations
 
-The concept of remote serves (or actually, the more general type of
-location does) as a point of distribution for a group of modules.
+/Location/ is a general term for objects storing /module/ repositories,
+and are either local, in which case they are /localities/, or non-local,
+in which case they are, unsurprisingly, /remotes/[fn:3].
 
-Remotes combine following concepts:
-     - version control system type (git, darcs, cvs or svn)
-     - transport type (native, http or rsync)
-     - simple pattern for matching module pathes on the distributor
-     - an internet port number
+***** Remotes
 
-***** Gate remotes
+The concept of /remote/ serves as a point of distribution for a group of /modules/.
 
-Gate remotes are special remotes which participate in the desire
-protocol.  They have a special module called '.meta', which contains
-the containing distributor's idea about the world in a special file
-with name 'DEFINITIONS'.
+In general, all remotes carry the following information:
+     - version control system type (git, darcs, cvs or svn),
+     - transport type (native, http or rsync),
+     - simple pattern for matching module paths on the distributor,
+     - an internet port number, and
+     - some additional quirks necessary to access the remote repository;
+
+******* Non-gate remotes
+
+/Non-gate remotes/ represent distribution points of non-wishmasters, that is,
+nodes not participating in the Desire protocol.
+
+******* Gate remotes, or gates
+
+/Gate remotes/, or /gates/ are special remotes which are instrumental
+to participation in the Desire protocol.  They carry a special module called
+*.meta*, which records the containing distributor's idea about the domain
+in aforementioned DEFINITIONS.
 
 The information in this file is subject to propagation in the network
 of hosts participating in the desire protocol.
 
-Distributors recorded in these definitions are considered 'well-known'.
-
 Gate remotes have a second purpose: as parts of well-known wishmasters
 they serve for redistribution of modules converted by those wishmasters
-into a single repository format, currently 'git'.  The modules converted
+into a single repository format, currently /git/.  The modules converted
 in such a way are advertised differently from those which are considered
 'released' by the containing distributor.
 
+******* Localities
+
+/Localities/ serve to express module storage on the local machine.
+/Master localities/ (except the /local gate/, about which see below)
+are canonical transitory locations used for conversion of modules
+retrieved from remotes of specific VCS types.
+
+/The master git locality/, also the /local gate/ or a /gate locality/, is
+described in the next section, and is supposed to be a canonical storage
+location for all modules used on the Desire node.
+
+A scrupulous reader might note that the above description leaves open
+a possibility of existence for /non-master localities/.  While it is true,
+and purposefully so, this concept is not currently employed.
+
+******* Local gate, or gate locality
+
+=*SELF*= always contains a special location, a /local gate/ or a /gate locality/,
+which is both a remote and a locality and serves a threefold purpose:
+
+   - storage of incoming modules for local consumption,
+   - export of the aforementioned converted modules, and
+   - distribution point for modules released by the local distributor.
+
+Naturally, the last two points only apply to well-known wishmasters.
+
 *** Modules
 
-Modules represent units of software, as released by the distributor,
-and contain the information remaining to complete the information
-provided by less granular concepts to construct a module address.
+/Modules/ represent versioned, atomic units of software, as released
+by the distributor, and, from the point of Desire, carry the additional
+information necessary to complete the information provided by
+the less granular concepts to obtain the module from its containing remote.
 
 Modules can be provided by several different remotes of different
-distributors.  When retrieval of a module is requested, gate remotes
+distributors.  When the end-user requests retrieval of a module, gate remotes
 are preferred above others.
+
+Locally, all incoming modules end up in the local gate, which
+always exists, nevermind the dominant operation mode of the Desire node.
+Once in the local gate, the module becomes /locally available/[fn:9], and is
+made loadable through the preferred local system definition facility.
+
+Locally available modules can be classified into one of the four
+categories, the first two of which are only applicable to well-known
+wishmasters:
+
+   - released, for modules advertised through DEFINITIONS to be released
+     through the distributor corresponding to =*SELF*=;
+   - converted, for module originating elsewhere, but advertised in
+     DEFINITIONS as being converted in the gate of =*SELF*=;
+   - unpublished, modules accessible through the gate, yet unadvertised
+     in DEFINITIONS;
+   - hidden, modules physically present in the local gate, but made
+     unavailable to anonymous remote clients[fn:4].
+
+***** Pseudo-modules
+
+/Pseudo-modules/ refer to repositories stored in gates used for Desire-specific
+information storage and exchange.  Currently there are two common pseudo-modules:
+
+   - *.meta*, the aforementioned domain-specific information junction point, and
+   - *.local-meta*, a hidden repository used to store local information, which
+     currently amounts to tracking unpublished and hidden modules.
 
 *** Systems
 
-Descending further down we meet systems.
+Descending further down we meet /systems/.
 Systems are objects only meant to be relevant in the domain of Common Lisp
 software, and more precisely -- to backend system definition facilities,
-such as ASDF, XCVB, Mudballs or others[4].
+such as ASDF, XCVB, Mudballs or others[fn:5].
 
 The concept of system introduces inter-system dependencies, which cross
 module boundaries, producing inter-module dependencies.
 
-Evidently, there can be several systems per module, and also those
-can be obscured from the end-user, either intentionally or by unfortunate
-accident[5].
+Evidently, there can be several systems per module, and also those can be
+obscured from the end-user, either intentionally or by unfortunate
+accident[fn:6].
 
 Desire handles all these complications and operates on the full
 inter-module dependency graph.  It also doesn't store that graph anywhere,
-recomputing it instead every time a request for module is performed.
+recomputing it, instead, every time a request for a module is performed.
+
+It should be noted, that there is no requirement for modules to have systems,
+which enables end-users to manage (and provide) gittified non-Lisp software
+for local (and not-so-local) needs.
 
 *** Applications
 
 Applications are simple extensions of systems, providing some very
-preliminary support for launching applications, potentially simplifiable
-to the point of the end-user being able to say "run climacs" and
-have everything downloaded, required systems loaded and the application
-up and running.
-
-*** Localities
-
-The more general type of 'location' besides remotes also includes
-'localities', which serve the same purpose as remotes, but on the local
-machine.  Master localities are canonical locations for module repositories
-managed by a specific VCS type.
-
-The master git locality is a canonical location for both release and
-converted module redistribution.
+preliminary support for launching programs.  They are intended to simplify
+end-user experience by making requests such as "run climacs" expressible
+and actionable.
 
 * API (aka end-user interface)
 *** Initial chores & storage location choice
@@ -159,8 +234,8 @@ converted module redistribution.
         named by the AS keyword.
 
         This is performed by checking that the locally available set of modules covers every module
-        that is claimed to be "well known" to be published by our distributor[6].  When this check
-        fails an error is signalled.
+        that is claimed to be to be published by our distributor[fn:7], according to the local
+        DEFINITIONS.  When this check fails an error is signalled.
 
       - =*self*= => distributor ::
         The local distributor set up during INIT, be it well-known or not.
@@ -193,14 +268,16 @@ converted module redistribution.
       - list-modules => <no values> ::
         List all known modules, with some additional information.
 
+      - module-hidden-p module-designator &optional (locality (gate =*self*=)) => boolean ::
+        See whether whether module designated by MODULE-DESIGNATOR is unavailable to anonymous remote clients.
+
       - module-present-p module-designator &optional (locality (gate =*self*=)) check-when-present-p (check-when-missing-p t) => boolean ::
         Determine whether module designated by MODULE-DESIGNATOR is present in LOCALITY, which defaults
         to the local gate locality.
 
-      - system-loadable-p system-designator &optional (locality (gate =*self*=)) => generalised-boolean ::
-        Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
-        to the local gate locality.
-
+      - local-summary &optional (stream =*standard-output*=) => <no values> ::
+        Print a summary about modules within the local gate to STREAM.
+        
       - module-best-remote module-designator &key (if-does-not-exist :error) => remote ::
         Produce the remote, if any, which will be chosen to satisfy desires for module
         designated by MODULE-DESIGNATOR.
@@ -217,6 +294,10 @@ converted module redistribution.
         Try 'access' MODULE via its preferred remote and return whether the attempt was successful as the primary value,
         and the output of the toucher executable as the secondary value.
 
+      - system-loadable-p system-designator &optional (locality (gate =*self*=)) => generalised-boolean ::
+        Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
+        to the local gate locality.
+
 *** Making wishes
 
       - lust &rest module-names => boolean ::
@@ -230,6 +311,14 @@ converted module redistribution.
 
       - update-module module-specifier &optional (locality (gate *self*)) => <no values> ::
         Update a module designated by MODULE-SPECIFIER, possibly specifying the target LOCALITY.
+
+      - make-module-unpublished module-designator &optional (locality (gate =*self*=)) ::
+        Stop advertising MODULE in DEFINITIONS, without completely hiding it.
+        If it is hidden, unhide it.
+      
+      - hide-module module-designator &optional (locality (gate =*self*=)) ::
+        Stop advertising MODULE in DEFINITIONS, as well as make it inaccessible
+        to general public through LOCALITY.
 
       - =*silently-reset-dirty-repositories*= => boolean ::
         Whenever a dirty repository comes up in a situation which requires a clean one to proceed, quietly reset, or otherwise cleanup the repository,
@@ -402,7 +491,7 @@ also does:
 
      -  checks that the locally available set of modules covers every module
         that is claimed to be "well known" to be published by our
-        distributor[6], otherwise signalling an error
+        distributor[fn:7], otherwise signalling an error
      -  publishes the informations about non-"well known", converted modules
         in the gate remote's DEFINITIONS file
 
@@ -410,7 +499,7 @@ also does:
         
 The conversion is performed by external programs:
 
-     -  darcs-to-git[7]
+     -  darcs-to-git[fn:8]
      -  git cvs, debian package git-cvs
      -  git svn, debian package git-svn
 
@@ -444,11 +533,25 @@ Some known problems:
 
 * Footnotes
 
-[1] Not entirely, but some merging functionality is already in place.
-[3] Actually, sometimes a group of domain names, like in case of sourceforge.
-[4] Currently, the only backend system implemented is ASDF.
-[5] Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
-[6] This is tied to the concept of well known release locations and differs
+[fn:1] Actually, sometimes a group of domain names, like in case of sourceforge.
+
+[fn:2] Currently supported release mechanisms are: git, darcs, cvs, svn and tarballs.
+Additionally, this is extended by some transport variety, like, for example, rsync.
+
+[fn:3] The term is borrowed from the git terminology.
+
+[fn:4] In git this is accomplished by ensuring that the relevant repository lacks
+a .git/git-daemon-export-ok file.
+
+[fn:5] Currently, the only backend system implemented is ASDF.
+
+[fn:6] Recovering such hidden systems complicates construction of full dependency graph in case of ASDF.
+
+[fn:7] This is tied to the concept of well known release locations and differs
 from the set of modules converted and reexported in the wishmaster
 process.
-[7] Available through git://github.com/purcell/darcs-to-git.git/
+
+[fn:8] Available through git://github.com/purcell/darcs-to-git.git/
+
+[fn:9] As per MODULE-LOCALLY-PRESENT-P.
+
