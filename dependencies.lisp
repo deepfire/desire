@@ -10,24 +10,6 @@
   (eq (car (pathname-directory pathname)) :absolute))
 
 ;;;;
-;;;; Pipes
-;;;;
-(defun make-pipe-stream (&key (element-type 'base-char) (external-format :default) (buffering :full))
-  #+sbcl
-  (multiple-value-bind (r w) (sb-posix:pipe)
-    (make-two-way-stream
-     (sb-sys:make-fd-stream r :input t :element-type element-type :external-format external-format :buffering buffering)
-     (sb-sys:make-fd-stream w :output t :element-type element-type :external-format external-format :buffering buffering)))
-  #-sbcl
-  (error "~@<Not implemented.~:@>"))
-
-(defmacro with-pipe-stream ((s &rest make-pipe-stream-args) &body body)
-  `(let ((,s (make-pipe-stream ,@make-pipe-stream-args)))
-     (unwind-protect (progn ,@body)
-       (close (two-way-stream-input-stream ,s))
-       (close (two-way-stream-output-stream ,s)))))
-
-;;;;
 ;;;; NAMED
 ;;;;
 (defclass named ()
