@@ -22,14 +22,14 @@ or, for the Org-mode source:
 
 Desire is a package management substrate.
   
-The domain of Desire includes software distribution points and software
+The domain of desire includes software distribution points and software
 modules, but carefully avoids module internals, leaving that to system
 definition facilities.  The domain-specific information is represented
 in a both human- and machine-readable form and is shared, by the means
 of a distributed VCS, within a loose aggregation that could be called a network
-of Desire nodes.
+of desire nodes.
 
-There are three sides of Desire:
+There are three sides of desire:
      -  a knowledge base about world of software distributors and modules,
      -  an end-user software retrieval system, and
      -  (re)distribution.
@@ -41,7 +41,7 @@ Desire shares concepts with and provides some features of, at least:
 
 Desire uses the Git distributed version control system to pass around
 the domain-specific information, as well as for software redistribution,
-and tries not to lose the 'distributed' part of it.  Ideally, Desire could
+and tries not to lose the 'distributed' part of it.  Ideally, desire could
 be used to ease distributed, cross-project cooperation and coordinated
 release making.
 
@@ -60,7 +60,7 @@ This is the term you will often see mentioned, as it is central to
 the process of distribution of information about the domain.
 
 For the moment it would suffice to say that this is a text file
-containing forms (which are READable using Desire-provided readers) which
+containing forms (which are READable using desire-provided readers) which
 carry information about terms covered in this section.
 
 *** Distributors
@@ -90,7 +90,7 @@ The upstream module conversion process serves to simplify life of average
 desire users by repackaging modules available through a variety
 of distribution means[fn:2] into a common DVCS format.
 
-The wishmaster corresponding to the local Desire instance is available
+The wishmaster corresponding to the local desire instance is available
 through the variable called =*SELF*=.
 
 *** Locations
@@ -113,12 +113,12 @@ In general, all remotes carry the following information:
 ******* Non-gate remotes
 
 /Non-gate remotes/ represent distribution points of non-wishmasters, that is,
-nodes not participating in the Desire protocol.
+nodes not participating in the desire protocol.
 
 ******* Gate remotes, or gates
 
 /Gate remotes/, or /gates/ are special remotes which are instrumental
-to participation in the Desire protocol.  They carry a special module called
+to participation in the desire protocol.  They carry a special module called
 *.meta*, which records the containing distributor's idea about the domain
 in aforementioned DEFINITIONS.
 
@@ -140,7 +140,7 @@ retrieved from remotes of specific VCS types.
 
 /The master git locality/, also the /local gate/ or a /gate locality/, is
 described in the next section, and is supposed to be a canonical storage
-location for all modules used on the Desire node.
+location for all modules used on the desire node.
 
 A scrupulous reader might note that the above description leaves open
 a possibility of existence for /non-master localities/.  While it is true,
@@ -160,7 +160,7 @@ Naturally, the last two points only apply to well-known wishmasters.
 *** Modules
 
 /Modules/ represent versioned, atomic units of software, as released
-by the distributor, and, from the point of Desire, carry the additional
+by the distributor, and, from the point of desire, carry the additional
 information necessary to complete the information provided by
 the less granular concepts to obtain the module from its containing remote.
 
@@ -169,7 +169,7 @@ distributors.  When the end-user requests retrieval of a module, gate remotes
 are preferred above others.
 
 Locally, all incoming modules end up in the local gate, which
-always exists, nevermind the dominant operation mode of the Desire node.
+always exists, nevermind the dominant operation mode of the desire node.
 Once in the local gate, the module becomes /locally available/[fn:9], and is
 made loadable through the preferred local system definition facility.
 
@@ -188,7 +188,7 @@ wishmasters:
 
 ***** Pseudo-modules
 
-/Pseudo-modules/ refer to repositories stored in gates used for Desire-specific
+/Pseudo-modules/ refer to repositories stored in gates used for desire-specific
 information storage and exchange.  Currently there are two common pseudo-modules:
 
    - *.meta*, the aforementioned domain-specific information junction point, and
@@ -228,7 +228,7 @@ and actionable.
 *** Initial chores & storage location choice
 
       - init path &key as (default-wishmasters (list desr:*default-wishmaster*)) => <no values> ::
-        Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
+        Initialise desire with PATH chosen as directory for storage of all VCS-specific locations.
        
         When AS is non-NIL an attempt is made to establish an identity to a defined distributor
         named by the AS keyword.
@@ -260,10 +260,10 @@ and actionable.
         REMOTE-DESIGNATOR.
 
       - apropos-desr string-designator &optional set-designator => <no values> ::
-        Like APROPOS, but finds objects from the domain of Desire.
+        Like APROPOS, but finds objects from the domain of desire.
 
       - apropos-desr-list string-designator &optional set-designator => desirables ::
-        Like APROPOS-LIST, but finds objects from the domain of Desire.
+        Like APROPOS-LIST, but finds objects from the domain of desire.
 
       - list-modules => <no values> ::
         List all known modules, with some additional information.
@@ -358,12 +358,12 @@ Following reader macro is enabled by install-add-module-reader:
         Forget everything associated with the system specified by SYSTEM-DESIGNATOR.
 
       - save-definitions &key seal => <no values> ::
-        Write out the current idea about the Desire's domain into DEFINITIONS,
+        Write out the current idea about the desire's domain into DEFINITIONS,
         optionally committing changes, when SEAL is non-NIL.
        
       - read-definitions &key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)) => <no values> ::
         Append definitions currently available in METASTORE to the current idea about
-        Desire's domain.
+        desire's domain.
 
 * Workflow
 *** Streamlined bootstrap

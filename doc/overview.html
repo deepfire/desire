@@ -8,7 +8,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2009-11-14 03:54:37 MSK"/>
+<meta name="generated" content="2009-11-14 18:18:10 MSK"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -177,15 +177,15 @@ or, for the Org-mode source:
 Desire is a package management substrate.
 </p>
 <p>
-The domain of Desire includes software distribution points and software
+The domain of desire includes software distribution points and software
 modules, but carefully avoids module internals, leaving that to system
 definition facilities.  The domain-specific information is represented
 in a both human- and machine-readable form and is shared, by the means
 of a distributed VCS, within a loose aggregation that could be called a network
-of Desire nodes.
+of desire nodes.
 </p>
 <p>
-There are three sides of Desire:
+There are three sides of desire:
 </p><ul>
 <li>
  a knowledge base about world of software distributors and modules,
@@ -215,7 +215,7 @@ There are three sides of Desire:
 
 <p>Desire uses the Git distributed version control system to pass around
 the domain-specific information, as well as for software redistribution,
-and tries not to lose the 'distributed' part of it.  Ideally, Desire could
+and tries not to lose the 'distributed' part of it.  Ideally, desire could
 be used to ease distributed, cross-project cooperation and coordinated
 release making.
 </p>
@@ -259,7 +259,7 @@ the process of distribution of information about the domain.
 </p>
 <p>
 For the moment it would suffice to say that this is a text file
-containing forms (which are READable using Desire-provided readers) which
+containing forms (which are READable using desire-provided readers) which
 carry information about terms covered in this section.
 </p>
 </div>
@@ -314,7 +314,7 @@ desire users by repackaging modules available through a variety
 of distribution means<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup> into a common DVCS format.
 </p>
 <p>
-The wishmaster corresponding to the local Desire instance is available
+The wishmaster corresponding to the local desire instance is available
 through the variable called <code>*SELF*</code>.
 </p>
 </div>
@@ -373,7 +373,7 @@ some additional quirks necessary to access the remote repository;
 
 <p>
 <i>Non-gate remotes</i> represent distribution points of non-wishmasters, that is,
-nodes not participating in the Desire protocol.
+nodes not participating in the desire protocol.
 </p>
 </div>
 
@@ -386,7 +386,7 @@ nodes not participating in the Desire protocol.
 
 <p>
 <i>Gate remotes</i>, or <i>gates</i> are special remotes which are instrumental
-to participation in the Desire protocol.  They carry a special module called
+to participation in the desire protocol.  They carry a special module called
 <b>.meta</b>, which records the containing distributor's idea about the domain
 in aforementioned DEFINITIONS.
 </p>
@@ -419,7 +419,7 @@ retrieved from remotes of specific VCS types.
 <p>
 <i>The master git locality</i>, also the <i>local gate</i> or a <i>gate locality</i>, is
 described in the next section, and is supposed to be a canonical storage
-location for all modules used on the Desire node.
+location for all modules used on the desire node.
 </p>
 <p>
 A scrupulous reader might note that the above description leaves open
@@ -467,7 +467,7 @@ distribution point for modules released by the local distributor.
 
 <p>
 <i>Modules</i> represent versioned, atomic units of software, as released
-by the distributor, and, from the point of Desire, carry the additional
+by the distributor, and, from the point of desire, carry the additional
 information necessary to complete the information provided by
 the less granular concepts to obtain the module from its containing remote.
 </p>
@@ -478,7 +478,7 @@ are preferred above others.
 </p>
 <p>
 Locally, all incoming modules end up in the local gate, which
-always exists, nevermind the dominant operation mode of the Desire node.
+always exists, nevermind the dominant operation mode of the desire node.
 Once in the local gate, the module becomes /locally available/<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>, and is
 made loadable through the preferred local system definition facility.
 </p>
@@ -515,7 +515,7 @@ unavailable to anonymous remote clients<sup><a class="footref" name="fnr.5" href
 
 
 <p>
-<i>Pseudo-modules</i> refer to repositories stored in gates used for Desire-specific
+<i>Pseudo-modules</i> refer to repositories stored in gates used for desire-specific
 information storage and exchange.  Currently there are two common pseudo-modules:
 </p>
 <ul>
@@ -599,7 +599,7 @@ and actionable.
 <dt>init path &amp;key as (default-wishmasters (list desr:*default-wishmaster*)) =&gt; &lt;no values&gt;</dt><dd>
 
 <p>
-Initialise Desire with PATH chosen as directory for storage of all VCS-specific locations.
+Initialise desire with PATH chosen as directory for storage of all VCS-specific locations.
 </p>
 <p>
 When AS is non-NIL an attempt is made to establish an identity to a defined distributor
@@ -670,13 +670,13 @@ REMOTE-DESIGNATOR.
 <dt>apropos-desr string-designator &amp;optional set-designator =&gt; &lt;no values&gt;</dt><dd>
 
 <p>
-Like APROPOS, but finds objects from the domain of Desire.
+Like APROPOS, but finds objects from the domain of desire.
 </p>
 </dd>
 <dt>apropos-desr-list string-designator &amp;optional set-designator =&gt; desirables</dt><dd>
 
 <p>
-Like APROPOS-LIST, but finds objects from the domain of Desire.
+Like APROPOS-LIST, but finds objects from the domain of desire.
 </p>
 </dd>
 <dt>list-modules =&gt; &lt;no values&gt;</dt><dd>
@@ -844,7 +844,7 @@ Return the pathname of the SYSTEM's definition.
 <dt>clear-definitions =&gt; &lt;no values&gt;</dt><dd>
 
 <p>
-Forget everything. A subsequent LOAD-DEFINITIONS will be instrumental to continue any productive use.
+Forget everything. A subsequent READ-DEFINITIONS will be instrumental to continue any productive use.
 </p>
 </dd>
 <dt>remove-remote remote-designator &amp;key keep-modules =&gt; nil</dt><dd>
@@ -867,18 +867,18 @@ its systems and applications.
 Forget everything associated with the system specified by SYSTEM-DESIGNATOR.
 </p>
 </dd>
-<dt>save-current-definitions &amp;key seal =&gt; &lt;no values&gt;</dt><dd>
+<dt>save-definitions &amp;key seal =&gt; &lt;no values&gt;</dt><dd>
 
 <p>
-Write out the current idea about the Desire's domain into DEFINITIONS,
+Write out the current idea about the desire's domain into DEFINITIONS,
 optionally committing changes, when SEAL is non-NIL.
 </p>
 </dd>
-<dt>load-definitions &amp;key (source <b>self</b>) (force-source (eq source <b>self</b>)) (metastore (meta-path)) =&gt; &lt;no values&gt;</dt><dd>
+<dt>read-definitions &amp;key (source <b>self</b>) (force-source (eq source <b>self</b>)) (metastore (meta-path)) =&gt; &lt;no values&gt;</dt><dd>
 
 <p>
 Append definitions currently available in METASTORE to the current idea about
-Desire's domain.
+desire's domain.
 </p>
 </dd>
 </dl>
@@ -1135,7 +1135,7 @@ The required super-entities are either found among current definitions,
 or created on the spot.
 </p>
 <p>
-SAVE-CURRENT-DEFINITIONS writes out changes into
+SAVE-DEFINITIONS writes out changes into
 &lt;value-of-(ROOT <code>*SELF*</code>)&gt;/git/.meta/DEFINITIONS
 </p>
 </div>
@@ -1221,7 +1221,7 @@ process.
 <p class="author"> Author: Samium Gromoff
 <a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2009-11-14 03:54:37 MSK</p>
+<p class="date"> Date: 2009-11-14 18:18:10 MSK</p>
 <p class="creator">HTML generated by org-mode 6.32b in emacs 23</p>
 </div>
 </div>
