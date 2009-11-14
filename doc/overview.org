@@ -344,7 +344,7 @@ Following reader macro is enabled by install-add-module-reader:
         Return the pathname of the SYSTEM's definition.
        
       - clear-definitions => <no values> ::
-        Forget everything. A subsequent LOAD-DEFINITIONS will be instrumental to continue any productive use.
+        Forget everything. A subsequent READ-DEFINITIONS will be instrumental to continue any productive use.
 
       - remove-remote remote-designator &key keep-modules => nil ::
         Forget everything associated with a remote specified by REMOTE-DESIGNATOR, optionally, when KEEP-MODULES
@@ -357,11 +357,11 @@ Following reader macro is enabled by install-add-module-reader:
       - remove-system system-designator => nil ::
         Forget everything associated with the system specified by SYSTEM-DESIGNATOR.
 
-      - save-current-definitions &key seal => <no values> ::
+      - save-definitions &key seal => <no values> ::
         Write out the current idea about the Desire's domain into DEFINITIONS,
         optionally committing changes, when SEAL is non-NIL.
        
-      - load-definitions &key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)) => <no values> ::
+      - read-definitions &key (source *self*) (force-source (eq source *self*)) (metastore (meta-path)) => <no values> ::
         Append definitions currently available in METASTORE to the current idea about
         Desire's domain.
 
@@ -514,7 +514,7 @@ that is one of 'git', 'http' (which actually means git+http), 'darcs',
 The required super-entities are either found among current definitions,
 or created on the spot.
 
-SAVE-CURRENT-DEFINITIONS writes out changes into
+SAVE-DEFINITIONS writes out changes into
 <value-of-(ROOT =*SELF*=)>/git/.meta/DEFINITIONS
 
 * Shortcomings
