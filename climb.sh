@@ -193,13 +193,26 @@ valid_storage_location_p() {
     return 0
 }
 
+clone_module() {
+    local root="$1"
+    local module="$2"
+    git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/git/${module}" >/dev/null || \
+        fail "failed to retrieve ${module}"
+}
+
+update_module() {
+    local root="$1"
+    local module="$2"
+    (cd "${root}/git/${module}" && git fetch "${WISHMASTER}" >/dev/null 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >/dev/null) || \
+        fail "failed to update ${module}"
+}
+
 clone_dependencies() {
     local root="$1"
     for desire_dep in ${desire_deps} desire
     do
         test "${VERBOSE}" && echo -n "      ${desire_dep}: "
-        git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/git/${desire_dep}" >/dev/null || \
-            fail "failed to retrieve ${desire_dep}"
+        clone_module "${root}" "${desire_dep}"
         test "${VERBOSE}" && echo "ok"
     done
 }
@@ -209,8 +222,12 @@ update_dependencies() {
     for desire_dep in ${desire_deps} desire
     do
         test "${VERBOSE}" && echo -n "      $desire_dep: "
-        (cd "${root}/git/$desire_dep" && git fetch "${WISHMASTER}" >/dev/null 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >/dev/null) || \
-            fail "failed to update $desire_dep"
+        if test -d "${root}/git/${desire_dep}"
+        then
+            update_module "${root}" "${desire_dep}"
+        else
+            clone_module "${root}" "${desire_dep}"
+        fi
         test "${VERBOSE}" && echo "ok"
     done
 }
