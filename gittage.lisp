@@ -276,7 +276,7 @@
     (set-head (get-head))))
 
 (defun invoke-with-detached-head (fn directory)
-  (within-directory (directory)
+  (maybe-within-directory directory
     (let ((current-head (get-head)))
       (unwind-protect (progn (git-detach-head)
                              (funcall fn))
