@@ -22,63 +22,32 @@
   (:use :common-lisp :iterate :alexandria :desire :pergamum :executor)
   (:export
    #:*definitions-path*
-   #:run-tests))
+   #:quicktest))
 
 (in-package :desire-tests)
 
-(define-executable ssh)
-
-(defvar *test-user-account* "empty@betelheise")
+(defvar *test-host* "betelheise")
+(defvar *test-user-account* "empty")
 (defvar *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
 
-(defvar *clean-command* "rm -rf climb.sh desr /tmp/empty-*")
-(defvar *download-bootstrapper-command* (format nil "wget ~A" *bootstrap-script-location*))
-(defvar *disable-debugger* "export DISABLE_DEBUGGER=t")
-(defvar *climacs-load-command* "bash climb.sh /home/empty/desr/ climacs")
-(defvar *xcvb-bootstrap-command* "bash climb.sh /home/empty/desr/ xcvb")
+(defvar *clean-command* "rm -rf climb.sh desr")
+(defvar *download-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
+(defvar *bootstrap-command*      "sh climb.sh ~A            ~~/desr")
+(defvar *climacs-run-command*    "sh climb.sh ~A -a climacs ~~/desr")
+(defvar *xcvb-bootstrap-command* "sh climb.sh ~A -s xcvb    ~~/desr")
 
-(defvar *tests-common* `(,*clean-command*
-                         ,*download-bootstrapper-command*
-                         ,*disable-debugger*))
-
-(defvar *climacs-test* `(,@*tests-common*
-                         ,*climacs-load-command*))
-
-(defvar *xcvb-bootstrap-test* `(,@*tests-common*
-                                ,*xcvb-bootstrap-command*))
-
-(defparameter *test-output-separator* ";; ------------------------  8<  ------------------------------")
-(defvar *test-outputs* nil)
-
-(defun compile-shell-command (commands &aux (output ""))
-  (iter (for command in (butlast commands))
-        (setf output (concatenate 'string output command " &&" #(#\Newline)))
-        (finally
-         (return (concatenate 'string output (lastcar commands))))))
-
-(defun run-remote-test (name commands &optional verbose (account *test-user-account*))
-  (lret (condition
-         output
-         successp)
-    (syncformat t ";; Running test ~A: " name)
-    (with-output-to-string (capture)
-      (let ((*standard-output-direction* capture))
-        (handler-case
-            (setf successp
-                  (with-input-from-string (stream (compile-shell-command commands))
-                    (with-executable-input-stream stream
-                      (ssh account "bash" "-s"))))
-          (serious-condition (c) (setf condition c)))
-        (when (open-stream-p capture)
-          (finish-output capture))
-        (setf output (get-output-stream-string capture))
-        (push output *test-outputs*)))
-    (if (or verbose condition)
-        (syncformat t "~:[failure~;success~].~%;;~%;; The output was:~%~A~%~A~&~A~%~:[~;~:*~@<;; ~@;The condition met was: ~A~:@>~%~]"
-                        successp *test-output-separator* output *test-output-separator* condition)
-        (syncformat t "success.~%"))))
-
-(defun run-tests (&key verbose (account *test-user-account*))
-  (lret ((success t))
-    (setf success (and (run-remote-test :climacs *climacs-test* verbose account) success))
-    (setf success (and (run-remote-test :xcvb-bootstrap *xcvb-bootstrap-test* verbose account) success))))
+(defun quicktest (&key verbose clean disable-debugger (mode :bootstrap) (branch "devo"))
+  (find-executable 'ssh)
+  (watch-remote-commands *test-host* *test-user-account*
+                         (append (when clean
+                                   `(,*clean-command*))
+                                 `(,*download-bootstrapper-command*)
+                                 `(,(format nil (ecase mode
+                                                  (:bootstrap *bootstrap-command*)
+                                                  (:climacs *climacs-run-command*)
+                                                  (:xcvb *xcvb-bootstrap-command*))
+                                            (concatenate 'string
+                                                         (when disable-debugger "-g ")
+                                                         (when branch (format nil "-b ~(~A~) " branch))
+                                                         (when verbose "-v "))))))
+  (values))
