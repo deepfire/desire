@@ -158,6 +158,12 @@ This notably excludes converted modules."
   (:method ((r wrinkle-mixin) module-name)
     (cadr (assoc module-name (wrinkles r) :test #'string=))))
 
+(defgeneric set-remote-module-wrinkle (remote module-name wrinkle)
+  (:method ((r wrinkle-mixin) module-name wrinkle)
+    (if-let ((cell (assoc module-name (wrinkles r) :test #'string=)))
+      (setf (cadr cell) wrinkle)
+      (push (list (name (coerce-to-module module-name)) wrinkle) (wrinkles r)))))
+
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
    Return T when all executables required by TYPE are available, or NIL."
