@@ -22,18 +22,16 @@
 
 
 (define-executable git :may-want-display t :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat"))
-(define-executable gitk :may-want-display t)
 #-win32
 (progn
   (define-executable darcs)
   (define-executable rsync)
-  (define-executable git-cvsimport)
-  (define-executable git-svn)
   (define-executable darcs-to-git)
-  (define-executable cp)
-  (define-executable make)
   (define-executable wget)
-  (define-executable cvs))
+  (define-executable cvs)
+  ;; these are needed for XCVB stack's postinstall
+  (define-executable cp)
+  (define-executable make))
 
 (define-condition about-to-purge (error)
   ((directory :accessor cond-directory :initarg :directory))

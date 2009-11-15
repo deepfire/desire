@@ -21,8 +21,6 @@
 (in-package :desire)
 
 
-(define-executable patch)
-
 (defvar *xcvbifier-base-uri* "http://common-lisp.net/project/xcvb/releases/patches/")
 (defvar *xcvbifiable-module-set* '())
 
