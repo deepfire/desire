@@ -30,7 +30,7 @@
    #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module
    #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor #:module-fetch-url
-   #:touch-module #:distributor-module-enabled-remote #:update-module
+   #:touch-module #:distributor-module-enabled-remote #:update
    #:module-locally-present-p #:module-publishable-p #:module-hidden-p
    ;;   types.lisp :: system
    #:system-hidden-p

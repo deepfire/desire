@@ -58,7 +58,7 @@
 (defun module-test-fetchability (m)
   (let ((*fetch-errors-serious* t))
     (with-recorded-status ()
-      (update-module m)
+      (update m)
       t)))
 
 (defun module-test-loadability (m)

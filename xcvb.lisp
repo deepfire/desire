@@ -39,7 +39,7 @@
                  (values nil output)))))))
 
 (defun xcvbify-module (module &optional break-on-patch-failure)
-  (update-module module)       ; leaves the repo in inconsistent state
+  (update module)       ; leaves the repo in inconsistent state
   (within-directory ((module-pathname module))
     (git-set-branch-index-tree)
     (git-set-head-index-tree :master :if-changes :reset)
