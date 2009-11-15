@@ -91,7 +91,7 @@
     (iter (for m in (append (location-module-names gate) (gate-converted-module-names gate)))
           (destructuring-bind (&key name mode status output condition) (list* :name m :mode :convert (module-test-fetchability m))
             (declare (ignore output))
-            (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A~]~%" name mode status condition)))
+            (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A, output was:~%~A~]~%" name mode status condition output)))
     (multiple-value-bind (status output condition)
         (watch-remote-commands hostname username (remove nil
                                                          (list

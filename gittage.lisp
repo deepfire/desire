@@ -81,7 +81,7 @@
 
 (defun git-repository-staged-changes-p (&optional directory)
   (maybe-within-directory directory
-    (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
+    (with-explanation ("determining whether git repository at ~S has staged changes" *default-pathname-defaults*)
       (with-avoided-executable-output
         (not (with-valid-exit-codes ((0 t)
                                      (128 nil))

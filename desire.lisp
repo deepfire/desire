@@ -272,7 +272,7 @@ without raising any signals.")
     (let ((repository-path (module-pathname module locality)))
       (if (typep remote 'git)
           (reset-git-branch-to-remote-branch :master `(,(down-case-name remote) "master") repository-path t)
-          (git-set-head-index-tree '("master"))))))
+          (git-set-head-index-tree '("master") :error repository-path)))))
 
 (defun update-module (module &optional (locality (gate *self*)))
   (let* ((module (coerce-to-module module))
