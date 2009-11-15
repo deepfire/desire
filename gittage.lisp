@@ -83,7 +83,9 @@
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
       (with-avoided-executable-output
-        (not (with-shell-predicate (git "diff" "--cached" "--exit-code")))))))
+        (not (with-valid-exit-codes ((0 t)
+                                     (128 nil))
+               (git "diff" "--cached" "--exit-code")))))))
 
 (defun git-repository-changes-p (&optional directory)
   (maybe-within-directory directory
