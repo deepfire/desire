@@ -48,7 +48,7 @@
    #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
-   #:repo-var #:module-gitbranches #:module-gitremotes #:module-add-gitremote #:ensure-module-gitremote
+   #:repo-var #:module-git-branches #:module-git-remotes #:module-add-git-remote #:ensure-module-git-remote
    #:module-bare-p #:module-locally-present-p #:do-present-modules #:module-world-readable-p
    ;; desire.lisp
    #:*fetch-errors-serious* #:*silently-reset-dirty-repositories*

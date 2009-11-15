@@ -464,12 +464,13 @@ they participate in the desire wishmaster protocol or not."
             (format t ";; Following modules were demoted to hidden:~{ ~A~}~%" new-hidden))
           (when mia
             (error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" mia (name o) (root o)))
-          (let ((new-release-set (set-difference release-set (append new-unpublished new-hidden))))
-            (dolist (m-name release-set)
-              (let ((m (module m-name)))
-                (unless (typep m 'origin-module)
-                  (change-class m 'origin-module))))
-            (nset-differencef (gate-converted-module-names gate) release-set)))))))
+          ;; the new release set is (set-difference release-set (append new-unpublished new-hidden))
+          ;; but nobody seems to care
+          (dolist (m-name release-set)
+            (let ((m (module m-name)))
+              (unless (typep m 'origin-module)
+                (change-class m 'origin-module))))
+          (nset-differencef (gate-converted-module-names gate) release-set))))))
 
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
@@ -584,12 +585,10 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defclass origin-module (module) 
   ((status :accessor module-status :initarg :status)
-   (public-packages :accessor module-public-packages :initarg :public-packages)
-   (hidden-p :accessor module-hidden-p :initarg :hidden-p))
+   (public-packages :accessor module-public-packages :initarg :public-packages))
   (:default-initargs
    :status :unknown
-   :public-packages nil
-   :hidden-p t))
+   :public-packages nil))
 
 (defmethod initialize-instance :around ((o module) &key name &allow-other-keys)
   (when (module name :if-does-not-exist :continue)
@@ -948,10 +947,10 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
         (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
           (git "clone" "-o" remote-name (concatenate 'string url "/.meta")))
         (within-directory (meta-dir)
-          (unless (gitbranch-present-p :master)
-            (add-gitbranch :master '("HEAD")))
-          (git-checkout-ref '("master"))
-          (git-repository-reset-hard `("remotes" ,remote-name ,(downstring branch))))))))
+          (unless (git-branch-present-p :master)
+            (git-set-branch :master))
+          (git-set-head-index-tree '("master"))
+          (git-set-branch-index-tree `("remotes" ,remote-name ,(downstring branch))))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)
@@ -967,8 +966,9 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
   (once-only (wishmaster)
     `(within-directory ((meta *self*))
        ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
-       (with-git-ref (list "remotes" (down-case-name ,wishmaster) ,branch)
-         ,@body))))
+       (unwind-protect (progn (git-set-head-index-tree (list "remotes" (down-case-name ,wishmaster) ,branch))
+                              ,@body)
+         (git-set-head-index-tree '("master"))))))
 
 (defun merge-remote-wishmaster (wishmaster)
   "Merge definitions from WISHMASTER."

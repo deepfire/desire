@@ -41,16 +41,11 @@
   (and (if directory (directory-exists-p directory) t)
        (maybe-within-directory directory
          (and (directory-exists-p (subdirectory* nil ".git"))
-              (not (null (gitbranches)))))))
+              (not (null (git-branches)))))))
 
 (defun git-repository-bare-p (&optional directory)
   (maybe-within-directory directory
     (null (directory-exists-p (subdirectory* nil ".git")))))
-
-(defun git-repository-reset-hard (&optional ref directory)
-  (maybe-within-directory directory
-    (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" *default-pathname-defaults* ref)
-      (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
 
 (defun (setf git-repository-bare-p) (val directory)
   (within-directory (directory)
@@ -62,7 +57,7 @@
             (dolist (filename git-files)
               (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
           (setf (gitvar 'core.bar) "false")
-          (git-repository-reset-hard)
+          (git-set-branch-index-tree)
           nil))))
 
 (defun git-repository-world-readable-p (&optional directory)
@@ -273,8 +268,7 @@
 
 (defun git-detach-head (&optional directory)
   (maybe-within-directory directory
-    (with-explanation ("detaching HEAD in ~S" *default-pathname-defaults*)
-      (set-head (get-head)))))
+    (set-head (get-head))))
 
 (defun invoke-with-detached-head (fn directory)
   (within-directory (directory)
@@ -290,7 +284,7 @@
 ;;;
 ;;; Branches
 ;;;
-(defun gitbranches (&optional directory)
+(defun git-branches (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
       (let ((output (execution-output-string 'git "branch")))
@@ -299,64 +293,59 @@
                                    (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
 
 
-(defun gitbranch-present-p (name &optional directory)
-  (member name (gitbranches directory) :test #'string=))
+(defun git-branch-present-p (name &optional directory)
+  (member name (git-branches directory) :test #'string=))
 
-(defun add-gitbranch (name ref &optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("adding a git branch ~A tracking ~S in ~S" name ref *default-pathname-defaults*)
-      (nth-value 0 (git "branch" (downstring name) (flatten-path-list ref))))))
-
-(defun remove-gitbranch (name &optional directory)
+(defun git-remove-branch (name &optional directory)
   (maybe-within-directory directory
     (with-explanation ("removing git branch ~A in ~S" name *default-pathname-defaults*)
       (nth-value 0 (git "branch" "-d" (downstring name))))))
 
-(defun git-set-noncurrent-gitbranch (branchname &optional directory (refvalue (get-head directory)))
+(defun git-set-noncurrent-branch (branchname &optional directory (refvalue (get-head directory)))
   (declare (type (or list (integer 0)) refvalue))
   (maybe-within-directory directory
     (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S" branchname (consp refvalue) refvalue *default-pathname-defaults*)
       (nth-value 0 (git "branch" "-f" (downstring branchname) (cook-refval refvalue))))))
 
-(defun set-gitbranch (branchname &optional directory (refvalue (get-head directory)))
+(defun git-set-branch (name &optional directory (refvalue (get-head directory)))
   (with-detached-head (directory)
-    (git-set-noncurrent-gitbranch branchname directory refvalue)))
+    (git-set-noncurrent-branch name directory refvalue)))
 
-(defun git-checkout-ref (ref &optional directory &key (if-changes :error))
-  "This assumes that the local 'master' branch is present."
-  (let ((ref (ensure-cons ref)))
+(defun git-set-branch-index-tree (&optional ref directory)
+  (maybe-within-directory directory
+    (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" *default-pathname-defaults* ref)
+      (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
+
+(defun git-set-head-index-tree (ref &optional (if-changes :error) directory)
+  (let ((ref (ensure-cons ref))
+        (ignore-changes (eq if-changes :ignore))
+        (drop-changes (eq if-changes :reset)))
     (maybe-within-directory directory
       (with-retry-restarts ((hardreset-repository ()
                                                   :report "Clear all uncommitted changes, both staged and unstaged."
-                                                  (git-repository-reset-hard)))
-        (unless (eq if-changes :ignore)
+                                                  (git-set-branch-index-tree)))
+        (unless (or ignore-changes drop-changes)
           (when (git-repository-changes-p directory)
             (ecase if-changes
-              (:reset (git-repository-reset-hard))
               (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
                            (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
               (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
                                  (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory))))))
         (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
-          (git "checkout" (flatten-path-list ref)))))))
+          (apply #'git "checkout" (prepend (when drop-changes "-f") (list (flatten-path-list ref)))))))))
 
-(defmacro with-git-ref (ref &body body)
-  `(unwind-protect (progn (git-checkout-ref ,ref)
-                          ,@body)
-     (git-checkout-ref '("master"))))
-
-(defun checkout-gitbranch (name &optional directory reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
-  (unless (gitbranch-present-p name directory)
+(defun checkout-git-branch (name &optional directory reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
+  (unless (git-branch-present-p name directory)
     (ecase if-does-not-exist 
       (:error (git-error "~@<Asked to check out a nonexistent branch ~A in ~S~:@>" name (or directory *default-pathname-defaults*)))
       (:create (if default-ref
-                   (add-gitbranch name default-ref directory)
+                   (git-set-branch name directory default-ref)
                    (git-error "~@<While checking out branch ~A in ~S: branch doesn't exist and the default ref was not provided.~:@>" name (or directory *default-pathname-defaults*))))))
   (when reset-before-checkout
-    (git-repository-reset-hard nil directory))
-  (git-checkout-ref `(,(downstring name)) directory :if-changes if-changes))
+    (git-set-branch-index-tree nil directory))
+  (git-set-head-index-tree `(,(downstring name)) if-changes directory))
 
-(defun reset-gitbranch-to-remote-branch (name qualified-remote-branch-name directory &optional reset-before-checkout)
+(defun reset-git-branch-to-remote-branch (name qualified-remote-branch-name directory &optional reset-before-checkout)
   (let ((remote-ref (list* "remotes" qualified-remote-branch-name)))
-    (checkout-gitbranch name directory reset-before-checkout :if-does-not-exist :create :default-ref remote-ref)
-    (git-repository-reset-hard remote-ref directory)))
+    (checkout-git-branch name directory reset-before-checkout :if-does-not-exist :create :default-ref remote-ref)
+    (git-set-branch-index-tree remote-ref directory)))

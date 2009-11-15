@@ -80,9 +80,9 @@ without raising any signals.")
       (if (directory-created-p)
           (with-explanation ("initialising git repository of module ~A in ~S" (name module) *default-pathname-defaults*)
             (git "init-db"))
-          (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
-                                                         :reset
-                                                         :error)))
+          (git-set-head-index-tree "master" (if *silently-reset-dirty-repositories*
+                                                :reset
+                                                :error)))
       (git-fetch-remote remote (name module)))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote darcs-http-remote) module)
@@ -105,9 +105,9 @@ without raising any signals.")
   (let ((repo-dir (module-pathname module locality)))
     (multiple-value-bind (url cvs-module-name) (url cvs module)
       (within-directory (repo-dir :if-does-not-exist :create)
-        (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
-                                                       :reset
-                                                       :error))
+        (git-set-head-index-tree "master" (if *silently-reset-dirty-repositories*
+                                              :reset
+                                              :error))
         (git "cvsimport" "-d" url (or cvs-module-name (down-case-name module)))))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote svn-rsync-remote) module)
@@ -122,9 +122,9 @@ without raising any signals.")
       (if (directory-created-p)
           (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" (name module) url *default-pathname-defaults*)
             (git "svn" `("init" ,url ,wrinkle)))
-          (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
-                                                         :reset
-                                                         :error)))
+          (git-set-head-index-tree "master" (if *silently-reset-dirty-repositories*
+                                                :reset
+                                                :error)))
       (with-explanation ("on behalf of module ~A, importing from ~S in ~S" (name module) url *default-pathname-defaults*)
         (git "svn" "fetch")))))
 
@@ -188,6 +188,7 @@ without raising any signals.")
       (call-next-method))))
 
 (defmethod fetch :before ((locality locality) (remote remote) module)
+  (git-set-branch :master (module-pathname module locality))
   (fetch-remote locality remote module))
 
 (defmethod fetch ((to git-locality) (from git-locality) module)
@@ -211,9 +212,9 @@ without raising any signals.")
     (purge-binaries git-repo-dir)
     (within-directory (git-repo-dir :if-does-not-exist :create)
       (when (directory-existed-p)
-        (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
-                                                       :reset
-                                                       :error)))
+        (git-set-head-index-tree "master" (if *silently-reset-dirty-repositories*
+                                              :reset
+                                              :error)))
       (with-explanation ("on behalf of module ~A, converting from darcs to git: ~S => ~S" (name module) darcs-repo-dir *default-pathname-defaults*)
         (with-condition-recourses dirt-files-in-repository
             (multiple-value-bind (successp output) (with-shell-predicate
@@ -234,9 +235,10 @@ without raising any signals.")
     (with-output-to-file (stream (subfile* cvs-repo-dir "CVSROOT" "config") :if-exists :supersede)
       (format stream "LockDir=~A~%" (namestring (cvs-locality-lock-path cvs-locality))))
     (when (git-repository-present-p git-repo-dir)
-      (git-checkout-ref "master" git-repo-dir :if-changes (if *silently-reset-dirty-repositories*
-                                                              :reset
-                                                              :error)))
+      (git-set-head-index-tree "master" (if *silently-reset-dirty-repositories*
+                                            :reset
+                                            :error)
+                               git-repo-dir))
     (multiple-value-bind (url cvs-module-name) (url remote module)
       (declare (ignore url))
       (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module module :locality git-locality))
@@ -253,9 +255,9 @@ without raising any signals.")
         (if (directory-created-p)
             (with-explanation ("on behalf of module ~A, setting up svn to git conversion: ~S => ~S" (name module) svn-repo-dir *default-pathname-defaults*)
               (git "svn" "init" `("file://" ,(namestring svn-repo-dir) ,wrinkle))) ;; gratuitious SVN complication
-            (git-checkout-ref "master" nil :if-changes (if *silently-reset-dirty-repositories*
-                                                           :reset
-                                                           :error))))
+            (git-set-head-index-tree "master" (if *silently-reset-dirty-repositories*
+                                                  :reset
+                                                  :error))))
       (within-directory (git-repo-dir :lisp nil)
         (with-explanation ("on behalf of module ~A, converting from svn to git: ~S => ~S" (name module) svn-repo-dir *default-pathname-defaults*)
           (git "svn" "fetch"))))))
@@ -268,11 +270,9 @@ without raising any signals.")
   (:method (module remote &optional (locality (gate *self*)))
     (fetch locality remote module)
     (let ((repository-path (module-pathname module locality)))
-      (cond ((typep remote 'git)
-             (reset-git-branch-to-remote-branch :master `(,(down-case-name remote) "master") repository-path t))
-            (t
-             (git-set-branch :master repository-path)
-             (git-set-head-index-tree '("master")))))))
+      (if (typep remote 'git)
+          (reset-git-branch-to-remote-branch :master `(,(down-case-name remote) "master") repository-path t)
+          (git-set-head-index-tree '("master"))))))
 
 (defun update-module (module &optional (locality (gate *self*)))
   (let* ((module (coerce-to-module module))
