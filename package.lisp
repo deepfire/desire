@@ -18,7 +18,10 @@
    #:remove-distributor #:remove-remote #:remove-module #:remove-system #:remove-app
    ;;   types.lisp :: distributors
    #:wishmasterp #:do-wishmasters #:do-distributor-remotes #:do-distributor-modules #:compute-distributor-modules
+   ;;   types.lisp :: location
+   #:location-module-names
    ;;   types.lisp :: remote
+   #:gate-converted-module-names #:gate-unpublished-module-names #:gate-hidden-module-names
    #:url #:parse-remote-namestring #:remote-disabled-p
    #:credentials #:cred-name #:cred-username #:cred-password #:cred
    ;;   types.lisp :: global UI
