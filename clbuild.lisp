@@ -91,5 +91,5 @@
                           (name new-remote) module-name (name better-remote) (remote-path better-remote))
                   (remote-link-module better-remote (module module-name)
                                       :module-module (when (typep new-remote 'cvs)
-                                                       (cvs-remote-module-module new-remote module-name)))
+                                                       (remote-module-wrinkle new-remote module-name)))
                   (remove-remote new-remote :keep-modules t))))))))

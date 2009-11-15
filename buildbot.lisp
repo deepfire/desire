@@ -119,5 +119,4 @@
                   (declare (ignore output))
                   (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A~]~%" name mode status condition))))
         (build-test-error "~<@Marker ~S wasn't found in remote output.~:@>" *remote-output-marker*))
-      (hunchentoot:process-connection)
       status)))

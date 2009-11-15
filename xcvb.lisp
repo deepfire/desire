@@ -53,7 +53,7 @@
                    (git "commit" "-m" "Xcvbify.")))
                 (t
                  (git-set-head-index-tree :master nil :if-changes :reset)
-                 (remove-git-branch :xcvbify)
+                 (git-remove-branch :xcvbify)
                  (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
                    (if break-on-patch-failure
                        (break control-string (name module) output)
