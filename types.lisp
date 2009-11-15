@@ -956,7 +956,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
           (unless (git-branch-present-p :master)
             (git-set-branch :master))
           (git-set-head-index-tree '("master"))
-          (git-set-branch-index-tree `("remotes" ,remote-name ,(downstring branch))))))))
+          (git-set-branch-index-tree (make-remote-ref remote-name branch)))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)
@@ -972,7 +972,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
   (once-only (wishmaster)
     `(within-directory ((meta *self*))
        ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
-       (unwind-protect (progn (git-set-head-index-tree (list "remotes" (down-case-name ,wishmaster) ,branch))
+       (unwind-protect (progn (git-set-head-index-tree (make-remote-ref (down-case-name ,wishmaster) ,branch))
                               ,@body)
          (git-set-head-index-tree '("master"))))))
 

@@ -123,17 +123,17 @@
              (remote-names (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))
         (mapcar (compose #'intern #'string-upcase) remote-names)))))
 
-(defun gitremote-present-p (name &optional directory)
+(defun git-remote-present-p (name &optional directory)
   (member name (gitremotes directory) :test #'string=))
 
-(defun add-gitremote (name url &optional directory)
+(defun git-add-remote (name url &optional directory)
   (maybe-within-directory directory
     (with-explanation ("adding a git remote ~A (~A) in ~S" name url *default-pathname-defaults*)
       (git "remote" "add" (downstring name) url))))
 
 (defun ensure-gitremote (name url &optional directory)
-  (unless (gitremote-present-p name directory)
-    (add-gitremote name url directory)))
+  (unless (git-remote-present-p name directory)
+    (git-add-remote name url directory)))
 
 (defun fetch-gitremote (remote-name &optional directory)
   (maybe-within-directory directory
@@ -175,6 +175,9 @@
 
 (defun ref-remotep (ref)
   (and (not (ref-shortp ref)) (string= "remotes" (first ref))))
+
+(defun make-remote-ref (remote-name branch)
+  `("remotes" ,(downstring remote-name) ,(downstring branch)))
 
 ;;;
 ;;; Raw refs & iteration
