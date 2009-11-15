@@ -31,23 +31,32 @@
 (defvar *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
 
 (defvar *clean-command* "rm -rf climb.sh desr")
+(defvar *clean-module-command* "rm -rf desr/git/~(~A~)")
 (defvar *download-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
-(defvar *bootstrap-command*      "sh climb.sh ~A            ~~/desr")
-(defvar *climacs-run-command*    "sh climb.sh ~A -a climacs ~~/desr")
-(defvar *xcvb-bootstrap-command* "sh climb.sh ~A -s xcvb    ~~/desr")
+(defvar *bootstrap-command*         "sh climb.sh ~A                                  ~~/desr")
+(defvar *alexandria-update-command* "sh climb.sh ~A -x '(update-module :alexandria)' ~~/desr")
+(defvar *climacs-run-command*       "sh climb.sh ~A -a climacs                       ~~/desr")
+(defvar *xcvb-bootstrap-command*    "sh climb.sh ~A -s xcvb                          ~~/desr")
 
-(defun quicktest (&key verbose clean disable-debugger (mode :bootstrap) (branch "devo"))
+(defun quicktest (&key explain verbose clean list disable-debugger (mode :u) (branch "devo") update-climb)
   (find-executable 'ssh)
   (watch-remote-commands *test-host* *test-user-account*
                          (append (when clean
                                    `(,*clean-command*))
-                                 `(,*download-bootstrapper-command*)
+                                 (when (or clean update-climb)
+                                   `(,*download-bootstrapper-command*))
+                                 (when (eq mode :u)
+                                   `(,(format nil *clean-module-command* :alexandria)))
+                                 (when list
+                                   '("ls -la ~/desr/git"))
                                  `(,(format nil (ecase mode
                                                   (:bootstrap *bootstrap-command*)
+                                                  (:u *alexandria-update-command*)
                                                   (:climacs *climacs-run-command*)
                                                   (:xcvb *xcvb-bootstrap-command*))
                                             (concatenate 'string
                                                          (when disable-debugger "-g ")
                                                          (when branch (format nil "-b ~(~A~) " branch))
+                                                         (when explain "-e ")
                                                          (when verbose "-v "))))))
   (values))
