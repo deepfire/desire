@@ -276,10 +276,15 @@ without raising any signals.")
 
 (defun update-module (module &optional (locality (gate *self*)))
   (let* ((module (coerce-to-module module))
-         (best-remote (module-best-remote module)))
-    (syncformat t ";; Fetching module ~A from ~A remote ~A, ~A~%" (name module) (vcs-type best-remote) (name best-remote) (url best-remote module))
-    (update-module-using-remote module best-remote locality)
-    (syncformat t ";; Done fetching module ~A~%" (name module))
+         (best-remote (module-best-remote module :if-does-not-exist :continue)))
+    (cond ((null best-remote)
+           (if (module-best-remote module :allow-self t)
+               (syncformat t ";; Module ~A is local, skipping update~%" (name module))
+               (error 'insatiable-desire :desire module)))
+          (t
+           (syncformat t ";; Fetching module ~A from ~A remote ~A, ~A~%" (name module) (vcs-type best-remote) (name best-remote) (url best-remote module))
+           (update-module-using-remote module best-remote locality)
+           (syncformat t ";; Done fetching module ~A~%" (name module))))
     (values)))
 
 ;; system vocabulary
