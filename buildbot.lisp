@@ -58,7 +58,7 @@
 (defun module-test-fetchability (m)
   (let ((*fetch-errors-serious* t))
     (with-recorded-status ()
-      (desr::update-module m)
+      (update-module m)
       t)))
 
 (defun module-test-loadability (m)
@@ -87,15 +87,20 @@
                         disable-debugger
                         verbose)
   (find-executable 'ssh)
-  (multiple-value-bind (status output condition)
-      (watch-remote-commands hostname username (remove nil
-                                                       (list
-                                                        (when purge
-                                                          *purge-command*)
-                                                        (when purge-metastore
-                                                          *purge-metastore-command*)
-                                                        *update-bootstrapper-command*
-                                                        (format nil "bash climb.sh ~:[~;-v ~]~
+  (let ((gate (gate *self*)))
+    (iter (for m in (append (location-module-names gate) (gate-converted-module-names gate)))
+          (destructuring-bind (&key name mode status output condition) (list* :name m :mode :convert (module-test-fetchability m))
+            (declare (ignore output))
+            (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A~]~%" name mode status condition)))
+    (multiple-value-bind (status output condition)
+        (watch-remote-commands hostname username (remove nil
+                                                         (list
+                                                          (when purge
+                                                            *purge-command*)
+                                                          (when purge-metastore
+                                                            *purge-metastore-command*)
+                                                          *update-bootstrapper-command*
+                                                          (format nil "bash climb.sh ~:[~;-v ~]~
                                                                       ~:[~;-b ~:*~(~A~) ~] ~:[~;-t ~:*~(~A~) ~]~
                                                                       ~:[~;-g ~]~
                                                                       -x '(progn (desr:ensure-module-systems-loadable :desire) ~
@@ -103,15 +108,16 @@
                                                                                  (funcall (find-symbol \"TEST-CONVERTED-MODULES\" :desire-buildbot)) ~
                                                                                  (sb-ext:quit))' ~
                                                                       ~~/desr"
-                                                                verbose
-                                                                branch metastore-branch
-                                                                disable-debugger))))
-    (if-let ((marker-posn (search (prin1-to-string *remote-output-marker*) output)))
-      (with-input-from-string (s output :start (+ marker-posn 2 (length (symbol-name *remote-output-marker*))))
-        (iter (for form = (read s nil nil))
-              (while form)
-              (destructuring-bind (&key name mode status output condition) form
-                (declare (ignore output))
-                (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A~]~%" name mode status condition))))
-      (build-test-error "~<@Marker ~S wasn't found in remote output.~:@>" *remote-output-marker*))
-    status))
+                                                                  verbose
+                                                                  branch metastore-branch
+                                                                  disable-debugger))))
+      (if-let ((marker-posn (search (prin1-to-string *remote-output-marker*) output)))
+        (with-input-from-string (s output :start (+ marker-posn 2 (length (symbol-name *remote-output-marker*))))
+          (iter (for form = (read s nil nil))
+                (while form)
+                (destructuring-bind (&key name mode status output condition) form
+                  (declare (ignore output))
+                  (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A~]~%" name mode status condition))))
+        (build-test-error "~<@Marker ~S wasn't found in remote output.~:@>" *remote-output-marker*))
+      (hunchentoot:process-connection)
+      status)))
