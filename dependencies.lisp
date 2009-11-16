@@ -272,3 +272,11 @@ in order of strictly decreasing likelihood."
                                (appending (iter (for j from 0 below (1+ i))
                                                 (collect (butlast 10-bumped j)))))))
                      :test #'equal))
+
+;;;
+;;; Decoded time
+;;;
+(defun print-decoded-time (second minute hour date month year dow daylight-p zone)
+  (declare (ignorable second daylight-p zone))
+  (format nil "~[Mon~;Tue~;Wed~;Thu~;Fri~;Sat~;Sun~] ~[Jan~;Feb~;Mar~;Apr~;May~;Jun~;Jul~;Aug~;Sep~;Oct~;Nov~;Dec~] ~D ~D, ~D:~D"
+          dow (1- month) date year hour minute))
