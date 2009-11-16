@@ -10,6 +10,13 @@
   (eq (car (pathname-directory pathname)) :absolute))
 
 ;;;;
+;;;; Page size
+;;;;
+(defun virtual-memory-page-size ()
+  #+sbcl (sb-sys:get-page-size)
+  #-sbcl 4096)
+
+;;;;
 ;;;; NAMED
 ;;;;
 (defclass named ()
