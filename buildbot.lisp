@@ -308,21 +308,16 @@
               (setf (result-commit-id new-r) (desr::ref-value '("master") (result-path new-r))))
             (end-period o))))))
 
-(defgeneric grab-result (master i stream)
-  (:documentation
-   "Primary value is the result, secondary is whether there is work
-remaining to be done.")
-  (:method ((o buildmaster-run) (i integer) (stream stream))
+;; (setf (result-output-consumer r) stream)
+                   
+(defgeneric grab-result (master i)
+  (:method ((o buildmaster-run) (i integer))
     (with-master-run-lock (o)
-      (let* ((result-vector (master-run-results o))
-             (r (aref result-vector i)))
-        (if (< i (master-run-n-complete-results o))
-            (values r t)
-            (progn (finish-output stream)
-                   (setf (result-output-consumer r) stream)
-                   ;; let master take over the stream and wake us once it's done
-                   (bordeaux-threads:condition-wait (master-condvar o) (master-lock o))
-                   (values r nil)))))))
+      (lret ((r (aref (master-run-results o) i)))
+        (unless (< i (master-run-n-complete-results o))
+          ;; let master wake us once the result is done
+          (bordeaux-threads:condition-wait (master-condvar o) (master-lock o)))
+        r))))
 
 (defclass master-update-phase (master-update test-phase) ())
 (defclass slave-fetch-phase (slave-fetch test-phase) ())
