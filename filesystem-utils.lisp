@@ -27,7 +27,6 @@
   (define-executable darcs)
   (define-executable rsync)
   (define-executable darcs-to-git)
-  (define-executable wget)
   (define-executable cvs)
   ;; these are needed for XCVB stack's postinstall
   (define-executable cp)

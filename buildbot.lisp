@@ -20,7 +20,7 @@
 
 (defpackage desire-buildbot
   (:nicknames :desree)
-  (:use :common-lisp :iterate :alexandria :pergamum :executor :portable-spawn :desire :hunchentoot)
+  (:use :common-lisp :iterate :alexandria :pergamum :executor :portable-spawn :desire :hunchentoot :elsewhere.0)
   (:export
    ;; buildslave entry point
    #:buildslave

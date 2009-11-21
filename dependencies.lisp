@@ -1,7 +1,50 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 
-(in-package :desire)
+(cl:defpackage #:elsewhere.0
+  (:nicknames #:e.0)
+  (:use :common-lisp :iterate :alexandria :pergamum :executor)
+  (:export
+   ;; FADdy
+   #:pathname-absolute-p
+   ;; Page size
+   #:virtual-memory-page-size
+   ;; REGISTERED
+   #:registered #:registered-registrator #:fully-qualified-name
+   ;; SYNCHRONISABLE
+   #:synchronisable #:synchronised-p #:synchronisable-last-sync-time #:synchronisable-mirror
+   ;; CLASS-SLOT
+   #:define-marked-class #:instance-class-marked-value
+   #:class-slot #:set-class-slot #:with-class-slot
+   ;; Decoded time
+   #:print-decoded-time
+   ;;; encumbered
+   ;; Strings: iterate
+   #:extract-delimited-substrings #:downstring #:split-sequence
+   ;; PARSE-URI: strings
+   #:parse-uri
+   ;; Versions: pergamum
+   #:princ-version-to-string #:bump-version-component #:next-version-variants 
+   ;; NAMED: alexandria
+   #:named #:coerce-to-name #:coerce-to-named #:sort-by-name #:down-case-name #:coerce-to-namestring #:print-aborted-named-object #:slot-or-abort-print-object
+   ;; WWW: executor
+   #:wget
+   #:get-url-contents-as-string #:list-www-directory #:invoke-with-file-from-www #:with-file-from-www #:touch-www-file
+   ))
 
+(cl:in-package :elsewhere.0)
+
+;;;
+;;; Be polite, signal something articulate
+;;;
+(define-condition missing-implementation (program-error)
+  ((missing-designator :accessor missing-implementation-designator :initarg :designator))
+  (:report (lambda (condition stream)
+             (format stream "~@<~A not implemented.~:@>" (missing-implementation-designator condition))))
+  (:default-initargs
+   :designator "Function"))
+
+(defun not-implemented (&optional (designator "Function"))
+  (error 'missing-implementation :designator designator))
 
 ;;;;
 ;;;; FADdy
@@ -15,55 +58,6 @@
 (defun virtual-memory-page-size ()
   #+sbcl (sb-sys:get-page-size)
   #-sbcl 4096)
-
-;;;;
-;;;; NAMED
-;;;;
-(defclass named ()
-  ((name :accessor name :initarg :name)))
-
-(defun coerce-to-name (o)
-  (declare (type (or symbol named) o))
-  (if (symbolp o) o (name o)))
-
-(defun coerce-to-named (o)
-  (declare (type (or symbol named) o))
-  (if (symbolp o) (make-instance 'named :name o) o))
-
-(defun sort-by-name (named-objects)
-  "Sort object of class NAMED, lexicographically."
-  (sort named-objects #'string< :key (compose #'symbol-name #'name)))
-
-(defun downstring (x)
-  (string-downcase (string x)))
-
-(defun down-case-name (x)
-  (string-downcase (string (xform-if (of-type 'named) #'name x))))
-
-(defun coerce-to-namestring (namespec)
-  (declare (type (or symbol string named) namespec))
-  (typecase namespec
-    (named (string (name namespec)))
-    (symbol (string-upcase (symbol-name namespec)))
-    (string (string-upcase namespec))))
-
-(defun print-aborted-named-object (stream o &optional slot-name)
-  (declare (type stream stream) (type named o))
-  (format stream "~@<#<aborted printing object of type ~;~A with name ~S~:[~;, due to unbound or missing slot ~:*~A~]~;>~:@>"
-          (type-of o)
-          (if (slot-boundp o 'name)
-              (name o)
-              "#<not bound>")
-          slot-name))
-
-(defmacro slot-or-abort-print-object (stream o slot-name &optional (block 'print-object))
-  (with-gensyms (bo bslot-name)
-    `(let ((,bslot-name ,slot-name)
-           (,bo ,o))
-       (unless (slot-boundp ,bo ,bslot-name)
-         (print-aborted-named-object ,stream ,o ,bslot-name)
-         (return-from ,block nil))
-       (slot-value ,bo ,bslot-name))))
 
 ;;;;
 ;;;; REGISTERED
@@ -97,6 +91,18 @@ REGISTERED, in the mixing-in class precedence list, which provides the
    :synchronised-p nil))
 
 ;;;;
+;;;; MINI-CLOSER
+;;;;
+(defgeneric class-prototype (class)
+  (:method ((o symbol))
+    (class-prototype (find-class o)))
+  (:method ((o class))
+    #+sbcl
+    (sb-mop:class-prototype o)
+    #-(or sbcl)
+    (not-implemented 'CLASS-PROTOTYPE)))
+
+;;;;
 ;;;; CLASS-SLOT
 ;;;;
 (defvar *class-slot-store* (make-hash-table :test 'equal))
@@ -115,9 +121,31 @@ REGISTERED, in the mixing-in class precedence list, which provides the
   `(symbol-macrolet ,(iter (for class in classes) (collect `(,class (class-slot ',class ',slot-name))))
      ,@body))
 
+;;;
+;;; Decoded time
+;;;
+(defun print-decoded-time (second minute hour date month year dow daylight-p zone)
+  (declare (ignorable second daylight-p zone))
+  (format nil "~[Mon~;Tue~;Wed~;Thu~;Fri~;Sat~;Sun~] ~[Jan~;Feb~;Mar~;Apr~;May~;Jun~;Jul~;Aug~;Sep~;Oct~;Nov~;Dec~] ~D ~D, ~2,'0D:~2,'0D"
+          dow (1- month) date year hour minute))
+
 ;;;;
-;;;; SPLIT-SEQUENCE
+;;;; Strings
 ;;;;
+(defun extract-delimited-substrings (string start-delim-string end-delim-char)
+  (iter (with posn = 0)
+        (for href-posn = (search start-delim-string string :start2 posn))
+        (while href-posn)
+        (for start-posn = (+ href-posn (length start-delim-string)))
+        (for close-posn = (position end-delim-char string :start start-posn))
+        (when close-posn
+          (collect (subseq string start-posn close-posn))
+          (setf posn (1+ close-posn)))
+        (while close-posn)))
+
+(defun downstring (x)
+  (string-downcase (string x)))
+
 (defun split-sequence (delimiter seq &key (count nil) (remove-empty-subseqs nil) (from-end nil) (start 0) (end nil) (test nil test-supplied) (test-not nil test-not-supplied) (key nil key-supplied))
   "Return a list of subsequences in seq delimited by delimiter.
 
@@ -205,46 +233,9 @@ treating CVS locations as URIs."
               (when slash-pos (split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))
               (char= #\/ (aref namestring (1- (length namestring))))))))
 
-;;;
-;;; Strings
-;;;
-(defun extract-delimited-substrings (string start-delim-string end-delim-char)
-  (iter (with posn = 0)
-        (for href-posn = (search start-delim-string string :start2 posn))
-        (while href-posn)
-        (for start-posn = (+ href-posn (length start-delim-string)))
-        (for close-posn = (position end-delim-char string :start start-posn))
-        (when close-posn
-          (collect (subseq string start-posn close-posn))
-          (setf posn (1+ close-posn)))
-        (while close-posn)))
-
-;;;
-;;; WWW
-;;;
-(defun get-url-contents-as-string (url)
-  (with-explanation ("retrieving ~S" url)
-    (nth-value 1 (with-captured-executable-output
-                   (wget url "-O" "-")))))
-
-(defun list-www-directory (url)
-  (nthcdr 5 (extract-delimited-substrings (get-url-contents-as-string url) "HREF=\"" #\")))
-
-(defun invoke-with-file-from-www (filename url fn)
-  (unwind-protect (with-explanation ("retrieving ~A" url)
-                    (wget url "-O" filename)
-                    (funcall fn))
-    (delete-file filename)))
-
-(defmacro with-file-from-www ((filename url) &body body)
-  `(invoke-with-file-from-www ,filename ,url (lambda () ,@body)))
-
-(defun touch-www-file (url)
-  (with-valid-exit-codes ((8 nil)) (wget "--spider" url)))
-
-;;;
-;;; Versions
-;;;
+;;;;
+;;;; Versions
+;;;;
 (defun princ-version-to-string (version)
   "Return a textual representation of VERSION."
   (flatten-path-list (mapcar #'princ-to-string version) nil nil "."))
@@ -273,10 +264,73 @@ in order of strictly decreasing likelihood."
                                                 (collect (butlast 10-bumped j)))))))
                      :test #'equal))
 
-;;;
-;;; Decoded time
-;;;
-(defun print-decoded-time (second minute hour date month year dow daylight-p zone)
-  (declare (ignorable second daylight-p zone))
-  (format nil "~[Mon~;Tue~;Wed~;Thu~;Fri~;Sat~;Sun~] ~[Jan~;Feb~;Mar~;Apr~;May~;Jun~;Jul~;Aug~;Sep~;Oct~;Nov~;Dec~] ~D ~D, ~2,'0D:~2,'0D"
-          dow (1- month) date year hour minute))
+;;;;
+;;;; NAMED
+;;;;
+(defclass named ()
+  ((name :accessor name :initarg :name)))
+
+(defun coerce-to-name (o)
+  (declare (type (or symbol named) o))
+  (if (symbolp o) o (name o)))
+
+(defun coerce-to-named (o)
+  (declare (type (or symbol named) o))
+  (if (symbolp o) (make-instance 'named :name o) o))
+
+(defun sort-by-name (named-objects)
+  "Sort object of class NAMED, lexicographically."
+  (sort named-objects #'string< :key (compose #'symbol-name #'name)))
+
+(defun down-case-name (x)
+  (string-downcase (string (if (typep x 'named) (name x) x))))
+
+(defun coerce-to-namestring (namespec)
+  (declare (type (or symbol string named) namespec))
+  (typecase namespec
+    (named (string (name namespec)))
+    (symbol (string-upcase (symbol-name namespec)))
+    (string (string-upcase namespec))))
+
+(defun print-aborted-named-object (stream o &optional slot-name)
+  (declare (type stream stream) (type named o))
+  (format stream "~@<#<aborted printing object of type ~;~A with name ~S~:[~;, due to unbound or missing slot ~:*~A~]~;>~:@>"
+          (type-of o)
+          (if (slot-boundp o 'name)
+              (name o)
+              "#<not bound>")
+          slot-name))
+
+(defmacro slot-or-abort-print-object (stream o slot-name &optional (block 'print-object))
+  (with-gensyms (bo bslot-name)
+    `(let ((,bslot-name ,slot-name)
+           (,bo ,o))
+       (unless (slot-boundp ,bo ,bslot-name)
+         (print-aborted-named-object ,stream ,o ,bslot-name)
+         (return-from ,block nil))
+       (slot-value ,bo ,bslot-name))))
+
+;;;;
+;;;; WWW
+;;;;
+(define-executable wget)
+
+(defun get-url-contents-as-string (url)
+  (with-explanation ("retrieving ~S" url)
+    (nth-value 1 (with-captured-executable-output
+                   (wget url "-O" "-")))))
+
+(defun list-www-directory (url)
+  (nthcdr 5 (extract-delimited-substrings (get-url-contents-as-string url) "HREF=\"" #\")))
+
+(defun invoke-with-file-from-www (filename url fn)
+  (unwind-protect (with-explanation ("retrieving ~A" url)
+                    (wget url "-O" filename)
+                    (funcall fn))
+    (delete-file filename)))
+
+(defmacro with-file-from-www ((filename url) &body body)
+  `(invoke-with-file-from-www ,filename ,url (lambda () ,@body)))
+
+(defun touch-www-file (url)
+  (with-valid-exit-codes ((8 nil)) (wget "--spider" url)))
