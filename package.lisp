@@ -59,6 +59,12 @@
    #:define-application 
    #:fetch #:desire
    #:purge-module-binaries
+   ;; desire.lisp :: tests
+   #:module-test-reachability
+   #:module-test-fetchability
+   #:module-test-loadability
+   #:module-test-internal
+   #:buildslave #:*buildslave-remote-output-marker*
    ;; add-module.lisp
    #:*auto-lust*
    #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader #:steal-clbuild-projects-file

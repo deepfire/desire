@@ -35,19 +35,6 @@
 
 (cl:in-package :elsewhere.0)
 
-;;;
-;;; Be polite, signal something articulate
-;;;
-(define-condition missing-implementation (program-error)
-  ((missing-designator :accessor missing-implementation-designator :initarg :designator))
-  (:report (lambda (condition stream)
-             (format stream "~@<~A not implemented.~:@>" (missing-implementation-designator condition))))
-  (:default-initargs
-   :designator "Function"))
-
-(defun not-implemented (&optional (designator "Function"))
-  (error 'missing-implementation :designator designator))
-
 ;;;;
 ;;;; FADdy
 ;;;;

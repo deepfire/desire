@@ -495,23 +495,43 @@ Defined keywords:
 Updates present specified modules and skips present depended ones."
   (desire desires))
 
-;; (defgeneric fetch-desired-p (repo)
-;;   (:method ((o derived-repository))
-;;     (or (not (probe-file (path o)))
-;;         (etypecase (repo-master o)
-;;           (local-repository (> (time-identity (repo-master o)) (time-identity o)))
-;;           (remote-repository t)))))
+;;;
+;;; Basic buildslave, too little to warrant a system of its own
+;;;
+(defun module-test-reachability (m)
+  (let ((*fetch-errors-serious* t))
+    (with-recorded-status ()
+      (touch-module m)
+      t)))
 
-;; (defun update (os &key skip-loadable (check-success t) &aux (o (coerce-to-module os)))
-;;   (let* ((full-set (module-full-dependencies o))
-;;          (initially-unloadable (remove-if #'loadable-p full-set)))
-;;     (mapc #'update-single (xform skip-loadable (curry #'remove-if #'loadable-p) full-set))
-;;     (let* ((still-unloadable (remove-if #'loadable-p full-set))
-;;            (degraded (intersection still-unloadable (set-difference full-set initially-unloadable))))
-;;       (cond ((not check-success)
-;;              (warn "~@<success check suppressed~:@>"))
-;;             (degraded
-;;              (error "~@<modules degraded after update: ~S~:@>" degraded))
-;;             (still-unloadable
-;;              (error "~@<modules remained unloadable after update: ~S~:@>" still-unloadable))
-;;             (t)))))
+(defun module-test-fetchability (m)
+  (let ((*fetch-errors-serious* t))
+    (with-recorded-status ()
+      (update m)
+      t)))
+
+(defun module-test-loadability (m)
+  (with-recorded-status ()
+    (not (null (asdf:oos 'asdf:load-op (name m))))))
+
+(defun module-test-internal (m)
+  (declare (ignore m))
+  (with-recorded-status ()
+    (not-implemented 'module-test-internal)))
+
+(defvar *buildslave-remote-output-marker* :beginning-of-test-results-marker)
+
+(defun buildslave (module-names)
+  (let ((modules (mapcar #'module module-names)))
+    (syncformat t "~&~S~%" *buildslave-remote-output-marker*)
+    (iter (for m in modules)
+          (syncformat t "(:name ~S :mode :fetch~%" (name m))
+          (syncformat t " ~{ ~S~})~%" (module-test-fetchability m)))
+    (iter (for m in modules)
+          (syncformat t "(:name ~S :mode :load~%" (name m))
+          (syncformat t " ~{ ~S~})~%" (module-test-loadability m)))
+    #+(or)
+    (iter (for m in modules)
+          (when (module-has-tests-p m)
+            (syncformat t "(:name ~S :mode :test" (name m))
+            (syncformat t "~{ ~S~})~%" (module-run-tests m))))))

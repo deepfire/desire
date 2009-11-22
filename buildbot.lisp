@@ -30,54 +30,6 @@
 (defparameter *purge-metastore-command* "rm -rf desr/git/.meta")
 (defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
 
-;;;
-;;; Common for buildmaster and buildslave
-;;;
-(defun invoke-with-status-recording (fn)
-  (with-output-to-string (output)
-    (multiple-value-bind (condition successp)
-        (with-collected-conditions (error)
-          (let ((*standard-output* output)
-                (*error-output* output))
-            (funcall fn)))
-      (finish-output output)
-      (return-from invoke-with-status-recording
-        (list* :status successp :output (string-right-trim '(#\Newline) (get-output-stream-string output))
-               (when condition `(:condition ,(format nil "\"~A\"" condition))))))))
-
-(defmacro with-recorded-status (() &body body)
-  `(invoke-with-status-recording (lambda () ,@body)))
-
-(defun module-test-fetchability (m)
-  (let ((*fetch-errors-serious* t))
-    (with-recorded-status ()
-      (update m)
-      t)))
-
-(defun module-test-loadability (m)
-  (with-recorded-status ()
-    (not (null (asdf:oos 'asdf:load-op (name m))))))
-
-(defvar *remote-output-marker* :beginning-of-test-results-marker)
-
-(defun buildslave (module-names)
-  (let ((modules (mapcar #'module module-names)))
-    (syncformat t "~&~S~%" *remote-output-marker*)
-    (iter (for m in modules)
-          (syncformat t "(:name ~S :mode :fetch~%" (name m))
-          (syncformat t " ~{ ~S~})~%" (module-test-fetchability m)))
-    (iter (for m in modules)
-          (syncformat t "(:name ~S :mode :load~%" (name m))
-          (syncformat t " ~{ ~S~})~%" (module-test-loadability m)))
-    #+(or)
-    (iter (for m in converted-modules)
-          (syncformat t "(:name ~S :mode :test" (name m))
-          (when (module-has-tests-p m)
-            (syncformat t "~{ ~S~})~%" (module-run-tests m))))))
-
-;;;
-;;; Buildmaster only below
-;;;
 (defun cook-buildslave-command (module-names purge purge-metastore branch metastore-branch disable-debugger verbose)
   (remove nil (list
                (when purge
@@ -89,9 +41,9 @@
                                           ~:[~;-b ~:*~(~A~) ~] ~:[~;-t ~:*~(~A~) ~]~
                                           ~:[~;-g ~]~
                                           -x \"(progn (desr:ensure-module-systems-loadable :desire) ~
-                                                      (require :desire-buildbot) ~
-                                                      (funcall (find-symbol \"BUILDSLAVE\" :desire-buildbot) '~A) ~
-                                                      (sb-ext:quit))\" ~
+                                                      (require :desire) ~
+                                                      (funcall (find-symbol \\\"BUILDSLAVE\\\" :desire) '~A) ~
+                                                      (funcall (find-symbol \\\"QUIT\\\" :sb-ext)))\" ~
                                           ~~/desr"
                        verbose
                        branch metastore-branch
@@ -307,7 +259,7 @@
               (format t "~3D> ~S~%" i line)
               (when (and (plusp (length line))
                          (char= #\: (schar line 0))
-                         (string= line (symbol-name *remote-output-marker*)
+                         (string= line (symbol-name *buildslave-remote-output-marker*)
                                   :start1 1))
                 (format t "==( found remote marker on line ~D~%" i)))
         ()
