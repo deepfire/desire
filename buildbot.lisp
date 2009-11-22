@@ -279,20 +279,29 @@
 (defgeneric emit-master-run-header (stream master-run)
   (:method (stream (o buildmaster-run))
     (let ((max-length (iter (for m in (master-run-modules o))
-                            (maximize (length (symbol-name (name m)))))))
+                            (maximize (length (symbol-name (name m))))))
+          (names (mapcar (compose #'symbol-name #'name) (master-run-modules o))))
       (with-html-output (stream)
         (:div :class "runheader"
-              (dolist (m (mapcar (compose #'symbol-name #'name) (master-run-modules o)))
-                (with-html-output (stream)
-                  (:div :class "mn0"
-                        (:div :class "mn1"
-                              (let ((name m))
-                                (dotimes (i (- max-length (length name)))
-                                  (write-string "&nbsp;&nbsp;" stream)
-                                  (terpri stream))
-                                (iter (for c in-vector name)
-                                      (write-char (char-downcase c) stream)
-                                      (write-string "&nbsp; " stream))))))))))))
+              (:div :class "letterule"
+                    (iter (with current-letter = #\#)
+                          (for m in names)
+                          (cond ((char= current-letter (schar m 0))
+                                 (htm (:div :class "let cell" "&nbsp;&nbsp; ")))
+                                (t
+                                 (setf current-letter (schar m 0))
+                                 (htm (:div :class "let cell" (str (format nil "~A.." current-letter))))))))
+              (:div :class "names"
+                    (dolist (m names)
+                      (htm (:div :class "mn0 cell"
+                                 (:div :class "mn1"
+                                       (let ((name m))
+                                         (dotimes (i (- max-length (length name)))
+                                           (str "&nbsp;&nbsp;")
+                                           (terpri stream))
+                                         (iter (for c in-vector name)
+                                               (write-char (char-downcase c) stream)
+                                               (str "&nbsp; ")))))))))))))
 
 (defgeneric invoke-with-phase-emission (stream phase fn)
   (:method ((stream stream) (o test-phase) (fn function))
@@ -419,11 +428,20 @@
   min-width: 3000px;
   position: relative;
 }
-.runheader {
-}
-.runheader, .result {
-  font-family: monospace;
+.cell {
+  padding: 1px;
+  width: 2em;
   font-size: 120%;
+  font-family: monospace;
+}
+.letterule * {
+  background: #FFE4B5;
+}
+.letterule, .names {
+  clear: both;
+}
+.let {
+  float: left;
 }
 .results {
   background: green;
@@ -433,17 +451,16 @@
   clear: both;
 }
 .mn0 {
-  width: 2em;
   display: block;
   float: left;
   background: #fff8dc;
-  padding: 1px;
+}
+.mn1 {
+  padding: 0px;
 }
 .result {
   display: inline;
   float: left;
-  width: 2em;
-  padding: 1px;
   position: relative;
 }
 .nhint {

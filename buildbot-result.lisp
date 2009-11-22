@@ -81,7 +81,7 @@
 (defgeneric emit-with-result-emission (stream result fn)
   (:method ((stream stream) (o result) (fn function))
     (with-html-output (stream)
-      (:div :class "result"
+      (:div :class "result cell"
             (:div :class "nhint" (str (string-downcase (symbol-name (name (result-module o))))))
             (str (funcall fn))
             (:div :class (web-class o)
@@ -100,6 +100,6 @@
                  (for p = (class-prototype class-name))
                  (htm (:span :class "legend-entry" :style "clear: both; background: green;"
                              (:span :style "clear:both; float:left;"
-                                    (:div :class (conc "result " (web-class p))
+                                    (:div :class (conc "result cell " (web-class p))
                                           (str (web-marker p)))
                                     " - " (str (web-description p))))))))))
