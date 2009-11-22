@@ -83,6 +83,8 @@
   ((hostname :reader remote-phase-hostname :initarg :hostname)
    (username :reader remote-phase-username :initarg :username)))
 
+(defclass master-reachability-phase (test-phase) ()
+  (:default-initargs :action-description "test upstream repository reachability"))
 (defclass master-update-phase (test-phase) ()
   (:default-initargs :action-description "fetch upstream modules and convert them"))
 (defclass slave-fetch-phase (remote-test-phase) ()
@@ -205,7 +207,8 @@
           (bordeaux-threads:condition-wait (master-run-condvar o) (master-run-lock o)))
         r))))
 
-(defparameter *buildmaster-run-phases* '(master-update-phase
+(defparameter *buildmaster-run-phases* '(master-reachability-phase
+                                         master-update-phase
                                          ))
 
 (defgeneric invoke-with-active-phase (phase fn)
@@ -231,39 +234,47 @@
          (commands (cook-buildslave-command module-names purge purge-metastore branch metastore-branch disable-debugger verbose))
          (cooked-compound (compile-shell-command commands))
          (m-r (make-instance 'buildmaster-run :locality gate :phases *buildmaster-run-phases* :modules modules)))
-    ;; first goes the upstream fetch phase
-    #+nil
+    ;; upstream fetch phase
     (with-tracked-termination (m-r)
-      (with-active-phase ((first (master-run-phases m-r)))
-        (let ((initial-result (advance-result m-r)))
-          (push m-r *buildmaster-runs*)
-          (iter (with r = initial-result)
+      (let ((result-marker (advance-result m-r)))
+        (push m-r *buildmaster-runs*)
+        ;; #+nil
+        (with-active-phase ((first (master-run-phases m-r)))
+          (iter (with r = result-marker)
+                (repeat (master-run-n-phase-results m-r))
+                (for m = (result-module r))
+                (with-tracked-termination (r)
+                  (destructuring-bind (&key status output condition) (module-test-reachability m)
+                    (setf r (advance-result m-r status condition output))))
+                (finally (setf result-marker r))))
+        ;; #+nil
+        (with-active-phase ((second (master-run-phases m-r)))
+          (iter (with r = result-marker)
                 (repeat (master-run-n-phase-results m-r))
                 (for m = (result-module r))
                 (with-tracked-termination (r)
                   (destructuring-bind (&key status output condition) (module-test-fetchability m)
-                    (setf r (advance-result m-r status condition output))))))))
-    (format t "==( running:~%~S~%" commands)
-    (with-pipe-stream (pipe :element-type 'character :buffering :none)
-      (with-tracked-termination (m-r)
-        (with-asynchronous-execution
-          (with-input-from-string (stream cooked-compound)
-            (with-executable-input-stream stream
-              (let ((*executable-standard-output-direction* pipe))
-                (ssh `(,username "@" ,hostname) "bash" "-s")))))
-        (close (two-way-stream-output-stream pipe))
-        (iter (for line = (read-line pipe nil nil))
-              (unless line
-                (buildmaster-error "~@<Early termination from slave: no output marker found.~:@>"))
-              (for i from 0)
-              (format t "~3D> ~S~%" i line)
-              (when (and (plusp (length line))
-                         (char= #\: (schar line 0))
-                         (string= line (symbol-name *buildslave-remote-output-marker*)
-                                  :start1 1))
-                (format t "==( found remote marker on line ~D~%" i)))
-        ()
-        ))))
+                    (setf r (advance-result m-r status condition output))))
+                (finally (setf result-marker r))))
+        #+nil
+        (with-pipe-stream (pipe :element-type 'character :buffering :none)
+          (format t "==( running:~%~S~%" commands)
+          (with-asynchronous-execution
+            (with-input-from-string (stream cooked-compound)
+              (with-executable-input-stream stream
+                (let ((*executable-standard-output-direction* pipe))
+                  (ssh `(,username "@" ,hostname) "bash" "-s")))))
+          (close (two-way-stream-output-stream pipe))
+          (iter (for line = (read-line pipe nil nil))
+                (unless line
+                  (buildmaster-error "~@<Early termination from slave: no output marker found.~:@>"))
+                (for i from 0)
+                (format t "~3D> ~S~%" i line)
+                (when (and (plusp (length line))
+                           (char= #\: (schar line 0))
+                           (string= line (symbol-name *buildslave-remote-output-marker*)
+                                    :start1 1))
+                  (format t "==( found remote marker on line ~D~%" i))))))))
 
 (defgeneric emit-master-run-header (stream master-run)
   (:method (stream (o buildmaster-run))
