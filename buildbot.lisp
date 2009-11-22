@@ -438,7 +438,7 @@
          (hostname (string-downcase (string (name *self*)))))
     (with-html-output (stream nil :prologue t)
       (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
-             (:head (:title "desire buildbot waterfall on" (str hostname))
+             (:head (:title "desire buildbot waterfall on " (str hostname))
                     (:style :type "text/css" (str *style*)))
              (:body :class "body"
                     (:div :class "header"
