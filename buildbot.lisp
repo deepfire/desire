@@ -60,13 +60,13 @@
 
 (defvar *remote-output-marker* :beginning-of-test-results-marker)
 
-(defun buildslave ()
-  (let ((converted-modules (mapcar #'module (desire::distributor-converted-modules (distributor *default-buildslave-master*)))))
+(defun buildslave (module-names)
+  (let ((modules (mapcar #'module module-names)))
     (syncformat t "~&~S~%" *remote-output-marker*)
-    (iter (for m in converted-modules)
+    (iter (for m in modules)
           (syncformat t "(:name ~S :mode :fetch~%" (name m))
           (syncformat t " ~{ ~S~})~%" (module-test-fetchability m)))
-    (iter (for m in converted-modules)
+    (iter (for m in modules)
           (syncformat t "(:name ~S :mode :load~%" (name m))
           (syncformat t " ~{ ~S~})~%" (module-test-loadability m)))
     #+(or)
@@ -78,7 +78,7 @@
 ;;;
 ;;; Buildmaster only below
 ;;;
-(defun cook-buildslave-command (purge purge-metastore branch metastore-branch disable-debugger verbose)
+(defun cook-buildslave-command (module-names purge purge-metastore branch metastore-branch disable-debugger verbose)
   (remove nil (list
                (when purge
                  *purge-command*)
@@ -88,14 +88,15 @@
                (format nil "bash climb.sh ~:[~;-v ~]~
                                           ~:[~;-b ~:*~(~A~) ~] ~:[~;-t ~:*~(~A~) ~]~
                                           ~:[~;-g ~]~
-                                          -x '(progn (desr:ensure-module-systems-loadable :desire) ~
-                                                     (require :desire-buildbot) ~
-                                                     (funcall (find-symbol \"TEST-CONVERTED-MODULES\" :desire-buildbot)) ~
-                                                     (sb-ext:quit))' ~
+                                          -x \"(progn (desr:ensure-module-systems-loadable :desire) ~
+                                                      (require :desire-buildbot) ~
+                                                      (funcall (find-symbol \"BUILDSLAVE\" :desire-buildbot) '~A) ~
+                                                      (sb-ext:quit))\" ~
                                           ~~/desr"
                        verbose
                        branch metastore-branch
-                       disable-debugger))))
+                       disable-debugger
+                       module-names))))
 
 (defun run-build-tests (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
                         purge purge-metastore branch metastore-branch disable-debugger verbose)
@@ -275,9 +276,11 @@
          (module-names (sort (copy-list (append (location-module-names gate) (gate-converted-module-names gate)))
                              #'string<))
          (modules (mapcar #'module module-names))
-         (commands (cook-buildslave-command purge purge-metastore branch metastore-branch disable-debugger verbose))
+         (commands (cook-buildslave-command module-names purge purge-metastore branch metastore-branch disable-debugger verbose))
+         (cooked-compound (compile-shell-command commands))
          (m-r (make-instance 'buildmaster-run :locality gate :phases *buildmaster-run-phases* :modules modules)))
     ;; first goes the upstream fetch phase
+    #+nil
     (with-tracked-termination (m-r)
       (with-active-phase ((first (master-run-phases m-r)))
         (let ((initial-result (advance-result m-r)))
@@ -288,43 +291,27 @@
                 (with-tracked-termination (r)
                   (destructuring-bind (&key status output condition) (module-test-fetchability m)
                     (setf r (advance-result m-r status condition output))))))))
-    ;; (multiple-value-bind (status output condition)
-    ;;     (let (successp
-    ;;           condition)
-    ;;       (let ((output
-    ;;              (with-output-to-string (capture)
-    ;;                (with-pipe-stream (pipe :element-type 'character :buffering :none)
-    ;;                  (let ((*executable-standard-output-direction* pipe)
-    ;;                        (commands (compile-shell-command commands)))
-    ;;                    (handler-case
-    ;;                        (let ((process (with-asynchronous-execution
-    ;;                                         (with-input-from-string (stream commands)
-    ;;                                           (with-executable-input-stream stream
-    ;;                                             (ssh `(,username "@" ,hostname) "bash" "-s"))))))
-    ;;                          (declare (ignore process))
-    ;;                          (close (two-way-stream-output-stream pipe))
-    ;;                          (loop :for line = (read-line pipe nil nil)
-    ;;                             :while line
-    ;;                             :do
-    ;;                             (format t "> ~A~%" line)
-    ;;                             (finish-output)
-    ;;                             (write-line line capture)))
-    ;;                      (serious-condition (c)
-    ;;                        (setf condition c))))))))
-    ;;         (apply #'values
-    ;;                successp
-    ;;                output
-    ;;                (when condition (list condition)))))
-    ;;   (if-let ((marker-posn (search (prin1-to-string *remote-output-marker*) output)))
-    ;;     (with-input-from-string (s output :start (+ marker-posn 2 (length (symbol-name *remote-output-marker*))))
-    ;;       (iter (for form = (read s nil nil))
-    ;;             (while form)
-    ;;             (destructuring-bind (&key name mode status output condition) form
-    ;;               (declare (ignore output))
-    ;;               (format t "module ~A, ~A ~A~:[~; encountered condition: ~:*~A~]~%" name mode status condition))))
-    ;;     (build-test-error "~<@Marker ~S wasn't found in remote output.~:@>" *remote-output-marker*))
-    ;;   status)
-    ))
+    (format t "==( running:~%~S~%" commands)
+    (with-pipe-stream (pipe :element-type 'character :buffering :none)
+      (with-tracked-termination (m-r)
+        (with-asynchronous-execution
+          (with-input-from-string (stream cooked-compound)
+            (with-executable-input-stream stream
+              (let ((*executable-standard-output-direction* pipe))
+                (ssh `(,username "@" ,hostname) "bash" "-s")))))
+        (close (two-way-stream-output-stream pipe))
+        (iter (for line = (read-line pipe nil nil))
+              (unless line
+                (buildmaster-error "~@<Early termination from slave: no output marker found.~:@>"))
+              (for i from 0)
+              (format t "~3D> ~S~%" i line)
+              (when (and (plusp (length line))
+                         (char= #\: (schar line 0))
+                         (string= line (symbol-name *remote-output-marker*)
+                                  :start1 1))
+                (format t "==( found remote marker on line ~D~%" i)))
+        ()
+        ))))
 
 (defgeneric emit-master-run-header (stream master-run)
   (:method (stream (o buildmaster-run))
