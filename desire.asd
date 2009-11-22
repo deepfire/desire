@@ -8,11 +8,11 @@
 (defsystem :desire
   :depends-on (:alexandria :iterate :cl-fad
                :pergamum :executor)
-  :components ((:file "package")
+  :components ((:file "dependencies")
                ;; Tier #
-               (:file "dependencies" :depends-on ("package"))
+               (:file "package" :depends-on ("dependencies"))
                ;; Tier 0
-               (:file "filesystem-utils" :depends-on ("dependencies"))
+               (:file "filesystem-utils" :depends-on ("package"))
                ;; Tier 1
                (:file "gittage" :depends-on ("filesystem-utils"))
                ;; Tier 2

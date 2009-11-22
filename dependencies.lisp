@@ -12,6 +12,8 @@
    #:registered #:registered-registrator #:fully-qualified-name
    ;; SYNCHRONISABLE
    #:synchronisable #:synchronised-p #:synchronisable-last-sync-time #:synchronisable-mirror
+   ;; MINI-CLOSER
+   #:class-prototype
    ;; CLASS-SLOT
    #:define-marked-class #:instance-class-marked-value
    #:class-slot #:set-class-slot #:with-class-slot
@@ -25,7 +27,7 @@
    ;; Versions: pergamum
    #:princ-version-to-string #:bump-version-component #:next-version-variants 
    ;; NAMED: alexandria
-   #:named #:coerce-to-name #:coerce-to-named #:sort-by-name #:down-case-name #:coerce-to-namestring #:print-aborted-named-object #:slot-or-abort-print-object
+   #:named #:name #:coerce-to-name #:coerce-to-named #:sort-by-name #:down-case-name #:coerce-to-namestring #:print-aborted-named-object #:slot-or-abort-print-object
    ;; WWW: executor
    #:wget
    #:get-url-contents-as-string #:list-www-directory #:invoke-with-file-from-www #:with-file-from-www #:touch-www-file

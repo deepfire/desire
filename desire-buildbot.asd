@@ -6,5 +6,7 @@
 (in-package :desire-buildbot.system)
 
 (defsystem :desire-buildbot
-  :depends-on (:alexandria :iterate :pergamum :executor :desire)
-  :components ((:file "buildbot")))
+  :depends-on (:alexandria :iterate :pergamum :cl-who :executor :desire)
+  :components ((:file "buildbot-base")
+               (:file "buildbot-result")
+               (:file "buildbot" :depends-on ("buildbot-base" "buildbot-result"))))
