@@ -64,7 +64,8 @@
    #:module-test-fetchability
    #:module-test-loadability
    #:module-test-internal
-   #:buildslave #:*buildslave-remote-output-marker*
+   #:buildslave #:*buildslave-remote-output-marker* #:*buildslave-remote-end-of-output-marker*
+   #:*buildslave-remote-test-output-marker* #:*buildslave-remote-end-of-test-output-marker*
    ;; add-module.lisp
    #:*auto-lust*
    #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader #:steal-clbuild-projects-file

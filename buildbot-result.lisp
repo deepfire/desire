@@ -37,27 +37,18 @@
          ,@(remove :web-initargs class-options :key #'car)))
     (error "~@<No web-initargs class option was specified.~:@>")))
 
-(defconstant header-leeway 32)
-(defconstant page-size (virtual-memory-page-size))
-(defconstant initial-output-length (- page-size header-leeway))
-(defconstant output-size-scale-factor 4)
-
 (define-action-root-class result (action webbable)
   ((module :accessor result-module :initarg :module)
    (path :accessor result-path :initarg :path)
    (commit-id :accessor result-commit-id :initarg :commit-id)
+   (id :accessor result-id :initarg :id)
    (output :accessor result-output :initarg :output)
-   (output-consumer :accessor result-output-consumer :initarg :output-consumer))
+   (output-bytes :accessor result-output-bytes :initform 0)
+   (output-consumers :accessor result-output-consumers :type list :initform nil))
   (:subclass-to-action-class-map
    (success result-success)
    (failure result-failure)
-   (unhandled-failure result-unhandled-failure))
-  (:default-initargs
-   :output (make-array initial-output-length :element-type 'character :adjustable t)
-   :output-consumer nil))
-
-(defun extend-result-output (result)
-  (setf (result-output result) (adjust-array (result-output result) (* output-size-scale-factor (length (result-output result))))))
+   (unhandled-failure result-unhandled-failure)))
 
 (define-webbable-class result-not-yet (result incomplete-action) ()
   (:web-initargs
@@ -82,10 +73,25 @@
   (:method ((stream stream) (o result) (fn function))
     (with-html-output (stream)
       (:div :class "result cell"
-            (:div :class "nhint" (str (string-downcase (symbol-name (name (result-module o))))))
-            (str (funcall fn))
-            (:div :class (web-class o)
-                  (str (web-marker o)))))))
+            (funcall fn)
+            (let ((condition (action-condition o)))
+              (htm
+               (:div :class "nhint"
+                     (let* ((*print-escape* nil)
+                            (*print-length* nil)
+                            (*print-circle* t)
+                            (*print-level* nil)
+                            (condition-printed-form (when condition (escape-string (princ-to-string condition)))))
+                       (fmt "~A~:[~;<br><br>encountered condition:<br><pre>~A</pre>~]" (string-downcase (symbol-name (name (result-module o))))
+                            (and condition (> 10 (count #\Newline condition-printed-form))) condition-printed-form)))
+               (:div :class (web-class o)
+                     (str (web-marker o))
+                     :br
+                     (fmt "<a href='/desire-waterfall?mode=output&result-id=~D'>out</a>" (result-id o))
+                     (when condition
+                       (htm 
+                        :br
+                        (fmt "<a href='/desire-waterfall?mode=cond&result-id=~D'>co</a>" (result-id o)))))))))))
 
 (defmacro with-result-emission ((stream result) &body body)
   `(emit-with-result-emission ,stream ,result (lambda () ,@body)))
