@@ -21,6 +21,16 @@
 (in-package :desire)
 
 
+(progn
+  (define-executable darcs)
+  (define-executable darcs-to-git)
+  (define-executable python)        ; this is for hg-to-git.py
+  (define-executable rsync)
+  (define-executable cvs)
+  ;; these are needed for XCVB stack's postinstall
+  (define-executable cp)
+  (define-executable make))
+
 (defparameter *silently-reset-dirty-repositories* t
   "Whenever a dirty repository comes up in a situation which requires
 a clean one to proceed, quietly reset, or otherwise cleanup the repository,

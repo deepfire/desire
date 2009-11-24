@@ -12,19 +12,17 @@
                ;; Tier #
                (:file "package" :depends-on ("dependencies"))
                ;; Tier 0
-               (:file "filesystem-utils" :depends-on ("package"))
+               (:file "gittage" :depends-on ("package"))
                ;; Tier 1
-               (:file "gittage" :depends-on ("filesystem-utils"))
-               ;; Tier 2
                (:file "metastore" :depends-on ("gittage"))
-               ;; Tier 3
+               ;; Tier 2
                (:file "types" :depends-on ("metastore"))
-               ;; Tier 4
+               ;; Tier 3
                (:file "add-module" :depends-on ("types"))
                (:file "apropos" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
                (:file "system-loadability" :depends-on ("types"))
-               ;; Tier 5
+               ;; Tier 4
                (:file "application" :depends-on ("system-loadability"))
                (:file "clbuild" :depends-on ("add-module"))
                (:file "desire" :depends-on ("system-loadability"))

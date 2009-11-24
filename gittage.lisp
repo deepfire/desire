@@ -21,6 +21,8 @@
 (in-package :desire)
 
 
+(define-executable git :may-want-display t :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat"))
+
 (define-condition vcs-condition ()
   ((vcs :accessor condition-vcs :initarg :vcs)))
 
@@ -46,6 +48,11 @@
 (defun git-repository-bare-p (&optional directory)
   (maybe-within-directory directory
     (null (directory-exists-p (subdirectory* nil ".git")))))
+
+(defun move-to-directory (pathname target-directory)
+  (if (pathname-name pathname)
+      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (pathname-directory target-directory) :name (pathname-name pathname))))
+      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (append (pathname-directory target-directory) (list (lastcar (pathname-directory pathname)))))))))
 
 (defun (setf git-repository-bare-p) (val directory)
   (within-directory (directory)
