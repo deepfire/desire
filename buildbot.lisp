@@ -481,8 +481,8 @@
                                     (grab-result o i))
                                   (finish-output stream))))))))))))
 
-(defgeneric emit-master-run (stream master-run fresh-p)
-  (:method (stream (o buildmaster-run) fresh-p)
+(defgeneric emit-master-run (stream master-run complete-p &optional header-p)
+  (:method (stream (o buildmaster-run) complete-p &optional header-p)
     (with-html-output (stream)
       (:div :class "run"
             (:div (str (multiple-value-call #'print-decoded-time
@@ -505,8 +505,9 @@
                                         (t
                                          (format nil "failed, with uncaught exception, with ~D tests complete"
                                                  (master-run-n-complete-results o))))) ".")
-            (when fresh-p
-              (emit-master-run-header stream o)
+            (when complete-p
+              (when header-p
+                (emit-master-run-header stream o))
               (finish-output stream)
               (emit-master-run-results stream o))))))
 
@@ -551,9 +552,9 @@
                          (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
                            (cond (first-run
                                   (print-legend stream)
-                                  (emit-master-run stream first-run t)
+                                  (emit-master-run stream first-run t t)
                                   (dolist (run rest-runs)
-                                    (emit-master-run stream run nil)))
+                                    (emit-master-run stream run t)))
                                  (t
                                   (htm :br
                                        (:div :class "no-runs"
@@ -567,6 +568,7 @@
   "<!--
 .body {
   overflow: scroll;
+  margin-bottom: 15em;
 }
 .run {
   min-width: 3000px;
