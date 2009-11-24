@@ -24,6 +24,7 @@
 (progn
   (define-executable darcs)
   (define-executable darcs-to-git)
+  (define-executable hg)
   (define-executable python)        ; this is for hg-to-git.py
   (define-executable rsync)
   (define-executable cvs)
@@ -47,6 +48,8 @@ without raising any signals.")
     "fas" "o"     ;; ECL
     "lib" "obj"   ;; ECL/win32
     )) 
+
+(defparameter *hg-to-git-location* #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py")
 
 (defun purge-binaries (&optional directory)
   "Purge files with type among one of *PURGEWORTH-BINARIES* either in DIRECTORY,
@@ -75,6 +78,8 @@ without raising any signals.")
     (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)
     (touch-www-file `(,(url o name) "_darcs/inventory")))
+  (:method ((o hg-http-remote) name)
+    (touch-www-file `(,(url o name) ".hg/inventory")))
   (:method ((o rsync) name)
     (with-valid-exit-codes ((23 nil)) (rsync "--list-only" (url o name))))
   (:method ((o cvs-native-remote) name)
@@ -103,6 +108,16 @@ without raising any signals.")
           (darcs "pull" "--all" "--repodir" (namestring darcs-repo-dir) url))
         (with-explanation ("on behalf of module ~A, getting from darcs remote ~A to ~S" (name module) url darcs-repo-dir)
           (darcs "get" url (namestring darcs-repo-dir))))))
+
+(defmethod fetch-remote ((git-locality git-locality) (remote hg-http-remote) module)
+  (let ((repo-dir (module-pathname module (local-hg *self*)))
+        (url (url remote module)))
+    (if (directory-exists-p repo-dir)
+        (within-directory (repo-dir)
+          (with-explanation ("on behalf of module ~A, pulling from hg remote ~A to ~S" (name module) url repo-dir)
+            (hg "pull")))
+        (with-explanation ("on behalf of module ~A, cloning from hg remote ~A to ~S" (name module) url repo-dir)
+          (hg "clone" url (namestring repo-dir))))))
 
 (defmethod fetch-remote ((git-locality git-locality) (remote cvs-rsync-remote) module)
   (let* ((cvs-locality (local-cvs *self*))

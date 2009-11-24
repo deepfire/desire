@@ -304,8 +304,10 @@ a special module called '.meta'."
            ("git+http" 'git-http-remote)
            ("git-and-http" 'git-combined-remote)
            ("darcs" 'darcs-http-remote)
+           ("hg+http" 'hg-http-remote)
            ("http" (ecase hint
                      (git 'git-http-remote)
+                     (hg 'hg-http-remote)
                      (darcs 'darcs-http-remote)
                      (svn 'svn-http-remote)
                      ((nil) (error "~@<The 'http' uri type is ambiguous, and there was no hint given.~:@>"))))
@@ -1039,7 +1041,7 @@ locally present modules will be marked as converted."
            (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
       (clear-definitions)
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
-        (setf git '(git) hg '(hg)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
+        (setf git '(git) hg '(hg python)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
       (with-class-slot (git hg darcs cvs svn tarball) enabled-p
         (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
