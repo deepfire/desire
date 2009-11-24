@@ -69,6 +69,8 @@
   (sb-mop:finalize-inheritance (find-class 'result-failure))
   (sb-mop:finalize-inheritance (find-class 'result-unhandled-failure)))
 
+(defparameter *popup-display-nlines-threshold* 15)
+
 (defgeneric emit-with-result-emission (stream result fn)
   (:method ((stream stream) (o result) (fn function))
     (with-html-output (stream)
@@ -83,7 +85,7 @@
                             (*print-level* nil)
                             (condition-printed-form (when condition (escape-string (princ-to-string condition)))))
                        (fmt "~A~:[~;<br><br>encountered condition:<br><pre>~A</pre>~]" (string-downcase (symbol-name (name (result-module o))))
-                            (and condition (> 10 (count #\Newline condition-printed-form))) condition-printed-form)))
+                            (and condition (> *popup-display-nlines-threshold* (count #\Newline condition-printed-form))) condition-printed-form)))
                (:div :class (web-class o)
                      (str (web-marker o))
                      :br
