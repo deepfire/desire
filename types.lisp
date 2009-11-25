@@ -822,8 +822,8 @@ in the 'DESIRE' package.."
     (do-remove-system s))
   (%remove-module (name m)))
 
-(defun remove-module (module-designator &key keep-localities &aux (m (coerce-to-module module-designator)))
-  (unless keep-localities
+(defun remove-module (module-designator &key keep-locations &aux (m (coerce-to-module module-designator)))
+  (unless keep-locations
     (do-remotes (r)
       (when (remote-defines-module-p r m)
         (removef (location-module-names r) (name m)))))

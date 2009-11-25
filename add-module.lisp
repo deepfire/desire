@@ -204,7 +204,7 @@ The values returned are:
           (unless successp
             (when (and created-remote-p (not (member if-touch-fails '(:warn :continue))))
               (remove-remote remote))
-            (case if-touch-fails
+            (ecase if-touch-fails
               (:error (error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
               (:abort (return-from add-module nil))
               (:warn (format t "~@<;; ~@;Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
@@ -217,8 +217,8 @@ The values returned are:
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (if-touch-fails t) (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
+  (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (if-touch-fails :error) (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
     (add-module url name :if-touch-fails if-touch-fails :lust lust :remote-name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
 
 (defun install-add-module-reader (&optional (char #\@))
-  (set-dispatch-macro-character #\# char #'add-module-reader *readtable*))
+  (set-dispatch-macro-character #\# char 'add-module-reader *readtable*))
