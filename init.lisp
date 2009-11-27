@@ -48,8 +48,10 @@ locally present modules will be marked as converted."
            (meta-path (merge-pathnames #p".meta/" gate-path))
            (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
       (clear-definitions)
+      ;; this is crap
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
         (setf git '(git) hg '(hg python)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
+      ;; this is crap just as well
       (with-class-slot (git hg darcs cvs svn tarball) enabled-p
         (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
@@ -79,11 +81,15 @@ locally present modules will be marked as converted."
       (setf *unsaved-definition-changes-p* nil)
       (syncformat t ";;; determining available tools and deducing accessible remotes~%")
       (determine-tools-and-update-remote-accessibility)
-      (syncformat t ";;; registering ~S with ASDF~%" (locality-asdf-registry-path (gate *self*)))
-      (locality-register-with-asdf (gate *self*))
-      (syncformat t ";;; ensuring that present modules have their defined systems accessible~%")
-      ;; TODO: make this a method on NOTICE-MODULE-APPEARED
-      (ensure-present-module-systems-loadable (gate *self*))
+      ;; do some gate maintenance
+      (let ((gate (gate *self*)))
+        (syncformat t ";;; registering ~S with ASDF~%" (locality-asdf-registry-path gate))
+        (locality-register-with-asdf gate)
+        (syncformat t ";;; massaging present modules~%")
+        (do-present-modules (module gate)
+          (let ((repo-dir (module-pathname module gate)))
+            (ensure-tracker-branch repo-dir (ref-value '("heads" "master") repo-dir))
+            (ensure-module-systems-loadable module gate))))
       (syncformat t ";;; tweaking environment for CL-LAUNCH~%")
       (sb-posix:putenv "LISP_FASL_CACHE=NIL")
       (syncformat t ";;; all done~%")

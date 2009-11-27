@@ -1026,12 +1026,6 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
     (find-executable 'make)
     (find-executable 'cp)))
 
-(defun ensure-present-module-systems-loadable (&optional (locality (gate *self*)))
-  "Ensure that all modules present in LOCALITY have their systems loadable.
-   Return the list of present modules."
-  (do-present-modules (module locality)
-    (ensure-module-systems-loadable module locality)))
-
 (defgeneric read-definitions (&key source force-source metastore))
 (defgeneric read-local-definitions (&key metastore))
 (defgeneric save-definitions (&key seal commit-message))
