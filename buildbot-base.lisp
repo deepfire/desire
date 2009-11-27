@@ -26,7 +26,7 @@
    #:buildslave
    ;; buildmaster
    #:buildmaster-error #:simple-buildmaster-error #:simple-build-test-error
-   #:buildmaster-one #:buildmaster-one*
+   #:ping-slave #:one #:one*
    ;; buildmaster web interface
    #:start-cl-waterfall))
 
@@ -38,6 +38,11 @@
 ;;;
 (define-condition buildmaster-error (desire-error) ())
 (define-simple-error buildmaster-error)
+
+(define-reported-condition buildslave-error (buildmaster-error)
+  ((output :accessor error-output :initarg :output))
+  (:report (output)
+           "~@<Error encountered while initialising buildslave:~%~A~%~:@>" output))
 
 (define-condition build-test-error (desire-error) ())
 (define-simple-error build-test-error)

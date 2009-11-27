@@ -336,7 +336,9 @@
 ;;;
 ;;; Slave connection
 ;;;
-(defun invoke-with-slave-connection (hostname username slave-setup-commands fn)
+(defvar *implementation-debugger-signature*
+  #+sbcl "debugger invoked on a")
+(defun invoke-with-slave-connection (hostname username slave-setup-commands verbose fn)
   (flet ((setup-slave-connection (pipe hostname username commands)
            (with-asynchronous-execution
              (with-input-from-string (stream (compile-shell-command commands))
@@ -347,6 +349,16 @@
            (iter (for line = (read-line pipe nil nil))
                  (unless line
                    (buildmaster-error "~@<Early termination from slave: no output marker found.~:@>"))
+                 (when verbose
+                   (report-line i line))
+                 (when (string= *implementation-debugger-signature*
+                                (subseq line 0 (min (length *implementation-debugger-signature*) (length line))))
+                   (let ((error-message (apply #'concatenate 'string line #(#\Newline)
+                                               (iter (for line = (read-line pipe nil nil))
+                                                     (while line)
+                                                     (collect line)
+                                                     (collect #(#\Newline))))))
+                     (error 'buildslave-error :output error-message)))
                  (for i from 0)
                  (when (line-marker-p line *buildslave-remote-output-marker*)
                    (report-line i line)
@@ -362,21 +374,35 @@
       (funcall fn pipe)
       (finalise-slave-connection pipe))))
 
-(defmacro with-slave-connection ((pipe hostname username setup-commands) &body body)
-  `(invoke-with-slave-connection ,hostname ,username ,setup-commands (lambda (,pipe) ,@body)))
+(defmacro with-slave-connection ((pipe hostname username setup-commands &optional verbose) &body body)
+  `(invoke-with-slave-connection ,hostname ,username ,setup-commands ,verbose (lambda (,pipe) ,@body)))
 
 ;;;
 ;;; Buildmaster entry points
 ;;;
-(defun buildmaster-one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil))
+(defun ping-slave (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
+                   purge purge-metastore branch metastore-branch disable-debugger verbose)
+  (handler-case
+      (with-slave-connection (slave-pipe hostname username
+                              (cook-buildslave-command nil nil purge
+                                                       purge-metastore branch
+                                                       metastore-branch
+                                                       disable-debugger verbose)
+                              verbose)
+        (declare (ignore slave-pipe))
+        t)
+    (buildslave-error (c)
+      (return-from ping-slave (values nil c)))))
+
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil))
   (buildmaster-one :phases (append (when reachability '(master-reachability-phase))
                                    (when upstream '(master-update-phase))
                                    (when slave-fetch '(slave-fetch-phase))
                                    (when slave-load '(slave-load-phase))
                                    (when slave-test '(slave-test-phase)))))
 
-(defun buildmaster-one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
-                        purge purge-metastore branch metastore-branch disable-debugger verbose)
+(defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
+            purge purge-metastore branch metastore-branch disable-debugger verbose)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
          (module-names (sort (copy-list (append (location-module-names gate) (gate-converted-module-names gate)))
@@ -392,7 +418,8 @@
               (setf result-marker (execute-test-phase m-r phase result-marker)
                     rest-phases phases))
         (with-slave-connection (slave-pipe hostname username (cook-buildslave-command module-names (mapcar #'type-of rest-phases)
-                                                                                      purge purge-metastore branch metastore-branch disable-debugger verbose))
+                                                                                      purge purge-metastore branch metastore-branch disable-debugger verbose)
+                                verbose)
           (iter (for (phase . phases) on rest-phases)
                 (setf (remote-phase-slave-stream phase) slave-pipe
                       result-marker (execute-test-phase m-r phase result-marker))))))))
