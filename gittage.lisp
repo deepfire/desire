@@ -362,6 +362,7 @@
   (let ((ref (ensure-cons ref))
         (drop-changes (eq if-changes :reset)))
     (maybe-within-directory directory
+      (ref-value ref nil)
       (ensure-clean-repository if-changes)
       (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
         (apply #'git "checkout" (prepend (when drop-changes "-f") (list (flatten-path-list ref))))))))
