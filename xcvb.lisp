@@ -40,9 +40,9 @@
 (defun xcvbify-module (module &optional break-on-patch-failure)
   (update module)       ; leaves the repo in inconsistent state
   (within-directory ((module-pathname module))
-    (git-set-head-index-tree :tracker :if-changes :reset)
+    (git-set-head-index-tree '("tracker") :reset)
     (git-set-branch :xcvbify)
-    (git-set-head-index-tree :xcvbify :if-changes :reset)
+    (git-set-head-index-tree '("xcvbify") :reset)
     (unless (file-exists-p "build.xcvb")
       (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
         (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" nil t nil)
@@ -50,7 +50,7 @@
                  (with-explanation ("committing xcvbification change")
                    (git "commit" "-m" "Xcvbify.")))
                 (t
-                 (git-set-head-index-tree :tracker nil :if-changes :reset)
+                 (git-set-head-index-tree '("tracker") :reset)
                  (git-remove-branch :xcvbify)
                  (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
                    (if break-on-patch-failure
