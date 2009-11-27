@@ -89,7 +89,8 @@
                (:div :class (web-class o)
                      (str (web-marker o))
                      :br
-                     (fmt "<a href='/desire-waterfall?mode=output&result-id=~D'>out</a>" (result-id o))
+                     (unless (typep o 'result-not-yet) 
+                       (fmt "<a href='/desire-waterfall?mode=output&result-id=~D'>out</a>" (result-id o)))
                      (when condition
                        (htm 
                         :br
