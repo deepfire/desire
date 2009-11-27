@@ -26,7 +26,7 @@
    #:buildslave
    ;; buildmaster
    #:buildmaster-error #:simple-buildmaster-error #:simple-build-test-error
-   #:buildmaster-one
+   #:buildmaster-one #:buildmaster-one*
    ;; buildmaster web interface
    #:start-cl-waterfall))
 
