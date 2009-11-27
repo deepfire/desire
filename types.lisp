@@ -1127,20 +1127,3 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
    The user must never need this."
   (with-slots (remotes localities systems) module
     (setf (values remotes localities systems) (compute-module-caches module))))
-
-(defun test-core (&optional bail-out-early (pathes-from (list "/little/git/desire/definitions.lisp"))
-                  (path-int-0 "/tmp/essential-0") (path-int-1 "/tmp/essential-1") (path-int-2 "/tmp/essential-2"))
-  (clear-definitions)
-  (mapcar #'load pathes-from)
-  (with-output-to-file (f path-int-0)
-    (serialise-definitions f))
-  (when bail-out-early
-    (return-from test-core))
-  (clear-definitions)
-  (read-definitions path-int-0)
-  (with-output-to-file (f path-int-1)
-    (serialise-definitions f))
-  (clear-definitions)
-  (read-definitions path-int-1)
-  (with-output-to-file (f path-int-2)
-    (serialise-definitions f)))
