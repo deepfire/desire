@@ -29,7 +29,6 @@
 (defvar *self*                                     nil "Possibly unknown distributor whom we identify as.")
 (defvar *combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
 (defvar *default-system-type*                      'asdf-system)
-(defvar *fetch-errors-serious*                     nil)
 (defvar *merge-remote-wishmasters*                 t   "Whether to merge definitions from remote wishmasters.")
 
 ;;;
@@ -91,6 +90,12 @@ SAVE-DEFINITIONS was called.")
    (svn         :accessor local-svn     :documentation "Transitory svn locality of a locally-accessible distributor.")
    (tarball     :accessor local-tarball :documentation "Transitory tarball locality of a locally-accessible distributor.")))
 
+(defgeneric locality (specifier &optional local-distributor)
+  (:documentation
+   "Return the master locality of type denoted by SPECIFIER withing LOCAL-DISTRIBUTOR.")
+  (:method ((o symbol)  &optional (local-distributor *self*))
+    (slot-value local-distributor o)))
+
 (defmacro do-wishmasters ((var) &body body)
   `(do-distributors (,var)
      (when (wishmasterp ,var)
@@ -144,12 +149,13 @@ This notably excludes converted modules."
   (:default-initargs :wrinkles nil))
 
 ;;; exhaustive partition of VCS-TYPE-MIXIN
-(defclass git (vcs-type-mixin)               () (:default-initargs :vcs-type 'git))
-(defclass hg (vcs-type-mixin)                () (:default-initargs :vcs-type 'hg))
-(defclass darcs (vcs-type-mixin)             () (:default-initargs :vcs-type 'darcs))
-(defclass cvs (vcs-type-mixin wrinkle-mixin) () (:default-initargs :vcs-type 'cvs))
-(defclass svn (vcs-type-mixin wrinkle-mixin) () (:default-initargs :vcs-type 'svn))
-(defclass tarball (vcs-type-mixin)           () (:default-initargs :vcs-type 'tarball))
+(defclass git (vcs-type-mixin)                            () (:default-initargs :vcs-type 'git))
+(defclass nongit-mixin ()                                 ())
+(defclass hg (vcs-type-mixin nongit-mixin)                () (:default-initargs :vcs-type 'hg))
+(defclass darcs (vcs-type-mixin nongit-mixin)             () (:default-initargs :vcs-type 'darcs))
+(defclass cvs (vcs-type-mixin wrinkle-mixin nongit-mixin) () (:default-initargs :vcs-type 'cvs))
+(defclass svn (vcs-type-mixin wrinkle-mixin nongit-mixin) () (:default-initargs :vcs-type 'svn))
+(defclass tarball (vcs-type-mixin nongit-mixin)           () (:default-initargs :vcs-type 'tarball))
 
 (defun vcs-enabled-p (type)
   (class-slot type 'enabled-p))
@@ -172,24 +178,37 @@ This notably excludes converted modules."
 
 (defclass schema-mixin () ((schema :reader schema :initarg :schema)))
 (defclass transport-mixin (schema-mixin) ((transport :reader transport :initarg :transport)))
+(defclass clone-separation-mixin () ())
+(defclass fetch-indirection-mixin () ())
 
-;;; non-exhaustive partition of TRANSPORT-MIXIN
+;;; exhaustive partition of TRANSPORT-MIXIN
 (defclass native (transport-mixin) () (:default-initargs :transport 'native))
 (defclass http (transport-mixin) () (:default-initargs :transport 'http :schema 'http))
 (defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync :schema 'rsync))
 
-;;; exhaustive partition of type product of VCS-TYPE and TRANSPORT-MIXIN
-(defclass git-native (git native) () (:default-initargs :schema 'git))
-(defclass git-http (git http) ())
-(defclass hg-http (hg http) ())
-(defclass darcs-http (darcs http) ())
-(defclass cvs-rsync (cvs rsync) ())
-(defclass cvs-native (cvs native) () (:default-initargs :schema '|:PSERVER|))
-(defclass svn-rsync (svn rsync) ())
-(defclass svn-http (svn http) ())
-(defclass svn-native (svn native) () (:default-initargs :schema 'svn))
-(defclass tarball-http (tarball http)
-  ((initial-version :accessor initial-tarball-version :initarg :initial-version)))
+;;; exhaustive partition of FETCH-INDIRECTION-MIXIN
+(defclass separate-clone (clone-separation-mixin) ())
+(defclass clone-is-fetch (clone-separation-mixin) ())
+
+;;; exhaustive partition of FETCH-INDIRECTION-MIXIN
+(defclass direct-fetch (fetch-indirection-mixin) ())
+(defclass indirect-fetch (fetch-indirection-mixin) ())
+
+;;; exhaustive partition of type product of VCS-TYPE, TRANSPORT-MIXIN, CLONE-SEPARATION-MIXIN, and
+;;;   FETCH-INDIRECTION-MIXIN
+(defclass git-native   (git        native direct-fetch   clone-is-fetch) () (:default-initargs :schema 'git))
+(defclass git-http     (git        http   direct-fetch   clone-is-fetch) ())
+(defclass hg-http      (hg         http   indirect-fetch separate-clone) ())
+(defclass darcs-http   (darcs      http   indirect-fetch separate-clone) ())
+(defclass cvs-rsync    (cvs        rsync  indirect-fetch clone-is-fetch) ())
+(defclass cvs-native   (cvs        native direct-fetch   clone-is-fetch) () (:default-initargs :schema '|:PSERVER|))
+(defclass tarball-http (tarball    http   direct-fetch   clone-is-fetch) ((initial-version :accessor initial-tarball-version :initarg :initial-version)))
+(defclass svn-rsync    (svn        rsync  indirect-fetch clone-is-fetch) ())
+;;; ...... 8< ......
+(defclass svn-direct   (svn               direct-fetch) ())
+;;; ...... >8 ......
+(defclass svn-http     (svn-direct http   #| direct |#   clone-is-fetch) ())
+(defclass svn-native   (svn-direct native #| direct |#   clone-is-fetch) () (:default-initargs :schema 'svn))
 
 ;;;;
 ;;;; Location
@@ -197,7 +216,6 @@ This notably excludes converted modules."
 (defclass location (desirable)
   ((module-names :accessor location-module-names :initarg :module-names :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs
-   :registrator #'(setf locality)
    :modules nil))
 
 (defclass gate (location)
@@ -213,6 +231,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
   ((pathname :accessor locality-pathname :initarg :pathname :documentation "Specified.")
    (scan-p :accessor locality-scan-p :initarg :scan-p :documentation "Specified."))
   (:default-initargs
+   :registrator #'(setf loc)
    :scan-p nil))
 (defclass remote (location registered)
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
@@ -247,6 +266,9 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 (defun module-credentials (remote module-name)
   (cadr (assoc module-name (remote-module-credentials remote) :test #'string=)))
 
+(defmethod locality ((o remote)  &optional (local-distributor *self*))
+  (slot-value local-distributor (vcs-type o)))
+
 (defun wishmasterp (distributor)
   "See whether DISTRIBUTOR participates in the DESIRE protocol,
 that is, whether it has a gate remote -- a git remote containing
@@ -261,25 +283,25 @@ a special module called '.meta'."
 ;;;;
 ;;;; Location * VCS
 ;;;;
-(defclass git-remote (git remote) ())
-(defclass darcs-remote (darcs remote) ())
-(defclass hg-remote (hg remote) ())
-(defclass cvs-remote (cvs remote) ())
-(defclass svn-remote (svn remote) ())
-(defclass tarball-remote (tarball remote) ())
+(defclass git-remote (remote git) ())
+(defclass darcs-remote (remote darcs) ())
+(defclass hg-remote (remote hg) ())
+(defclass cvs-remote (remote cvs) ())
+(defclass svn-remote (remote svn) ())
+(defclass tarball-remote (remote tarball) ())
 
 ;;; almost most specific (due to GATE mixin), exhaustive partition of REMOTE
-(defclass git-native-remote (git-native git-remote) ())
-(defclass git-http-remote (git-http git-remote) ())
-(defclass git-combined-remote (git-native git-http git-remote) ())
-(defclass hg-http-remote (hg-http hg-remote) ())
-(defclass darcs-http-remote (darcs-http darcs-remote) ())
-(defclass cvs-rsync-remote (cvs-rsync cvs-remote) ())
-(defclass cvs-native-remote (cvs-native cvs-remote) ())
-(defclass svn-rsync-remote (svn-rsync svn-remote) ())
-(defclass svn-http-remote (svn-http svn-remote) ())
-(defclass svn-native-remote (svn-native svn-remote) ())
-(defclass tarball-http-remote (tarball-http tarball-remote) ())
+(defclass git-native-remote (git-remote git-native) ())
+(defclass git-http-remote (git-remote git-http) ())
+(defclass git-combined-remote (git-remote git-native git-http) ())
+(defclass hg-http-remote (hg-remote hg-http) ())
+(defclass darcs-http-remote (darcs-remote darcs-http) ())
+(defclass cvs-rsync-remote (cvs-remote cvs-rsync) ())
+(defclass cvs-native-remote (cvs-remote cvs-native) ())
+(defclass svn-rsync-remote (svn-remote svn-rsync) ())
+(defclass svn-http-remote (svn-remote svn-http) ())
+(defclass svn-native-remote (svn-remote svn-native) ())
+(defclass tarball-http-remote (tarball-remote tarball-http) ())
 
 ;;; A special case location*vcs*role extension which is /going/ to be
 ;;; troublesome, as it violates simplicity.
@@ -488,7 +510,7 @@ they participate in the desire wishmaster protocol or not."
   (update-local-distributor-conversions w))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
-  (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf locality)))
+  (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc)))
 
 ;;;
 ;;; Remote methods
@@ -784,7 +806,7 @@ Find out whether SYSTEM is hidden."
 (define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems)
 (define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
 (define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
-(define-root-container *localities*     locality      :type locality :mapper map-localities :if-exists :error)
+(define-root-container *localities*     loc           :type locality :mapper map-localities :if-exists :error)
 (define-root-container *credentials*    cred          :type credentials :iterator do-credentials :if-exists :error)
 (define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
 

@@ -5,7 +5,9 @@
 
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
-November 14, 2009, 03:53
+#+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
+November 27, 2009, 01:54
+#+END:
 #+END_CENTER
 
 * About this document
@@ -40,10 +42,13 @@ Desire shares concepts with and provides some features of, at least:
      -  clbuild
 
 Desire uses the Git distributed version control system to pass around
-the domain-specific information, as well as for software redistribution,
-and tries not to lose the 'distributed' part of it.  Ideally, desire could
-be used to ease distributed, cross-project cooperation and coordinated
-release making.
+the domain-specific information, as well as for software redistribution.
+
+Higher-order goals of desire revolve around:
+
+     - distributed development,
+     - cross-project cooperation, and
+     - coordinated release making.
 
 * How to obtain desire?
 
@@ -52,6 +57,18 @@ Desire can be obtained at:
         git://git.feelingofgreen.ru/desire
 
 but please see the "Streamlined bootstrap" section below.
+
+* Status
+
+Desire still undergoes major changes, and might be a rough ride.
+
+The streamlined bootstrapper (climb.sh) might break once in a while.
+
+A couple of DEFINITIONS format changes are ahead, and their contents is not
+yet completely correct (although automated testing is almost done,
+see http://www.feelingofgreen.ru/desire-waterfall).
+
+Desire still works only with ASDF systems, on Linux and using SBCL.
 
 * Overview of terms
 *** DEFINITIONS
@@ -320,15 +337,20 @@ and actionable.
         Stop advertising MODULE in DEFINITIONS, as well as make it inaccessible
         to general public through LOCALITY.
 
-      - =*silently-reset-dirty-repositories*= => boolean ::
-        Whenever a dirty repository comes up in a situation which requires a clean one to proceed, quietly reset, or otherwise cleanup the repository,
-        without raising any signals.  Defaults to T.
-
       - =*auto-lust*= => boolean ::
         Whether to automatically LUST the modules during ADD-MODULE.  Defaults to NIL.
 
       - =*fetch-errors-serious*= => boolean ::
-        Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE-MODULE.
+        Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE.
+        Defaults to NIL.
+
+      - =*follow-upstream*= => boolean ::
+        Whether tracking upstream should update HEAD.
+        Defaults to T.
+
+      - =*silently-reset-dirty-repositories*= => boolean ::
+        Whenever a dirty repository comes up in a situation which requires a clean one to proceed, quietly reset, or otherwise cleanup the repository,
+        without raising any signals.
         Defaults to NIL.
 
 ***** Reader macros for add-module

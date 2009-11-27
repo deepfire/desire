@@ -254,7 +254,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 
 (defun read-module (name &key (umbrella name) (systems nil systems-specified-p) complex-systems path-whitelist path-blacklist)
   (lret ((m (or (when-let ((existing-module (module name :if-does-not-exist :continue)))
-                  (remove-module existing-module :keep-localities t)
+                  (remove-module existing-module :keep-locations t)
                   nil)                   
                 (apply #'make-instance 'module :name name :last-sync-time *read-universal-time* :synchronised-p t :umbrella umbrella
                        (append (when path-whitelist `(:path-whitelist ,path-whitelist))

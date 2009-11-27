@@ -27,10 +27,10 @@
    ;;   types.lisp :: global UI
    #:clear-definitions #:init #:vcs-enabled-p #:*unsaved-definition-changes-p*
    ;;   types.lisp :: locality
-   #:locality-pathname #:module-pathname #:locality-register-with-asdf
+   #:loc #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module
    #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor #:module-fetch-url
-   #:touch-module #:distributor-module-enabled-remote #:update
+   #:touch-module #:distributor-module-enabled-remote
    #:module-locally-present-p #:module-publishable-p #:module-hidden-p
    ;;   types.lisp :: system
    #:system-hidden-p
@@ -53,6 +53,8 @@
    ;; gittage.lisp
    #:repo-var #:module-git-branches #:module-git-remotes #:module-add-git-remote #:ensure-module-git-remote
    #:module-bare-p #:module-locally-present-p #:do-present-modules #:module-world-readable-p
+   ;; import.lisp
+   #:update
    ;; desire.lisp
    #:*fetch-errors-serious* #:*silently-reset-dirty-repositories*
    #:desire #:lust

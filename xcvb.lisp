@@ -36,11 +36,11 @@
                  (error "~@<Failed to apply ~S in ~S:~%~A.~:@>" filename *default-pathname-defaults* output)
                  (values nil output)))))))
 
+;;; XXX: clarify branching
 (defun xcvbify-module (module &optional break-on-patch-failure)
   (update module)       ; leaves the repo in inconsistent state
   (within-directory ((module-pathname module))
-    (git-set-branch-index-tree)
-    (git-set-head-index-tree :master :if-changes :reset)
+    (git-set-head-index-tree :tracker :if-changes :reset)
     (git-set-branch :xcvbify)
     (git-set-head-index-tree :xcvbify :if-changes :reset)
     (unless (file-exists-p "build.xcvb")
@@ -50,7 +50,7 @@
                  (with-explanation ("committing xcvbification change")
                    (git "commit" "-m" "Xcvbify.")))
                 (t
-                 (git-set-head-index-tree :master nil :if-changes :reset)
+                 (git-set-head-index-tree :tracker nil :if-changes :reset)
                  (git-remove-branch :xcvbify)
                  (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
                    (if break-on-patch-failure

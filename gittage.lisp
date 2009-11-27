@@ -54,8 +54,8 @@
       (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (pathname-directory target-directory) :name (pathname-name pathname))))
       (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (append (pathname-directory target-directory) (list (lastcar (pathname-directory pathname)))))))))
 
-(defun (setf git-repository-bare-p) (val directory)
-  (within-directory (directory)
+(defun (setf git-repository-bare-p) (val &optional directory)
+  (maybe-within-directory directory
     (if val
         (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory)
         (progn
@@ -63,7 +63,7 @@
             (sb-posix:mkdir ".git" #o755)
             (dolist (filename git-files)
               (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
-          (setf (gitvar 'core.bar) "false")
+          (setf (gitvar 'core.bare) "false")
           (git-set-branch-index-tree)
           nil))))
 
@@ -84,7 +84,9 @@
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
       (with-avoided-executable-output
-        (not (with-shell-predicate (git "diff" "--exit-code")))))))
+        (not (with-valid-exit-codes ((0 t)
+                                     (128 nil))
+               (git "diff" "--exit-code")))))))
 
 (defun git-repository-staged-changes-p (&optional directory)
   (maybe-within-directory directory
@@ -97,8 +99,9 @@
 (defun git-repository-changes-p (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has staged or unstaged changes" *default-pathname-defaults*)
-      (with-avoided-executable-output
-        (not (with-shell-predicate (git "diff" "HEAD" "--exit-code")))))))
+      (not (with-valid-exit-codes ((0 t)
+                                   (128 nil))
+             (git "diff" "--exit-code" "--summary" "HEAD" "--"))))))
 
 ;;;
 ;;; Config variables
@@ -249,10 +252,24 @@
   (let ((path (ref-path ref directory)))
     (if (probe-file path)
         (%read-ref path)
-        (or (car (remove nil (map-packed-refs (lambda (r v) (when (string= "master" (first r)) v)) #'identity directory)))
+        (or (car (remove nil (map-packed-refs (lambda (r v) (declare (ignore v)) (equal ref r))
+                                              (lambda (r v) (declare (ignore r)) v)
+                                              directory)))
             (ecase if-does-not-exist
-              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref directory))
+              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref (or directory *default-pathname-defaults*)))
               (:continue nil))))))
+
+(defun ref-coerce-to-value (ref-or-value &optional directory)
+  (if (integerp ref-or-value)
+      ref-or-value
+      (ref-value ref-or-value directory)))
+
+(defgeneric ref= (ref-x ref-y &optional directory)
+  (:method (x y &optional directory)
+    (ref= (ref-coerce-to-value x directory) (ref-coerce-to-value y directory)))
+  (:method ((x integer) (y integer) &optional directory)
+    (declare (ignore directory))
+    (= x y)))
 
 (defun reffile-value-full (pathname &optional directory)
   (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
@@ -328,23 +345,24 @@
     (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" *default-pathname-defaults* ref)
       (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
 
+(defun ensure-clean-repository (&optional (if-changes :error) directory)
+  (maybe-within-directory directory
+    (with-retry-restarts ((hardreset-repository ()
+                            :report "Clear all uncommitted changes, both staged and unstaged."
+                            (git-set-branch-index-tree)))
+      (when (git-repository-changes-p)
+        (ecase if-changes
+          (:reset (git-set-branch-index-tree))
+          (:error (git-error "~@<~:[Uns~;S~]taged changes in git repository ~S.~:@>"
+                             (git-repository-staged-changes-p directory) (or directory *default-pathname-defaults*))))))))
+
 (defun git-set-head-index-tree (ref &optional (if-changes :error) directory)
   (let ((ref (ensure-cons ref))
-        (ignore-changes (eq if-changes :ignore))
         (drop-changes (eq if-changes :reset)))
     (maybe-within-directory directory
-      (with-retry-restarts ((hardreset-repository ()
-                                                  :report "Clear all uncommitted changes, both staged and unstaged."
-                                                  (git-set-branch-index-tree)))
-        (unless (or ignore-changes drop-changes)
-          (when (git-repository-changes-p directory)
-            (ecase if-changes
-              (:warn (warn "~@<WARNING: in git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes. Proceeding, by request.~:@>"
-                           (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory)))
-              (:error (git-error "~@<In git repository ~S: asked to check out ~S, but there were ~:[un~;~]staged changes.~:@>"
-                                 (or directory *default-pathname-defaults*) ref (git-repository-staged-changes-p directory))))))
-        (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
-          (apply #'git "checkout" (prepend (when drop-changes "-f") (list (flatten-path-list ref)))))))))
+      (ensure-clean-repository if-changes)
+      (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
+        (apply #'git "checkout" (prepend (when drop-changes "-f") (list (flatten-path-list ref))))))))
 
 (defun checkout-git-branch (name &optional directory reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
   (unless (git-branch-present-p name directory)

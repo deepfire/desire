@@ -213,7 +213,7 @@
                (incf (fill-pointer result-vector))
                (lret ((new-r (aref result-vector i)))
                  (start-period new-r)
-                 (setf (result-commit-id new-r) (desr::ref-value '("master") (result-path new-r)))))
+                 (setf (result-commit-id new-r) (desr::ref-value '("tracker") (result-path new-r)))))
               (t
                (end-period o)))))))
 
