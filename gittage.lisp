@@ -365,19 +365,3 @@
       (ensure-clean-repository if-changes)
       (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
         (apply #'git "checkout" (prepend (when drop-changes "-f") (list (flatten-path-list ref))))))))
-
-(defun checkout-git-branch (name &optional directory reset-before-checkout &key (if-does-not-exist :error) default-ref (if-changes :error))
-  (unless (git-branch-present-p name directory)
-    (ecase if-does-not-exist 
-      (:error (git-error "~@<Asked to check out a nonexistent branch ~A in ~S~:@>" name (or directory *default-pathname-defaults*)))
-      (:create (if default-ref
-                   (git-set-branch name directory default-ref)
-                   (git-error "~@<While checking out branch ~A in ~S: branch doesn't exist and the default ref was not provided.~:@>" name (or directory *default-pathname-defaults*))))))
-  (when reset-before-checkout
-    (git-set-branch-index-tree nil directory))
-  (git-set-head-index-tree `(,(downstring name)) if-changes directory))
-
-(defun reset-git-branch-to-remote-branch (name qualified-remote-branch-name directory &optional reset-before-checkout)
-  (let ((remote-ref (list* "remotes" qualified-remote-branch-name)))
-    (checkout-git-branch name directory reset-before-checkout :if-does-not-exist :create :default-ref remote-ref)
-    (git-set-branch-index-tree remote-ref directory)))
