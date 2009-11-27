@@ -317,9 +317,11 @@
   (maybe-within-directory directory
     (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
       (let ((output (execution-output-string 'git "branch")))
-        (remove :* (mapcar (compose #'make-keyword #'string-upcase) 
-                           (mapcan (curry #'split-sequence #\Space)
-                                   (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
+        (mapcar (compose #'make-keyword #'string-upcase) 
+                (remove-if
+                 (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
+                 (mapcan (curry #'split-sequence #\Space)
+                         (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
 
 
 (defun git-branch-present-p (name &optional directory)
