@@ -887,13 +887,14 @@ Those distributors with a gate best-remote are preferred, obviously."
   (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist :allow-self allow-self)))
     (remote-distributor r)))
 
-(defun module-fetch-url (module &key allow-self)
+(defun module-fetch-url (module &key allow-self (if-does-not-exist :error))
   "Return the URL which is to be used while fetching MODULE,
 that is the location of MODULE in the preferred remote.
 When ALLOW-SELF is specified, and non-NIL, remotes within *SELF* are
 not discarded from consideration."
   (let ((module (coerce-to-module module)))
-    (url (module-best-remote module :allow-self allow-self) module)))
+    (when-let ((remote (module-best-remote module :allow-self allow-self :if-does-not-exist if-does-not-exist)))
+      (url remote module))))
 
 (defun touch-module (module &aux (module (coerce-to-module module)))
   "Try 'access' MODULE via its preferred remote and return
