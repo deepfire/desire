@@ -18,20 +18,26 @@
                ;; Tier 2
                (:file "types" :depends-on ("metastore"))
                ;; Tier 3
-               (:file "add-module" :depends-on ("types"))
-               (:file "apropos" :depends-on ("types"))
-               (:file "import" :depends-on ("types"))
+               (:file "branching" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
                (:file "systems" :depends-on ("types"))
                ;; Tier 4
+               (:file "import" :depends-on ("branching"))
+               (:file "init" :depends-on ("branching"))
+               ;; Tier 5
+               (:file "recursor" :depends-on ("import"))
+
+               ;; Tier at-the-end-of-it-all
+               (:file "add-module" :depends-on ("types"))
+               (:file "apropos" :depends-on ("types"))
                (:file "application" :depends-on ("systems"))
+               ;; It's probably too bad that the buildslave doesn't exercise the recursor..
+               (:file "buildslave" :depends-on ("import"))
                (:file "clbuild" :depends-on ("add-module"))
                (:file "libcl" :depends-on ("add-module"))
                (:file "xcvb" :depends-on ("systems"))
                (:module "system-quirks" :depends-on ("systems")
                         :components ((:file "cl-launch")
                                      (:file "xcvb")))
-               ;; Tier 5
-               (:file "desire" :depends-on ("import" "systems"))
                ))
   

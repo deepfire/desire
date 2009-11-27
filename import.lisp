@@ -25,16 +25,6 @@
   "Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE.
 Defaults to NIL.")
 
-(defvar *follow-upstream* t
-  "Whether tracking upstream should update HEAD.
-Defaults to T.")
-
-(defvar *silently-reset-dirty-repositories* nil
-  "Whenever a dirty repository comes up in a situation which requires
-a clean one to proceed, quietly reset, or otherwise cleanup the repository,
-without raising any signals.
-Defaults to NIL.")
-
 (defvar *hg-to-git-location* #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py")
 
 (defparameter *purgeworth-binaries* 
@@ -75,7 +65,6 @@ Defaults to NIL.")
   (dolist (type *purgeworth-binaries*)
     (mapc #'delete-file (directory (subfile directory '(:wild-inferiors :wild) :type type)))))
 
-
 (defgeneric touch-remote-module (remote module)
   (:method :around ((o remote) name)
     (with-explanation ("attempting to touch module ~A in ~S" (coerce-to-name name) (url o name))
@@ -115,10 +104,6 @@ Only for remotes of type SEPARATE-CLONE.")
     (with-explanation ("initialising git repository of module ~A in ~S" name *default-pathname-defaults*)
       (git "init-db"))))
 
-(defun master-detached-p (&optional repo-dir)
-  "See if the master branch is driven by the user, that is out of desire's control."
-  (not (ref= '("master") '("tracker") repo-dir)))
-
 (defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname)
   (:documentation
    "Update the local repository, maybe creating it first.
@@ -148,8 +133,7 @@ Note that the provided directory is the final directory in the gate locality.")
     (when *new-repository-p*
       (init-db-when-new-repository name)
       (ensure-gitremote (name o) (url o name)))
-    (unless (git-branch-present-p :tracker)
-      (git-set-branch :tracker))
+    (ensure-tracker-branch)
     (let ((we-drive-master-p (or *new-repository-p* (not (master-detached-p)))))
       (git-fetch-remote o name)
       (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil)))
