@@ -131,7 +131,6 @@ Note that the provided directory is the final directory in the gate locality.")
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS"
-    (declare (ignore url repo-dir))
     (cond (*new-repository-p*
            (init-db-when-new-repository name)
            (ensure-gitremote (name o) (url o name)))

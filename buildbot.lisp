@@ -30,7 +30,7 @@
 (defparameter *purge-metastore-command* "rm -rf desr/git/.meta")
 (defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
 
-(defun cook-buildslave-command (module-names phase-names purge purge-metastore branch metastore-branch disable-debugger verbose)
+(defun cook-buildslave-command (module-names phase-names purge purge-metastore branch metastore-branch debug disable-debugger verbose)
   (remove nil (list
                (when purge
                  *purge-command*)
@@ -39,7 +39,7 @@
                *update-bootstrapper-command*
                (format nil "bash climb.sh ~:[~;-v ~]~
                                           ~:[~;-b ~:*~(~A~) ~] ~:[~;-t ~:*~(~A~) ~]~
-                                          ~:[~;-g ~]~
+                                          ~:[~;-d ~]~:[~;-g ~]~
                                           -x \"(progn (desr:ensure-module-systems-loadable :desire) ~
                                                       (require :desire) ~
                                                       (funcall (find-symbol \\\"BUILDSLAVE\\\" :desire) '~A '~A) ~
@@ -47,7 +47,7 @@
                                           ~~/desr"
                        verbose
                        branch metastore-branch
-                       disable-debugger
+                       debug disable-debugger
                        module-names phase-names))))
 
 ;;;
@@ -386,7 +386,7 @@
 ;;; Buildmaster entry points
 ;;;
 (defun ping-slave (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
-                   purge purge-metastore branch metastore-branch disable-debugger verbose
+                   purge purge-metastore branch metastore-branch debug disable-debugger verbose
                    just-print-conditions)
   (handler-case
       (with-maybe-just-printing-conditions (t buildslave-error) just-print-conditions
@@ -394,23 +394,24 @@
                                            (cook-buildslave-command nil nil purge
                                                                     purge-metastore branch
                                                                     metastore-branch
-                                                                    disable-debugger verbose)
+                                                                    debug disable-debugger verbose)
                                            verbose)
           (declare (ignore slave-pipe))
           t))
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil) purge)
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil) purge debug)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
                        (when slave-load '(slave-load-phase))
                        (when slave-test '(slave-test-phase)))
+       :debug debug
        :purge purge))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
-            purge purge-metastore branch metastore-branch disable-debugger verbose)
+            purge purge-metastore branch metastore-branch debug disable-debugger verbose)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
          (module-names (sort (copy-list (append (location-module-names gate) (gate-converted-module-names gate)))
@@ -426,7 +427,7 @@
               (setf result-marker (execute-test-phase m-r phase result-marker)
                     rest-phases phases))
         (with-slave-connection (slave-pipe hostname username (cook-buildslave-command module-names (mapcar #'type-of rest-phases)
-                                                                                      purge purge-metastore branch metastore-branch disable-debugger verbose)
+                                                                                      purge purge-metastore branch metastore-branch debug disable-debugger verbose)
                                 verbose)
           (iter (for (phase . phases) on rest-phases)
                 (setf (remote-phase-slave-stream phase) slave-pipe
