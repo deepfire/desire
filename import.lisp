@@ -135,7 +135,6 @@ Note that the provided directory is the final directory in the gate locality.")
     (when *new-repository-p*
       (init-db-when-new-repository name)
       (ensure-gitremote (name o) (url o name)))
-    (ensure-tracker-branch)
     (let ((we-drive-master-p (or *new-repository-p* (not (master-detached-p)))))
       (git-fetch-remote o name)
       (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil)))
