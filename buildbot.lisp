@@ -364,6 +364,7 @@
                    (report-line i line))
                  (when (or (starts-with-subseq *implementation-debugger-signature* line)
                            (starts-with-subseq *implementation-unhandled-condition-signature* line))
+                   (format t "==( found remote error signature on line ~D~%" i)
                    (let ((error-message (apply #'concatenate 'string line #(#\Newline)
                                                (iter (for line = (read-line pipe nil nil))
                                                      (while line)
@@ -407,7 +408,7 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) purge debug disable-debugger)
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key purge debug disable-debugger)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
