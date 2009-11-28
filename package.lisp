@@ -47,16 +47,18 @@
    #:module-status #:module-public-packages #:module-hidden-p
    ;; print-read.lisp
    #:serialise-definitions #:read-definitions #:save-definitions #:read-definitions #:read-local-definitions
-   ;; system-loadability.lisp
+   ;; systems.lisp
    #:system-loadable-p #:ensure-system-loadable
    #:ensure-module-systems-loadable #:module-systems-unloadable-error
    ;; gittage.lisp
    #:repo-var #:module-git-branches #:module-git-remotes #:module-add-git-remote #:ensure-module-git-remote
    #:module-bare-p #:module-locally-present-p #:do-present-modules #:module-world-readable-p
+   ;; branching.lisp
+   #:*follow-upstream* #:*drive-git-masters* #:*drive-git-masters-matching-trackers* #:*dirty-repository-behaviour*
    ;; import.lisp
    #:update
    ;; desire.lisp
-   #:*fetch-errors-serious* #:*silently-reset-dirty-repositories*
+   #:*fetch-errors-serious*
    #:desire #:lust
    #:define-application 
    #:fetch #:desire

@@ -22,14 +22,27 @@
 
 
 (defvar *follow-upstream* t
-  "Whether tracking upstream should update HEAD.
+  "Whether HEAD should be tracking upstream.
 Defaults to T.")
 
-(defvar *silently-reset-dirty-repositories* nil
+(defvar *dirty-repository-behaviour* :reset
   "Whenever a dirty repository comes up in a situation which requires
-a clean one to proceed, quietly reset, or otherwise cleanup the repository,
-without raising any signals.
-Defaults to NIL.")
+a clean one to proceed, do accordingly to the value of this variable:
+  :RESET  -  reset the dirty repository, losing unsaved changes,
+  :STASH  -  reset the dirty repository, stashing unsaved changes,
+  :ERROR  -  raise an error.
+Defaults to :RESET")
+
+(defvar *drive-git-masters* t
+  "Whether desire should be in control of the 'master' branches in modules
+natively git, essentially equating it to the 'tracker' branch.
+Defaults to T.")
+
+(defvar *drive-git-masters-matching-trackers* t
+  "Whether desire should be in control of the 'master' branches in modules
+natively git, when they match 'tracker' branches before module update, 
+essentially equating it to the 'tracker' branch.
+Defaults to T.")
 
 (defun master-detached-p (&optional repo-dir)
   "See if the master branch is driven by the user, that is out of desire's control."

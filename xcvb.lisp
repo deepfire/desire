@@ -36,27 +36,31 @@
                  (error "~@<Failed to apply ~S in ~S:~%~A.~:@>" filename *default-pathname-defaults* output)
                  (values nil output)))))))
 
-;;; XXX: clarify branching
 (defun xcvbify-module (module &optional break-on-patch-failure)
-  (update module)       ; leaves the repo in inconsistent state
+  "'I know what I do' mode: silently resets stuff."
+  (update module)
   (within-directory ((module-pathname module))
-    (git-set-head-index-tree '("tracker") :reset)
-    (git-set-branch :xcvbify)
-    (git-set-head-index-tree '("xcvbify") :reset)
-    (unless (file-exists-p "build.xcvb")
-      (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
-        (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" nil t nil)
-          (cond (successp
-                 (with-explanation ("committing xcvbification change")
-                   (git "commit" "-m" "Xcvbify.")))
-                (t
-                 (git-set-head-index-tree '("tracker") :reset)
-                 (git-remove-branch :xcvbify)
-                 (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
-                   (if break-on-patch-failure
-                       (break control-string (name module) output)
-                       (format t control-string (name module) output)))
-                 (values nil output))))))))
+    (let ((saved-head (get-head nil nil nil))
+          (saved-xcvbify (ref-value '("heads" "xcvbify") nil :if-does-not-exist :continue)))
+      (git-set-head-index-tree :tracker :reset)
+      (git-set-branch :xcvbify)
+      (git-set-head-index-tree :xcvbify :error)
+      (unless (file-exists-p "build.xcvb")
+        (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
+          (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" nil t nil)
+            (cond (successp
+                   (with-explanation ("committing xcvbification change")
+                     (git "commit" "-m" "Xcvbify.")))
+                  (t
+                   (git-set-head-index-tree saved-head :reset)
+                   (if saved-head
+                       (git-set-branch :xcvbify nil saved-xcvbify)
+                       (git-remove-branch :xcvbify))
+                   (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
+                     (if break-on-patch-failure
+                         (break control-string (name module) output)
+                         (format t control-string (name module) output)))
+                   (values nil output)))))))))
 
 (defun update-xcvbification (&optional break-on-patch-failure)
   (find-executable 'patch)

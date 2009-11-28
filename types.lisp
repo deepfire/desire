@@ -971,7 +971,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
         (within-directory (meta-dir)
           (unless (git-branch-present-p :master)
             (git-set-branch :master))
-          (git-set-head-index-tree '("master"))
+          (git-set-head-index-tree :master)
           (git-set-branch-index-tree (make-remote-ref remote-name branch)))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
@@ -990,7 +990,7 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
        ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
        (unwind-protect (progn (git-set-head-index-tree (make-remote-ref (down-case-name ,wishmaster) ,branch))
                               ,@body)
-         (git-set-head-index-tree '("master"))))))
+         (git-set-head-index-tree :master)))))
 
 (defun merge-remote-wishmaster (wishmaster)
   "Merge definitions from WISHMASTER."

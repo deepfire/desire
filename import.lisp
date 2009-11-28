@@ -115,28 +115,30 @@ Note that the provided directory is the final directory in the gate locality.")
         (unless (directory-created-p)
           (unless (git-repository-has-objects-p nil)
             (repository-error "~@<Repository in ~S has no objects.~:@>" repo-dir))
-          (ensure-clean-repository (if *silently-reset-dirty-repositories* :reset :error)))
+          (when *follow-upstream*
+            (ensure-clean-repository *dirty-repository-behaviour*)))
         (let ((*new-repository-p* (directory-created-p))
               (*source-remote* o))
           ;; at this point several facts apply:
           ;; - the directory of the module's repository within the gate exists, maybe without .git, and we're in that directory
-          ;; - when .git exists, its HEAD points to 'tracker', and there are no staged or unstaged changes
-          ;; - untracked files might be present (see how the DARCS-HTTP-REMOTE method on C-M-U-L deals with them)
           ;; - above variables are bound
-          (with-explanation ("on behalf of module ~A, fetching from  remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
+          (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
             (call-next-method)))
-        (when *follow-upstream*
-          (git-set-head-index-tree '("tracker"))))
+        (when (or *follow-upstream* (directory-created-p))
+          (git-set-head-index-tree :tracker (if (directory-created-p) :reset *dirty-repository-behaviour*))))
       (setf (git-repository-world-readable-p repo-dir) *default-world-readable*)))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir)
-    "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS"
+    "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
+Note that this method doesn't affect working tree, instead deferring that
+to the above :AROUND method."
     (cond (*new-repository-p*
            (init-db-when-new-repository name)
            (ensure-gitremote (name o) (url o name)))
           (t
            (ensure-tracker-branch)))
-    (let ((we-drive-master-p (or *new-repository-p* (not (master-detached-p)))))
+    (let ((we-drive-master-p (or *new-repository-p* *drive-git-masters* (and *drive-git-masters-matching-trackers*
+                                                                             (not (master-detached-p))))))
       (git-fetch-remote o name)
       (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil))
             (head-in-clouds-p (head-in-clouds-p)))
@@ -145,7 +147,7 @@ Note that the provided directory is the final directory in the gate locality.")
           (git-set-branch :master nil remote-master-val (not head-in-clouds-p))))))
   (:method :around ((o nongit-mixin) name url repo-dir)
     (unless *new-repository-p*
-      (git-set-head-index-tree '("master"))) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
+      (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     (let ((master-val (ref-value '("master") nil)))
       (git-set-branch :tracker nil master-val t)

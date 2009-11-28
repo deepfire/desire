@@ -93,6 +93,7 @@
     (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
       (with-avoided-executable-output
         (not (with-valid-exit-codes ((0 t)
+                                     (1 nil)
                                      (128 nil))
                (git "diff" "--exit-code")))))))
 
@@ -101,6 +102,7 @@
     (with-explanation ("determining whether git repository at ~S has staged changes" *default-pathname-defaults*)
       (with-avoided-executable-output
         (not (with-valid-exit-codes ((0 t)
+                                     (1 nil)
                                      (128 nil))
                (git "diff" "--cached" "--exit-code")))))))
 
@@ -108,6 +110,7 @@
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has staged or unstaged changes" *default-pathname-defaults*)
       (not (with-valid-exit-codes ((0 t)
+                                   (1 nil)
                                    (128 nil))
              (git "diff" "--exit-code" "--summary" "HEAD" "--"))))))
 
@@ -363,22 +366,29 @@
     (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" *default-pathname-defaults* ref)
       (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
 
-(defun ensure-clean-repository (&optional (if-changes :error) directory)
+(defun git-stash (&optional directory)
+  "Same as GIT-SET-BRANCH-INDEX-TREE with no arguments, but saves changes
+in a temporary pseudo-commit."
+  (maybe-within-directory directory
+    (with-explanation ("stashing changes in git repository at ~S" *default-pathname-defaults*)
+      (git "stash"))))
+
+(defun ensure-clean-repository (&optional (if-changes :stash) directory)
   (maybe-within-directory directory
     (with-retry-restarts ((hardreset-repository ()
                             :report "Clear all uncommitted changes, both staged and unstaged."
                             (git-set-branch-index-tree)))
       (when (git-repository-changes-p)
         (ecase if-changes
+          (:stash (git-stash))
           (:reset (git-set-branch-index-tree))
           (:error (git-error "~@<~:[Uns~;S~]taged changes in git repository ~S.~:@>"
                              (git-repository-staged-changes-p directory) (or directory *default-pathname-defaults*))))))))
 
-(defun git-set-head-index-tree (ref &optional (if-changes :error) directory)
-  (let ((ref (ensure-cons ref))
-        (drop-changes (eq if-changes :reset)))
+(defun git-set-head-index-tree (ref &optional (if-changes :stash) directory)
+  (let ((ref (mapcar #'downstring (ensure-cons ref))))
     (maybe-within-directory directory
       (ref-value ref nil)
       (ensure-clean-repository if-changes)
       (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
-        (apply #'git "checkout" (prepend (when drop-changes "-f") (list (flatten-path-list ref))))))))
+        (git "checkout" (flatten-path-list ref))))))

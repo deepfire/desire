@@ -6,7 +6,7 @@
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
 #+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
-November 27, 2009, 01:54
+November 28, 2009, 19:46
 #+END:
 #+END_CENTER
 
@@ -320,14 +320,14 @@ and actionable.
       - lust &rest module-names => boolean ::
         Make modules with MODULE-NAMES locally available.
 
-      - add-module url &optional module-name &key systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) => module ::
+      - add-module url &key module-name systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) => module ::
         Define a new module, with download location specified by URL, and the module's name
         either deduced from the URL, or provided via MODULE-NAME.
 
-        When LUST is non-NIL, the module is localised.
+        When LUST is non-NIL, the module is fetched after its definition is internalised.
 
-      - update-module module-specifier &optional (locality (gate *self*)) => <no values> ::
-        Update a module designated by MODULE-SPECIFIER, possibly specifying the target LOCALITY.
+      - update module-designator &optional (locality (gate *self*)) => <no values> ::
+        Update a module specified by MODULE-DESIGNATOR, possibly specifying the target LOCALITY.
 
       - make-module-unpublished module-designator &optional (locality (gate =*self*=)) ::
         Stop advertising MODULE in DEFINITIONS, without completely hiding it.
@@ -348,10 +348,13 @@ and actionable.
         Whether tracking upstream should update HEAD.
         Defaults to T.
 
-      - =*silently-reset-dirty-repositories*= => boolean ::
-        Whenever a dirty repository comes up in a situation which requires a clean one to proceed, quietly reset, or otherwise cleanup the repository,
-        without raising any signals.
-        Defaults to NIL.
+      - =*dirty-repository-behaviour*= => keyword ::
+        Whenever a dirty repository comes up in a situation which requires
+        a clean one to proceed, do accordingly to the value of this variable:
+        - :RESET  -  reset the dirty repository, losing unsaved changes,
+        - :STASH  -  reset the dirty repository, stashing unsaved changes,
+        - :ERROR  -  raise an error.
+        Defaults to :RESET.
 
 ***** Reader macros for add-module
 
