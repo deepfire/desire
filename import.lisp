@@ -132,9 +132,11 @@ Note that the provided directory is the final directory in the gate locality.")
   (:method ((o git-remote) name url repo-dir)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS"
     (declare (ignore url repo-dir))
-    (when *new-repository-p*
-      (init-db-when-new-repository name)
-      (ensure-gitremote (name o) (url o name)))
+    (cond (*new-repository-p*
+           (init-db-when-new-repository name)
+           (ensure-gitremote (name o) (url o name)))
+          (t
+           (ensure-tracker-branch)))
     (let ((we-drive-master-p (or *new-repository-p* (not (master-detached-p)))))
       (git-fetch-remote o name)
       (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil)))
