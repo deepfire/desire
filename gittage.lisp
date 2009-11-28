@@ -279,13 +279,13 @@
     (declare (ignore directory))
     (= x y)))
 
-(defun reffile-value-full (pathname &optional directory)
+(defun symbolic-reffile-value-full (pathname &optional directory)
   (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
     (let* ((normalised-ref (rest ref)) ; strip the "refs" component
            (refval (or refval (ref-value normalised-ref directory))))
       (values refval normalised-ref))))
 
-(defun set-reffile-value-full (pathname value)
+(defun set-symbolic-reffile-value-full (pathname value)
   (with-output-to-file (reffile pathname)
     (when (consp value)
       (write-string "ref: " reffile))
@@ -297,11 +297,11 @@
   (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
 
 (defun get-head (&optional directory remote)
-  (reffile-value-full (head-pathname directory remote) directory))
+  (symbolic-reffile-value-full (head-pathname directory remote) directory))
 
 (defun set-head (new-value &optional directory remote)
   (declare (type (or cons (integer 0)) new-value))
-  (set-reffile-value-full (head-pathname directory remote) new-value))
+  (set-symbolic-reffile-value-full (head-pathname directory remote) new-value))
 
 (defun git-detach-head (&optional directory)
   (maybe-within-directory directory
