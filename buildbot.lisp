@@ -338,6 +338,8 @@
 ;;;
 (defvar *implementation-debugger-signature*
   #+sbcl "debugger invoked on a")
+(defvar *implementation-unhandled-condition-signature*
+  #+sbcl "unhandled")
 (defun invoke-with-slave-connection (hostname username slave-setup-commands verbose fn)
   (flet ((setup-slave-connection (pipe hostname username commands)
            (with-asynchronous-execution
@@ -351,8 +353,8 @@
                    (buildmaster-error "~@<Early termination from slave: no output marker found.~:@>"))
                  (when verbose
                    (report-line i line))
-                 (when (string= *implementation-debugger-signature*
-                                (subseq line 0 (min (length *implementation-debugger-signature*) (length line))))
+                 (when (or (starts-with-subseq *implementation-debugger-signature* line)
+                           (starts-with-subseq *implementation-unhandled-condition-signature* line))
                    (let ((error-message (apply #'concatenate 'string line #(#\Newline)
                                                (iter (for line = (read-line pipe nil nil))
                                                      (while line)
@@ -381,16 +383,18 @@
 ;;; Buildmaster entry points
 ;;;
 (defun ping-slave (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
-                   purge purge-metastore branch metastore-branch disable-debugger verbose)
+                   purge purge-metastore branch metastore-branch disable-debugger verbose
+                   just-print-conditions)
   (handler-case
-      (with-slave-connection (slave-pipe hostname username
-                              (cook-buildslave-command nil nil purge
-                                                       purge-metastore branch
-                                                       metastore-branch
-                                                       disable-debugger verbose)
-                              verbose)
-        (declare (ignore slave-pipe))
-        t)
+      (with-maybe-just-printing-conditions (t buildslave-error) just-print-conditions
+        (with-slave-connection (slave-pipe hostname username
+                                           (cook-buildslave-command nil nil purge
+                                                                    purge-metastore branch
+                                                                    metastore-branch
+                                                                    disable-debugger verbose)
+                                           verbose)
+          (declare (ignore slave-pipe))
+          t))
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
