@@ -85,7 +85,8 @@
   (let ((path (subfile* directory ".git" "git-daemon-export-ok")))
     (if val
         (open path :direction :probe :if-does-not-exist :create)
-        (delete-file path))
+        (when (file-exists-p path)
+          (delete-file path)))
     val))
 
 (defun git-repository-unstaged-changes-p (&optional directory)
