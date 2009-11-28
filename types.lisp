@@ -889,8 +889,8 @@ not discarded from consideration."
 whether the attempt was successful."
   (let* ((best-remote (module-best-remote module :if-does-not-exist :continue))
          (localp (and (null best-remote) (module-best-remote module :allow-self t))))
-    (unless localp
-      (touch-remote-module best-remote module))))
+    (or localp
+        (touch-remote-module best-remote module))))
 
 (defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
   "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
