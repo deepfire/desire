@@ -121,6 +121,8 @@
   (:default-initargs :action-description "fetch upstream modules and convert them"))
 (defclass slave-fetch-phase (remote-test-phase) ()
   (:default-initargs :action-description "fetch modules from wishmaster"))
+(defclass slave-recurse-phase (remote-test-phase) ()
+  (:default-initargs :action-description "unwind module dependencies"))
 (defclass slave-load-phase (remote-test-phase) ()
   (:default-initargs :action-description "load modules"))
 (defclass slave-test-phase (remote-test-phase) ()
@@ -234,7 +236,10 @@
 (defparameter *buildmaster-run-phases* '(master-reachability-phase
                                          master-update-phase
                                          slave-fetch-phase
-                                         slave-load-phase))
+                                         slave-recurse-phase
+                                         slave-load-phase
+                                         ;; slave-test-phase
+                                         ))
 
 (defgeneric invoke-with-active-phase (phase fn)
   (:method ((o test-phase) (fn function))
@@ -307,6 +312,7 @@
                           (buildmaster-error "~@<Wrong module info from slave, next in turn was ~S, module returned ~S.~:@>" (name m) name))
                         (unless (eq mode (etypecase p
                                            (slave-fetch-phase :fetch)
+                                           (slave-recurse-phase :recurse)
                                            (slave-load-phase :load)))
                           (buildmaster-error "~@<Wrong phase for module ~A from slave: current phase ~S, client sent ~S~:@>" (name m) :fetch mode))
                         (format t "==( processing module ~A, phase ~A~%" name mode)
@@ -401,14 +407,16 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil) purge debug)
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) purge debug disable-debugger)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
+                       (when slave-recurse '(slave-recurse-phase))
                        (when slave-load '(slave-load-phase))
                        (when slave-test '(slave-test-phase)))
+       :purge purge
        :debug debug
-       :purge purge))
+       :disable-debugger disable-debugger))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
             purge purge-metastore branch metastore-branch debug disable-debugger verbose)
