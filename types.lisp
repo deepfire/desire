@@ -216,7 +216,7 @@ This notably excludes converted modules."
 (defclass location (desirable)
   ((module-names :accessor location-module-names :initarg :module-names :documentation "Specified or maybe cached, for LOCALITYs."))
   (:default-initargs
-   :modules nil))
+   :module-names nil))
 
 (defclass gate (location)
   ((converted-module-names :accessor gate-converted-module-names :initarg :converted-module-names :documentation "Complex computation."))
