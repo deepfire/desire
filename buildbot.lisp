@@ -310,10 +310,7 @@
                         (report-line 0 initial-line)
                         (unless (eq name (name m))
                           (buildmaster-error "~@<Wrong module info from slave, next in turn was ~S, module returned ~S.~:@>" (name m) name))
-                        (unless (eq mode (etypecase p
-                                           (slave-fetch-phase :fetch)
-                                           (slave-recurse-phase :recurse)
-                                           (slave-load-phase :load)))
+                        (unless (eq mode (make-keyword (symbol-name (type-of p))))
                           (buildmaster-error "~@<Wrong phase for module ~A from slave: current phase ~S, client sent ~S~:@>" (name m) :fetch mode))
                         (format t "==( processing module ~A, phase ~A~%" name mode)
                         (let ((marker-line (read-mandatory-line pipe (name m))))
