@@ -461,29 +461,15 @@ differ in only slight detail -- gate property, for example."
   ;; The locality typed *gate-vcs-type* needs to be constructed differently between make-instance/change-class.
   (mapc (curry #'define-local-distributor-locality o nil) (remove *gate-vcs-type* *supported-vcs-types*)))
 
-(defun wishmaster-release-modules (wishmaster)
-  "Return the list of names of modules released by WISHMASTER via its gate.
-This function is interesting because wishmasters only ever release via
-their gate remote."
-  (location-module-names (gate wishmaster)))
-
-(defun distributor-converted-modules (distributor)
-  "Return the list of names of converted modules provided by DISTRIBUTOR
-via its gate. It's called DISTRIBUTOR-CONVERTED-MODULES because we want to
-be able to use it on all distributors, without keeping track of whether
-they participate in the desire wishmaster protocol or not."
-  (gate-converted-module-names (gate distributor)))
-
 (defgeneric update-local-distributor-conversions (distributor)
   (:method ((o local-distributor))
     (let ((gate (gate o)))
-      (let ((converted (gate-converted-module-names gate))
+      (let (;; The logic here is that if we're engaging in this whole game,
+            ;; we're only releasing via our gate remote.
+            (release-set (location-module-names gate))
+            (converted (gate-converted-module-names gate))
             (unpublished (gate-unpublished-module-names gate))
-            (hidden (gate-hidden-module-names gate))
-            ;; The logic here is that if we're engaging in this whole game,
-            ;; we're only releasing via our gate remote, which means that
-            ;; WISHMASTER-RELEASE-MODULES returns the complete set of modules.
-            (release-set (wishmaster-release-modules o)))
+            (hidden (gate-hidden-module-names gate)))
         (let* ((missing (set-difference release-set converted))
                (new-unpublished (intersection missing unpublished))
                (new-hidden (intersection missing hidden))
