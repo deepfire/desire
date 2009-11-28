@@ -188,25 +188,30 @@
           (slot-value o 'results) (prepare-result-vector n-phases n-phase-results modules locality)
           (slot-value o 'n-phase-results) n-phase-results)))
 
-;; must be called under master run lock
-(defgeneric finalise-result (result successp condition backtrace)
-  (:method ((o result) successp condition backtrace)
-    (if successp
-        (succeed-action o)
-        (fail-action o :condition condition :backtrace backtrace))))
-
 (defun master-result (master-run i)
   (declare (type buildmaster-run master-run))
   (aref (master-run-results master-run) i))
 
-(defgeneric advance-result (master-run &optional successp condition backtrace)
-  (:method ((o buildmaster-run) &optional successp condition backtrace)
+(defun first-phase-result-p (master-run result)
+  (< (result-id result) (master-run-n-phase-results master-run)))
+
+(defun previous-phase-result (master-run result)
+  (master-result master-run (- (result-id result) (master-run-n-phase-results master-run))))
+
+(defun previous-phase-result-success-p (master-run result)
+  (typep (previous-phase-result master-run result) 'success))
+
+(defgeneric advance-result (master-run &optional ranp successp condition backtrace)
+  (:method ((o buildmaster-run) &optional ranp successp condition backtrace)
     (let* ((result-vector (master-run-results o))
            (i (fill-pointer result-vector)))
       (with-master-run-lock (o)
         (when-let ((completed-r (when (plusp i)
                                   (aref result-vector (1- i)))))
-          (finalise-result completed-r successp condition backtrace))
+          (when ranp
+            (if successp
+                (succeed-action completed-r)
+                (fail-action completed-r :condition condition :backtrace backtrace))))
         (bordeaux-threads:condition-notify (master-run-condvar o))
         (cond ((< i (* (master-run-n-phase-results o)
                        (master-run-n-phases o)))
@@ -269,7 +274,7 @@
           (buildmaster-error "~@<Early termination from slave: premature end while ~A.~:@>" description))
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
-             
+
 (defgeneric execute-test-phase (buildmaster-run test-phase result-marker)
   (:method :around ((m-r buildmaster-run) (p local-test-phase) result-marker)
     (with-active-phase (p)
@@ -279,7 +284,7 @@
             (with-tracked-termination (r)
               (destructuring-bind (&key return-value output condition) (call-next-method m-r p r)
                 (append-result-output r output t)
-                (setf r (advance-result m-r return-value condition))))
+                (setf r (advance-result m-r t return-value condition))))
             (finally (return r)))))
   (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result)
     (module-test-reachability (result-module current-result) :capture-output t))
@@ -327,7 +332,7 @@
                                          (char= #\) (schar final-line 0)))
                               (buildmaster-error "~@<Corrupt final line while reading module ~A.~:@>" (name m))))
                           (destructuring-bind (&key status condition backtrace) final-args
-                            (setf r (advance-result m-r status condition backtrace)))))
+                            (setf r (advance-result m-r t status condition backtrace)))))
                       (buildmaster-error "~@<Corrupt initial line while reading module ~A.~:@>" (name m)))))
               (finally (return r)))))))
 
