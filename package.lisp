@@ -64,10 +64,7 @@
    #:fetch #:desire
    #:purge-module-binaries
    ;; desire.lisp :: tests
-   #:module-test-reachability
-   #:module-test-fetchability
-   #:module-test-loadability
-   #:module-test-internal
+   #:run-module-test
    #:buildslave #:*buildslave-remote-output-marker* #:*buildslave-remote-end-of-output-marker*
    #:*buildslave-remote-test-output-marker* #:*buildslave-remote-end-of-test-output-marker*
    ;; add-module.lisp
