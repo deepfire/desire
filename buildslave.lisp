@@ -43,7 +43,7 @@
           (*break-on-signals* 'error))
       (update m)
       t))
-  (:method ((o (eql :slave-recursion-phase)) m)
+  (:method ((o (eql :slave-recurse-phase)) m)
     (desire (list (name m)) :skip-present t :seal nil)
     t)
   (:method ((o (eql :slave-load-phase)) m)
