@@ -279,13 +279,14 @@
     (declare (ignore directory))
     (= x y)))
 
-(defun symbolic-reffile-value-full (pathname &optional directory)
+(defun symbolic-reffile-value (pathname &optional dereference directory)
   (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
-    (let* ((normalised-ref (rest ref)) ; strip the "refs" component
-           (refval (or refval (ref-value normalised-ref directory))))
-      (values refval normalised-ref))))
+    (let ((normalised-ref (rest ref))) ; strip the "refs" component
+      (if dereference
+          (values (or refval (ref-value normalised-ref directory)) normalised-ref)
+          (or normalised-ref refval)))))
 
-(defun set-symbolic-reffile-value-full (pathname value)
+(defun set-symbolic-reffile-value (pathname value)
   (with-output-to-file (reffile pathname)
     (when (consp value)
       (write-string "ref: " reffile))
@@ -296,27 +297,34 @@
 (defun head-pathname (&optional directory remote)
   (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
 
-(defun get-head (&optional directory remote)
-  (symbolic-reffile-value-full (head-pathname directory remote) directory))
+(defun get-head (&optional directory remote (dereference t))
+  (symbolic-reffile-value (head-pathname directory remote) dereference directory))
 
 (defun set-head (new-value &optional directory remote)
   (declare (type (or cons (integer 0)) new-value))
-  (set-symbolic-reffile-value-full (head-pathname directory remote) new-value))
+  (set-symbolic-reffile-value (head-pathname directory remote) new-value))
 
 (defun git-detach-head (&optional directory)
   (maybe-within-directory directory
     (set-head (get-head))))
 
-(defun invoke-with-detached-head (fn directory)
-  (maybe-within-directory directory
-    (let ((current-head (get-head)))
-      (unwind-protect (progn (git-detach-head)
-                             (funcall fn))
-        (when current-head
-          (set-head current-head))))))
+(defun head-in-clouds-p (&optional directory remote)
+  (let ((head (get-head directory remote nil)))
+    (not (or (integerp head)
+             (ref-value head directory :if-does-not-exist :continue)))))
 
-(defmacro with-detached-head ((&optional directory) &body body)
-  `(invoke-with-detached-head (lambda () ,@body) ,directory))
+(defun invoke-with-maybe-detached-head (directory detachp fn)
+  (maybe-within-directory directory
+    (if detachp
+        (let ((current-head (get-head)))
+          (unwind-protect (progn (git-detach-head)
+                                 (funcall fn))
+            (when current-head
+              (set-head current-head))))
+        (funcall fn))))
+
+(defmacro with-maybe-detached-head ((&optional directory detachp) &body body)
+  `(invoke-with-maybe-detached-head ,directory ,detachp  (lambda () ,@body)))
 
 ;;;
 ;;; Branches
@@ -346,8 +354,8 @@
     (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S" branchname (consp refvalue) refvalue *default-pathname-defaults*)
       (nth-value 0 (git "branch" "-f" (downstring branchname) (cook-refval refvalue))))))
 
-(defun git-set-branch (name &optional directory (refvalue (get-head directory)))
-  (with-detached-head (directory)
+(defun git-set-branch (name &optional directory (refvalue (get-head directory)) possibly-current-p)
+  (with-maybe-detached-head (directory possibly-current-p)
     (git-set-noncurrent-branch name directory refvalue)))
 
 (defun git-set-branch-index-tree (&optional ref directory)

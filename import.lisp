@@ -138,17 +138,18 @@ Note that the provided directory is the final directory in the gate locality.")
            (ensure-tracker-branch)))
     (let ((we-drive-master-p (or *new-repository-p* (not (master-detached-p)))))
       (git-fetch-remote o name)
-      (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil)))
-        (git-set-branch :tracker nil remote-master-val)
+      (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil))
+            (head-in-clouds-p (head-in-clouds-p)))
+        (git-set-branch :tracker nil remote-master-val (not head-in-clouds-p))
         (when we-drive-master-p
-          (git-set-branch :master nil remote-master-val)))))
+          (git-set-branch :master nil remote-master-val (not head-in-clouds-p))))))
   (:method :around ((o nongit-mixin) name url repo-dir)
     (unless *new-repository-p*
       (git-set-head-index-tree '("master"))) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     (let ((master-val (ref-value '("master") nil)))
-      (git "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-refval master-val))
-      (git-set-branch :tracker nil master-val)))
+      (git-set-branch :tracker nil master-val t)
+      (git "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-refval master-val))))
   ;; ====================== end of branch model aspect ==========================
   ;; direct fetch, non-git
   (:method ((o cvs-native-remote) name url repo-dir)
