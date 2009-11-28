@@ -9,4 +9,5 @@
   :depends-on (:alexandria :iterate :pergamum :cl-who :executor :desire)
   :components ((:file "buildbot-base")
                (:file "buildbot-result")
-               (:file "buildbot" :depends-on ("buildbot-base" "buildbot-result"))))
+               (:file "buildbot" :depends-on ("buildbot-base" "buildbot-result"))
+               (:file "buildbot-presentation" :depends-on ("buildbot"))))
