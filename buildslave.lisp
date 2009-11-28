@@ -67,23 +67,23 @@
       (iter (for m in modules)
             (syncformat t "(:name ~S :mode :fetch~%~S~%" (name m) *buildslave-remote-test-output-marker*)
             (destructuring-bind (&key return-value condition backtrace) (module-test-fetchability m)
-              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
+              (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (when (member "SLAVE-RECURSE-PHASE" phases :test #'string-equal)
       (iter (for m in modules)
             (syncformat t "(:name ~S :mode :recurse~%~S~%" (name m) *buildslave-remote-test-output-marker*)
             (destructuring-bind (&key return-value condition backtrace) (module-test-recursion m)
-              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
+              (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (when (member "SLAVE-LOAD-PHASE" phases :test #'string-equal)
       (iter (for m in modules)
             (syncformat t "(:name ~S :mode :load~%~S~%" (name m) *buildslave-remote-test-output-marker*)
             (destructuring-bind (&key return-value condition backtrace) (module-test-loadability m)
-              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
+              (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (when (member "SLAVE-TEST-PHASE" phases :test #'string-equal)
       (iter (for m in modules)
             (destructuring-bind (&key return-value condition backtrace) (module-test-internal m)
-              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
+              (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (syncformat t "~%~S~%" *buildslave-remote-end-of-output-marker*)))
