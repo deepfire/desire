@@ -92,7 +92,7 @@
                      (unless (typep o 'result-not-yet) 
                        (fmt "<a href='/desire-waterfall?mode=output&result-id=~D'>out</a>" (result-id o)))
                      (when condition
-                       (htm 
+                       (htm
                         :br
                         (fmt "<a href='/desire-waterfall?mode=cond&result-id=~D'>co</a>" (result-id o)))))))))))
 

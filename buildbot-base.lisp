@@ -81,9 +81,11 @@
 ;;;
 (define-protocol-class action (period)
   ((condition :accessor action-condition :initarg :condition)
+   (backtrace :accessor action-backtrace :initarg :backtrace)
    (class-map :accessor action-class-map :allocation :class :initarg :class-map))
   (:default-initargs
-   :condition nil))
+   :condition nil
+   :backtrace nil))
 
 (defmacro define-action-root-class (name superclasses (&rest slots) &rest class-options)
   (if-let ((subclass-map (assoc :subclass-to-action-class-map class-options)))

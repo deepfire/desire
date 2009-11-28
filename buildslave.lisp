@@ -27,20 +27,20 @@
 (defparameter *buildslave-remote-end-of-test-output-marker* :end-of-test-result-marker)
 
 (defun module-test-reachability (m &key capture-output)
-  (with-recorded-status (:record-output capture-output)
+  (with-recorded-status (:record-backtrace t :record-output capture-output)
     (touch-module m)
     t))
 
 (defun module-test-fetchability (m &key capture-output)
   (let ((*fetch-errors-serious* t))
-    (with-recorded-status (:record-output capture-output)
+    (with-recorded-status (:record-backtrace t :record-output capture-output)
       (unwind-protect (update m)
         (finish-output *standard-output*)
         (finish-output *error-output*))
       t)))
 
 (defun module-test-loadability (m &key capture-output)
-  (with-recorded-status (:record-output capture-output)
+  (with-recorded-status (:record-backtrace t :record-output capture-output)
     (unwind-protect (asdf:oos 'asdf:load-op (name m))
       (finish-output *standard-output*)
       (finish-output *error-output*))
@@ -48,7 +48,7 @@
 
 (defun module-test-internal (m &key capture-output)
   (declare (ignore m))
-  (with-recorded-status (:record-output capture-output)
+  (with-recorded-status (:record-backtrace t :record-output capture-output)
     (unwind-protect (not-implemented 'module-test-internal)
       (finish-output *standard-output*)
       (finish-output *error-output*))))
@@ -59,18 +59,18 @@
     (when (member "SLAVE-FETCH-PHASE" phases :test #'string-equal)
       (iter (for m in modules)
             (syncformat t "(:name ~S :mode :fetch~%~S~%" (name m) *buildslave-remote-test-output-marker*)
-            (destructuring-bind (&key return-value condition) (module-test-fetchability m)
-              (syncformat t "~%~S~%:status ~S :condition ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value condition))))
+            (destructuring-bind (&key return-value condition backtrace) (module-test-fetchability m)
+              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (when (member "SLAVE-LOAD-PHASE" phases :test #'string-equal)
       (iter (for m in modules)
             (syncformat t "(:name ~S :mode :load~%~S~%" (name m) *buildslave-remote-test-output-marker*)
-            (destructuring-bind (&key return-value condition) (module-test-loadability m)
-              (syncformat t "~%~S~%:status ~S :condition ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value condition))))
+            (destructuring-bind (&key return-value condition backtrace) (module-test-loadability m)
+              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (when (member "SLAVE-TEST-PHASE" phases :test #'string-equal)
       (iter (for m in modules)
-            (destructuring-bind (&key return-value condition) (module-test-internal m)
-              (syncformat t "~%~S~%:status ~S :condition ~S)~%"
-                          *buildslave-remote-end-of-test-output-marker* return-value condition))))
+            (destructuring-bind (&key return-value condition backtrace) (module-test-internal m)
+              (syncformat t "~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                          *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) (format nil "~A" backtrace)))))
     (syncformat t "~%~S~%" *buildslave-remote-end-of-output-marker*)))
