@@ -144,16 +144,17 @@
     (complete-action o (specific-action-subclass o 'success) initargs)))
 
 (defun invoke-with-tracked-termination (action fn)
-  (let (termination-done-p)
-    (unwind-protect-case ()
-        (handler-case (funcall fn)
-          (serious-condition (c)
-            (terminate-action action :condition c)
-            (setf termination-done-p t)
-            (error c)))
-      (:abort
-       (unless termination-done-p
-         (terminate-action action))))))
+  (let (normally-executed-p
+        termination-done-p)
+    (unwind-protect
+         (handler-case (multiple-value-prog1 (funcall fn)
+                         (setf normally-executed-p t))
+           (serious-condition (c)
+             (terminate-action action :condition c)
+             (setf termination-done-p t)
+             (error c)))
+      (unless (or normally-executed-p termination-done-p)
+        (terminate-action action)))))
 
 (defmacro with-tracked-termination ((action) &body body)
   `(invoke-with-tracked-termination ,action (lambda () ,@body)))
