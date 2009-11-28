@@ -401,12 +401,13 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil))
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-load t) (slave-test nil) purge)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
                        (when slave-load '(slave-load-phase))
-                       (when slave-test '(slave-test-phase)))))
+                       (when slave-test '(slave-test-phase)))
+       :purge purge))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
             purge purge-metastore branch metastore-branch disable-debugger verbose)
