@@ -30,6 +30,13 @@
    (system-dictionary :accessor condition-system-dictionary :initarg :system-dictionary))
   (:report (system-dictionary previous-system-dictionary)
            "~@<Progress halted while processing system dictionary ~S. Previous dictionary: ~S.~:@>" system-dictionary previous-system-dictionary))
+(define-reported-condition counterproductive-system-definition (recursor-error module-error system-error)
+  ((imperatively-loaded-system :initarg :imperatively-loaded-system))
+  (:report (module system imperatively-loaded-system)
+           "~@<In module ~A: encountered a counterproductive definition for system ~A, ~
+               which violates declarative semantics of system definitions by imperatively ~
+               loading system ~A belonging to module ~A.~:@>"
+           (name module) (name system) (name imperatively-loaded-system) (name (system-module imperatively-loaded-system))))
 
 ;; system dictionary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))
@@ -118,10 +125,12 @@
                            ;; A hidden system is a system definition residing in a file named differently from main system's name.
                            ;; Find them.
                            (iter (for hidden-system-name in (set-difference (asdf-hidden-system-names system) known-visible :test #'equal))
-                                 (set-syspath hidden-system-name path)
                                  (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
                                                           (register-new-system (intern hidden-system-name) path type module))))
+                                   (unless (eq module (system-module hidden-system))
+                                     (error 'counterproductive-system-definition :module module :system system :imperatively-loaded-system hidden-system))
                                    (ensure-system-loadable hidden-system path nil locality))
+                                 (set-syspath hidden-system-name path)
                                  (collect (if complete
                                               (make-wanted-missing hidden-system-name)
                                               (make-unwanted-missing hidden-system-name)))))))))

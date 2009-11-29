@@ -47,7 +47,7 @@
    #:distributor-condition #:remote-condition #:locality-condition #:module-condition #:system-condition #:application-condition #:repository-condition
    #:distributor-error #:remote-error #:locality-error #:module-error #:system-error #:application-error #:repository-error
    #:simple-distributor-error #:simple-remote-error #:simple-locality-error #:simple-module-error #:simple-system-error #:simple-application-error #:simple-repository-error 
-   #:recursor-progress-halted
+   #:recursor-progress-halted #:counterproductive-system-definition
    #:insatiable-desire #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module
    #:module-status #:module-public-packages #:module-hidden-p
