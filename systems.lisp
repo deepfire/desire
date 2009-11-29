@@ -97,7 +97,9 @@ differently from that system's name."
            (handler-case (let ((*break-on-signals* nil)
                                (name (downstring name)))
                            (unless (asdf-system-name-blacklisted-p name)
-                             (asdf:find-system name)))
+                             (format t "about to find system ~A~%" name)
+                             (let ((system (asdf:find-system name)))
+                               (format t "finding system ~A: ~A, ~S~%" name system (asdf:system-definition-pathname system)))))
              (error (c)
                (format t "~@<; ~@;WARNING: error while querying ASDF about hidden names of system ~S: ~A~:@>~%" (name system) c)))
            (mapcar (compose #'string-upcase #'asdf:component-name)
@@ -143,17 +145,16 @@ differently from that system's name."
   "Return a list of all MODULE's system definition pathnames corresponding to
 system TYPE within LOCALITY."
   (let* ((module (coerce-to-module module))
-         (path (module-pathname module locality))
-         (pass1 (directory (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-file-type type)))))
-    (if-let ((blacklist (module-system-path-blacklist module)))
-      (remove-if (rcurry #'pathname-match-p (subwild path blacklist)) pass1)
-      pass1)))
-
-(defun central-module-system-definition-pathname (module type &optional (locality (gate *self*)))
-  (let* ((file-type (system-type-file-type type))
-         (central-system-pathname (subfile (module-pathname module locality) (list (down-case-name module)) :type file-type)))
-    (and (probe-file central-system-pathname)
-         central-system-pathname)))
+         (path (truename (module-pathname module locality)))
+         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-file-type type)))
+         (pass1 (directory pass1-pattern))
+         (blacklists (list* (subwild path '("test"))
+                            (subwild path '("tests"))
+                            (when-let ((blacklist (module-system-path-blacklist module)))
+                              (list (subwild path blacklist))))))
+    (iter (for p in pass1)
+          (when (notany (curry #'pathname-match-p p) blacklists)
+            (collect p)))))
 
 (defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
@@ -171,3 +172,7 @@ system TYPE within LOCALITY."
    Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
   (dolist (s (module-systems module))
     (ensure-system-loadable s nil (not (system-hidden-p s)) locality)))
+
+(defun module-central-system-name (module)
+  "How stupid is that?"
+  (name module))

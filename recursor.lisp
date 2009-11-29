@@ -26,19 +26,19 @@
   #-sbcl nil)
 
 (define-reported-condition recursor-progress-halted (recursor-error)
-  ((previous-system-dictionary :reader condition-previous-system-dictionary :initarg :previous-system-dictionary)
-   (system-dictionary :reader condition-system-dictionary :initarg :system-dictionary))
+  ((system-dictionary :reader condition-system-dictionary :initarg :system-dictionary))
   (:report (system-dictionary previous-system-dictionary)
-           "~@<Progress halted while processing system dictionary ~S. Previous dictionary: ~S.~:@>" system-dictionary previous-system-dictionary))
+           "~@<Progress halted while processing system dictionary ~S.~:@>" system-dictionary))
 (define-reported-condition counterproductive-system-definition (recursor-error module-error system-error)
-  ((raw-hidden-system-names :reader raw-hidden-system-names :initarg :raw-hidden-system-names)
-   (known-other-module-systems :reader known-other-module-systems :initarg :known-other-module-systems))
-  (:report (module system raw-hidden-system-names known-other-module-systems)
+  ((raw-hidden-system-names :reader condition-raw-hidden-system-names :initarg :raw-hidden-system-names)
+   (known-other-module-systems :reader condition-known-other-module-systems :initarg :known-other-module-systems)
+   (other-modules :reader condition-other-modules :initarg :other-modules))
+  (:report (module system raw-hidden-system-names known-other-module-systems other-modules)
            "~@<In module ~A: encountered a counterproductive definition for system ~A, ~
                which violates declarative semantics of system definitions by imperatively ~
-               loading systems ~A known to be belonging to other modules.  Unprocessed hidden ~
+               loading systems ~A known to be belonging to modules ~A.  Unprocessed hidden ~
                system discovery output: ~A.~:@>"
-           (name module) (name system) raw-hidden-system-names (mapcar #'name known-other-module-systems)))
+           (name module) (name system) (mapcar #'name known-other-module-systems) (mapcar #'name other-modules) raw-hidden-system-names))
 (define-reported-condition system-name-conflict (recursor-error module-error system-error)
   ()
   (:report ()
@@ -58,6 +58,7 @@
              (set-syspath (name value) (setf (gethash name syspath) value))
              (subj (c) (car c))
              (cell (c) (cdr c))
+             ((setf cellar) (v c) (setf (cadr c) v))
              ((setf celldr) (v c) (setf (cddr c) v))
              (entry (vocab subj &optional (test #'eq))
                (assoc subj vocab :test test))
@@ -86,8 +87,8 @@
                    (let ((extended-system-dictionary system-dictionary))
                      (dolist (newdep (append (mapcar (compose #'string #'name) local-newdeps)
                                              new-missing))
-                       (if-let ((cell (cell (entry system-dictionary newdep #'string=))))
-                         (setf (car cell) :wanted)
+                       (if-let ((entry (entry system-dictionary newdep #'string=)))
+                         (setf (cellar entry) :wanted)
                          (setf extended-system-dictionary (cons (make-wanted-missing newdep) extended-system-dictionary))))
                      ;; NOTE: on module boundaries we lose precise system dependency names
                      (values (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
@@ -98,24 +99,30 @@
               MISSING unknown systems, returning them as multiple values."
                (declare (special *syspath*))
                (if-let ((name (next-unsatisfied-system system-dictionary)))
-                 (if-let ((system (system name :if-does-not-exist :continue)))
-                   (let* ((path (or (syspath name)
-                                    (recursor-error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
-                                                    name (hash-table-keys *syspath*))))
-                          (actual-type (system-definition-type path)))
-                     (unless (subtypep system-type actual-type)
-                       (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
-                     (unless (typep system system-type)
-                       (recursor-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
-                     (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
-                     (add-system-dependencies module system modules system-dictionary))
-                   (if-let ((cell (cell (entry system-dictionary name #'string=))))
-                     (progn
-                       (setf (car cell) :wanted)
-                       (values modules (cons cell (remove cell system-dictionary))))
-                     (recursor-error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
+                 (progn
+                   (if-let ((system (system name :if-does-not-exist :continue)))
+                     (let* ((path (or (syspath name)
+                                      (recursor-error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
+                                                      name (hash-table-keys *syspath*))))
+                            (actual-type (system-definition-type path)))
+                       (when verbose
+                         (format t ";;;; processing known system ~A~%" name))
+                       (unless (subtypep system-type actual-type)
+                         (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
+                       (unless (typep system system-type)
+                         (recursor-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
+                       (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
+                       (add-system-dependencies module system modules system-dictionary))
+                     (let ((entry (entry system-dictionary name #'string=)))
+                       (when verbose
+                         (format t ";;;; processing unknown system ~A~%" name))
+                       (if (and entry (not (eq :wanted (car (cell entry)))))
+                           (progn
+                             (setf (cellar entry) :wanted)
+                             (values modules (cons entry (remove entry system-dictionary))))
+                           (recursor-error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))))
                  (values modules system-dictionary)))
-             (add-visible-system (module name path type dictionary known-visible &optional (actual-type (system-definition-type path)))
+             (add-visible-system (module name path type dictionary known-local-visible &optional (actual-type (system-definition-type path)))
                (unless (eq type actual-type)
                  (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
                (when verbose
@@ -133,7 +140,7 @@
                            ;; A hidden system is a system definition residing in a file named differently from main system's name.
                            ;; Find them.
                            (let* ((raw-hidden-system-names (asdf-hidden-system-names system))
-                                  (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names known-visible :test #'equal)))
+                                  (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names known-local-visible :test #'equal)))
                              (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
                                    (when verbose
                                      (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
@@ -145,14 +152,15 @@
                                                                                (when (and knownhs (not (eq module (system-module knownhs))))
                                                                                  (collect knownhs)))))
                                          (error 'counterproductive-system-definition :module module :system system
-                                                :raw-hidden-system-names raw-hidden-system-names :known-other-module-systems known-other-module-systems)))
+                                                :raw-hidden-system-names raw-hidden-system-names :known-other-module-systems known-other-module-systems
+                                                :other-modules (mapcar #'system-module known-other-module-systems))))
                                      (ensure-system-loadable hidden-system path nil locality))
                                    (set-syspath hidden-system-name path)
                                    (collect (if complete
                                                 (make-wanted-missing hidden-system-name)
                                                 (make-unwanted-missing hidden-system-name))))))))))
       (let* ((all-sysfiles (module-system-definitions module system-type locality))
-             (main-sysfile (central-module-system-definition-pathname module system-type locality))
+             (main-sysfile (find (string-downcase (module-central-system-name module)) all-sysfiles :key #'pathname-name :test #'string=))
              (other-sysfiles (remove main-sysfile all-sysfiles)))
         ;; This doesn't deal with other modules providing same systems. Will silently break.
         (let* ((required-sysfiles (xform main-sysfile (curry #'cons main-sysfile) (when complete other-sysfiles)))
@@ -175,16 +183,15 @@
                   (format t "~@<;;;; ~@;After adding system definition ~A dictionary is: ~A.~:@>~%"
                           name extended-system-dictionary)))
           (iter (with modules)
-                ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the dictionary,
-                ;; where we've appended our required systems.
+                (when (not (iter (for (name wanted . satisfied) in extended-system-dictionary)
+                                 (finding name such-that (and wanted (not satisfied)))))
+                  (return (values (remove-duplicates modules) extended-system-dictionary)))
+                ;; Progress is made .. why?
                 (for previous-system-dictionary = (copy-tree extended-system-dictionary))
                 (for (values modules-new new-extended-system-dictionary) = (satisfy-next-system module system-type modules extended-system-dictionary))
                 (when (equal previous-system-dictionary new-extended-system-dictionary)
-                  (error 'recursor-progress-halted :previous-system-dictionary previous-system-dictionary :system-dictionary new-extended-system-dictionary))
-                (setf (values modules extended-system-dictionary) (values modules-new new-extended-system-dictionary))
-                (when (not (iter (for (name wanted . satisfied) in extended-system-dictionary)
-                                 (finding name such-that (and wanted (not satisfied)))))
-                  (return (values (remove-duplicates modules) extended-system-dictionary)))))))))
+                  (error 'recursor-progress-halted :system-dictionary new-extended-system-dictionary))
+                (setf (values modules extended-system-dictionary) (values modules-new new-extended-system-dictionary))))))))
 
 (defgeneric satisfy-module (name locality system-type module-dictionary system-dictionary &key complete skip-present verbose)
   (:method ((name symbol) locality system-type module-dictionary system-dictionary &key complete skip-present verbose)
