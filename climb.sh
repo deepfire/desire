@@ -24,7 +24,7 @@ handle_self_update() {
 ### Don't change the amount of characters above this comment.
 ###
 
-version="9.11.1"
+version="9.11.2"
 
 argv0="$(basename $0)"
 

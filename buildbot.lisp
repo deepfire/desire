@@ -42,13 +42,13 @@
                                           ~:[~;-d ~]~:[~;-g ~]~
                                           -x \"(progn (desr:ensure-module-systems-loadable :desire) ~
                                                       (require :desire) ~
-                                                      (funcall (find-symbol \\\"BUILDSLAVE\\\" :desire) '~A '~A) ~
+                                                      (funcall (find-symbol \\\"BUILDSLAVE\\\" :desire) '~A '~A ~:[nil~;t~]) ~
                                                       (funcall (find-symbol \\\"QUIT\\\" :sb-ext)))\" ~
                                           ~~/desr"
                        verbose
                        branch metastore-branch
                        debug disable-debugger
-                       module-names phase-names))))
+                       module-names phase-names verbose))))
 
 ;;;
 ;;; Result output vector management
@@ -405,7 +405,7 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key purge debug disable-debugger)
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key purge debug disable-debugger verbose)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
@@ -414,7 +414,8 @@
                        (when slave-test '(slave-test-phase)))
        :purge purge
        :debug debug
-       :disable-debugger disable-debugger))
+       :disable-debugger disable-debugger
+       :verbose verbose))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
             purge purge-metastore branch metastore-branch debug disable-debugger verbose)

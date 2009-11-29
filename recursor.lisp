@@ -39,6 +39,10 @@
                loading systems ~A known to be belonging to other modules.  Unprocessed hidden ~
                system discovery output: ~A.~:@>"
            (name module) (name system) raw-hidden-system-names (mapcar #'name known-other-module-systems)))
+(define-reported-condition system-name-conflict (recursor-error module-error system-error)
+  ()
+  (:report ()
+           "~@<System name conflict.~:@>"))
 
 ;; system dictionary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))
@@ -114,6 +118,8 @@
              (add-visible-system (module name path type dictionary known-visible &optional (actual-type (system-definition-type path)))
                (unless (eq type actual-type)
                  (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
+               (when verbose
+                 (format t "~@<;;;; ~@;Adding visible system ~A at ~S, and its hidden systems.~:@>~%" name path))
                (let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
                                    (when system
                                      (unless (typep system type)
@@ -129,6 +135,8 @@
                            (let* ((raw-hidden-system-names (asdf-hidden-system-names system))
                                   (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names known-visible :test #'equal)))
                              (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
+                                   (when verbose
+                                     (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
                                    (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
                                                             (register-new-system (intern hidden-system-name) path type module))))
                                      (unless (eq module (system-module hidden-system))
@@ -155,9 +163,17 @@
                (extended-system-dictionary (append (mapcar #'make-wanted-missing required-names)
                                                    (mapcar #'make-unwanted-missing also-names)
                                                    system-dictionary)))
+          (when verbose
+            (format t "~@<;;;; ~@;Determining dependencies of module ~A.  Main system file: ~A.  ~
+                       Other system files: ~A.  Required system files: ~A.  Pre-extension system ~
+                       dictionary: ~A.~:@>~%"
+                    (name module) main-sysfile other-sysfiles required-sysfiles extended-system-dictionary))
           (iter (for sysfile in (append required-sysfiles also-sysfiles))
                 (for name in (append required-names also-names))
-                (setf extended-system-dictionary (add-visible-system module name sysfile system-type extended-system-dictionary all-names)))
+                (setf extended-system-dictionary (add-visible-system module name sysfile system-type extended-system-dictionary all-names))
+                (when verbose
+                  (format t "~@<;;;; ~@;After adding system definition ~A dictionary is: ~A.~:@>~%"
+                          name extended-system-dictionary)))
           (iter (with modules)
                 ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the dictionary,
                 ;; where we've appended our required systems.
@@ -187,7 +203,7 @@
          (setf (car cell) :processing)
          (when (not (and skip-present (module-locally-present-p module locality))) 
            (update module locality))
-         (multiple-value-bind (module-deps new-system-dictionary) (module-dependencies module locality system-type complete system-dictionary)
+         (multiple-value-bind (module-deps new-system-dictionary) (module-dependencies module locality system-type complete system-dictionary verbose)
            (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
                   (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
              (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
