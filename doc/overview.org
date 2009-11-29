@@ -6,7 +6,7 @@
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
 #+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
-November 28, 2009, 19:46
+November 29, 2009, 11:02
 #+END:
 #+END_CENTER
 
@@ -62,11 +62,13 @@ but please see the "Streamlined bootstrap" section below.
 
 Desire still undergoes major changes, and might be a rough ride.
 
-The streamlined bootstrapper (climb.sh) might break once in a while.
+The streamlined bootstrapper (climb.sh) breaks once in a while.
 
 A couple of DEFINITIONS format changes are ahead, and their contents is not
-yet completely correct (although automated testing is almost done,
-see http://www.feelingofgreen.ru/desire-waterfall).
+yet either satisfactorily complete or correct.
+
+Automated domain-wide testing is set up, and the process of elimination of determined
+problems is well underway.  See http://www.feelingofgreen.ru/desire-waterfall.
 
 Desire still works only with ASDF systems, on Linux and using SBCL.
 
