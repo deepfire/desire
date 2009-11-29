@@ -40,7 +40,7 @@
 (define-simple-error buildmaster-error)
 
 (define-reported-condition buildslave-error (buildmaster-error)
-  ((output :accessor error-output :initarg :output))
+  ((output :reader error-output :initarg :output))
   (:report (output)
            "~@<Error encountered while initialising buildslave:~%~A~%~:@>" output))
 
@@ -80,9 +80,9 @@
 ;;; Action
 ;;;
 (define-protocol-class action (period)
-  ((condition :accessor action-condition :initarg :condition)
-   (backtrace :accessor action-backtrace :initarg :backtrace)
-   (class-map :accessor action-class-map :allocation :class :initarg :class-map))
+  ((condition :reader action-condition :initarg :condition)
+   (backtrace :reader action-backtrace :initarg :backtrace)
+   (class-map :reader action-class-map :allocation :class :initarg :class-map))
   (:default-initargs
    :condition nil
    :backtrace nil))

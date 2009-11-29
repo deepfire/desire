@@ -26,12 +26,12 @@
   #-sbcl nil)
 
 (define-reported-condition recursor-progress-halted (recursor-error)
-  ((previous-system-dictionary :accessor condition-previous-system-dictionary :initarg :previous-system-dictionary)
-   (system-dictionary :accessor condition-system-dictionary :initarg :system-dictionary))
+  ((previous-system-dictionary :reader condition-previous-system-dictionary :initarg :previous-system-dictionary)
+   (system-dictionary :reader condition-system-dictionary :initarg :system-dictionary))
   (:report (system-dictionary previous-system-dictionary)
            "~@<Progress halted while processing system dictionary ~S. Previous dictionary: ~S.~:@>" system-dictionary previous-system-dictionary))
 (define-reported-condition counterproductive-system-definition (recursor-error module-error system-error)
-  ((imperatively-loaded-system :initarg :imperatively-loaded-system))
+  ((imperatively-loaded-system :reader condition-imperatively-loaded-system :initarg :imperatively-loaded-system))
   (:report (module system imperatively-loaded-system)
            "~@<In module ~A: encountered a counterproductive definition for system ~A, ~
                which violates declarative semantics of system definitions by imperatively ~

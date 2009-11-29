@@ -35,9 +35,8 @@ Defaults to NIL.")
     "lib" "obj"   ;; ECL/win32
     )) 
 
-(define-reported-condition fetch-failure (remote-error)
-  ((module :accessor condition-module :initarg :module)
-   (execution-error :accessor condition-execution-error :initarg :execution-error))
+(define-reported-condition fetch-failure (module-error remote-error)
+  ((execution-error :reader condition-execution-error :initarg :execution-error))
   (:report (remote module execution-error)
            "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (coerce-to-name module) remote execution-error))
 (define-reported-condition repository-not-clean-during-fetch (repository-error executable-failure) ()

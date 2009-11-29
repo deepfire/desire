@@ -45,7 +45,7 @@ essentially equating it to the 'tracker' branch.
 Defaults to T.")
 
 (define-reported-condition patch-failure (repository-error)
-  ((output :initarg :output))
+  ((output :reader condition-output :initarg :output))
   (:report (pathname output)
            "~@<Failed to apply patch in ~S. The output was:~%~A~%~:@>" pathname output))
 

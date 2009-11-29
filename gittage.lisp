@@ -24,7 +24,7 @@
 (define-executable git :may-want-display t :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat"))
 
 (define-condition vcs-condition ()
-  ((vcs :accessor condition-vcs :initarg :vcs)))
+  ((vcs :reader condition-vcs :initarg :vcs)))
 
 (define-condition git-condition (vcs-condition)
   ()

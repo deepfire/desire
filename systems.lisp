@@ -108,18 +108,15 @@ differently from that system's name."
 ;;;;
 ;;;; Conditions
 ;;;;
-(define-condition system-condition (desire-condition)
-  ((systems :accessor condition-systems :initarg :systems)))
-
-(define-reported-condition module-systems-unloadable-error (desire-error system-condition)
-  ((module :accessor module-system-unloadable-error-module :initarg :module))
+(define-reported-condition module-systems-unloadable-error (module-error)
+  ((systems :reader condition-systems :initarg :systems))
   (:report (module systems)
            "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>" module systems))
 
-(define-reported-condition system-definition-missing-error (desire-error system-condition)
-  ((path :accessor system-definition-missing-error-path :initarg :path))
-  (:report (systems path)
-           "~@<Couldn't find the definition for ~S in ~S~:@>" (first systems) path))
+(define-reported-condition system-definition-missing-error (system-error)
+  ((path :reader condition-path :initarg :path))
+  (:report (system path)
+           "~@<Couldn't find the definition for ~S in ~S~:@>" system path))
 
 ;;;;
 ;;;; Generic
@@ -139,7 +136,7 @@ differently from that system's name."
         (first (apply-repo-system-filter
                 repository (directory (subwild repository (or (system-search-restriction system) '("_darcs")) :name name :type type))))
         (ecase if-does-not-exist
-          (:error (error 'system-definition-missing-error :systems (list system) :path repository))
+          (:error (error 'system-definition-missing-error :system system :path repository))
           (:continue nil)))))
 
 (defun module-system-definitions (module type &optional (locality (gate *self*)))
