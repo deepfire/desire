@@ -32,6 +32,7 @@
    #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor #:module-fetch-url
    #:touch-module #:distributor-module-enabled-remote
    #:module-locally-present-p #:module-publishable-p #:module-hidden-p
+   #:module-system-definitions
    ;;   types.lisp :: system
    #:system-hidden-p
    ;;   types.lisp :: desires

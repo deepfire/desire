@@ -139,10 +139,11 @@ differently from that system's name."
           (:error (error 'system-definition-missing-error :system system :path repository))
           (:continue nil)))))
 
-(defun module-system-definitions (module type &optional (locality (gate *self*)))
+(defun module-system-definitions (module &optional (type *default-system-type*) (locality (gate *self*)))
   "Return a list of all MODULE's system definition pathnames corresponding to
 system TYPE within LOCALITY."
-  (let* ((path (module-pathname module locality))
+  (let* ((module (coerce-to-module module))
+         (path (module-pathname module locality))
          (pass1 (directory (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-file-type type)))))
     (if-let ((blacklist (module-system-path-blacklist module)))
       (remove-if (rcurry #'pathname-match-p (subwild path blacklist)) pass1)
