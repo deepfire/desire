@@ -143,8 +143,11 @@
                                  (finding name such-that (and wanted (not satisfied)))))
                   (return (values (remove-duplicates modules) extended-system-vocabulary)))))))))
 
-(defgeneric satisfy-module (name &optional locality system-type complete skip-present module-vocabulary system-vocabulary)
-  (:method ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary)
+(defgeneric satisfy-module (name &optional locality system-type complete skip-present module-vocabulary system-vocabulary verbose)
+  (:method ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary verbose)
+    (when verbose
+      (syncformat t "~@<;;; ~@;modules: ~A~:@>~%" module-vocabulary)
+      (syncformat t "~@<;;; ~@;systems: ~A~:@>~%" system-vocabulary))
     (let ((cell (or (cdr (assoc name module-vocabulary))
                     (cdr (first (push (make-notprocessing-undone name) module-vocabulary)))))  ; extend the vocabulary
           (module (module name)))
@@ -165,7 +168,7 @@
                  (if new-deps-from-this-module
                      (satisfy-modules new-deps-from-this-module locality system-type complete skip-present new-module-vocabulary new-system-vocabulary)
                      (values new-module-vocabulary new-system-vocabulary)))))))))
-  (:method :around ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary)
+  (:method :around ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary verbose)
     (declare (ignore locality system-type complete skip-present module-vocabulary system-vocabulary))
     (multiple-value-bind (new-module-vocabulary new-system-vocabulary) (call-next-method)
       (let ((cell (cdr (assoc name new-module-vocabulary))))
@@ -176,10 +179,7 @@
 
 (defun satisfy-modules (module-names locality system-type complete skip-present module-vocabulary system-vocabulary &optional toplevel verbose)
   (iter (for module-name in module-names)
-        (when verbose
-          (syncformat t "~@<;;; ~@;modules: ~A~:@>~%" module-vocabulary)
-          (syncformat t "~@<;;; ~@;systems: ~A~:@>~%" system-vocabulary))
-        (for (values updated-module-vocabulary updated-system-vocabulary) = (satisfy-module module-name locality system-type complete skip-present module-vocabulary system-vocabulary))
+        (for (values updated-module-vocabulary updated-system-vocabulary) = (satisfy-module module-name locality system-type complete skip-present module-vocabulary system-vocabulary verbose))
         (setf (values module-vocabulary system-vocabulary) (values updated-module-vocabulary updated-system-vocabulary))
         (finally
          (when-let ((undone (and toplevel (mapcar #'car (remove-if #'cddr module-vocabulary)))))
