@@ -155,7 +155,8 @@
          (values module-vocabulary system-vocabulary))
         (t
          (setf (car cell) :processing)
-         (update module locality)
+         (when (not (and skip-present (module-locally-present-p module locality))) 
+           (update module locality))
          (multiple-value-bind (module-deps new-system-vocabulary) (module-dependencies module locality system-type complete system-vocabulary)
            (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-vocabulary) module-deps))
                   (new-module-vocabulary (append module-vocabulary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
