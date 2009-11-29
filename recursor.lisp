@@ -31,12 +31,14 @@
   (:report (system-dictionary previous-system-dictionary)
            "~@<Progress halted while processing system dictionary ~S. Previous dictionary: ~S.~:@>" system-dictionary previous-system-dictionary))
 (define-reported-condition counterproductive-system-definition (recursor-error module-error system-error)
-  ((imperatively-loaded-system :reader condition-imperatively-loaded-system :initarg :imperatively-loaded-system))
-  (:report (module system imperatively-loaded-system)
+  ((raw-hidden-system-names :reader raw-hidden-system-names :initarg :raw-hidden-system-names)
+   (known-other-module-systems :reader known-other-module-systems :initarg :known-other-module-systems))
+  (:report (module system raw-hidden-system-names known-other-module-systems)
            "~@<In module ~A: encountered a counterproductive definition for system ~A, ~
                which violates declarative semantics of system definitions by imperatively ~
-               loading system ~A belonging to module ~A.~:@>"
-           (name module) (name system) (name imperatively-loaded-system) (name (system-module imperatively-loaded-system))))
+               loading systems ~A known to be belonging to other modules.  Unprocessed hidden ~
+               system discovery output: ~A.~:@>"
+           (name module) (name system) raw-hidden-system-names (mapcar #'name known-other-module-systems)))
 
 ;; system dictionary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))
@@ -124,16 +126,23 @@
                          (when (typep system 'asdf-system)
                            ;; A hidden system is a system definition residing in a file named differently from main system's name.
                            ;; Find them.
-                           (iter (for hidden-system-name in (set-difference (asdf-hidden-system-names system) known-visible :test #'equal))
-                                 (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
-                                                          (register-new-system (intern hidden-system-name) path type module))))
-                                   (unless (eq module (system-module hidden-system))
-                                     (error 'counterproductive-system-definition :module module :system system :imperatively-loaded-system hidden-system))
-                                   (ensure-system-loadable hidden-system path nil locality))
-                                 (set-syspath hidden-system-name path)
-                                 (collect (if complete
-                                              (make-wanted-missing hidden-system-name)
-                                              (make-unwanted-missing hidden-system-name)))))))))
+                           (let* ((raw-hidden-system-names (asdf-hidden-system-names system))
+                                  (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names known-visible :test #'equal)))
+                             (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
+                                   (let ((hidden-system (or (system hidden-system-name :if-does-not-exist :continue)
+                                                            (register-new-system (intern hidden-system-name) path type module))))
+                                     (unless (eq module (system-module hidden-system))
+                                       (let ((known-other-module-systems (iter (for hsname in raw-hidden-system-names-minus-known)
+                                                                               (for knownhs = (system hsname :if-does-not-exist :continue))
+                                                                               (when (and knownhs (not (eq module (system-module knownhs))))
+                                                                                 (collect knownhs)))))
+                                         (error 'counterproductive-system-definition :module module :system system
+                                                :raw-hidden-system-names raw-hidden-system-names :known-other-module-systems known-other-module-systems)))
+                                     (ensure-system-loadable hidden-system path nil locality))
+                                   (set-syspath hidden-system-name path)
+                                   (collect (if complete
+                                                (make-wanted-missing hidden-system-name)
+                                                (make-unwanted-missing hidden-system-name))))))))))
       (let* ((all-sysfiles (module-system-definitions module system-type locality))
              (main-sysfile (central-module-system-definition-pathname module system-type locality))
              (other-sysfiles (remove main-sysfile all-sysfiles)))
