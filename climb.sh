@@ -48,25 +48,26 @@ Usage:  ${argv0} [OPTION]... [STORAGE-ROOT]
 Bootstrap, update or perform other actions on a desire installation
 in either STORAGE-ROOT, or a location specified in ~/.climb-root
 
-  -u          Self-update and continue processing other options, using
+  -u           Self-update and continue processing other options, using
                 the updated version.
-  -n HOSTNAME Use HOSTNAME as a bootstrap node.
+  -n HOSTNAME  Use HOSTNAME as a bootstrap node.
                 HOSTNAME must refer to a node participating in desire protocol.
-  -b BRANCH   Check out BRANCH of desire other than 'master'.
-  -t BRANCH   Check out BRANCH of metastore on the bootstrap node other than
+  -b BRANCH    Check out BRANCH of desire other than 'master'.
+  -t BRANCH    Check out BRANCH of metastore on the bootstrap node other than
                 the default.  The default is the same as the used branch
                 of desire.
-  -m MODULE   Retrieve MODULE, once ready.
-  -s SYSTEM   Install or update the module relevant to SYSTEM, then load it.
-  -a APP      Load system containing APP, as per -s, then launch it.
-  -x EXPR     Evaluate an expression, in the end of it all.
-  -d          Enable debug optimisation of Lisp code.
-  -g          Disable debugger, causing desire dump stack and abort on errors,
+  -m MODULE(s) Retrieve a space-separated list of MODULEs, once ready.
+  -s SYSTEM    Install or update the module relevant to SYSTEM, then load it.
+  -a APP       Load system containing APP, as per -s, then launch it.
+  -x EXPR      Evaluate an expression, in the end of it all.
+  -p PHASE(s)  Apply buildslave PHASEs to MODULEs specified through -m.
+  -d           Enable debug optimisation of Lisp code.
+  -g           Disable debugger, causing desire dump stack and abort on errors,
                 instead of entering the debugger.
-  -e          Enable explanations about external program invocations.
-  -v          Crank up verbosity.
-  -V          Print version.
-  -h          Display this help message.
+  -e           Enable explanations about external program invocations.
+  -v           Crank up verbosity.
+  -V           Print version.
+  -h           Display this help message.
 
 As step zero, when the -u switch is provided, climb.sh is updated using wget
 from the canonical location at ${argv0_url},
@@ -114,17 +115,18 @@ EOF
     exit $1
 }
 
-while getopts :un:b:t:m:s:a:x:dgevVh opt
+while getopts :un:b:t:m:s:a:x:p:dgevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
         n)  WISHMASTER="${OPTARG}";;
         b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
-        m)  MODULE="${OPTARG}";;
+        m)  MODULES="${OPTARG}";;
         s)  SYSTEM="${OPTARG}";;
         a)  APP="${OPTARG}";;
         x)  EXPR="${OPTARG}";;
+        p)  PHASES="${OPTARG}";;
         d)  DEBUG="3";;
         g)  DISABLE_DEBUGGER="--disable-debugger";;
         e)  EXPLAIN="t";;
@@ -153,8 +155,8 @@ DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
 test "${VERBOSE}" -a "${METASTORE_BRANCH}" && echo "NOTE: choosing a specific metastore branch: '${METASTORE_BRANCH}'"
 METASTORE_BRANCH=${METASTORE_BRANCH:-${DESIRE_BRANCH}}
 
-test "${VERBOSE}" -a "${MODULE}" && echo "NOTE: will install or update ${MODULE}, along with dependencies"
-MODULE=${MODULE:-nil}
+test "${VERBOSE}" -a "${MODULES}" && echo "NOTE: will install or update ${MODULES}, along with dependencies"
+MODULES=${MODULES:-nil}
 test "${VERBOSE}" -a "${SYSTEM}" && echo "NOTE: will load ${SYSTEM}, after installing or updating relevant module"
 SYSTEM=${SYSTEM:-nil}
 test "${VERBOSE}" -a "${APP}"    && echo "NOTE: will launch ${APP}, after updating/loading relevant module/system"
@@ -162,6 +164,8 @@ APP=${APP:-nil}
 
 test "${VERBOSE}" -a "${EXPR}" && echo "NOTE: will execute ${EXPR}, in the end of it all"
 EXPR=${EXPR:-nil}
+test "${VERBOSE}" -a "${PHASES}" && echo "NOTE: will execute buildbot ${PHASES} on ${MODULES}, in the end of it all"
+PHASES=${PHASES:-nil}
 
 test "${VERBOSE}" -a "${DEBUG}" && echo echo "NOTE: optimising for debug"
 DEBUG=${DEBUG:-1}
@@ -322,19 +326,23 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
          (system  (if app
                       (app-system app)
                       (system (quote ${SYSTEM}) :if-does-not-exist :continue)))
-         (module (if system
-                     (system-module system)
-                     (module (quote ${MODULE}) :if-does-not-exist :continue)))
-         (desire (or (quote ${MODULE}) (quote ${SYSTEM}) (quote ${APP}))))
-    (when (and desire (not module))
-      (error \"~@<~S was desired, but no such entity (application, system or module) is known.~:@>\"
+         (module-spec (quote ${MODULES}))
+         (phases (ensure-list (quote ${PHASES})))
+         (modules (if system
+                      (list (system-module system))
+                      (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue)) (ensure-list module-spec)))))
+         (desire (or module-spec (quote ${SYSTEM}) (quote ${APP}))))
+    (when (and desire (not modules))
+      (error \"~@<~S was/were desired, but no such entity (application, system or module) is known.~:@>\"
              desire))
-    (when module
-      (lust (name module)))
+    (when modules
+      (if phases
+          (buildslave modules phases ${VERBOSE})
+          (desire (mapcar (function coerce-to-name) modules) :skip-present t)))
     (when system
       (require (down-case-name system)))
     (when app
       (run app))))" \
      --eval "
 (when (quote ${EXPR})
-  ${EXPR})" 
+  ${EXPR})"

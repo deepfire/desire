@@ -173,16 +173,19 @@
         (setf (cdr cell) :done)
         (values new-module-vocabulary new-system-vocabulary)))))
 
-(defun satisfy-modules (module-names locality system-type complete skip-present module-vocabulary system-vocabulary &optional toplevel)
+(defun satisfy-modules (module-names locality system-type complete skip-present module-vocabulary system-vocabulary &optional toplevel verbose)
   (iter (for module-name in module-names)
+        (when verbose
+          (syncformat t "~@<;;; ~@;modules: ~A~:@>~%" module-vocabulary)
+          (syncformat t "~@<;;; ~@;systems: ~A~:@>~%" system-vocabulary))
         (for (values updated-module-vocabulary updated-system-vocabulary) = (satisfy-module module-name locality system-type complete skip-present module-vocabulary system-vocabulary))
         (setf (values module-vocabulary system-vocabulary) (values updated-module-vocabulary updated-system-vocabulary))
         (finally
          (when-let ((undone (and toplevel (mapcar #'car (remove-if #'cddr module-vocabulary)))))
-           (syncformat t "WARNING: after all gyrations following modules were left unsatisfied:~{ ~S~}~%" undone))
+           (format t "WARNING: after all gyrations following modules were left unsatisfied:~{ ~S~}~%" undone))
          (return (values module-vocabulary system-vocabulary)))))
 
-(defun desire (desires &key complete skip-present (seal t))
+(defun desire (desires &key complete skip-present (seal t) verbose)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
 Desire satisfaction means:
@@ -215,7 +218,7 @@ Defined keywords:
           (module-vocabulary nil)
           (system-vocabulary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
       (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
-      (satisfy-modules desired-module-names (gate *self*) *default-system-type* complete skip-present module-vocabulary system-vocabulary :sure-as-hell))
+      (satisfy-modules desired-module-names (gate *self*) *default-system-type* complete skip-present module-vocabulary system-vocabulary :sure-as-hell verbose))
     (when (and *unsaved-definition-changes-p* seal)
       (syncformat t "; Definitions modified and sealing was requested, committing changes.~%")
       (save-definitions :seal t))
