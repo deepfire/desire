@@ -405,24 +405,26 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key purge debug disable-debugger verbose)
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge debug disable-debugger verbose)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
                        (when slave-recurse '(slave-recurse-phase))
                        (when slave-load '(slave-load-phase))
                        (when slave-test '(slave-test-phase)))
+       :modules modules
        :purge purge
        :debug debug
        :disable-debugger disable-debugger
        :verbose verbose))
 
-(defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*)
+(defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*) modules
             purge purge-metastore branch metastore-branch debug disable-debugger verbose)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
-         (module-names (sort (copy-list (append (location-module-names gate) (gate-converted-module-names gate)))
-                             #'string<))
+         (module-names (or modules
+                           (sort (copy-list (append (location-module-names gate) (gate-converted-module-names gate)))
+                                 #'string<)))
          (modules (mapcar #'module module-names))
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
     (with-tracked-termination (m-r)
