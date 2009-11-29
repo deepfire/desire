@@ -33,6 +33,6 @@
               `("LISP_SOURCE=" ,locality-directory)
               `("LISP_SYSTEMS=" ,(subdirectory* locality-directory ".asdf-registry")))))))
 
-(defmethod satisfy-module :after ((module-name (eql 'xcvb)) &optional locality system-type complete skip-present module-vocabulary system-vocabulary verbose)
-  (declare (ignore system-type complete skip-present module-vocabulary system-vocabulary verbose))
+(defmethod satisfy-module :after ((module-name (eql 'xcvb)) locality system-type module-vocabulary system-vocabulary &key complete skip-present verbose)
+  (declare (ignore complete skip-present verbose))
   (make-xcvb-using-asdf (locality-pathname locality)))

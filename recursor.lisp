@@ -143,8 +143,8 @@
                                  (finding name such-that (and wanted (not satisfied)))))
                   (return (values (remove-duplicates modules) extended-system-vocabulary)))))))))
 
-(defgeneric satisfy-module (name &optional locality system-type complete skip-present module-vocabulary system-vocabulary verbose)
-  (:method ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary verbose)
+(defgeneric satisfy-module (name locality system-type module-vocabulary system-vocabulary &key complete skip-present verbose)
+  (:method ((name symbol) locality system-type module-vocabulary system-vocabulary &key complete skip-present verbose)
     (when verbose
       (syncformat t "~@<;;; ~@;modules: ~A~:@>~%" module-vocabulary)
       (syncformat t "~@<;;; ~@;systems: ~A~:@>~%" system-vocabulary))
@@ -166,10 +166,11 @@
              (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
              (multiple-value-prog1
                  (if new-deps-from-this-module
-                     (satisfy-modules new-deps-from-this-module locality system-type complete skip-present new-module-vocabulary new-system-vocabulary)
+                     (satisfy-modules new-deps-from-this-module locality system-type new-module-vocabulary new-system-vocabulary nil
+                                      :complete complete :skip-present skip-present :verbose verbose)
                      (values new-module-vocabulary new-system-vocabulary)))))))))
-  (:method :around ((name symbol) &optional (locality (gate *self*)) (system-type *default-system-type*) complete skip-present module-vocabulary system-vocabulary verbose)
-    (declare (ignore locality system-type complete skip-present module-vocabulary system-vocabulary))
+  (:method :around (name locality system-type module-vocabulary system-vocabulary &key complete skip-present verbose)
+    (declare (ignore complete skip-present verbose))
     (multiple-value-bind (new-module-vocabulary new-system-vocabulary) (call-next-method)
       (let ((cell (cdr (assoc name new-module-vocabulary))))
         (assert cell)
@@ -177,12 +178,13 @@
         (setf (cdr cell) :done)
         (values new-module-vocabulary new-system-vocabulary)))))
 
-(defun satisfy-modules (module-names locality system-type complete skip-present module-vocabulary system-vocabulary &optional toplevel verbose)
+(defun satisfy-modules (module-names locality system-type module-vocabulary system-vocabulary toplevelp &key complete skip-present verbose)
   (iter (for module-name in module-names)
-        (for (values updated-module-vocabulary updated-system-vocabulary) = (satisfy-module module-name locality system-type complete skip-present module-vocabulary system-vocabulary verbose))
+        (for (values updated-module-vocabulary updated-system-vocabulary) = (satisfy-module module-name locality system-type module-vocabulary system-vocabulary
+                                                                                            :complete complete :skip-present skip-present :verbose verbose))
         (setf (values module-vocabulary system-vocabulary) (values updated-module-vocabulary updated-system-vocabulary))
         (finally
-         (when-let ((undone (and toplevel (mapcar #'car (remove-if #'cddr module-vocabulary)))))
+         (when-let ((undone (and toplevelp (mapcar #'car (remove-if #'cddr module-vocabulary)))))
            (format t "WARNING: after all gyrations following modules were left unsatisfied:~{ ~S~}~%" undone))
          (return (values module-vocabulary system-vocabulary)))))
 
@@ -219,7 +221,8 @@ Defined keywords:
           (module-vocabulary nil)
           (system-vocabulary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
       (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
-      (satisfy-modules desired-module-names (gate *self*) *default-system-type* complete skip-present module-vocabulary system-vocabulary :sure-as-hell verbose))
+      (satisfy-modules desired-module-names (gate *self*) *default-system-type* module-vocabulary system-vocabulary :sure-as-hell
+                        :complete complete :skip-present skip-present :verbose verbose))
     (when (and *unsaved-definition-changes-p* seal)
       (syncformat t "; Definitions modified and sealing was requested, committing changes.~%")
       (save-definitions :seal t))
