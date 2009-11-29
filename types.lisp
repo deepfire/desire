@@ -249,9 +249,9 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :credentials nil))
 
 (defstruct (credentials (:conc-name cred-) (:constructor make-cred (name &key username password)))
-  (name (desire-error "~@<Won't create an unnamed credential.~:@>") :type symbol)
-  (username (desire-error "~@<Won't create a credential without a username.~:@>") :type string)
-  (password (desire-error "~@<Won't create a credential without a password.~:@>") :type (or null string)))
+  (name (definition-error "~@<Won't create an unnamed credential.~:@>") :type symbol)
+  (username (definition-error "~@<Won't create a credential without a username.~:@>") :type string)
+  (password (definition-error "~@<Won't create a credential without a password.~:@>") :type (or null string)))
 
 (defvar *credentials* (alist-hash-table `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous :username "anonymous" :password "anonymous"))
                                           (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil)))
@@ -535,10 +535,10 @@ instead."
   (let ((distributor-name (name distributor)))
     (cond (specified-name (if (null (find specified-name (distributor-remotes distributor) :key #'name))
                               specified-name
-                              (definition-error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
+                              (distributor-error distributor "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
           (t (or (choose-default-remote-name distributor vcs-type transport)
-                 (definition-error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
-                        vcs-type distributor-name))))))
+                 (distributor-error distributor "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
+                                    vcs-type distributor-name))))))
 
 (defmethod initialize-instance :before ((o remote) &key distributor vcs-type transport name &allow-other-keys)
   (setf (name o) (init-time-select-remote-name distributor vcs-type transport name)))
@@ -1027,24 +1027,40 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 ;;; Conditions.
 ;;;
 (define-condition desire-condition (condition) ())
+(define-condition definition-condition (desire-condition) ())
 (define-condition recursor-condition (desire-condition) ())
-(define-condition remote-condition (desire-condition) ())
-(define-condition repository-condition (desire-condition) ())
+
+(define-condition distributor-condition (desire-condition) ((distributor :accessor condition-distributor :initarg :distributor)))
+(define-condition remote-condition (desire-condition)      ((remote :accessor condition-remote :initarg :remote)))
+(define-condition locality-condition (desire-condition)    ((locality :accessor condition-locality :initarg :locality)))
+(define-condition module-condition (desire-condition)      ((module :accessor condition-module :initarg :module)))
+(define-condition system-condition (desire-condition)      ((system :accessor condition-system :initarg :system)))
+(define-condition application-condition (desire-condition) ((application :accessor condition-application :initarg :application)))
+(define-condition repository-condition (locality-condition module-condition)
+  ((pathname :accessor condition-pathname :initarg :pathname)))
 
 (define-condition desire-error (desire-condition error) ())
-(define-condition remote-error (remote-condition desire-error)
-  ((remote :accessor condition-remote :initarg :remote)))
-(define-condition repository-error (repository-condition desire-error)
-  ((locality :accessor condition-locality :initarg :locality)
-   (module :accessor condition-module :initarg :module)))
-(define-condition definition-error (desire-error) ())
+(define-condition definition-error (definition-condition desire-error) ())
 (define-condition recursor-error (recursor-condition desire-error) ())
 
+(define-condition distributor-error (distributor-condition desire-error) ())
+(define-condition remote-error (remote-condition desire-error) ())
+(define-condition locality-error (locality-condition desire-error) ())
+(define-condition module-error (module-condition desire-error) ())
+(define-condition system-error (system-condition desire-error) ())
+(define-condition application-error (application-condition desire-error) ())
+(define-condition repository-error (repository-condition desire-error) ())
+
 (define-simple-error desire-error)
-(define-simple-error remote-error)
-(define-simple-error repository-error)
 (define-simple-error definition-error)
 (define-simple-error recursor-error)
+
+(define-simple-error distributor-error :object-initarg :distributor)
+(define-simple-error remote-error :object-initarg :remote)
+(define-simple-error locality-error :object-initarg :locality)
+(define-simple-error module-error :object-initarg :module)
+(define-simple-error system-error :object-initarg :system)
+(define-simple-error application-error :object-initarg :application)
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))

@@ -24,7 +24,7 @@
   (let* ((a (coerce-to-application application-designator))
          (s (app-system a)))
     (unless (system-loadable-p s)
-      (desire-error "~@<Can't launch ~A, as its primary system, ~A, isn't loadable.~:@>" (name a) (name s)))
+      (application-error a "~@<Can't launch ~A, as its primary system, ~A, isn't loadable.~:@>" (name a) (name s)))
     (unless (find-package (app-package a))
       (syncformat t "; Package containing primary function of app ~A not found, requiring the respective system...~%"
                   (name a))

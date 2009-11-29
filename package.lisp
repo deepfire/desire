@@ -41,10 +41,13 @@
    #:*combined-remotes-prefer-native-over-http*
    ;;   types.lisp :: conditions
    #:desire-condition #:desire-error
-   #:recursor-condition #:remote-condition #:repository-condition #:definition-condition
-   #:recursor-error #:remote-error #:repository-error #:definition-error
-   #:simple-recursor-error #:simple-remote-error #:simple-repository-error #:simple-definition-error
-   #:progress-halt
+   #:definition-condition #:recursor-condition
+   #:definition-error #:recursor-error
+   #:simple-definition-error #:simple-recursor-error
+   #:distributor-condition #:remote-condition #:locality-condition #:module-condition #:system-condition #:application-condition #:repository-condition
+   #:distributor-error #:remote-error #:locality-error #:module-error #:system-error #:application-error #:repository-error
+   #:simple-distributor-error #:simple-remote-error #:simple-locality-error #:simple-module-error #:simple-system-error #:simple-application-error #:simple-repository-error 
+   #:recursor-progress-halted
    #:insatiable-desire #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module
    #:module-status #:module-public-packages #:module-hidden-p

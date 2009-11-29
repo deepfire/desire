@@ -61,7 +61,7 @@
 (defun system-definition-type (pathname)
   "Detect the type of system definition residing at PATHNAME."
   (or (cdr (assoc (pathname-type pathname) *system-pathname-typemap* :test #'string=))
-      (definition-error "~@<Couldn't detect type of system in alleged definition at ~S.~:@>" pathname)))
+      (system-error pathname "~@<Couldn't detect type of system in alleged definition at ~S.~:@>" pathname)))
 
 (defgeneric system-definition-name (system-type system-definition-pathname)
   (:method ((type (eql 'asdf-system)) pathname)
@@ -163,7 +163,7 @@ system TYPE within LOCALITY."
   (when-let ((definition-pathname (or path (system-definition system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
     (unless (string= (down-case-name system) (pathname-name definition-pathname))
       (when check-path-sanity
-        (desire-error "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))
+        (system-error system "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))
     (ensure-symlink (system-definition-registry-symlink-path system locality)
                     definition-pathname)))
 

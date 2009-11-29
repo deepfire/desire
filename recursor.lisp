@@ -25,7 +25,7 @@
   #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
   #-sbcl nil)
 
-(define-reported-condition progress-halt (recursor-error)
+(define-reported-condition recursor-progress-halted (recursor-error)
   ((previous-system-dictionary :accessor condition-previous-system-dictionary :initarg :previous-system-dictionary)
    (system-dictionary :accessor condition-system-dictionary :initarg :system-dictionary))
   (:report (system-dictionary previous-system-dictionary)
@@ -87,29 +87,29 @@
                (if-let ((name (next-unsatisfied-system system-dictionary)))
                  (if-let ((system (system name :if-does-not-exist :continue)))
                    (let* ((path (or (syspath name)
-                                    (desire-error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
-                                           name (hash-table-keys *syspath*))))
+                                    (recursor-error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
+                                                    name (hash-table-keys *syspath*))))
                           (actual-type (system-definition-type path)))
                      (unless (subtypep system-type actual-type)
-                       (desire-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
+                       (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
                      (unless (typep system system-type)
-                       (desire-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
+                       (recursor-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
                      (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
                      (add-system-dependencies module system modules system-dictionary))
                    (if-let ((cell (cell (entry system-dictionary name #'string=))))
                      (progn
                        (setf (car cell) :wanted)
                        (values modules (cons cell (remove cell system-dictionary))))
-                     (desire-error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
+                     (recursor-error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
                  (values modules system-dictionary)))
              (add-visible-system (module name path type dictionary known-visible &optional (actual-type (system-definition-type path)))
                (unless (eq type actual-type)
-                 (desire-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
+                 (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
                (let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
                                    (when system
                                      (unless (typep system type)
-                                       (desire-error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
-                                              type name (type-of system)))))
+                                       (recursor-error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
+                                                       type name (type-of system)))))
                                  (register-new-system (intern (string-upcase name)) path type module))))
                  (set-syspath name path)
                  (ensure-system-loadable system path t locality)
@@ -146,7 +146,7 @@
                 (for previous-system-dictionary = (copy-tree extended-system-dictionary))
                 (for (values modules-new new-extended-system-dictionary) = (satisfy-next-system module system-type modules extended-system-dictionary))
                 (when (equal previous-system-dictionary new-extended-system-dictionary)
-                  (error 'progress-halt :previous-system-dictionary previous-system-dictionary :system-dictionary new-extended-system-dictionary))
+                  (error 'recursor-progress-halted :previous-system-dictionary previous-system-dictionary :system-dictionary new-extended-system-dictionary))
                 (setf (values modules extended-system-dictionary) (values modules-new new-extended-system-dictionary))
                 (when (not (iter (for (name wanted . satisfied) in extended-system-dictionary)
                                  (finding name such-that (and wanted (not satisfied)))))
@@ -224,7 +224,7 @@ Defined keywords:
     (iter (for (distributor-name . modules) in interpreted-desires)
           (for distributor = (distributor distributor-name))
           (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
-            (desire-error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
+            (distributor-error distributor "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires))) ; currently unused
           (desired-module-names (mapcar #'canonicalise-module-name (mapcan #'rest interpreted-desires)))
           (module-dictionary nil)

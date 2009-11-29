@@ -44,6 +44,11 @@ natively git, when they match 'tracker' branches before module update,
 essentially equating it to the 'tracker' branch.
 Defaults to T.")
 
+(define-reported-condition patch-failure (repository-error)
+  ((output :initarg :output))
+  (:report (pathname output)
+           "~@<Failed to apply patch in ~S. The output was:~%~A~%~:@>" pathname output))
+
 (defun master-detached-p (&optional repo-dir)
   "See if the master branch is driven by the user, that is out of desire's control."
   (not (ref= '("master") '("tracker") repo-dir)))
