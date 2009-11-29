@@ -315,6 +315,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
         file)))
   (push (quote basic-root-modules-search) asdf:*system-definition-search-functions*)
   (asdf:operate (quote asdf:load-op) :desire :verbose nil)
+  (pop asdf:*system-definition-search-functions*)
   (in-package :desr))" \
      --eval "
 (progn
