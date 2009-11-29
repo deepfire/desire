@@ -276,7 +276,7 @@
 (defun read-mandatory-line (stream description &optional (slurp-empty-lines t))
   (iter (for line = (read-line stream nil nil))
         (unless line
-          (buildmaster-error "~@<Early termination from slave: premature end while ~A.~:@>" description))
+          (buildmaster-error "~@<Early termination from slave: premature end while processing ~A.~:@>" description))
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
 
@@ -374,7 +374,7 @@
                    (format t "==( found remote output beginning marker on line ~D~%" i)
                    (return))))
          (finalise-slave-connection (pipe)
-           (let ((final-line (read-mandatory-line pipe "looking for final line")))
+           (let ((final-line (read-mandatory-line pipe "the final line")))
              (report-line -1 final-line)
              (unless (line-marker-p final-line *buildslave-remote-end-of-output-marker*)
                (buildmaster-error "~@<Early termination from slave: remote end-of-output marker missing.~:@>")))))
