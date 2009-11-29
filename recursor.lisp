@@ -26,9 +26,10 @@
   #-sbcl nil)
 
 (define-reported-condition progress-halt (recursor-error)
-  ((system-dictionary :accessor condition-system-dictionary :initarg :system-dictionary))
-  (:report (system-dictionary)
-           "~@<Progress halted while processing system dictionary ~S.~:@>" system-dictionary))
+  ((previous-system-dictionary :accessor condition-previous-system-dictionary :initarg :previous-system-dictionary)
+   (system-dictionary :accessor condition-system-dictionary :initarg :system-dictionary))
+  (:report (system-dictionary previous-system-dictionary)
+           "~@<Progress halted while processing system dictionary ~S. Previous dictionary: ~S.~:@>" system-dictionary previous-system-dictionary))
 
 ;; system dictionary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))
@@ -142,9 +143,10 @@
           (iter (with modules)
                 ;; Progress is made because NEXT-UNSATISFIED-SYSTEM proceeds from the head of the dictionary,
                 ;; where we've appended our required systems.
+                (for previous-system-dictionary = (copy-tree extended-system-dictionary))
                 (for (values modules-new new-extended-system-dictionary) = (satisfy-next-system module system-type modules extended-system-dictionary))
-                (when (equal extended-system-dictionary new-extended-system-dictionary)
-                  (error 'progress-halt :system-dictionary extended-system-dictionary))
+                (when (equal previous-system-dictionary new-extended-system-dictionary)
+                  (error 'progress-halt :previous-system-dictionary previous-system-dictionary :system-dictionary new-extended-system-dictionary))
                 (setf (values modules extended-system-dictionary) (values modules-new new-extended-system-dictionary))
                 (when (not (iter (for (name wanted . satisfied) in extended-system-dictionary)
                                  (finding name such-that (and wanted (not satisfied)))))
