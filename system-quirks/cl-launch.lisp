@@ -29,7 +29,7 @@
     (with-explanation ("installing CL-LAUNCH source")
       (make "install_source" `("INSTALL_SOURCE=" ,(subfile* locality-directory "cl-launch"))))))
 
-(defmethod satisfy-module :after ((module-name (eql 'cl-launch)) locality system-type module-vocabulary system-vocabulary &key complete skip-present verbose)
+(defmethod satisfy-module :after ((module-name (eql 'cl-launch)) locality system-type module-dictionary system-dictionary &key complete skip-present verbose)
   (declare (ignore complete skip-present verbose))
   (make-cl-launch-system (locality-pathname locality))
   (ensure-module-systems-loadable (module 'cl-launch) locality))
