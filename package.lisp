@@ -40,8 +40,10 @@
    #:*default-system-type* #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:root
    #:*combined-remotes-prefer-native-over-http*
    ;;   types.lisp :: conditions
-   #:desire-condition #:desire-error #:remote-error #:repository-error #:definition-error
-   #:simple-remote-error #:simple-repository-error #:simple-definition-error
+   #:desire-condition #:desire-error
+   #:recursor-condition #:remote-condition #:repository-condition #:definition-condition
+   #:recursor-error #:remote-error #:repository-error #:definition-error
+   #:simple-recursor-error #:simple-remote-error #:simple-repository-error #:simple-definition-error
    #:insatiable-desire #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module
    #:module-status #:module-public-packages #:module-hidden-p

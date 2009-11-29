@@ -249,9 +249,9 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :credentials nil))
 
 (defstruct (credentials (:conc-name cred-) (:constructor make-cred (name &key username password)))
-  (name (error "~@<Won't create an unnamed credential.~:@>") :type symbol)
-  (username (error "~@<Won't create a credential without a username.~:@>") :type string)
-  (password (error "~@<Won't create a credential without a password.~:@>") :type (or null string)))
+  (name (desire-error "~@<Won't create an unnamed credential.~:@>") :type symbol)
+  (username (desire-error "~@<Won't create a credential without a username.~:@>") :type string)
+  (password (desire-error "~@<Won't create a credential without a password.~:@>") :type (or null string)))
 
 (defvar *credentials* (alist-hash-table `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous :username "anonymous" :password "anonymous"))
                                           (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil)))
@@ -332,7 +332,7 @@ a special module called '.meta'."
                      (hg 'hg-http-remote)
                      (darcs 'darcs-http-remote)
                      (svn 'svn-http-remote)
-                     ((nil) (error "~@<The 'http' uri type is ambiguous, and there was no hint given.~:@>"))))
+                     ((nil) (definition-error "~@<The 'http' uri type is ambiguous, and there was no hint given.~:@>"))))
            ("cvs+rsync" 'cvs-rsync-remote)
            ("cvs" 'cvs-native-remote)
            (":pserver" 'cvs-native-remote)
@@ -401,7 +401,7 @@ differ in only slight detail -- gate property, for example."
 ;;;
 (defmethod initialize-instance :after ((o locality) &key pathname omit-registration-by-path &allow-other-keys)
   (unless pathname
-    (error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
+    (definition-error "~@<A location without path specified is useless. ~S is one of many.~:@>" o))
   (unless omit-registration-by-path
     (setf (locality-by-path pathname) o))
   (unless (directory-exists-p pathname)
@@ -479,7 +479,7 @@ differ in only slight detail -- gate property, for example."
           (when new-hidden
             (format t ";; Following modules were demoted to hidden:~{ ~A~}~%" new-hidden))
           (when mia
-            (error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" mia (name o) (root o)))
+            (desire-error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" mia (name o) (root o)))
           ;; the new release set is (set-difference release-set (append new-unpublished new-hidden))
           ;; but nobody seems to care
           (dolist (m-name release-set)
@@ -535,9 +535,9 @@ instead."
   (let ((distributor-name (name distributor)))
     (cond (specified-name (if (null (find specified-name (distributor-remotes distributor) :key #'name))
                               specified-name
-                              (error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
+                              (definition-error "~@<Specified remote name ~A conflicts in distributor ~A.~:@>" specified-name distributor-name)))
           (t (or (choose-default-remote-name distributor vcs-type transport)
-                 (error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
+                 (definition-error "~@<Cannot choose an unambiguous name for a ~A remote in distributor ~A, provide one explicitly.~:@>"
                         vcs-type distributor-name))))))
 
 (defmethod initialize-instance :before ((o remote) &key distributor vcs-type transport name &allow-other-keys)
@@ -576,9 +576,9 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   (multiple-value-bind (schema user password hostname port path directoryp) (parse-uri namestring :slashless-header slashless)
     (let ((cred (when user
                   (or (match-credentials user password)
-                      (error "~@<Credentials were provided in an URI namestring ~S, but were not recognised.~:@>" namestring)))))
+                      (desire-error "~@<Credentials were provided in an URI namestring ~S, but were not recognised.~:@>" namestring)))))
       (values (or (uri-type-to-remote-type schema :gate-p gate-p :hint type-hint)
-                  (error "Bad URI type ~S in remote namestring ~S." schema namestring))
+                  (desire-error "Bad URI type ~S in remote namestring ~S." schema namestring))
               cred hostname port path directoryp))))
 
 ;;;;
@@ -1027,17 +1027,24 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 ;;; Conditions.
 ;;;
 (define-condition desire-condition (condition) ())
+(define-condition recursor-condition (desire-condition) ())
+(define-condition remote-condition (desire-condition) ())
+(define-condition repository-condition (desire-condition) ())
+
 (define-condition desire-error (desire-condition error) ())
-(define-condition remote-error (desire-error)
+(define-condition remote-error (remote-condition desire-error)
   ((remote :accessor condition-remote :initarg :remote)))
-(define-condition repository-error (desire-error)
+(define-condition repository-error (repository-condition desire-error)
   ((locality :accessor condition-locality :initarg :locality)
    (module :accessor condition-module :initarg :module)))
 (define-condition definition-error (desire-error) ())
+(define-condition recursor-error (recursor-condition desire-error) ())
 
+(define-simple-error desire-error)
 (define-simple-error remote-error)
 (define-simple-error repository-error)
 (define-simple-error definition-error)
+(define-simple-error recursor-error)
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))

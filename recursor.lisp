@@ -81,28 +81,28 @@
                (if-let ((name (next-unsatisfied-system system-vocabulary)))
                  (if-let ((system (system name :if-does-not-exist :continue)))
                    (let* ((path (or (syspath name)
-                                    (error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
+                                    (desire-error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
                                            name (hash-table-keys *syspath*))))
                           (actual-type (system-definition-type path)))
                      (unless (subtypep system-type actual-type)
-                       (error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
+                       (desire-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type actual-type path))
                      (unless (typep system system-type)
-                       (error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
+                       (desire-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
                      (setf (system-satisfiedp system-vocabulary name) :present) ; made loadable, hiddens uncovered, deps about to be added
                      (add-system-dependencies module system modules system-vocabulary))
                    (if-let ((cell (cell (entry system-vocabulary name #'string=))))
                      (progn
                        (setf (car cell) :wanted)
                        (values modules (cons cell (remove cell system-vocabulary))))
-                     (error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
+                     (desire-error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))
                  (values modules system-vocabulary)))
              (add-visible-system (module name path type vocabulary known-visible &optional (actual-type (system-definition-type path)))
                (unless (eq type actual-type)
-                 (error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
+                 (desire-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
                (let ((system (or (lret ((system (system name :if-does-not-exist :continue)))
                                    (when system
                                      (unless (typep system type)
-                                       (error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
+                                       (desire-error "~@<During dependency resolution: asked for a system ~S of type ~S, got one of type ~S~:@>"
                                               type name (type-of system)))))
                                  (register-new-system (intern (string-upcase name)) path type module))))
                  (set-syspath name path)
@@ -215,7 +215,7 @@ Defined keywords:
     (iter (for (distributor-name . modules) in interpreted-desires)
           (for distributor = (distributor distributor-name))
           (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
-            (error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
+            (desire-error "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
     (let ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires))) ; currently unused
           (desired-module-names (mapcar #'canonicalise-module-name (mapcan #'rest interpreted-desires)))
           (module-vocabulary nil)

@@ -23,10 +23,10 @@
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
-    (error "~@<The specified root at ~S does not exist.~:@>" directory))
+    (desire-error "~@<The specified root at ~S does not exist.~:@>" directory))
   (let ((gitroot (subdirectory* directory "git")))
     (when (and (probe-file gitroot) (not (directory-exists-p gitroot)))
-      (error "~@<The specified root at ~S contains a file named 'git', which violates the requirement for a sane root.~:@>" directory))
+      (desire-error "~@<The specified root at ~S contains a file named 'git', which violates the requirement for a sane root.~:@>" directory))
     (ensure-directories-exist gitroot)
     (ensure-directories-exist (subdirectory* directory "tmp")))
   directory)
@@ -55,7 +55,7 @@ locally present modules will be marked as converted."
       (with-class-slot (git hg darcs cvs svn tarball) enabled-p
         (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
-        (error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+        (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
       (unless (metastore-present-p meta-path '(definitions))
         (syncformat t ";;; no metastore found in ~S, bootstrapping from ~S~%" meta-path *bootstrap-wishmaster-url*)
         (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))

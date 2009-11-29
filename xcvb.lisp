@@ -33,7 +33,7 @@
             (t
              (git-set-branch-index-tree)
              (if error-on-failure
-                 (error "~@<Failed to apply ~S in ~S:~%~A.~:@>" filename *default-pathname-defaults* output)
+                 (desire-error "~@<Failed to apply ~S in ~S:~%~A.~:@>" filename *default-pathname-defaults* output)
                  (values nil output)))))))
 
 (defun xcvbify-module (module &optional break-on-patch-failure)

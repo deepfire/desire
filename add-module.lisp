@@ -34,8 +34,8 @@ remote, in which case TYPE must be subtype of GIT."
       (push r (distributor-remotes d))
       (when gate-p
         (unless (typep r *gate-vcs-type*)
-          (error "~@<Requested to make ~S a gate remote of ~A, but it is not a remote of gate type, i.e. ~A.~:@>"
-                 r hostname *gate-vcs-type*))
+          (desire-error "~@<Requested to make ~S a gate remote of ~A, but it is not a remote of gate type, i.e. ~A.~:@>"
+                        r hostname *gate-vcs-type*))
         (setf (gate d) r)))))
 
 (defun find-distributor-fuzzy (distname &aux (downcase-distname (downstring distname)))
@@ -205,7 +205,7 @@ The values returned are:
             (when (and created-remote-p (not (member if-touch-fails '(:warn :continue))))
               (remove-remote remote))
             (ecase if-touch-fails
-              (:error (error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
+              (:error (definition-error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
               (:abort (return-from add-module nil))
               (:warn (format t "~@<;; ~@;Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
               (:continue)))

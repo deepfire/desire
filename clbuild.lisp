@@ -51,7 +51,7 @@
               (for (values remote-name offset1) = (read-from-string string nil nil :start offset0))
               (for known-remote = (recognise-clbuild-remote remote-name))
               (unless remote-name
-                (error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
+                (definition-error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
               (let* ((spacepos (position #\Space string :start offset1))
                      (url (subseq string offset1 spacepos))
                      (posturl (let ((*readtable* (copy-readtable)))

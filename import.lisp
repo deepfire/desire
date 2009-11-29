@@ -179,7 +179,7 @@ to the above :AROUND method."
             (setf last-version next-version)
             (while url)
             (let* ((slash-pos (or (position #\/ url :from-end t)
-                                  (error "~@<Error while calculating URL for module ~A in ~S: resulting URL ~S has no slashes.~:@>" name (name o) url)))
+                                  (desire-error "~@<Error while calculating URL for module ~A in ~S: resulting URL ~S has no slashes.~:@>" name (name o) url)))
                    (localised-tarball (concatenate 'string "../../tmp/" (subseq url (1+ slash-pos)))))
               (with-file-from-www (localised-tarball url)
                 (with-explanation ("on behalf of module ~A, importing tarball version ~A" name (princ-version-to-string next-version))
