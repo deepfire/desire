@@ -53,6 +53,11 @@ For case-insensitive systems the name is in upper case.")
   (:method ((o asdf-system))
     (downstring (name o))))
 
+;; This is /just/ for two functions below.
+;; Use SYSTEM-DEFINITION-REGISTRY-SYMLINK-PATH for your needs.
+(defun locality-asdf-registry-path (locality)
+  (subdirectory* (locality-pathname locality) ".asdf-registry"))
+
 (defgeneric register-locality-with-system-backend (type locality)
   (:documentation
    "Do the module-agnostic part of the rituals needed for making systems
@@ -67,7 +72,7 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
   (:method :around (system &optional locality)
     (subfile (call-next-method system locality) (list (down-case-name system)) :type (system-pathname-type system)))
   (:method ((o asdf-system) &optional (locality (gate *self*)))
-    (subdirectory* (locality-pathname locality) ".asdf-registry")))
+    (locality-asdf-registry-path locality)))
 
 (defgeneric system-dependencies (system)
   (:documentation
