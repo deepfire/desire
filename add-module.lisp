@@ -238,4 +238,5 @@ The values returned are:
         (:publish (location-link-module locality m))
         (:convert (push name (gate-converted-module-names locality)))
         (:unpublished (push name (gate-unpublished-module-names locality)))
-        (:hidden (push name (gate-hidden-module-names locality)))))))
+        (:hidden (push name (gate-hidden-module-names locality))))
+      (desire (list name) :skip-present t :seal nil))))
