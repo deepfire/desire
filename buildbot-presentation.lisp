@@ -117,7 +117,7 @@
                                          (format nil "still going, with ~D tests complete"
                                                  (master-run-n-complete-results o)))
                                         ((terminatedp o)
-                                         (format nil "terminated~:[, with no known reason~;, due to following condition: ~:*~A~]"
+                                         (format nil "terminated~:[, with no known reason~;, due to a <a href='/desire-waterfall?mode=runcond'>condition</a>~]"
                                                  (action-condition o)))
                                         ((period-ended-p o)
                                          (format nil "completed successfully at ~A"
@@ -142,25 +142,30 @@
                    :overview)))
     (ecase mode
       (:output
-       (let ((result-id (or (let ((result-id (getf parameters :result-id)))
-                              (and result-id (ignore-errors (parse-integer result-id))))
-                            (buildmaster-error "~@<In result output mode: no result id provided.~:@>"))))
-         (setf (content-type*) "text/plain")
-         (when-let ((m-r (first *buildmaster-runs*)))
-           (let ((r (master-result m-r result-id)))
-             (subseq (result-output r) 0 (result-output-bytes r))))))
+       (setf (content-type*) "text/plain")
+       (when-let ((m-r (first *buildmaster-runs*)))
+         (when-let* ((result-id (or (let ((result-id (getf parameters :result-id)))
+                                      (and result-id (ignore-errors (parse-integer result-id))))
+                                    (buildmaster-error "~@<In result output mode: no result id provided.~:@>")))
+                     (r (master-result m-r result-id)))
+           (subseq (result-output r) 0 (result-output-bytes r)))))
       (:cond
-       (let ((result-id (or (let ((result-id (getf parameters :result-id)))
-                              (and result-id (ignore-errors (parse-integer result-id))))
-                            (buildmaster-error "~@<In result condition mode: no result id provided.~:@>"))))
-         (setf (content-type*) "text/plain")
-         (when-let ((m-r (first *buildmaster-runs*)))
-           (let ((r (master-result m-r result-id)))
-             (concatenate 'string
-                          (when-let ((condition (action-condition r)))
-                            (format nil "~A~%" condition))
-                          (when-let ((backtrace (action-backtrace r)))
-                            (format nil "~%The backtrace was:~%~%~A~%" backtrace)))))))
+        (setf (content-type*) "text/plain")
+        (when-let ((m-r (first *buildmaster-runs*)))
+          (when-let* ((result-id (or (let ((result-id (getf parameters :result-id)))
+                                       (and result-id (ignore-errors (parse-integer result-id))))
+                                     (buildmaster-error "~@<In result condition mode: no result id provided.~:@>")))
+                      (r (master-result m-r result-id)))
+            (concatenate 'string
+                         (when-let ((condition (action-condition r)))
+                           (format nil "~A~%" condition))
+                         (when-let ((backtrace (action-backtrace r)))
+                           (format nil "~%The backtrace was:~%~%~A~%" backtrace))))))
+      (:runcond
+       (setf (content-type*) "text/plain")
+       (when-let* ((m-r (first *buildmaster-runs*))
+                   (condition (and (not (processingp m-r)) (terminatedp m-r) (action-condition m-r))))
+         (format nil "~A~%" condition)))
       (:overview
        (let* ((binary-stream (send-headers))
               (stream (flexi-streams:make-flexi-stream binary-stream)))
