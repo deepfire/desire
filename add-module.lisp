@@ -239,4 +239,5 @@ The values returned are:
         (:convert (push name (gate-converted-module-names locality)))
         (:unpublished (push name (gate-unpublished-module-names locality)))
         (:hidden (push name (gate-hidden-module-names locality))))
+      (notice-module-repository m locality)
       (desire (list name) :skip-present t :seal nil))))

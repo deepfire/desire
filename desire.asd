@@ -22,11 +22,12 @@
                (:file "print-read" :depends-on ("types"))
                (:file "systems" :depends-on ("types"))
                ;; Tier 4
-               (:file "import" :depends-on ("branching"))
-               (:file "init" :depends-on ("branching" "print-read"))
+               (:file "modules" :depends-on ("branching" "systems"))
                ;; Tier 5
+               (:file "import" :depends-on ("modules"))
+               (:file "init" :depends-on ("print-read" "modules"))
+               ;; Tier 6
                (:file "recursor" :depends-on ("import"))
-
                ;; Tier at-the-end-of-it-all
                (:file "add-module" :depends-on ("types"))
                (:file "apropos" :depends-on ("types"))
