@@ -49,21 +49,17 @@
                                  ,@(remove-from-plist open-options :element-type))
      ,@body))
 
-(defmacro with-output-to-new-metafile ((stream name metastore-directory &rest open-options &key commit-p commit-message &allow-other-keys) &body body)
-  (once-only (name metastore-directory)
-    `(prog1
-         (with-output-to-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character
-                                       ,@(remove-from-plist open-options :element-type :if-exists :commit-p :commit-message))
-           ,@body)
-       ,@(when commit-p
-           `((when (and ,commit-p
-                        (git-repository-changes-p ,metastore-directory))
-               (commit-metafile ,name ,metastore-directory ,@(maybecall commit-message #'list commit-message))))))))
+(defun invoke-with-output-to-new-metafile (metastore-directory name commit-p commit-message fn)
+  (lret (return-value)
+    (let ((content (with-output-to-string (stream)
+                     (setf return-value (funcall fn stream)))))
+      (with-output-to-file (stream (metafile-path name metastore-directory) :element-type 'character :if-does-not-exist :create)
+        (write-string content stream)))
+    (when (and commit-p (git-repository-changes-p metastore-directory))
+      (commit-metafile name metastore-directory commit-message))))
 
-(defmacro appending-to-metafile ((stream name metastore-directory &rest open-options) &body body)
-  `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character :if-does-not-exist :error :if-exists :append
-                            ,@(remove-from-plist open-options :element-type :if-does-not-exist :if-exists))
-     ,@body))
+(defmacro with-output-to-new-metafile ((stream name metastore-directory &key commit-p commit-message) &body body)
+  `(invoke-with-output-to-new-metafile ,metastore-directory ,name ,commit-p ,commit-message (lambda (,stream) ,@body)))
 
 (defun commit-metafile (name metastore-directory &optional (commit-message (format nil "Updated ~A" name)))
   "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY.
