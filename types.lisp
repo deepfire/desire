@@ -524,7 +524,6 @@ instead."
 ;;;;
 (defclass module (desirable)
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
-   (essential-p :accessor module-essential-p :initarg :essential-p :documentation "Specified.")
    (system-path-whitelist :accessor module-system-path-whitelist :initarg :path-whitelist :documentation "Specified.")
    (system-path-blacklist :accessor module-system-path-blacklist :initarg :path-blacklist :documentation "Specified.")
    (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans should fill this one.")
@@ -535,7 +534,7 @@ instead."
    :registrator #'(setf module)
    :path-whitelist nil :path-blacklist nil
    :remotes nil :localities nil
-   :systems nil :essential-p nil))
+   :systems nil))
 
 (defclass origin-module (module) 
   ((status :accessor module-status :initarg :status)
