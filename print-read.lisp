@@ -257,7 +257,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                        (append (when path-whitelist `(:path-whitelist ,path-whitelist))
                                (when path-blacklist `(:path-blacklist ,path-blacklist)))))))
     (do-remotes (r)
-      (when (remote-defines-module-p r m)
+      (when (location-defines-module-p r m)
         (pushnew r (module-remotes m))))
     (if systems-specified-p
         (mapcar (curry #'read-simple-system *default-system-type* name) systems)
