@@ -859,7 +859,11 @@ to DIRECTORY."
   "Given a module's NAME, whether in form of a string, keyword or a symbol
 in any other package, return the canonical module name, as a symbol in the
 'DESIRE' package.."
-  (name (module name)))
+  (if-let ((m (module name :if-does-not-exist :continue)))
+    (name m)
+    (etypecase name
+      (symbol (intern (symbol-name name) :desire))
+      (string (intern name :desire)))))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
   (git-repository-present-p (module-pathname module locality)))
