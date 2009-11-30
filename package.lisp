@@ -19,7 +19,7 @@
    ;;   types.lisp :: distributors
    #:wishmasterp #:do-wishmasters #:do-distributor-remotes #:do-distributor-modules #:compute-distributor-modules
    ;;   types.lisp :: location
-   #:location-module-names
+   #:location-module-names #:location-defines-module-p
    ;;   types.lisp :: remote
    #:gate-converted-module-names #:gate-unpublished-module-names #:gate-hidden-module-names
    #:url #:parse-remote-namestring #:remote-disabled-p
@@ -29,7 +29,7 @@
    ;;   types.lisp :: locality
    #:loc #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module
-   #:remote-link-module #:remote-unlink-module #:remote-defines-module-p #:module-best-remote #:module-best-distributor #:module-fetch-url
+   #:remote-link-module #:remote-unlink-module #:module-best-remote #:module-best-distributor #:module-fetch-url
    #:touch-module #:distributor-module-enabled-remote
    #:module-locally-present-p #:module-publishable-p #:module-hidden-p
    #:module-system-definitions

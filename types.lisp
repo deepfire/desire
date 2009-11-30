@@ -576,11 +576,12 @@ instead."
     (location-unlink-module r m)
     (removef (module-remotes m) r)))
 
-(defun remote-defines-module-p (remote module)
-  "See whether MODULE is defined for REMOTE."
-  (or (not (null (find (name module) (location-module-names remote))))
-      (when (typep remote 'gate)
-        (not (null (find (name module) (gate-converted-module-names remote)))))))
+(defun location-defines-module-p (location module)
+  "See whether MODULE is defined by LOCATION."
+  (let ((name (coerce-to-name module)))
+    (or (not (null (find name (location-module-names location))))
+        (when (typep location 'gate)
+          (not (null (find name (gate-converted-module-names location))))))))
 
 ;;;;
 ;;;; Systems
@@ -677,7 +678,7 @@ Find out whether SYSTEM is hidden."
 (defun remove-module (module-designator &key keep-locations &aux (m (coerce-to-module module-designator)))
   (unless keep-locations
     (do-remotes (r)
-      (when (remote-defines-module-p r m)
+      (when (location-defines-module-p r m)
         (removef (location-module-names r) (name m)))))
   (do-remove-module m))
 
@@ -896,7 +897,7 @@ cache results."
 Currently implements a static 'gates are preferred' policy."
   (let ((module (coerce-to-module module)))
     (or (choose-gate-or-else (do-remotes (r)
-                               (when (and (remote-defines-module-p r module)
+                               (when (and (location-defines-module-p r module)
                                           (or allow-self
                                               (not (eq (remote-distributor r) *self*))))
                                  (collect r))))
@@ -937,7 +938,7 @@ whether the attempt was successful."
    providing remotes, regardless of the enabled-p flag."
   (choose-gate-or-else
    (do-distributor-remotes (r distributor)
-     (when (and (remote-defines-module-p r module) (not (remote-disabled-p r)))
+     (when (and (location-defines-module-p r module) (not (remote-disabled-p r)))
        (collect r)))))
 
 (defun hide-module (module &optional (locality (gate *self*)) &aux
