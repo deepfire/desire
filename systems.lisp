@@ -149,16 +149,34 @@ differently from that system's name."
 ;;;;
 ;;;; Generic
 ;;;;
-(defun apply-repo-system-filter (repository system-pathnames)
-  (remove-if (rcurry #'pathname-match-p (subwild repository '("_darcs"))) system-pathnames))
+(defun invoke-with-module-system-definitions-and-blacklists (module repo-dir system-pathname-type fn)
+  (let* ((path (truename repo-dir))
+         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type system-pathname-type))
+         (pass1 (directory pass1-pattern))
+         (blacklist-patterns (list* (subwild path '("test"))
+                                    (subwild path '("tests"))
+                                    (subwild path '("darcs"))
+                                    (when-let ((blacklist (module-system-path-blacklist module)))
+                                      (list (subwild path blacklist))))))
+    (funcall fn pass1 blacklist-patterns)))
+
+(defmacro do-module-system-definitions ((pathname module repo-dir system-pathname-type) &body body)
+  (with-gensyms (pathnames blacklists)
+    `(invoke-with-module-system-definitions-and-blacklists ,module ,repo-dir ,system-pathname-type
+                                                           (lambda (,pathnames ,blacklists)
+                                                             (flet ((blacklisted-p (x)
+                                                                      (notany (curry #'pathname-match-p x) ,blacklists)))
+                                                               (iter (for ,pathname in ,pathnames)
+                                                                     ,@body))))))
 
 (defun system-definition-pathname (system repository &key (if-does-not-exist :error))
   "Return the pathname of a SYSTEM's definition within REPOSITORY."
   (let ((name (or (system-definition-pathname-name system) (system-canonical-definition-name system)))
         (type (system-pathname-type system)))
     (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
-        (first (apply-repo-system-filter
-                repository (directory (subwild repository (or (system-search-restriction system) '("_darcs")) :name name :type type))))
+        (do-module-system-definitions (path (system-module system) repository type)
+          (finding path such-that (and (string= name (pathname-name path))
+                                       (not (blacklisted-p path)))))
         (ecase if-does-not-exist
           (:error (error 'system-definition-missing-error :system system :path repository))
           (:continue nil)))))
@@ -166,17 +184,9 @@ differently from that system's name."
 (defun module-system-definitions (module &optional (type *default-system-type*) (locality (gate *self*)))
   "Return a list of all MODULE's system definition pathnames corresponding to
 system TYPE within LOCALITY."
-  (let* ((module (coerce-to-module module))
-         (path (truename (module-pathname module locality)))
-         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-to-file-type type)))
-         (pass1 (directory pass1-pattern))
-         (blacklists (list* (subwild path '("test"))
-                            (subwild path '("tests"))
-                            (when-let ((blacklist (module-system-path-blacklist module)))
-                              (list (subwild path blacklist))))))
-    (iter (for p in pass1)
-          (when (notany (curry #'pathname-match-p p) blacklists)
-            (collect p)))))
+  (do-module-system-definitions (path module (module-pathname module locality) (system-type-to-file-type type))
+    (unless (blacklisted-p path)
+      (collect path))))
 
 (defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
