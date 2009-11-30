@@ -222,3 +222,20 @@ The values returned are:
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char 'add-module-reader *readtable*))
+
+(defun add-module-local (name &optional (mode :publish) (locality (gate *self*)) &key path-whitelist path-blacklist)
+  (let ((name (canonicalise-module-name name)))
+    (unless (typep locality 'gate)
+      (locality-error locality "~@<Asked to add module ~A to a non-gate ~A.~:@>" name locality))
+    (when (location-defines-module-p locality name)
+      (module-error name "~@<Module ~A is already provided by ~A.~:@>" name (locality-pathname locality)))
+    (let ((repo-dir (module-pathname name locality)))
+      (unless (git-repository-present-p repo-dir t)
+        (module-error name "~@<Module ~A doesn't appear to have a repository with objects in ~S.~:@>" name repo-dir)))
+    (let* ((present (module name :if-does-not-exist :continue))
+           (m (or present (make-instance 'module :name name :umbrella name :path-whitelist path-whitelist :path-blacklist path-blacklist))))
+      (ecase mode
+        (:publish (location-link-module locality m))
+        (:convert (push name (gate-converted-module-names locality)))
+        (:unpublished (push name (gate-unpublished-module-names locality)))
+        (:hidden (push name (gate-hidden-module-names locality)))))))

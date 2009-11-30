@@ -77,6 +77,7 @@
    ;; add-module.lisp
    #:*auto-lust*
    #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader #:steal-clbuild-projects-file
+   #:add-module-local
    ;; apropos.lisp
    #:apropos-desr-list #:apropos-desr #:list-modules #:local-summary))
 
