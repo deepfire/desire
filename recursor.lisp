@@ -254,6 +254,7 @@ When individual desires are symbols, they are interpreted as module names.
 When they are lists, their first element is interpreted as the source
 distributor, from which the rest of the list is supposed to be fetched.
 These two forms can be mixed in the list of desires.
+The distributor specification is currently ignored, though.
 
 Defined keywords:
    - SKIP-PRESENT - whether to skip updating specified modules which are 
@@ -261,23 +262,20 @@ Defined keywords:
    - SEAL - whether to commit any definition changes, and,
    - COMPLETE - whether to obtain all modules' systems, even those not
      part of main module systems' complete dependency graphs."
-  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list (name (module-best-distributor m)) m))) desires)))
-    (iter (for (distributor-name . modules) in interpreted-desires)
-          (for distributor = (distributor distributor-name))
-          (when-let ((missing (remove-if (curry #'distributor-module-enabled-remote distributor) modules)))
-            (distributor-error distributor "~@<Distributor ~S does not provide following modules: ~S~:@>" distributor missing)))
-    (let ((*desires* (substitute-desires *desires* (remove-if-not #'consp desires))) ; currently unused
-          (desired-module-names (mapcar #'canonicalise-module-name (mapcan #'rest interpreted-desires)))
-          (module-dictionary nil)
-          (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
-      (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
-      (satisfy-modules desired-module-names (gate *self*) *default-system-type* module-dictionary system-dictionary :sure-as-hell
-                        :complete complete :skip-present skip-present :verbose verbose))
-    (when (and *unsaved-definition-changes-p* seal)
-      (syncformat t "; Definitions modified and sealing was requested, committing changes.~%")
-      (save-definitions :seal t))
-    (syncformat t "; All done.~%")
-    t))
+  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list nil m))) desires)))
+    (when-let ((desired-module-names (mapcar #'canonicalise-module-name (mapcan #'rest interpreted-desires))))
+      (let ((module-dictionary nil)
+            (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
+        (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
+        (satisfy-modules desired-module-names (gate *self*) *default-system-type* module-dictionary system-dictionary :sure-as-hell
+                         :complete complete :skip-present skip-present :verbose verbose)
+      
+        (when *unsaved-definition-changes-p*
+          (syncformat t "; Definitions modified, writing~:[~; and committing~] changes.~%" seal)
+          (save-definitions :seal seal :commit-message (format nil "Added~{ ~A~} and ~:[their~;its~] dependencies."
+                                                               desired-module-names (endp (rest desired-module-names)))))
+        (syncformat t "; All done.~%")
+        (values)))))
 
 (defun lust (&rest desires)
   "A spread interface function for DESIRE.
