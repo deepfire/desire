@@ -570,12 +570,12 @@ instead."
 (defgeneric remote-unlink-module (remote module)
   (:documentation
    "Undo a 'publishes' relationship between REMOTE and MODULE.")
+  (:method ((r wrinkle-mixin) (m module))
+    (removef (wrinkles r) (name m) :key #'car)
+    (call-next-method))
   (:method ((r remote) (m module))
     (location-unlink-module r m)
-    (removef (module-remotes m) r))
-  (:method ((r cvs-remote) (m module))
-    (removef (wrinkles r) (name m) :key #'car)
-    (call-next-method)))
+    (removef (module-remotes m) r)))
 
 (defun remote-defines-module-p (remote module)
   "See whether MODULE is defined for REMOTE."
