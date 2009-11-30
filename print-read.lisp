@@ -357,19 +357,21 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                    (while spec)
                    (interpret-desirable spec)))))))
 
-(defmethod read-definitions (&key (source *self*) (force-source (eq source *self*)) (metastore (meta *self*)))
-  "Load definitions of the world from METASTORE."
-  (let ((*read-time-merge-source-distributor* source)
-        (*read-time-force-source* force-source))
-    (with-open-metafile (definitions 'definitions metastore)
-      (read-definitions-from-stream definitions))
-    (values)))
+(defgeneric read-definitions (&key source force-source metastore)
+  (:method (&key (source *self*) (force-source (eq source *self*)) (metastore (meta *self*)))
+    "Load definitions of the world from METASTORE."
+    (let ((*read-time-merge-source-distributor* source)
+          (*read-time-force-source* force-source))
+      (with-open-metafile (definitions 'definitions metastore)
+        (read-definitions-from-stream definitions))
+      (values))))
 
-(defmethod read-local-definitions (&key (metastore (localmeta *self*)))
-  "Load local definitions from METASTORE."
-  (with-open-metafile (definitions 'definitions metastore)
-    (read-definitions-from-stream definitions t))
-  (values))
+(defgeneric read-local-definitions (&key metastore)
+  (:method (&key (metastore (localmeta *self*)))
+    "Load local definitions from METASTORE."
+    (with-open-metafile (definitions 'definitions metastore)
+      (read-definitions-from-stream definitions t))
+    (values)))
 
 ;;;
 ;;; PRINT path
@@ -395,16 +397,17 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Gate unpublished & hidden:~%;;;~%")
     (print-gate-local-definitions (gate *self*) stream)))
 
-(defmethod save-definitions (&key seal (commit-message "Updated DEFINITIONS"))
-  "Save current model of the world within METASTORE.
+(defgeneric save-definitions (&key seal commit-message)
+  (:method (&key seal (commit-message "Updated DEFINITIONS"))
+    "Save current model of the world within METASTORE.
 When SEAL-P is non-NIL, the changes are committed."
-  (let ((meta (meta *self*))
-        (localmeta (localmeta *self*)))
-    (with-output-to-new-metafile (definitions 'definitions meta :if-does-not-exist :create :commit-p seal :commit-message commit-message)
-      (serialise-definitions definitions)
-      (terpri definitions))
-    (with-output-to-new-metafile (definitions 'definitions localmeta :if-does-not-exist :create :commit-p seal :commit-message commit-message)
-      (serialise-local-definitions definitions)
-      (terpri definitions))
-    (setf *unsaved-definition-changes-p* nil)
-    (values)))
+    (let ((meta (meta *self*))
+          (localmeta (localmeta *self*)))
+      (with-output-to-new-metafile (definitions 'definitions meta :if-does-not-exist :create :commit-p seal :commit-message commit-message)
+        (serialise-definitions definitions)
+        (terpri definitions))
+      (with-output-to-new-metafile (definitions 'definitions localmeta :if-does-not-exist :create :commit-p seal :commit-message commit-message)
+        (serialise-local-definitions definitions)
+        (terpri definitions))
+      (setf *unsaved-definition-changes-p* nil)
+      (values))))

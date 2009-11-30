@@ -23,7 +23,7 @@
 (defvar *system-pathname-typemap* '(("asd" . asdf-system) ("mb" . mudball-system) ("xcvb" . xcvb-system))
   "The mapping between SYSTEM subclasses and definition pathname types.")
 
-(defun system-type-file-type (type)
+(defun system-type-to-file-type (type)
   (or (car (rassoc type *system-pathname-typemap* :test #'eq))
       (desire-error "~@<Unknown system type ~S.~:@>" type)))
 
@@ -35,14 +35,50 @@
 ;;;;
 ;;;; Backends
 ;;;;
-(defgeneric system-dependencies (s)
+(defun system-type-from-definition (pathname)
+  "Detect the type of system definition residing at PATHNAME."
+  (or (cdr (assoc (pathname-type pathname) *system-pathname-typemap* :test #'string=))
+      (system-error pathname "~@<Couldn't detect type of system in alleged definition at ~S.~:@>" pathname)))
+
+(defgeneric system-name-from-definition (system-type system-definition-pathname)
+  (:documentation
+   "Return the canonical name of the system defined through SYSTEM-DEFINITION-PATHNAME.
+For case-insensitive systems the name is in upper case.")
+  (:method ((type (eql 'asdf-system)) pathname)
+    (string-upcase (pathname-name pathname))))
+
+(defgeneric system-canonical-definition-name (system)
+  (:documentation
+   "Return the canonical definition patname name for SYSTEM.")
+  (:method ((o asdf-system))
+    (downstring (name o))))
+
+(defgeneric register-locality-with-system-backend (type locality)
+  (:documentation
+   "Do the module-agnostic part of the rituals needed for making systems
+within LOCALITY loadable using BACKEND-TYPE.  The other, module-specific
+part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
+  (:method ((type (eql 'asdf-system)) locality)
+    (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
+
+(defgeneric system-definition-registry-symlink-path (system &optional locality)
+  (:documentation
+   "This is functionality badly abstracted.")
+  (:method :around (system &optional locality)
+    (subfile (call-next-method system locality) (list (down-case-name system)) :type (system-pathname-type system)))
+  (:method ((o asdf-system) &optional (locality (gate *self*)))
+    (subdirectory* (locality-pathname locality) ".asdf-registry")))
+
+(defgeneric system-dependencies (system)
+  (:documentation
+   "Inspect SYSTEM for systems it depends upon, and return a list of
+known system objects as the primary value, and a list of names of unknown
+systems as the secondary value.")
   (:method :around ((s system))
-    (handler-case (let ((*break-on-signals* nil))
-                    (call-next-method))
-      (error (c)
-        (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c))))
-  (:method ((s xcvb-system)))
-  (:method ((s mudball-system)))
+           (handler-case (let ((*break-on-signals* nil))
+                           (call-next-method))
+             (error (c)
+               (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c))))
   (:method ((s asdf-system) &aux (name (down-case-name s)))
     (unless (asdf-system-name-blacklisted-p name)
       (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system name)))))
@@ -52,32 +88,19 @@
               (collect sanitised-depname into unknown-names))
             (finally (return (values known-systems unknown-names)))))))
 
-(defgeneric system-definition-registry-symlink-path (system &optional locality)
-  (:method :around (system &optional locality)
-    (subfile (call-next-method system locality) (list (down-case-name system)) :type (system-pathname-type system)))
-  (:method ((o asdf-system) &optional (locality (gate *self*)))
-    (locality-asdf-registry-path locality)))
-
-(defun system-definition-type (pathname)
-  "Detect the type of system definition residing at PATHNAME."
-  (or (cdr (assoc (pathname-type pathname) *system-pathname-typemap* :test #'string=))
-      (system-error pathname "~@<Couldn't detect type of system in alleged definition at ~S.~:@>" pathname)))
-
-(defgeneric system-definition-name (system-type system-definition-pathname)
-  (:method ((type (eql 'asdf-system)) pathname)
-    (string-upcase (pathname-name pathname))))
-
-(defgeneric system-loadable-p (system-or-name &optional locality)
+(defgeneric system-loadable-p (system &optional locality)
+  (:documentation
+   "Determine whether SYSTEM is loadable within LOCALITY.")
   (:method :around ((s system) &optional (locality (gate *self*)))
     (handler-case (let ((*break-on-signals* nil))
                     (call-next-method s locality))
       (error (c)
         (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its loadability: ~A~:@>~%" (name s) c))))
   (:method ((o symbol) &optional (locality (gate *self*)))
-    (system-loadable-p (coerce-to-system o) locality))
+    (system-loadable-p (system o) locality))
   (:method ((o asdf-system) &optional (locality (gate *self*)))
     (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
-                              (system-definition o (module-pathname (system-module o) locality) :if-does-not-exist :continue))
+                              (system-definition-pathname o (module-pathname (system-module o) locality) :if-does-not-exist :continue))
                        (let ((name (down-case-name o)))
                          (or (asdf-system-name-blacklisted-p name)
                              (asdf:find-system name nil))))
@@ -123,16 +146,12 @@ differently from that system's name."
 ;;;;
 ;;;; Generic
 ;;;;
-(defun system-pathname-name (pathname)
-  "Return the canonical name for a system residing in PATHNAME."
-  (string-upcase (pathname-name pathname)))
-
 (defun apply-repo-system-filter (repository system-pathnames)
   (remove-if (rcurry #'pathname-match-p (subwild repository '("_darcs"))) system-pathnames))
 
-(defun system-definition (system repository &key (if-does-not-exist :error))
+(defun system-definition-pathname (system repository &key (if-does-not-exist :error))
   "Return the pathname of a SYSTEM's definition within REPOSITORY."
-  (let ((name (or (system-definition-pathname-name system) (system-definition-canonical-pathname-name system)))
+  (let ((name (or (system-definition-pathname-name system) (system-canonical-definition-name system)))
         (type (system-pathname-type system)))
     (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
         (first (apply-repo-system-filter
@@ -146,7 +165,7 @@ differently from that system's name."
 system TYPE within LOCALITY."
   (let* ((module (coerce-to-module module))
          (path (truename (module-pathname module locality)))
-         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-file-type type)))
+         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type (system-type-to-file-type type)))
          (pass1 (directory pass1-pattern))
          (blacklists (list* (subwild path '("test"))
                             (subwild path '("tests"))
@@ -159,7 +178,7 @@ system TYPE within LOCALITY."
 (defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
    definition path within its module within LOCALITY."
-  (when-let ((definition-pathname (or path (system-definition system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
+  (when-let ((definition-pathname (or path (system-definition-pathname system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
     (unless (string= (down-case-name system) (pathname-name definition-pathname))
       (when check-path-sanity
         (system-error system "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))

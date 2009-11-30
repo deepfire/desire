@@ -96,28 +96,6 @@ SAVE-DEFINITIONS was called.")
   (:method ((o symbol)  &optional (local-distributor *self*))
     (slot-value local-distributor o)))
 
-(defmacro do-wishmasters ((var) &body body)
-  `(do-distributors (,var)
-     (when (wishmasterp ,var)
-       ,@body)))
-
-(defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
-  `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
-         ,@body))
-
-(defmacro do-distributor-modules ((module-var distributor) &body body)
-  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
-  (with-gensyms (remote module-name block)
-    `(do-distributor-remotes (,remote ,distributor ,block)
-       (iter (for ,module-name in (location-module-names ,remote))
-             (for ,module-var = (module ,module-name))
-             (in ,block ,@body)))))
-
-(defun compute-distributor-modules (distributor)
-  "Compute the set of module names published by DISTRIBUTOR.
-This notably excludes converted modules."
-  (remove-duplicates (mapcan #'location-module-names (distributor-remotes (coerce-to-distributor distributor)))))
-
 (defclass relationship ()
   ((from :accessor rel-from :initarg :from)
    (to :accessor rel-to :initarg :to)))
@@ -422,14 +400,6 @@ differ in only slight detail -- gate property, for example."
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
   (update-gate-conversions o))
 
-(defun locality-asdf-registry-path (locality)
-  "Provide the fixed definition of ASDF registry directory,
-   within LOCALITY."
-  (subdirectory* (locality-pathname locality) ".asdf-registry"))
-
-(defun locality-register-with-asdf (locality)
-  (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal))
-
 (defun cvs-locality-lock-path (cvs-locality)
   "Provide the fixed definition of lock directory for CVS repositories,
    within CVS-LOCALITY."
@@ -549,38 +519,6 @@ instead."
                                            (declare (special *module* *umbrella*))
                                            (list ,@path)))))
 
-;;;
-;;; NOTE: this is the reason why remotes have names
-;;;
-(defun git-fetch-remote (remote module-name &optional directory)
-  "Fetch from REMOTE, with working directory optionally changed
-to DIRECTORY."
-  (maybe-within-directory directory
-    (let ((module-url (url remote module-name)))
-      (ensure-gitremote (name remote) module-url))
-    (fetch-gitremote (name remote))))
-
-(defun git-clone-remote (remote module-name &optional locality-pathname)
-  "Clone REMOTE, with working directory optionally changed to
-LOCALITY-PATHNAME."
-  (maybe-within-directory locality-pathname
-    (let ((module-url (url remote module-name)))
-      (with-explanation ("cloning module ~A from remote ~A in ~S" module-name (name remote) *default-pathname-defaults*)
-        (git "clone" "-o" (down-case-name remote) module-url)))))
-
-(defun parse-remote-namestring (namestring &key gate-p slashless type-hint)
-  "Given a remote NAMESTRING, deduce the remote's type, host, port and path,
-and return them as multiple values.
-Note that http is interpreted as git-http -type remote.
-DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
-  (multiple-value-bind (schema user password hostname port path directoryp) (parse-uri namestring :slashless-header slashless)
-    (let ((cred (when user
-                  (or (match-credentials user password)
-                      (desire-error "~@<Credentials were provided in an URI namestring ~S, but were not recognised.~:@>" namestring)))))
-      (values (or (uri-type-to-remote-type schema :gate-p gate-p :hint type-hint)
-                  (desire-error "Bad URI type ~S in remote namestring ~S." schema namestring))
-              cred hostname port path directoryp))))
-
 ;;;;
 ;;;; Modules
 ;;;;
@@ -645,37 +583,223 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
       (when (typep remote 'gate)
         (not (null (find (name module) (gate-converted-module-names remote)))))))
 
-(defun compute-module-presence (module &optional (locality (gate *self*)))
-  (git-repository-present-p (module-pathname module locality)))
+;;;;
+;;;; Systems
+;;;;
+(defclass system-type-mixin ()
+  ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
 
-(defun update-module-presence (module &optional (locality (gate *self*)) (force-to nil forcep))
-  "Recompute MODULE's presence in LOCALITY, updating MODULE's presence cache.
-Optionally, when FORCE-TO is specified, the actual check is omitted and the
-value of FORCE-TO is assumed."
-  (with-slots (scan-positive-localities) module
-    (lret ((presence (if forcep
-                         force-to
-                         (compute-module-presence module locality))))
-      (if presence
-          (pushnew locality scan-positive-localities)
-          (removef scan-positive-localities locality)))))
+(defclass asdf (system-type-mixin) () (:default-initargs :pathname-type "asd"))
+(defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
+(defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
 
-(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
-                                 &aux (module (coerce-to-module module-or-name)))
-  "See if MODULE's presence cache is positive for LOCALITY, failing that perform
-actual repository check and update the presence cache.
-CHECK-WHEN-PRESENT-P determines if presence check is forced when MODULE's cache
-is positive.
-CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
-cache results."
-  (if-let ((cache-hit (find locality (module-scan-positive-localities module))))
-    (if check-when-present-p
-        (update-module-presence module locality)
-        t)
-    (if check-when-missing-p
-        (update-module-presence module locality)
-        nil)))
+(defclass system (desirable)
+  ((module :accessor system-module :initarg :module :documentation "Specified.")
+   (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name
+                             :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
+   (applications :accessor system-applications :initarg :applications :documentation "Cache."))
+  (:default-initargs
+   :registrator #'(setf system)
+   :definition-pathname-name nil
+   :module nil :applications nil)
+  (:documentation
+   "Note that we don't remember how to find systems within the module's
+directory hierarchy, as we rely on the recursor to properly register the
+system with the system definition backend, so we can query the backend,
+when needed."))
 
+(defun system-hidden-p (system)
+  "A hidden system is a system whose definition resides in a file
+named differently from system's name. We have to store the name of
+the definition file for such systems.
+Find out whether SYSTEM is hidden."
+  (not (null (system-definition-pathname-name system))))
+
+(defclass asdf-system (asdf system) ())
+(defclass mudball-system (mudball system) ())
+(defclass xcvb-system (xcvb system) ())
+
+(defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
+  (appendf (module-systems module) (list o)))
+
+;;;;
+;;;; Applications
+;;;;
+(defclass application (desirable)
+  ((system :accessor app-system :initarg :system :documentation "Specified.")
+   (package :accessor app-package :initarg :package :documentation "Specified.")
+   (function :accessor app-function :initarg :function :documentation "Specified.")
+   (default-parameters :accessor app-default-parameters :initarg :default-parameters :documentation "Specified."))
+  (:default-initargs
+   :registrator #'(setf app) :system nil :package nil :function nil :default-parameters nil))
+
+(defmethod initialize-instance :after ((o application) &key system &allow-other-keys)
+  (appendf (system-applications system) (list o)))
+
+;;;;
+;;;; Object nomenclature
+;;;;
+(define-root-container *distributors*   distributor   :name-transform-fn coerce-to-namestring :remover %remove-distributor :coercer t :mapper map-distributors :iterator do-distributors)
+(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :remover %remove-module :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
+(define-root-container *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
+(define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
+(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems)
+(define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
+(define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
+(define-root-container *localities*     loc           :type locality :mapper map-localities :if-exists :error)
+(define-root-container *credentials*    cred          :type credentials :iterator do-credentials :if-exists :error)
+(define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
+
+;;;;
+;;;; Object knowledge base tampering
+;;;;
+(defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
+  (do-distributor-remotes (r d)
+    (do-remove-remote r))
+  (%remove-distributor (name d)))
+
+(defun do-remove-remote (r &key keep-modules)
+  (dolist (m (location-module-names r))
+    (when-let ((m (module m :if-does-not-exist :continue)))
+      (if keep-modules
+          (remote-unlink-module r m)
+          (do-remove-module (module m)))))
+  (%remove-remote (name r)))
+
+(defun remove-remote (remote-designator &key keep-modules &aux (r (coerce-to-remote remote-designator)))
+  (removef (distributor-remotes (remote-distributor r)) r)
+  (do-remove-remote r :keep-modules keep-modules))
+
+(defun do-remove-module (m)
+  (dolist (s (module-systems m))
+    (do-remove-system s))
+  (%remove-module (name m)))
+
+(defun remove-module (module-designator &key keep-locations &aux (m (coerce-to-module module-designator)))
+  (unless keep-locations
+    (do-remotes (r)
+      (when (remote-defines-module-p r m)
+        (removef (location-module-names r) (name m)))))
+  (do-remove-module m))
+
+(defun do-remove-system (s)
+  (dolist (a (system-applications s))
+    (%remove-app a))
+  (%remove-system (name s)))
+
+(defun remove-system (system-designator &aux (s (coerce-to-system system-designator)))
+  (removef (module-systems (system-module s)) s)
+  (do-remove-system s))
+
+(defun remove-app (app-designator &aux (a (coerce-to-application app-designator)))
+  (removef (system-applications (app-system a)) a)
+  (%remove-app (name a)))
+
+;;;
+;;; Conditions.
+;;;
+(define-condition desire-condition (condition) ())
+(define-condition definition-condition (desire-condition) ())
+(define-condition recursor-condition (desire-condition) ())
+
+(define-condition distributor-condition (desire-condition) ((distributor :reader condition-distributor :initarg :distributor)))
+(define-condition remote-condition (desire-condition)      ((remote :reader condition-remote :initarg :remote)))
+(define-condition locality-condition (desire-condition)    ((locality :reader condition-locality :initarg :locality)))
+(define-condition module-condition (desire-condition)      ((module :reader condition-module :initarg :module)))
+(define-condition system-condition (desire-condition)      ((system :reader condition-system :initarg :system)))
+(define-condition application-condition (desire-condition) ((application :reader condition-application :initarg :application)))
+(define-condition repository-condition (locality-condition module-condition)
+  ((pathname :reader condition-pathname :initarg :pathname)))
+
+(define-condition desire-error (desire-condition error) ())
+(define-condition definition-error (definition-condition desire-error) ())
+(define-condition recursor-error (recursor-condition desire-error) ())
+
+(define-condition distributor-error (distributor-condition desire-error) ())
+(define-condition remote-error (remote-condition desire-error) ())
+(define-condition locality-error (locality-condition desire-error) ())
+(define-condition module-error (module-condition desire-error) ())
+(define-condition system-error (system-condition desire-error) ())
+(define-condition application-error (application-condition desire-error) ())
+(define-condition repository-error (repository-condition desire-error) ())
+
+(define-simple-error desire-error)
+(define-simple-error definition-error)
+(define-simple-error recursor-error)
+
+(define-simple-error distributor-error :object-initarg :distributor)
+(define-simple-error remote-error :object-initarg :remote)
+(define-simple-error locality-error :object-initarg :locality)
+(define-simple-error module-error :object-initarg :module)
+(define-simple-error system-error :object-initarg :system)
+(define-simple-error application-error :object-initarg :application)
+
+(define-reported-condition insatiable-desire (desire-error)
+  ((desire :accessor condition-desire :initarg :desire))
+  (:report (desire)
+           "~@<It is not known to me how to satisfy the desire for ~S.~:@>" desire))
+
+;;;;
+;;;; Distributors, in context of knowledge base
+;;;;
+(defmacro do-wishmasters ((var) &body body)
+  `(do-distributors (,var)
+     (when (wishmasterp ,var)
+       ,@body)))
+
+(defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
+  `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
+         ,@body))
+
+(defmacro do-distributor-modules ((module-var distributor) &body body)
+  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
+  (with-gensyms (remote module-name block)
+    `(do-distributor-remotes (,remote ,distributor ,block)
+       (iter (for ,module-name in (location-module-names ,remote))
+             (for ,module-var = (module ,module-name))
+             (in ,block ,@body)))))
+
+(defun compute-distributor-modules (distributor)
+  "Compute the set of module names published by DISTRIBUTOR.
+This notably excludes converted modules."
+  (remove-duplicates (mapcan #'location-module-names (distributor-remotes (coerce-to-distributor distributor)))))
+
+;;;;
+;;;; Remotes, in context of knowledge base
+;;;;
+(defun match-credentials (username password)
+  "Find a named credentials entry with matching USERNAME and PASSWORD."
+  (do-credentials (c)
+    (when (credentials-match-p c username password)
+      (return c))))
+
+(defun parse-remote-namestring (namestring &key gate-p slashless type-hint)
+  "Given a remote NAMESTRING, deduce the remote's type, host, port and path,
+and return them as multiple values.
+Note that http is interpreted as git-http -type remote.
+DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
+  (multiple-value-bind (schema user password hostname port path directoryp) (parse-uri namestring :slashless-header slashless)
+    (let ((cred (when user
+                  (or (match-credentials user password)
+                      (desire-error "~@<Credentials were provided in an URI namestring ~S, but were not recognised.~:@>" namestring)))))
+      (values (or (uri-type-to-remote-type schema :gate-p gate-p :hint type-hint)
+                  (desire-error "Bad URI type ~S in remote namestring ~S." schema namestring))
+              cred hostname port path directoryp))))
+
+;;; NOTE: this is the reason why remotes have names
+;;;
+;;; Why it's here?  The metastore functions below need it.
+(defun git-fetch-remote (remote module-name &optional directory)
+  "Fetch from REMOTE, with working directory optionally changed
+to DIRECTORY."
+  (maybe-within-directory directory
+    (let ((module-url (url remote module-name)))
+      (ensure-gitremote (name remote) module-url))
+    (fetch-gitremote (name remote))))
+
+;;;;
+;;;; Modules, in context of knowledge base
+;;;;
 (defvar *module*)
 (defvar *umbrella*)
 
@@ -723,138 +847,50 @@ cache results."
             (format nil ":~A~:[~;~:*:~A~]@" (cred-username cred) (cred-password cred)))
           ":anonymous@"))))
 
-(defun url (remote-or-name &optional module-or-name)
-  (declare (type (or remote symbol) remote-or-name) (type (or module symbol) module-or-name))
-  (url-using-module (coerce-to-remote remote-or-name)
-                    (or (when (symbolp module-or-name)
-                          (module module-or-name :if-does-not-exist :continue))
-                        module-or-name)))
-
-;;;;
-;;;; Systems
-;;;;
-(defclass system-type-mixin ()
-  ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
-
-(defclass asdf (system-type-mixin) () (:default-initargs :pathname-type "asd"))
-(defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
-(defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
-
-(defclass system (desirable)
-  ((module :accessor system-module :initarg :module :documentation "Specified.")
-   (search-restriction :accessor system-search-restriction :initarg :search-restriction :documentation "Specified.")
-   (relativity :accessor system-relativity :initarg :relativity :documentation "Specified.")
-   (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name
-                             :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
-   (applications :accessor system-applications :initarg :applications :documentation "Cache."))
-  (:default-initargs
-   :registrator #'(setf system)
-   :hidden-p nil :search-restriction nil :definition-pathname-name nil
-   :module nil :applications nil :relativity nil))
-
-(defun system-hidden-p (system)
-  "A hidden system is a system whose definition resides in a file
-named differently from system's name. We have to store the name of
-the definition file for such systems.
-Find out whether SYSTEM is hidden."
-  (not (null (system-definition-pathname-name system))))
-
-(defclass asdf-system (asdf system) ())
-(defclass mudball-system (mudball system) ())
-(defclass xcvb-system (xcvb system) ())
-
-(defun system-definition-canonical-pathname-name (system)
-  "Return the canonical definition patname name for SYSTEM."
-  (downstring (name system)))
-
-(defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
-  (appendf (module-systems module) (list o)))
-
-;;;;
-;;;; Applications
-;;;;
-(defclass application (desirable)
-  ((system :accessor app-system :initarg :system :documentation "Specified.")
-   (package :accessor app-package :initarg :package :documentation "Specified.")
-   (function :accessor app-function :initarg :function :documentation "Specified.")
-   (default-parameters :accessor app-default-parameters :initarg :default-parameters :documentation "Specified."))
-  (:default-initargs
-   :registrator #'(setf app) :system nil :package nil :function nil :default-parameters nil))
-
-(defmethod initialize-instance :after ((o application) &key system &allow-other-keys)
-  (appendf (system-applications system) (list o)))
-
-;;;;
-;;;; Globals
-;;;;
-(define-root-container *distributors*   distributor   :name-transform-fn coerce-to-namestring :remover %remove-distributor :coercer t :mapper map-distributors :iterator do-distributors)
-(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :remover %remove-module :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
-(define-root-container *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
-(define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
-(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems)
-(define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
-(define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
-(define-root-container *localities*     loc           :type locality :mapper map-localities :if-exists :error)
-(define-root-container *credentials*    cred          :type credentials :iterator do-credentials :if-exists :error)
-(define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
-
-(defun match-credentials (username password)
-  "Find a named credentials entry with matching USERNAME and PASSWORD."
-  (do-credentials (c)
-    (when (credentials-match-p c username password)
-      (return c))))
+(defun url (remote &optional module)
+  "Compute the URL to MODULE within REMOTE."
+  (declare (type (or remote symbol) remote) (type (or module symbol) module))
+  (url-using-module (coerce-to-remote remote)
+                    (or (when (symbolp module)
+                          (module module :if-does-not-exist :continue))
+                        module)))
 
 (defun canonicalise-module-name (name)
   "Given a module's NAME, whether in form of a string, keyword or a symbol
-in any other package, return the canonical module name, as a symbol 
-in the 'DESIRE' package.."
+in any other package, return the canonical module name, as a symbol in the
+'DESIRE' package.."
   (name (module name)))
 
-(defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
-  (do-distributor-remotes (r d)
-    (do-remove-remote r))
-  (%remove-distributor (name d)))
+(defun compute-module-presence (module &optional (locality (gate *self*)))
+  (git-repository-present-p (module-pathname module locality)))
 
-(defun do-remove-remote (r &key keep-modules)
-  (dolist (m (location-module-names r))
-    (when-let ((m (module m :if-does-not-exist :continue)))
-      (if keep-modules
-          (remote-unlink-module r m)
-          (do-remove-module (module m)))))
-  (%remove-remote (name r)))
+(defun update-module-presence (module &optional (locality (gate *self*)) (force-to nil forcep))
+  "Recompute MODULE's presence in LOCALITY, updating MODULE's presence cache.
+Optionally, when FORCE-TO is specified, the actual check is omitted and the
+value of FORCE-TO is assumed."
+  (with-slots (scan-positive-localities) module
+    (lret ((presence (if forcep
+                         force-to
+                         (compute-module-presence module locality))))
+      (if presence
+          (pushnew locality scan-positive-localities)
+          (removef scan-positive-localities locality)))))
 
-(defun remove-remote (remote-designator &key keep-modules &aux (r (coerce-to-remote remote-designator)))
-  (removef (distributor-remotes (remote-distributor r)) r)
-  (do-remove-remote r :keep-modules keep-modules))
-
-(defun do-remove-module (m)
-  (dolist (s (module-systems m))
-    (do-remove-system s))
-  (%remove-module (name m)))
-
-(defun remove-module (module-designator &key keep-locations &aux (m (coerce-to-module module-designator)))
-  (unless keep-locations
-    (do-remotes (r)
-      (when (remote-defines-module-p r m)
-        (removef (location-module-names r) (name m)))))
-  (do-remove-module m))
-
-(defun do-remove-system (s)
-  (dolist (a (system-applications s))
-    (%remove-app a))
-  (%remove-system (name s)))
-
-(defun remove-system (system-designator &aux (s (coerce-to-system system-designator)))
-  (removef (module-systems (system-module s)) s)
-  (do-remove-system s))
-
-(defun remove-app (app-designator &aux (a (coerce-to-application app-designator)))
-  (removef (system-applications (app-system a)) a)
-  (%remove-app (name a)))
-
-(defun choose-gate-or-else (remotes)
-  (or (find-if (of-type 'gate) remotes)
-      (first remotes)))
+(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
+                                 &aux (module (coerce-to-module module-or-name)))
+  "See if MODULE's presence cache is positive for LOCALITY, failing that perform
+actual repository check and update the presence cache.
+CHECK-WHEN-PRESENT-P determines if presence check is forced when MODULE's cache
+is positive.
+CHECK-WHEN-MISSING-P defermines if presence check is performed upon negative
+cache results."
+  (if-let ((cache-hit (find locality (module-scan-positive-localities module))))
+    (if check-when-present-p
+        (update-module-presence module locality)
+        t)
+    (if check-when-missing-p
+        (update-module-presence module locality)
+        nil)))
 
 (defun module-best-remote (module &key (if-does-not-exist :error) allow-self)
   "Return the preferred remote among those providing MODULE.
@@ -891,6 +927,10 @@ whether the attempt was successful."
          (localp (and (null best-remote) (module-best-remote module :allow-self t))))
     (or localp
         (touch-remote-module best-remote module))))
+
+(defun choose-gate-or-else (remotes)
+  (or (find-if (of-type 'gate) remotes)
+      (first remotes)))
 
 (defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
   "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
@@ -958,6 +998,9 @@ The value returned is the list of found modules."
      (when (module-locally-present-p ,module ,locality nil nil)
        ,@body)))
 
+;;;;
+;;;; Metastore: communication with other desire nodes
+;;;;
 (defun clone-metastore (url locality-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out."
@@ -1006,69 +1049,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
     (unless (eq w *self*)
       (merge-remote-wishmaster w))))
 
-(defun determine-tools-and-update-remote-accessibility ()
-  "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
-  (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
-    (do-remotes (r)
-      (setf (remote-disabled-p r) (not (member (vcs-type r) present))))
-    (find-executable 'make)
-    (find-executable 'cp)))
-
-(defgeneric read-definitions (&key source force-source metastore))
-(defgeneric read-local-definitions (&key metastore))
-(defgeneric save-definitions (&key seal commit-message))
-
-(defun define-locality (name vcs-type &rest keys &key &allow-other-keys)
-  "Define locality of VCS-TYPE at PATH, if one doesn't exist already, 
-   in which case an error is signalled."
-  (apply #'make-instance (format-symbol (symbol-package vcs-type) "~A-LOCALITY" vcs-type) :name name (remove-from-plist keys :name)))
-
 ;;;
-;;; Conditions.
-;;;
-(define-condition desire-condition (condition) ())
-(define-condition definition-condition (desire-condition) ())
-(define-condition recursor-condition (desire-condition) ())
-
-(define-condition distributor-condition (desire-condition) ((distributor :reader condition-distributor :initarg :distributor)))
-(define-condition remote-condition (desire-condition)      ((remote :reader condition-remote :initarg :remote)))
-(define-condition locality-condition (desire-condition)    ((locality :reader condition-locality :initarg :locality)))
-(define-condition module-condition (desire-condition)      ((module :reader condition-module :initarg :module)))
-(define-condition system-condition (desire-condition)      ((system :reader condition-system :initarg :system)))
-(define-condition application-condition (desire-condition) ((application :reader condition-application :initarg :application)))
-(define-condition repository-condition (locality-condition module-condition)
-  ((pathname :reader condition-pathname :initarg :pathname)))
-
-(define-condition desire-error (desire-condition error) ())
-(define-condition definition-error (definition-condition desire-error) ())
-(define-condition recursor-error (recursor-condition desire-error) ())
-
-(define-condition distributor-error (distributor-condition desire-error) ())
-(define-condition remote-error (remote-condition desire-error) ())
-(define-condition locality-error (locality-condition desire-error) ())
-(define-condition module-error (module-condition desire-error) ())
-(define-condition system-error (system-condition desire-error) ())
-(define-condition application-error (application-condition desire-error) ())
-(define-condition repository-error (repository-condition desire-error) ())
-
-(define-simple-error desire-error)
-(define-simple-error definition-error)
-(define-simple-error recursor-error)
-
-(define-simple-error distributor-error :object-initarg :distributor)
-(define-simple-error remote-error :object-initarg :remote)
-(define-simple-error locality-error :object-initarg :locality)
-(define-simple-error module-error :object-initarg :module)
-(define-simple-error system-error :object-initarg :system)
-(define-simple-error application-error :object-initarg :application)
-
-(define-reported-condition insatiable-desire (desire-error)
-  ((desire :accessor condition-desire :initarg :desire))
-  (:report (desire)
-           "~@<It is not known to me how to satisfy the desire for ~S.~:@>" desire))
-
-;;;
-;;; Desires.
+;;; Desires.  Bitrotten and unused.
 ;;;
 (defun distributor-related-desires (distributor-spec)
   "Yield the names of modules currently desired from DISTRIBUTOR-SPEC."
@@ -1110,25 +1092,10 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
                                       (car (push (list new-dist) new-desires)))))
                     (push module (rest new-home))))))))
 
-;;;
-;;; Rudimentary caching.
-;;;
-(defun compute-module-caches (module)
-  "Regarding MODULE, return remotes defining it, localities storing 
-   (or desiring to store) it and systems it provides, as values."
-  (values
-   (do-remotes (remote)
-     (when (remote-defines-module-p remote module)
-       (collect remote)))
-   (remove-duplicates
-    (xform (module-desired-p module)
-           (curry #'cons (gate *self*))
-           (module-scan-positive-localities module)))
-   (remove-if #'null (map-systems (compose #'module #'system-module)))))
-
-(defun update-module-caches (module)
-  "Update MODULE's locality, remote and system caches.
-
-   The user must never need this."
-  (with-slots (remotes localities systems) module
-    (setf (values remotes localities systems) (compute-module-caches module))))
+;;;;
+;;;; Localities.  Utilities not used anywhere at this moment.
+;;;;
+(defun define-locality (name vcs-type &rest keys &key &allow-other-keys)
+  "Define locality of VCS-TYPE at PATH, if one doesn't exist already, 
+   in which case an error is signalled."
+  (apply #'make-instance (format-symbol (symbol-package vcs-type) "~A-LOCALITY" vcs-type) :name name (remove-from-plist keys :name)))

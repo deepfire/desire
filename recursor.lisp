@@ -104,7 +104,7 @@
                      (let* ((path (or (syspath name)
                                       (recursor-error "~@<Internal invariant violation during dependency resolution: failed to find system ~S among syspathed ~S~:@>~%"
                                                       name (hash-table-keys *syspath*))))
-                            (actual-type (system-definition-type path)))
+                            (actual-type (system-type-from-definition path)))
                        (when verbose
                          (format t ";;;; processing known system ~A~%" name))
                        (unless (subtypep system-type actual-type)
@@ -122,7 +122,7 @@
                              (values modules (cons entry (remove entry system-dictionary))))
                            (recursor-error "~@<Encountered a non-local dependency on an unknown system ~A.~:@>" name)))))
                  (values modules system-dictionary)))
-             (add-visible-system (module name path type dictionary known-local-visible &optional (actual-type (system-definition-type path)))
+             (add-visible-system (module name path type dictionary known-local-visible &optional (actual-type (system-type-from-definition path)))
                (unless (eq type actual-type)
                  (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" type actual-type path))
                (when verbose
@@ -165,8 +165,8 @@
         ;; This doesn't deal with other modules providing same systems. Will silently break.
         (let* ((required-sysfiles (xform main-sysfile (curry #'cons main-sysfile) (when complete other-sysfiles)))
                (also-sysfiles (unless complete other-sysfiles))
-               (required-names (mapcar (curry #'system-definition-name system-type) required-sysfiles))
-               (also-names (mapcar (curry #'system-definition-name system-type) also-sysfiles))
+               (required-names (mapcar (curry #'system-name-from-definition system-type) required-sysfiles))
+               (also-names (mapcar (curry #'system-name-from-definition system-type) also-sysfiles))
                (all-names (append required-names also-names))
                (extended-system-dictionary (append (mapcar #'make-wanted-missing required-names)
                                                    (mapcar #'make-unwanted-missing also-names)

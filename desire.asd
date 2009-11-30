@@ -23,7 +23,7 @@
                (:file "systems" :depends-on ("types"))
                ;; Tier 4
                (:file "import" :depends-on ("branching"))
-               (:file "init" :depends-on ("branching"))
+               (:file "init" :depends-on ("branching" "print-read"))
                ;; Tier 5
                (:file "recursor" :depends-on ("import"))
 

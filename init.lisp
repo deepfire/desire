@@ -31,6 +31,14 @@
     (ensure-directories-exist (subdirectory* directory "tmp")))
   directory)
 
+(defun determine-tools-and-update-remote-accessibility ()
+  "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
+  (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
+    (do-remotes (r)
+      (setf (remote-disabled-p r) (not (member (vcs-type r) present))))
+    (find-executable 'make)
+    (find-executable 'cp)))
+
 (defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master))
   "Make Desire fully functional, with PATH chosen as storage location.
 
@@ -83,8 +91,8 @@ locally present modules will be marked as converted."
       (determine-tools-and-update-remote-accessibility)
       ;; do some gate maintenance
       (let ((gate (gate *self*)))
-        (syncformat t ";;; registering ~S with ASDF~%" (locality-asdf-registry-path gate))
-        (locality-register-with-asdf gate)
+        (syncformat t ";;; registering gate locality ~S with system backend ~A~%" (locality-pathname gate) *default-system-type*)
+        (register-locality-with-system-backend *default-system-type* gate)
         (syncformat t ";;; massaging present modules~%")
         (do-present-modules (module gate)
           (let ((repo-dir (module-pathname module gate)))
