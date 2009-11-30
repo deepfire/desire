@@ -313,9 +313,9 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
            (file (make-pathname :directory (append *asdf-root* (list name)) :name name :type \"asd\" :case :local)))
       (when (and file (probe-file file))
         file)))
-  (push (quote basic-root-modules-search) asdf:*system-definition-search-functions*)
-  (asdf:operate (quote asdf:load-op) :desire :verbose nil)
-  (pop asdf:*system-definition-search-functions*)
+  (let ((asdf:*system-definition-search-functions* (cons (quote basic-root-modules-search)
+                                                         asdf:*system-definition-search-functions*)))
+    (asdf:operate (quote asdf:load-op) :desire :verbose nil))
   (in-package :desr))" \
      --eval "
 (progn
