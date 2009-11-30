@@ -532,9 +532,11 @@ instead."
    (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
    :registrator #'(setf module)
-   :path-whitelist nil :path-blacklist nil
-   :remotes nil :localities nil
-   :systems nil))
+   ;; name and umbrella are mandatory
+   :systems nil
+   :path-whitelist nil
+   :path-blacklist nil
+   :remotes nil :localities nil))
 
 (defclass origin-module (module) 
   ((status :accessor module-status :initarg :status)

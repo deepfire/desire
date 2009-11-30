@@ -86,8 +86,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
-  (and (null (system-search-restriction system))
-       (null (system-definition-pathname-name system))))
+  (and (null (system-definition-pathname-name system))))
 
 (defun module-simple-p (module)
   "Determine whether MODULE meets the requirements for a simple module."
@@ -267,9 +266,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 
 (defmethod print-object ((o system) stream)
   (format stream "~@<#S(~;~A~{ ~S~}~;)~:@>" (symbol-name (name o))
-          (append (list :module (name (system-module o)))
-                  (and (system-relativity o) (list :relativity (system-relativity o)))
-                  (and (system-search-restriction o) (list :search-restriction (system-search-restriction o)))
+          (append (list :module (name (slot-or-abort-print-object stream o 'module)))
                   (and (system-definition-pathname-name o) (list :definition-pathname-name (system-definition-pathname-name o)))
                   (and (system-applications o) (list :applications (sort (copy-list (system-applications o)) #'string< :key (compose #'string #'name)))))))
 
