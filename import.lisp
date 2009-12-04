@@ -69,8 +69,9 @@ Defaults to NIL.")
 
 (defgeneric touch-remote-module (remote module)
   (:method :around ((o remote) name)
-    (with-explanation ("attempting to touch module ~A in ~S" (coerce-to-name name) (url o name))
-      (call-next-method)))
+    (with-unaffected-executable-output
+      (with-explanation ("attempting to touch module ~A in ~S" (coerce-to-name name) (url o name))
+        (call-next-method))))
   (:method ((o git-remote) name)
     (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)

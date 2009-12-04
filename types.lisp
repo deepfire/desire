@@ -931,7 +931,9 @@ not discarded from consideration."
 whether the attempt was successful."
   (let* ((best-remote (module-best-remote module :if-does-not-exist :continue))
          (localp (and (null best-remote) (module-best-remote module :allow-self t))))
-    (or localp
+    (if localp
+        (prog1 t
+          (write-line "Module is local."))
         (touch-remote-module best-remote module))))
 
 (defun choose-gate-or-else (remotes)
