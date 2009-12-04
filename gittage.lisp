@@ -345,7 +345,8 @@
 
 
 (defun git-branch-present-p (name &optional directory)
-  (member name (git-branches directory) :test #'string=))
+  (or (not (null (probe-file (ref-path (downstring name) directory))))
+      (member name (git-branches directory) :test #'string=)))
 
 (defun git-remove-branch (name &optional directory)
   (maybe-within-directory directory
