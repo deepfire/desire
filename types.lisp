@@ -653,6 +653,31 @@ Find out whether SYSTEM is hidden."
 (define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
 
 ;;;;
+;;;; Distributors, in context of knowledge base
+;;;;
+(defmacro do-wishmasters ((var) &body body)
+  `(do-distributors (,var)
+     (when (wishmasterp ,var)
+       ,@body)))
+
+(defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
+  `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
+         ,@body))
+
+(defmacro do-distributor-modules ((module-var distributor) &body body)
+  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
+  (with-gensyms (remote module-name block)
+    `(do-distributor-remotes (,remote ,distributor ,block)
+       (iter (for ,module-name in (location-module-names ,remote))
+             (for ,module-var = (module ,module-name))
+             (in ,block ,@body)))))
+
+(defun compute-distributor-modules (distributor)
+  "Compute the set of module names published by DISTRIBUTOR.
+This notably excludes converted modules."
+  (remove-duplicates (mapcan #'location-module-names (distributor-remotes (coerce-to-distributor distributor)))))
+
+;;;;
 ;;;; Object knowledge base tampering
 ;;;;
 (defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
@@ -740,31 +765,6 @@ Find out whether SYSTEM is hidden."
   ((desire :accessor condition-desire :initarg :desire))
   (:report (desire)
            "~@<It is not known to me how to satisfy the desire for ~S.~:@>" desire))
-
-;;;;
-;;;; Distributors, in context of knowledge base
-;;;;
-(defmacro do-wishmasters ((var) &body body)
-  `(do-distributors (,var)
-     (when (wishmasterp ,var)
-       ,@body)))
-
-(defmacro do-distributor-remotes ((var distributor &optional block-name) &body body)
-  `(iter ,@(when block-name `(,block-name)) (for ,var in (distributor-remotes (coerce-to-distributor ,distributor)))
-         ,@body))
-
-(defmacro do-distributor-modules ((module-var distributor) &body body)
-  "Execute BODY with MODULE-VAR iteratively bound to DISTRIBUTOR's modules."
-  (with-gensyms (remote module-name block)
-    `(do-distributor-remotes (,remote ,distributor ,block)
-       (iter (for ,module-name in (location-module-names ,remote))
-             (for ,module-var = (module ,module-name))
-             (in ,block ,@body)))))
-
-(defun compute-distributor-modules (distributor)
-  "Compute the set of module names published by DISTRIBUTOR.
-This notably excludes converted modules."
-  (remove-duplicates (mapcan #'location-module-names (distributor-remotes (coerce-to-distributor distributor)))))
 
 ;;;;
 ;;;; Remotes, in context of knowledge base
