@@ -165,10 +165,18 @@
 ;;;
 ;;; Raw refs
 ;;;
+(defun ref-shortp (ref)
+  (endp (cdr ref)))
+
+(defun canonicalise-ref (ref)
+  (declare (type (or string cons) ref))
+  (let ((ref (ensure-cons ref)))
+    (if (ref-shortp ref)
+        (cons "heads" ref)
+        ref)))
+
 (defun ref-path (ref &optional directory)
-  (subfile directory (list* ".git" "refs" (if (ref-shortp ref)
-                                              (list* "heads" ref)
-                                              ref))))
+  (subfile directory (list* ".git" "refs" (canonicalise-ref ref))))
 
 (defun path-ref (pathname directory)
   (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
@@ -188,9 +196,6 @@
   (etypecase refvalue
     (integer (format nil "~40,'0X" refvalue))
     (list (flatten-path-list (xform prepend-refs (curry #'cons "refs") refvalue)))))
-
-(defun ref-shortp (ref)
-  (endp (rest ref)))
 
 (defun ref-headp (ref)
   (or (ref-shortp ref) (string= "heads" (first ref))))
@@ -261,7 +266,8 @@
                         (map-all-remote-heads #'ref-if-= directory)))))
 
 (defun ref-value (ref directory &key (if-does-not-exist :error))
-  (let ((path (ref-path ref directory)))
+  (let* ((ref (canonicalise-ref ref))
+         (path (ref-path ref directory)))
     (if (probe-file path)
         (%read-ref path)
         (or (car (remove nil (map-packed-refs (lambda (r v) (declare (ignore v)) (equal ref r))
