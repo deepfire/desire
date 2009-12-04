@@ -106,7 +106,8 @@ SAVE-DEFINITIONS was called.")
 (defun rel (distributor to)
   (cdr (assoc to (distributor-relationships distributor) :test #'eq)))
 
-(defun set-rel (distributor to value &aux (rships (distributor-relationships distributor)))
+(defun set-rel (distributor to value &aux
+                (rships (distributor-relationships distributor)))
   (if-let ((cell (assoc to rships :test #'eq)))
     (setf (cdr cell) value)
     (setf (distributor-relationships distributor) (acons to value rships))))
@@ -244,7 +245,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 (defun module-credentials (remote module-name)
   (cadr (assoc module-name (remote-module-credentials remote) :test #'string=)))
 
-(defmethod locality ((o remote)  &optional (local-distributor *self*))
+(defmethod locality ((o remote) &optional (local-distributor *self*))
   (slot-value local-distributor (vcs-type o)))
 
 (defun wishmasterp (distributor)
@@ -680,7 +681,8 @@ This notably excludes converted modules."
 ;;;;
 ;;;; Object knowledge base tampering
 ;;;;
-(defun remove-distributor (distributor-designator &aux (d (coerce-to-distributor distributor-designator)))
+(defun remove-distributor (distributor-designator &aux
+                           (d (coerce-to-distributor distributor-designator)))
   (do-distributor-remotes (r d)
     (do-remove-remote r))
   (%remove-distributor (name d)))
@@ -693,7 +695,8 @@ This notably excludes converted modules."
           (do-remove-module (module m)))))
   (%remove-remote (name r)))
 
-(defun remove-remote (remote-designator &key keep-modules &aux (r (coerce-to-remote remote-designator)))
+(defun remove-remote (remote-designator &key keep-modules &aux
+                      (r (coerce-to-remote remote-designator)))
   (removef (distributor-remotes (remote-distributor r)) r)
   (do-remove-remote r :keep-modules keep-modules))
 
@@ -702,7 +705,8 @@ This notably excludes converted modules."
     (do-remove-system s))
   (%remove-module (name m)))
 
-(defun remove-module (module-designator &key keep-locations &aux (m (coerce-to-module module-designator)))
+(defun remove-module (module-designator &key keep-locations &aux
+                      (m (coerce-to-module module-designator)))
   (unless keep-locations
     (do-remotes (r)
       (when (location-defines-module-p r m)
@@ -714,11 +718,13 @@ This notably excludes converted modules."
     (%remove-app a))
   (%remove-system (name s)))
 
-(defun remove-system (system-designator &aux (s (coerce-to-system system-designator)))
+(defun remove-system (system-designator &aux
+                      (s (coerce-to-system system-designator)))
   (removef (module-systems (system-module s)) s)
   (do-remove-system s))
 
-(defun remove-app (app-designator &aux (a (coerce-to-application app-designator)))
+(defun remove-app (app-designator &aux
+                   (a (coerce-to-application app-designator)))
   (removef (system-applications (app-system a)) a)
   (%remove-app (name a)))
 
@@ -882,8 +888,8 @@ value of FORCE-TO is assumed."
           (pushnew locality scan-positive-localities)
           (removef scan-positive-localities locality)))))
 
-(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t)
-                                 &aux (module (coerce-to-module module-or-name)))
+(defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t) &aux
+                                 (module (coerce-to-module module-or-name)))
   "See if MODULE's presence cache is positive for LOCALITY, failing that perform
 actual repository check and update the presence cache.
 CHECK-WHEN-PRESENT-P determines if presence check is forced when MODULE's cache
@@ -926,7 +932,8 @@ not discarded from consideration."
     (when-let ((remote (module-best-remote module :allow-self allow-self :if-does-not-exist if-does-not-exist)))
       (url remote module))))
 
-(defun touch-module (module &aux (module (coerce-to-module module)))
+(defun touch-module (module &aux
+                     (module (coerce-to-module module)))
   "Try 'access' MODULE via its preferred remote and return
 whether the attempt was successful."
   (let* ((best-remote (module-best-remote module :if-does-not-exist :continue))
@@ -940,7 +947,9 @@ whether the attempt was successful."
   (or (find-if (of-type 'gate) remotes)
       (first remotes)))
 
-(defun distributor-module-enabled-remote (distributor module &aux (module (coerce-to-module module)) (distributor (coerce-to-distributor distributor)))
+(defun distributor-module-enabled-remote (distributor module &aux
+                                          (distributor (coerce-to-distributor distributor))
+                                          (module (coerce-to-module module)))
   "Return the first non-disabled DISTRIBUTOR's remote providing MODULE.
    The second value is a boolean, indicating non-emptiness of the set of
    providing remotes, regardless of the enabled-p flag."
@@ -1069,7 +1078,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 
 (defsetf distributor-related-desires set-distributor-related-desires)
 
-(defun add-desire (distributor &optional (module-spec :everything) &aux (distributor (coerce-to-distributor distributor)))
+(defun add-desire (distributor &optional (module-spec :everything) &aux
+                   (distributor (coerce-to-distributor distributor)))
   "Add MODULE-SPEC (which is either a list of module specifications or an
    :EVERYTHING wildcard) to the list of modules desired from DISTRIBUTOR."
   (check-type module-spec (or (eql :everything) list))
@@ -1078,7 +1088,8 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
               (compute-distributor-modules distributor)
               (mapcar #'coerce-to-name module-spec))))
 
-(defun module-desired-p (module &aux (module (coerce-to-module module)))
+(defun module-desired-p (module &aux
+                         (module (coerce-to-module module)))
   "See whether MODULE is desired. Return the desired distributor, if so."
   (iter (for (distributor-name . desires) in *desires*)
         (when (member (name module) desires)
