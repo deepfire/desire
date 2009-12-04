@@ -22,15 +22,64 @@
 
 (defvar *system-pathname-typemap* '(("asd" . asdf-system) ("mb" . mudball-system) ("xcvb" . xcvb-system))
   "The mapping between SYSTEM subclasses and definition pathname types.")
+(defparameter *asdf-system-blacklist* '("cffi-tests" "trivial-features-tests"))
 
 (defun system-type-to-file-type (type)
   (or (car (rassoc type *system-pathname-typemap* :test #'eq))
       (desire-error "~@<Unknown system type ~S.~:@>" type)))
 
-(defparameter *asdf-system-blacklist* '("cffi-tests" "trivial-features-tests"))
-
 (defun asdf-system-name-blacklisted-p (name)
   (member name *asdf-system-blacklist* :test #'equal))
+
+;;;;
+;;;; Conditions
+;;;;
+(define-reported-condition system-definition-missing-error (system-error)
+  ((path :reader condition-path :initarg :path))
+  (:report (system path)
+           "~@<Couldn't find the definition for ~S in ~S~:@>" system path))
+
+;;;;
+;;;; Generic
+;;;;
+(defun invoke-with-module-system-definitions-and-blacklists (module repo-dir system-pathname-type fn)
+  (let* ((path (truename repo-dir))
+         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type system-pathname-type))
+         (pass1 (directory pass1-pattern))
+         (blacklist-patterns (list* (subwild path '("test"))
+                                    (subwild path '("tests"))
+                                    (subwild path '("darcs"))
+                                    (when-let ((blacklist (module-system-path-blacklist module)))
+                                      (list (subwild path blacklist))))))
+    (funcall fn pass1 blacklist-patterns)))
+
+(defmacro do-module-system-definitions ((pathname module repo-dir system-pathname-type) &body body)
+  (with-gensyms (pathnames blacklists)
+    `(invoke-with-module-system-definitions-and-blacklists ,module ,repo-dir ,system-pathname-type
+                                                           (lambda (,pathnames ,blacklists)
+                                                             (flet ((blacklisted-p (x)
+                                                                      (notany (curry #'pathname-match-p x) ,blacklists)))
+                                                               (iter (for ,pathname in ,pathnames)
+                                                                     ,@body))))))
+
+(defun system-definition-pathname (system repository &key (if-does-not-exist :error))
+  "Return the pathname of a SYSTEM's definition within REPOSITORY."
+  (let ((name (or (system-definition-pathname-name system) (system-canonical-definition-name system)))
+        (type (system-pathname-type system)))
+    (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
+        (do-module-system-definitions (path (system-module system) repository type)
+          (finding path such-that (and (string= name (pathname-name path))
+                                       (not (blacklisted-p path)))))
+        (ecase if-does-not-exist
+          (:error (error 'system-definition-missing-error :system system :path repository))
+          (:continue nil)))))
+
+(defun module-system-definitions (module &optional (type *default-system-type*) (locality (gate *self*)))
+  "Return a list of all MODULE's system definition pathnames corresponding to
+system TYPE within LOCALITY."
+  (do-module-system-definitions (path module (module-pathname module locality) (system-type-to-file-type type))
+    (unless (blacklisted-p path)
+      (collect path))))
 
 ;;;;
 ;;;; Backends
@@ -65,6 +114,16 @@ within LOCALITY loadable using BACKEND-TYPE.  The other, module-specific
 part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
   (:method ((type (eql 'asdf-system)) locality)
     (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
+
+(defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
+  "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
+   definition path within its module within LOCALITY."
+  (when-let ((definition-pathname (or path (system-definition-pathname system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
+    (unless (string= (down-case-name system) (pathname-name definition-pathname))
+      (when check-path-sanity
+        (system-error system "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))
+    (ensure-symlink (system-definition-registry-symlink-path system locality)
+                    definition-pathname)))
 
 (defgeneric system-definition-registry-symlink-path (system &optional locality)
   (:documentation
@@ -113,6 +172,9 @@ systems as the secondary value.")
         (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY signalled during ASDF:FIND-SYSTEM~:@>" 'system)
         t))))
 
+;;;
+;;; ASDF
+;;;
 (defun asdf-hidden-system-names (system &aux (name (name system)))
   "Find out names of ASDF systems hiding in SYSTEM.
 A hidden system is a system with a definition residing in a file named
@@ -132,79 +194,3 @@ differently from that system's name."
                    (remove (string name) (mapcar #'cdr (hash-table-values test))
                            :test #'string= :key (compose #'string-upcase #'asdf:component-name))))
       (setf asdf::*defined-systems* orig))))
-
-;;;;
-;;;; Conditions
-;;;;
-(define-reported-condition module-systems-unloadable-error (module-error)
-  ((systems :reader condition-systems :initarg :systems))
-  (:report (module systems)
-           "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>" module systems))
-
-(define-reported-condition system-definition-missing-error (system-error)
-  ((path :reader condition-path :initarg :path))
-  (:report (system path)
-           "~@<Couldn't find the definition for ~S in ~S~:@>" system path))
-
-;;;;
-;;;; Generic
-;;;;
-(defun invoke-with-module-system-definitions-and-blacklists (module repo-dir system-pathname-type fn)
-  (let* ((path (truename repo-dir))
-         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type system-pathname-type))
-         (pass1 (directory pass1-pattern))
-         (blacklist-patterns (list* (subwild path '("test"))
-                                    (subwild path '("tests"))
-                                    (subwild path '("darcs"))
-                                    (when-let ((blacklist (module-system-path-blacklist module)))
-                                      (list (subwild path blacklist))))))
-    (funcall fn pass1 blacklist-patterns)))
-
-(defmacro do-module-system-definitions ((pathname module repo-dir system-pathname-type) &body body)
-  (with-gensyms (pathnames blacklists)
-    `(invoke-with-module-system-definitions-and-blacklists ,module ,repo-dir ,system-pathname-type
-                                                           (lambda (,pathnames ,blacklists)
-                                                             (flet ((blacklisted-p (x)
-                                                                      (notany (curry #'pathname-match-p x) ,blacklists)))
-                                                               (iter (for ,pathname in ,pathnames)
-                                                                     ,@body))))))
-
-(defun system-definition-pathname (system repository &key (if-does-not-exist :error))
-  "Return the pathname of a SYSTEM's definition within REPOSITORY."
-  (let ((name (or (system-definition-pathname-name system) (system-canonical-definition-name system)))
-        (type (system-pathname-type system)))
-    (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
-        (do-module-system-definitions (path (system-module system) repository type)
-          (finding path such-that (and (string= name (pathname-name path))
-                                       (not (blacklisted-p path)))))
-        (ecase if-does-not-exist
-          (:error (error 'system-definition-missing-error :system system :path repository))
-          (:continue nil)))))
-
-(defun module-system-definitions (module &optional (type *default-system-type*) (locality (gate *self*)))
-  "Return a list of all MODULE's system definition pathnames corresponding to
-system TYPE within LOCALITY."
-  (do-module-system-definitions (path module (module-pathname module locality) (system-type-to-file-type type))
-    (unless (blacklisted-p path)
-      (collect path))))
-
-(defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
-  "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
-   definition path within its module within LOCALITY."
-  (when-let ((definition-pathname (or path (system-definition-pathname system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
-    (unless (string= (down-case-name system) (pathname-name definition-pathname))
-      (when check-path-sanity
-        (system-error system "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))
-    (ensure-symlink (system-definition-registry-symlink-path system locality)
-                    definition-pathname)))
-
-(defun ensure-module-systems-loadable (module &optional (locality (gate *self*)) &aux (module (coerce-to-module module)))
-  "Try making MODULE's systems loadable, defaulting to LOCALITY.
- 
-   Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
-  (dolist (s (module-systems module))
-    (ensure-system-loadable s nil (not (system-hidden-p s)) locality)))
-
-(defun module-central-system-name (module)
-  "How stupid is that?"
-  (name module))

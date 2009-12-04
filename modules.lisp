@@ -21,11 +21,26 @@
 (in-package :desire)
 
 
+(define-reported-condition module-systems-unloadable-error (module-error)
+  ((systems :reader condition-systems :initarg :systems))
+  (:report (module systems)
+           "~@<Following ~S's systems couldn't be made loadable:~{ ~S~}~:@>" module systems))
+
+(defun ensure-module-systems-loadable (module &optional (locality (gate *self*)) &aux (module (coerce-to-module module)))
+  "Try making MODULE's systems loadable, defaulting to LOCALITY.
+Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
+  (dolist (s (module-systems module))
+    (ensure-system-loadable s nil (not (system-hidden-p s)) locality)))
+
+(defun module-central-system-name (module)
+  "How stupid is that?"
+  (name module))
+
 (defgeneric notice-module-repository (module &optional locality)
   (:documentation
    "Ensure that the repository corresponding to MODULE within LOCALITY
 meets desire's operational requirements.")
   (:method ((o module) &optional (locality (gate *self*)))
     (let ((repo-dir (module-pathname o locality)))
-      (ensure-tracker-branch repo-dir (ref-value '("heads" "master") repo-dir))
+      (ensure-tracker-branch repo-dir (ref-value "master" repo-dir))
       (ensure-module-systems-loadable o locality))))
