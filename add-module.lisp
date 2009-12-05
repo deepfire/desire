@@ -266,12 +266,11 @@ The values returned are:
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
 (defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*))
-  (multiple-value-bind (remote cred module-name created-remote-p) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
+  (multiple-value-bind (remote cred module-name) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
     (if remote
         (multiple-value-bind (successp output) (touch-remote-module remote module-name)
           (unless successp
-            (when (and created-remote-p (not (member if-touch-fails '(:warn :continue))))
-              (remove-remote remote))
+            (remove-remote remote)
             (ecase if-touch-fails
               (:error (definition-error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
               (:abort (return-from add-module nil))
