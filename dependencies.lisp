@@ -322,4 +322,4 @@ in order of strictly decreasing likelihood."
   `(invoke-with-file-from-www ,filename ,url (lambda () ,@body)))
 
 (defun touch-www-file (url)
-  (with-valid-exit-codes ((8 nil)) (wget "--spider" url)))
+  (with-valid-exit-codes ((1 nil) (2 nil) (3 nil) (4 nil) (5 nil) (6 nil) (7 nil) (8 nil)) (wget "--spider" url)))
