@@ -23,6 +23,8 @@
 
 (defvar *auto-lust* nil
   "Whether to automatically LUST the modules during ADD-MODULE.")
+(defvar *verbose-remote-matching* nil
+  "Whether to comment on the progress of matching provided URLs vs. candidate remotes.")
 
 (defun add-distributor (type hostname port path &key gate-p)
   "Make a distributor residing at HOSTNAME, with a remote of TYPE,
@@ -38,15 +40,28 @@ remote, in which case TYPE must be subtype of GIT."
               r hostname *gate-vcs-type*))
         (setf (gate d) r)))))
 
-(defun find-distributor-fuzzy (distname &aux (downcase-distname (downstring distname)))
+(defun subdomain-p (tentative-superdomain domain)
+  "Determine whether DOMAIN is a subdomain of TENTATIVE-SUPERDOMAIN, and, in case it is,
+return the subdomain part of DOMAIN before the dot.  Otherwise return NIL."
+  (let ((posn (search tentative-superdomain domain :start2 1)))
+    (when (and posn (char= #\. (schar domain (1- posn)))
+               (= (+ posn (length tentative-superdomain)) (length domain)))
+      (subseq domain 0 (1- posn)))))
+
+(defun find-distributor-fuzzy (distname &aux
+                               (downcase-distname (downstring distname)))
   "Find a distributor which looks like a match for DISTNAME.
 For example, domain name OGRE.SVN.SOURCEFORGE.NET refers to a distributor
 called SVN.SOURCEFORGE.NET, as the remote specification takes over
-domain name generation."
-  (or (distributor distname :if-does-not-exist :continue)
-      (do-distributors (d)
-        (when (search (down-case-name d) downcase-distname)
-          (return d)))))
+domain name generation.
+The secondary value returned is a boolean specifying whether
+the match was exact.
+The ternary value returned designates the "
+  (if-let ((distributor (distributor distname :if-does-not-exist :continue)))
+    (values distributor t)
+    (do-distributors (d)
+      (when-let ((subdomain (subdomain-p (down-case-name d) downcase-distname)))
+        (return (values d nil subdomain))))))
 
 (defun string-detect-splitsubst (string sub replacement &key allowed-separators)
   "Detect whether STRING contains SUB, in which case the string is
@@ -107,9 +122,11 @@ of a module URL and try to deduce name of the module."
 
 
 
-(defun match-module-url-components-against-remote-set (raw-distributor-name port pcl dirp raw-module-name remotes)
-  (multiple-value-bind (dist domain-name-takeover) (string-detect-splitsubst raw-distributor-name raw-module-name '*module*)
-    (let* ((variants (compute-remote-path-variants pcl dirp raw-module-name))
+(defun match-module-url-components-against-remote-set (raw-distributor-name subdomain port pathname-component-list dirp raw-module-name remotes)
+  (multiple-value-bind (dist domain-name-takeover) (if subdomain
+                                                       (string-detect-splitsubst raw-distributor-name subdomain '*umbrella*)
+                                                       (string-detect-splitsubst raw-distributor-name raw-module-name '*module*))
+    (let* ((variants (compute-remote-path-variants pathname-component-list dirp raw-module-name))
            (remote (iter (for remote-path-variant in variants)
                          (let ((remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
                            (when-let ((remote (dolist (r remotes)
@@ -124,22 +141,37 @@ of a module URL and try to deduce name of the module."
 
 (defun module-ensure-distributor-match-remote (remote-type distributor-name port pathname-component-list dirp &optional module-name)
   "Given a REMOTE-TYPE, DISTRIBUTOR-NAME, PORT, PATH, DIRP and an optional
-MODULE-NAME, try to first find matching distributor, creating it, if it
-doesn't exist and then, match the remote, yielding them as multiple values.
-
-Additionally, when no matching remote is present, the best module path
-is determined.
-Further, it is determined if distributor's hostname depends on module
-name.
-These additional values are returned as multiple values."
+MODULE-NAME, try to first find a matching distributor, and, when found,
+a matching remote within it.
+When no distributor successfully matched, a new one is created.
+When no remote was matched, or no distributor existed, a corresponding remote
+is not created, but rather a path looking like a best match for the parameters
+provided is computed.
+The values returned are: 
+  - the distributor, either matched or created;
+  - a boolean designating whether the distributor was created;
+  - the matched remote or NIL;
+  - a boolean designating whether the domain name is a function of the module;
+  - a best-looking remote path specifier, when no remote was matched."
   (let ((module-name (or module-name (guess-module-name distributor-name pathname-component-list))))
-    (multiple-value-bind (distributor created-distributor-p) (or (find-distributor-fuzzy distributor-name)
-                                                                 (values (make-instance 'distributor :name (read-from-string distributor-name)) t))
-      (multiple-value-call #'values
-        distributor created-distributor-p
-        (match-module-url-components-against-remote-set
-         distributor-name port pathname-component-list dirp (downstring module-name)
-         (remove-if-not (curry #'remote-types-compatible-p remote-type) (distributor-remotes distributor)))))))
+    (multiple-value-bind (existing-distributor distributor-matched-exactly subdomain) (find-distributor-fuzzy distributor-name)
+      (let ((distributor (or existing-distributor (make-instance 'distributor :name (read-from-string distributor-name)))))
+        (when *verbose-remote-matching*
+          (format t "~@<;;; ~@;~@<F~;~:[ailed to find a match~*~;ound a~:[ fuzzy~;n exact~] match~] for provided distributor name ~:@(~A~)~:[~;, as subdomain ~:*~:@(~A~) of ~A~]~:@>~:@>~%"
+                  existing-distributor distributor-matched-exactly distributor-name subdomain (when subdomain
+                                                                                                (name existing-distributor))))
+        (multiple-value-bind (remote domain-name-takeover-by-remote-match deduced-path)
+            (match-module-url-components-against-remote-set distributor-name subdomain port pathname-component-list dirp (downstring module-name)
+                                                            (remove-if-not (curry #'remote-types-compatible-p remote-type)
+                                                                           (distributor-remotes distributor)))
+          (let* ((domain-name-takeover-by-fuzzy-distributor (and existing-distributor (not distributor-matched-exactly)))
+                 (domain-name-takeover (or domain-name-takeover-by-fuzzy-distributor domain-name-takeover-by-remote-match))
+                 (fallback-path (and (not remote)
+                                     (if domain-name-takeover-by-fuzzy-distributor
+                                         deduced-path
+                                         deduced-path))))
+            (values distributor (not existing-distributor)
+                    remote domain-name-takeover fallback-path)))))))
 
 (defun make-remote (type domain-name-takeover distributor port path &key name)
   (flet ((query-remote-name (default-name)
@@ -163,7 +195,7 @@ These additional values are returned as multiple values."
                    :module-names nil
                    :path path)))
 
-(defun ensure-url-remote (url &optional module-name &key remote-name gate-p vcs-type-hint)
+(defun ensure-url-remote (url &optional (module-name nil module-name-provided-p) &key remote-name gate-p vcs-type-hint)
    "Given an URL and an optionally specified MODULE-NAME, try to ensure
 existence of a remote corresponding to the URL.
 This is done by first finding a matching distributor, or creating it, if it
@@ -175,14 +207,24 @@ The values returned are:
    - the module name, which was either deduced, or specified, and
    - a boolean specifying, when a remote is returned, whether it was
      created anew."
+  (when *verbose-remote-matching*
+    (format t "~@<;;; ~@;Tr~@<ying to internalise URL ~S~:[~; for module ~:*~:@(~A~)~]~:[~;, with a provided hint of remote's type being ~:*~A~].~:@>~:@>~%"
+            url module-name vcs-type-hint))
   (multiple-value-bind (type cred hostname port path dirp) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
     (let ((module-name (or module-name (guess-module-name hostname path))))
+      (when *verbose-remote-matching*
+        (format t "~@<;;; ~@;De~@<duced remote type ~A~:[~;, credentials ~:*~A~], hostname ~:@(~A~)~:[~;, port ~:*~D~], path ~S with~:[out~;~] a trailing slash. ~
+                             Module name ~A was ~:[guessed~;provided~].~:@>~:@>~%"
+                type cred hostname port path dirp module-name module-name-provided-p))
       (multiple-value-bind (dist created-dist-p remote domain-name-takeover deduced-path) (module-ensure-distributor-match-remote
                                                                                            type hostname port path dirp module-name)
         (when created-dist-p
-          (format t ";; didn't find distributor at ~A, creating it~%" hostname))
+          (when *verbose-remote-matching*
+            (format t "~@<;;; ~@;Didn't find distributor at ~A, creating it.~:@>~%" hostname)))
         (let ((new-remote (unless remote
-                            (format t "~@<;; ~@;didn't find a remote for ~S (path ~S) on ~A, creating it~:@>~%" url (or deduced-path path) (name dist))
+                            (when *verbose-remote-matching*
+                              (format t "~@<;;; ~@;Di~@<dn't find a remote for ~S (path ~S) on ~A, creating it.~:@>~:@>~%"
+                                      url (or deduced-path path) (name dist)))
                             (make-remote type domain-name-takeover dist port (or deduced-path path) :name remote-name))))
           (values (or remote new-remote)
                   cred
@@ -213,7 +255,7 @@ The values returned are:
             (when lust
               (let ((*fetch-errors-serious* t))
                 (lust (name module))))))
-        (format t "~@<;; ~@;remote for ~A was not created~:@>~%" url))))
+        (format t "~@<;; ~@;Re~@<mote for ~A was not created~:@>~:@>~%" url))))
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))

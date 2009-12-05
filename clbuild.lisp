@@ -78,11 +78,10 @@
         (flet ((module-url-reformulable (name url current remotes)
                  (multiple-value-bind (type cred hostname port path) (parse-remote-namestring url :slashless (typep current 'cvs-native-remote) :type-hint (vcs-type current))
                    (declare (ignore cred)) ; XXX: is it the right thing to do?
-                   (match-module-url-components-against-remote-set
-                    hostname port path (downstring name)
-                    (remove-if-not (curry #'remote-types-compatible-p type) remotes)))))
+                   (match-module-url-components-against-remote-set hostname nil port path (downstring name) ; XXX: do we waste the *UMBRELLA* matcher here?
+                                                                   (remove-if-not (curry #'remote-types-compatible-p type) remotes)))))
           (iter (for (new-remote module-url module-name) in new-remotes)
-                (when-let* ((module-name (when (null (rest (location-module-names new-remote))) ;; we're after single-module remotes
+                (when-let* ((module-name (when (null (rest (location-module-names new-remote))) ; we're after single-module remotes
                                            (first (location-module-names new-remote))))
                             (better-remote (module-url-reformulable module-name module-url new-remote
                                                                     (remove new-remote (mapcar #'car new-remotes)))))
