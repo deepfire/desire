@@ -50,20 +50,18 @@ return the subdomain part of DOMAIN before the dot.  Otherwise return NIL."
                (string= tentative-superdomain (subseq domain posn)))
       (subseq domain 0 dot-posn))))
 
-(defun find-distributor-fuzzy (distname &aux
-                               (downcase-distname (downstring distname)))
-  "Find a distributor which looks like a match for DISTNAME.
+(defun find-distributor-fuzzy (domain-name &aux
+                               (downcase-domain-name (downstring domain-name)))
+  "Find a distributor which looks like a match for DOMAIN-NAME.
 For example, domain name OGRE.SVN.SOURCEFORGE.NET refers to a distributor
-called SVN.SOURCEFORGE.NET, as the remote specification takes over
-domain name generation.
-The secondary value returned is a boolean specifying whether
-the match was exact.
-The ternary value returned designates the "
-  (if-let ((distributor (distributor distname :if-does-not-exist :continue)))
-    (values distributor t)
-    (do-distributors (d)
-      (when-let ((subdomain (subdomain-p (down-case-name d) downcase-distname)))
-        (return (values d nil subdomain))))))
+called SVN.SOURCEFORGE.NET.
+The secondary value, if non-NIL, designates the subdomain of the matched
+distributor, if the match was non-strict due to the module's domain name
+being a function of its name, as depicted above."
+  (or (distributor domain-name :if-does-not-exist :continue)
+      (do-distributors (d)
+        (when-let ((subdomain (subdomain-p (down-case-name d) downcase-domain-name)))
+          (return (values d subdomain))))))
 
 (defun string-detect-splitsubst (string sub replacement &key allowed-separators)
   "Detect whether STRING contains SUB, in which case the string is
@@ -122,24 +120,46 @@ of a module URL and try to deduce name of the module."
                       last))))
     (make-keyword (string-upcase name))))
 
-
+(defun compute-umbrellised-remote-path (pathname-component-list)
+  "This /only/ works for pathname component lists that take over domain name."
+  (if-let ((posn (member '*module* pathname-component-list)))
+    (nconc (ldiff pathname-component-list posn) (list '*umbrella*) (rest posn))
+    pathname-component-list))
 
 (defun match-module-url-components-against-remote-set (raw-distributor-name subdomain port pathname-component-list dirp raw-module-name remotes)
-  (multiple-value-bind (dist domain-name-takeover) (if subdomain
-                                                       (string-detect-splitsubst raw-distributor-name subdomain '*umbrella*)
-                                                       (string-detect-splitsubst raw-distributor-name raw-module-name '*module*))
-    (let* ((variants (compute-remote-path-variants pathname-component-list dirp raw-module-name))
-           (remote (iter (for remote-path-variant in variants)
-                         (let ((remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
-                           (when-let ((remote (dolist (r remotes)
-                                                (when (and (equalp remote-path-variant (remote-path r))
-                                                           (eql port (remote-distributor-port r)))
-                                                  (return r)))))
-                             (return remote))))))
-      (values remote
-              domain-name-takeover
-              ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
-              (unless remote (append (when domain-name-takeover dist) (lastcar variants)))))))
+  "Given parsed components of an URL:
+   - the RAW-DISTIBUTOR-NAME (really a domain name) against which it matched,
+   - the possible additional SUBDOMAIN part, 
+   - PORT, 
+   - PATHNAME-COMPONENT-LIST, 
+   - whether the URL has a trailing slash, as specified by DIRP
+and the RAW-MODULE-NAME, try to find a matching remote among REMOTES."
+  ;; first, detect if the domain name of the distributor is a function of module or its umbrella
+  (multiple-value-bind (dist domain-name-takeover) (string-detect-splitsubst raw-distributor-name (or subdomain raw-module-name) '*umbrella*)
+    ;; compute variants of the non-domain part of the remote path specification
+    (let ((variants (compute-remote-path-variants pathname-component-list dirp raw-module-name)))
+      (multiple-value-bind (remote umbrellised-remote-path)
+          (iter outer
+                (with umbrellisable-remote) (with umbrellisable-variant)
+                (for remote-path-variant in variants)
+                (let ((full-remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
+                  (dolist (r remotes)
+                    (when (eql port (remote-distributor-port r))
+                      (cond ((equalp full-remote-path-variant (remote-path r)) ; the match is either against pristine remote path
+                             (return-from outer r))
+                            (domain-name-takeover
+                             (let ((umbrellised-remote-path (compute-umbrellised-remote-path (remote-path r))))
+                               ;; or we might need to update a remote...
+                               (when (equalp full-remote-path-variant umbrellised-remote-path)
+                                 (setf umbrellisable-remote r
+                                       umbrellisable-variant umbrellised-remote-path))))))))
+                (finally (when umbrellisable-remote
+                           (return-from outer (values umbrellisable-remote umbrellisable-variant)))))
+        (values remote
+                domain-name-takeover
+                umbrellised-remote-path
+                ;; choose the last path variant, which doesn't refer to *UMBRELLA*, by construction
+                (unless remote (append (when domain-name-takeover dist) (lastcar variants))))))))
 
 (defun module-ensure-distributor-match-remote (remote-type distributor-name port pathname-component-list dirp &optional module-name)
   "Given a REMOTE-TYPE, DISTRIBUTOR-NAME, PORT, PATH, DIRP and an optional
@@ -154,26 +174,25 @@ The values returned are:
   - a boolean designating whether the distributor was created;
   - the matched remote or NIL;
   - a boolean designating whether the domain name is a function of the module;
-  - a best-looking remote path specifier, when no remote was matched."
+  - a best-looking remote path specifier, when no remote was matched;
+  - the umbrellised remote path specifier, when the remote was matched, but it was determined
+    that it will be usable for the purposes of the module designated by MODULE-NAME only if
+    the domain-name part of its path specifier would be updated to refer to an umbrella,
+    rather than a module name."
   (let ((module-name (or module-name (guess-module-name distributor-name pathname-component-list))))
-    (multiple-value-bind (existing-distributor distributor-matched-exactly subdomain) (find-distributor-fuzzy distributor-name)
+    (multiple-value-bind (existing-distributor subdomain) (find-distributor-fuzzy distributor-name)
       (let ((distributor (or existing-distributor (make-instance 'distributor :name (read-from-string distributor-name)))))
         (when *verbose-remote-matching*
-          (format t "~@<;;; ~@;~@<F~;~:[ailed to find a match~*~;ound a~:[ fuzzy~;n exact~] match~] for provided distributor name ~:@(~A~)~:[~;, as subdomain ~:*~:@(~A~) of ~A~]~:@>~:@>~%"
-                  existing-distributor distributor-matched-exactly distributor-name subdomain (when subdomain
-                                                                                                (name existing-distributor))))
-        (multiple-value-bind (remote domain-name-takeover-by-remote-match deduced-path)
+          (format t "~@<;;; ~@;~@<F~;~:[ailed to find a match~*~;ound a~:[ fuzzy~;n exact~] match~] ~
+                            for provided distributor name ~:@(~A~)~:[~;, as subdomain ~:*~:@(~A~) of ~A~]~:@>~:@>~%"
+                  existing-distributor (null subdomain) distributor-name subdomain (when subdomain
+                                                                                     (name existing-distributor))))
+        (multiple-value-bind (remote domain-name-takeover umbrellised-remote-path deduced-path)
             (match-module-url-components-against-remote-set distributor-name subdomain port pathname-component-list dirp (downstring module-name)
                                                             (remove-if-not (curry #'remote-types-compatible-p remote-type)
                                                                            (distributor-remotes distributor)))
-          (let* ((domain-name-takeover-by-fuzzy-distributor (and existing-distributor (not distributor-matched-exactly)))
-                 (domain-name-takeover (or domain-name-takeover-by-fuzzy-distributor domain-name-takeover-by-remote-match))
-                 (fallback-path (and (not remote)
-                                     (if domain-name-takeover-by-fuzzy-distributor
-                                         deduced-path
-                                         deduced-path))))
-            (values distributor (not existing-distributor)
-                    remote domain-name-takeover fallback-path)))))))
+          (values distributor (not existing-distributor)
+                  remote domain-name-takeover deduced-path umbrellised-remote-path))))))
 
 (defun make-remote (type domain-name-takeover distributor port path &key name)
   (flet ((query-remote-name (default-name)
@@ -218,11 +237,16 @@ The values returned are:
         (format t "~@<;;; ~@;De~@<duced remote type ~A~:[~;, credentials ~:*~A~], hostname ~:@(~A~)~:[~;, port ~:*~D~], path ~S with~:[out~;~] a trailing slash. ~
                              Module name ~A was ~:[guessed~;provided~].~:@>~:@>~%"
                 type cred hostname port path dirp module-name module-name-provided-p))
-      (multiple-value-bind (dist created-dist-p remote domain-name-takeover deduced-path) (module-ensure-distributor-match-remote
-                                                                                           type hostname port path dirp module-name)
+      (multiple-value-bind (dist created-dist-p remote domain-name-takeover deduced-path umbrellised-remote-path) (module-ensure-distributor-match-remote
+                                                                                                                   type hostname port path dirp module-name)
         (when created-dist-p
           (when *verbose-remote-matching*
             (format t "~@<;;; ~@;Didn't find distributor at ~A, creating it.~:@>~%" hostname)))
+        (when (and remote *verbose-remote-matching*)
+          (format t "~@<;;; ~@;Ma~@<tched a remote ~A with remote path ~S~:[~;, but it requires umbrellisation.  The new path is: ~:*~S~].~:@>~:@>~%"
+                  (name remote) (remote-path remote) umbrellised-remote-path))
+        (when umbrellised-remote-path
+          (setf (remote-path remote) umbrellised-remote-path))
         (let ((new-remote (unless remote
                             (when *verbose-remote-matching*
                               (format t "~@<;;; ~@;Di~@<dn't find a remote for ~S (path ~S) on ~A, creating it.~:@>~:@>~%"
@@ -257,7 +281,7 @@ The values returned are:
             (when lust
               (let ((*fetch-errors-serious* t))
                 (lust (name module))))))
-        (format t "~@<;; ~@;Re~@<mote for ~A was not created~:@>~:@>~%" url))))
+        (format t "~@<;; ~@;Re~@<mote for ~A was not created.~:@>~:@>~%" url))))
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
