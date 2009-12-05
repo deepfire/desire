@@ -23,7 +23,7 @@
 
 (defvar *auto-lust* nil
   "Whether to automatically LUST the modules during ADD-MODULE.")
-(defvar *verbose-remote-matching* nil
+(defvar *verbose-internalisation* nil
   "Whether to comment on the progress of matching provided URLs vs. candidate remotes.")
 
 (defun add-distributor (type hostname port path &key gate-p)
@@ -182,7 +182,7 @@ The values returned are:
   (let ((module-name (or module-name (guess-module-name distributor-name pathname-component-list))))
     (multiple-value-bind (existing-distributor subdomain) (find-distributor-fuzzy distributor-name)
       (let ((distributor (or existing-distributor (make-instance 'distributor :name (read-from-string distributor-name)))))
-        (when *verbose-remote-matching*
+        (when *verbose-internalisation*
           (format t "~@<;;; ~@;~@<F~;~:[ailed to find a match~*~;ound a~:[ fuzzy~;n exact~] match~] ~
                             for provided distributor name ~:@(~A~)~:[~;, as subdomain ~:*~:@(~A~) of ~A~]~:@>~:@>~%"
                   existing-distributor (null subdomain) distributor-name subdomain (when subdomain
@@ -192,7 +192,7 @@ The values returned are:
                                                             (remove-if-not (curry #'remote-types-compatible-p remote-type)
                                                                            (distributor-remotes distributor)))
           (values distributor (not existing-distributor)
-                  remote domain-name-takeover deduced-path umbrellised-remote-path))))))
+                  remote domain-name-takeover subdomain deduced-path umbrellised-remote-path))))))
 
 (defun make-remote (type domain-name-takeover distributor port path &key name)
   (flet ((query-remote-name (default-name)
@@ -225,58 +225,67 @@ doesn't exist, then, finding a matching remote, or creating it as well.
 The values returned are:
    - the remote, matching or created, or NIL if the creation attempt failed,
    - the credentials extracted from the URL, if any,
-   - the module name, which was either deduced, or specified, and
+   - the module name, which was either deduced, or specified,
+   - the suggested umbrella name, when the domain name in the URL is a subdomain of the matched distributor, and
    - a boolean specifying, when a remote is returned, whether it was
      created anew."
-  (when *verbose-remote-matching*
+  (when *verbose-internalisation*
     (format t "~@<;;; ~@;Tr~@<ying to internalise URL ~S~:[~; for module ~:*~:@(~A~)~]~:[~;, with a provided hint of remote's type being ~:*~A~].~:@>~:@>~%"
             url module-name vcs-type-hint))
   (multiple-value-bind (type cred hostname port path dirp) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
     (let ((module-name (or module-name (guess-module-name hostname path))))
-      (when *verbose-remote-matching*
+      (when *verbose-internalisation*
         (format t "~@<;;; ~@;De~@<duced remote type ~A~:[~;, credentials ~:*~A~], hostname ~:@(~A~)~:[~;, port ~:*~D~], path ~S with~:[out~;~] a trailing slash. ~
                              Module name ~A was ~:[guessed~;provided~].~:@>~:@>~%"
                 type cred hostname port path dirp module-name module-name-provided-p))
-      (multiple-value-bind (dist created-dist-p remote domain-name-takeover deduced-path umbrellised-remote-path) (module-ensure-distributor-match-remote
-                                                                                                                   type hostname port path dirp module-name)
-        (when created-dist-p
-          (when *verbose-remote-matching*
-            (format t "~@<;;; ~@;Didn't find distributor at ~A, creating it.~:@>~%" hostname)))
-        (when (and remote *verbose-remote-matching*)
-          (format t "~@<;;; ~@;Ma~@<tched a remote ~A with remote path ~S~:[~;, but it requires umbrellisation.  The new path is: ~:*~S~].~:@>~:@>~%"
+      (multiple-value-bind (dist created-dist-p remote domain-name-takeover subdomain deduced-path umbrellised-remote-path)
+          (module-ensure-distributor-match-remote type hostname port path dirp module-name)
+        (when (and created-dist-p *verbose-internalisation*)
+          (format t "~@<;;; ~@;Didn't find distributor at ~A, creating it.~:@>~%" hostname))
+        (when (and remote *verbose-internalisation*)
+          (format t "~@<;;; ~@;Ma~@<tched a remote ~A with remote path ~S~
+                            ~:[~;, but it requires umbrellisation.  The new path is: ~:*~S~].~:@>~:@>~%"
                   (name remote) (remote-path remote) umbrellised-remote-path))
         (when umbrellised-remote-path
           (setf (remote-path remote) umbrellised-remote-path))
         (let ((new-remote (unless remote
-                            (when *verbose-remote-matching*
+                            (when *verbose-internalisation*
                               (format t "~@<;;; ~@;Di~@<dn't find a remote for ~S (path ~S) on ~A, creating it.~:@>~:@>~%"
                                       url (or deduced-path path) (name dist)))
                             (make-remote type domain-name-takeover dist port (or deduced-path path) :name remote-name))))
           (values (or remote new-remote)
                   cred
-                  module-name
+                  module-name (intern (string-upcase subdomain) (find-package :desire))
                   (not (null new-remote))))))))
 
-(defun ensure-remote-module (remote module-name &key credentials path-whitelist path-blacklist)
+(defun ensure-remote-module (remote module-name umbrella-name &key credentials path-whitelist path-blacklist)
   (lret ((module (or (module module-name :if-does-not-exist :continue)
-                     (make-instance 'module :name module-name :umbrella module-name :path-whitelist path-whitelist :path-blacklist path-blacklist))))
+                     (make-instance 'module :name module-name :umbrella umbrella-name :path-whitelist path-whitelist :path-blacklist path-blacklist))))
     (unless (find module-name (location-module-names remote))
       (remote-link-module remote module))
     (when credentials
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
 (defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*))
-  (multiple-value-bind (remote cred module-name) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
+  (multiple-value-bind (remote credentials module-name maybe-umbrella-name) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
     (if remote
-        (multiple-value-bind (successp output) (touch-remote-module remote module-name)
-          (unless successp
-            (remove-remote remote)
-            (ecase if-touch-fails
-              (:error (definition-error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
-              (:abort (return-from add-module nil))
-              (:warn (format t "~@<;; ~@;Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
-              (:continue)))
-          (lret ((module (ensure-remote-module remote module-name :credentials cred :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+        (lret ((module (ensure-remote-module remote module-name (or maybe-umbrella-name module-name) :credentials credentials :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+          (when *verbose-internalisation*
+            (format t "~@<;;; ~@;Cr~@<eated module ~A~:[~; with umbrella ~S~]~
+                              ~:[~;, credentials ~:*~A~]~
+                              ~:[~;, path whitelist ~:*~A~]~
+                              ~:[~;, path blacklist ~:*~A~].~:@>~:@>~%"
+                    module-name (and maybe-umbrella-name (not (string-equal maybe-umbrella-name (string module-name)))) maybe-umbrella-name
+                    credentials path-whitelist path-blacklist))
+          (multiple-value-bind (successp output) (touch-remote-module remote module-name)
+            (unless successp
+              (remove-module module)
+              (remove-remote remote)
+              (ecase if-touch-fails
+                (:error (definition-error "~@<Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
+                (:abort (return-from add-module nil))
+                (:warn (format t "~@<;; ~@;Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
+                (:continue)))
             (when lust
               (let ((*fetch-errors-serious* t))
                 (lust (name module))))))

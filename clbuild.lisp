@@ -58,17 +58,18 @@
                                 (setf (readtable-case *readtable*) :preserve)
                                 (when spacepos (when-let ((posturl (read-from-string string nil nil :start spacepos)))
                                                  (princ-to-string posturl))))))
-                (multiple-value-bind (remote cred i created-p) (or known-remote (ensure-url-remote url module-name :vcs-type-hint (case remote-name
-                                                                                                                                    (get_git 'git)
-                                                                                                                                    (get_darcs 'darcs)
-                                                                                                                                    (get_svn 'svn))))
+                (multiple-value-bind (remote cred i maybe-umbrella-name created-p)
+                    (or known-remote (ensure-url-remote url module-name :vcs-type-hint (case remote-name
+                                                                                         (get_git 'git)
+                                                                                         (get_darcs 'darcs)
+                                                                                         (get_svn 'svn))))
                   (declare (ignore i))
                   (unless remote
                     (next-iteration))
                   (when created-p
                     (push (list remote url module-name) (new-remotes (remote-distributor remote))))
                   (unless (find module-name (location-module-names remote))
-                    (ensure-remote-module remote module-name :credentials cred)
+                    (ensure-remote-module remote module-name (or maybe-umbrella-name module-name) :credentials cred)
                     (when (typep remote 'cvs)
                       (let* ((default-cvs-module-name (downstring module-name))
                              (cvs-module-name (or posturl default-cvs-module-name)))
