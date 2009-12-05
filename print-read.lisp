@@ -168,9 +168,11 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 (defun read-remote (type name path-components &key distributor-port domain-name-takeover modules converted-module-names credentials wrinkles initial-version)
   (let* ((source *read-time-merge-source-distributor*)
          (owner *read-time-enclosing-distributor*)
+         ;; compute name, the object and type
          (predicted-name (or name (default-remote-name (name owner) (vcs-type type) (transport type)))) ; note that the vcs type doesn't change due to type merging
          (subject (find predicted-name (distributor-remotes owner) :key #'name))
          (merged-type (merge-remote-type source owner subject type))
+         ;; compute modules
          (systemless-modules (mapcar #'car (remove-if-not #'consp modules)))
          (modules (remove-if #'consp modules))
          (merged-module-names (merge-slot-value source owner subject 'module-names (append modules systemless-modules)))
@@ -227,6 +229,11 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     (setf (gate-unpublished-module-names gate) unpublished
           (gate-hidden-module-names gate) hidden)))
 
+(defun module-can-omit-simple-systems-p (module systems)
+  (and (first systems)
+       (string= (name (first systems)) (name module))
+       (endp (cdr systems))))
+
 (defmethod print-object ((o module) stream)
   (format stream "~@<#M(~;~A~{ ~<~(~S ~S~)~:@>~}~;)~:@>" (symbol-name (name o))
           (remove nil (multiple-value-call #'list
@@ -235,7 +242,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
                         (destructuring-bind (&optional first &rest other-systems) (module-systems o)
                           (unless (and first (null other-systems) (system-simple-p first) (eq (name first) (name o)))
                             (multiple-value-bind (simple complex) (unzip #'system-simple-p (module-systems o))
-                              (values (when simple
+                              (values (unless (module-can-omit-simple-systems-p o simple)
                                         (list :systems (sort (mapcar #'name simple) #'string< :key #'string)))
                                       (when complex
                                         (list :complex-systems (sort (mapcar #'name complex) #'string< :key #'string)))))))
