@@ -43,10 +43,12 @@ remote, in which case TYPE must be subtype of GIT."
 (defun subdomain-p (tentative-superdomain domain)
   "Determine whether DOMAIN is a subdomain of TENTATIVE-SUPERDOMAIN, and, in case it is,
 return the subdomain part of DOMAIN before the dot.  Otherwise return NIL."
-  (let ((posn (search tentative-superdomain domain :start2 1)))
-    (when (and posn (char= #\. (schar domain (1- posn)))
-               (= (+ posn (length tentative-superdomain)) (length domain)))
-      (subseq domain 0 (1- posn)))))
+  (let* ((posn (- (length domain) (length tentative-superdomain)))
+         (dot-posn (1- posn)))
+    (when (and (plusp posn)
+               (char= #\. (schar domain dot-posn))
+               (string= tentative-superdomain (subseq domain posn)))
+      (subseq domain 0 dot-posn))))
 
 (defun find-distributor-fuzzy (distname &aux
                                (downcase-distname (downstring distname)))
