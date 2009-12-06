@@ -69,7 +69,7 @@ Defaults to NIL.")
 
 (defgeneric touch-remote-module (remote module)
   (:method :around ((o remote) name)
-    (with-unaffected-executable-output
+    (with-unaffected-executable-output ()
       (with-explanation ("attempting to touch module ~A in ~S" (coerce-to-name name) (url o name))
         (call-next-method))))
   (:method ((o git-remote) name)
@@ -252,8 +252,9 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                 (return-from determine-available-module-tarball-version-starting-after (values url next-version-variant))))
         (setf current-depth-version (first current-depth-variants))))
 
-(defun update (module &optional (locality (gate *self*)))
+(defun update (module &optional locality &key pass-output)
   (let* ((module (coerce-to-module module))
+         (locality (or locality (gate *self*)))
          (best-remote (module-best-remote module :if-does-not-exist :continue)))
     (cond ((null best-remote)
            (if (module-best-remote module :allow-self t)
@@ -271,6 +272,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                                        (invoke-restart (find-restart 'retry)))
                                 :test-function (of-type 'repository-not-clean-during-fetch)
                                 :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))
-                 (fetch-module-using-remote best-remote name url repo-dir)))
+                 (with-maybe-unaffected-executable-output (pass-output)
+                   (fetch-module-using-remote best-remote name url repo-dir))))
              (syncformat t ";; Done fetching module ~A~%" name))))
     (values)))

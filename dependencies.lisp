@@ -306,7 +306,7 @@ in order of strictly decreasing likelihood."
 
 (defun get-url-contents-as-string (url)
   (with-explanation ("retrieving ~S" url)
-    (nth-value 1 (with-captured-executable-output
+    (nth-value 1 (with-captured-executable-output ()
                    (wget url "-O" "-")))))
 
 (defun list-www-directory (url)

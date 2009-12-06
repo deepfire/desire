@@ -92,7 +92,7 @@
 (defun git-repository-unstaged-changes-p (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
-      (with-avoided-executable-output
+      (with-avoided-executable-output ()
         (not (with-valid-exit-codes ((0 t)
                                      (1 nil)
                                      (128 nil))
@@ -101,7 +101,7 @@
 (defun git-repository-staged-changes-p (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("determining whether git repository at ~S has staged changes" *default-pathname-defaults*)
-      (with-avoided-executable-output
+      (with-avoided-executable-output ()
         (not (with-valid-exit-codes ((0 t)
                                      (1 nil)
                                      (128 nil))
@@ -121,7 +121,7 @@
 (defun gitvar (var &optional directory)
   (declare (type symbol var))
   (maybe-within-directory directory
-    (with-captured-executable-output
+    (with-captured-executable-output ()
       (multiple-value-bind (setp output)
           (with-explanation ("getting value of git variable ~A" (symbol-name var))
             (with-shell-predicate
