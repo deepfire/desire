@@ -27,14 +27,6 @@ Defaults to NIL.")
 
 (defvar *hg-to-git-location* #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py")
 
-(defparameter *purgeworth-binaries* 
-  '("dfsl"        ;; OpenMCL
-    "ppcf" "x86f" ;; CMUCL
-    "fasl"        ;; SBCL
-    "fas" "o"     ;; ECL
-    "lib" "obj"   ;; ECL/win32
-    )) 
-
 (define-reported-condition fetch-failure (module-error remote-error)
   ((execution-error :reader condition-execution-error :initarg :execution-error))
   (:report (remote module execution-error)
@@ -60,12 +52,6 @@ Defaults to NIL.")
   ;; these are needed for XCVB stack's postinstall
   (define-executable cp)
   (define-executable make))
-
-(defun purge-binaries (&optional directory)
-  "Purge files with type among one of *PURGEWORTH-BINARIES* either in DIRECTORY,
-   or, when it's NIL, in *DEFAULT-PATHNAME-DEFAULTS*."
-  (dolist (type *purgeworth-binaries*)
-    (mapc #'delete-file (directory (subfile directory '(:wild-inferiors :wild) :type type)))))
 
 (defgeneric touch-remote-module (remote module)
   (:method :around ((o remote) name)
@@ -214,7 +200,14 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
     (with-explanation ("on behalf of module ~A, converting from ~A to ~A: ~S => ~S" name (vcs-type o) *gate-vcs-type* from-repo-dir *default-pathname-defaults*)
       (call-next-method)))
   (:method ((o darcs-locality) name from-repo-dir)
-    (purge-binaries *default-pathname-defaults*)
+    (when (git-repository-present-p)
+      (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
+        (when untracked
+          (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
+                  from-repo-dir *default-pathname-defaults* untracked)
+          (mapc #'delete-file untracked))
+        (when (or staged-mod staged-del staged-new unstaged-mod unstaged-del)
+          (ensure-clean-repository :error))))
     (with-condition-recourses dirt-files-in-repository
         (multiple-value-bind (successp output) (with-shell-predicate (darcs-to-git from-repo-dir))
           (unless successp
