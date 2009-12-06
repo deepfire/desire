@@ -405,7 +405,7 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge debug disable-debugger verbose)
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t))
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
@@ -419,7 +419,7 @@
        :verbose verbose))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*) modules
-            purge purge-metastore branch metastore-branch debug disable-debugger verbose)
+            purge purge-metastore branch metastore-branch debug disable-debugger (verbose t))
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
          (module-names (or modules
