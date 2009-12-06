@@ -105,3 +105,12 @@ locally present modules will be marked as converted."
   "Execute INIT with the arguments that were passed to it last time."
   (init (root *self*) :as (when (distributor (name *self*) :if-does-not-exist :continue)
                             (name *self*))))
+
+(defun reload-definitions (&key reset-metastore)
+  "Lose all unsaved definitions by replacing them with those from the metastore."
+  (clear-definitions)
+  (when reset-metastore
+    (reset-metastore))
+  (read-definitions :force-source t)
+  ;; Metastore subscriptions?
+  )

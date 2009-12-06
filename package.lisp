@@ -24,8 +24,10 @@
    #:gate-converted-module-names #:gate-unpublished-module-names #:gate-hidden-module-names
    #:url #:parse-remote-namestring #:remote-disabled-p
    #:credentials #:cred-name #:cred-username #:cred-password #:cred
+   ;;   types.lisp :: metastore
+   #:reset-metastore
    ;;   types.lisp :: global UI
-   #:clear-definitions #:init #:vcs-enabled-p #:*unsaved-definition-changes-p*
+   #:clear-definitions #:init #:reload-definitions #:vcs-enabled-p #:*unsaved-definition-changes-p*
    ;;   types.lisp :: locality
    #:loc #:locality-pathname #:module-pathname #:locality-register-with-asdf
    ;;   types.lisp :: module

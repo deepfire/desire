@@ -1018,6 +1018,10 @@ The value returned is the list of found modules."
 ;;;;
 ;;;; Metastore: communication with other desire nodes
 ;;;;
+(defun reset-metastore (&optional (metastore-pathname (meta *self*)))
+  "Drop unsaved changes recorded in METASTORE-PATHNAME."
+  (git-set-branch-index-tree nil metastore-pathname))
+
 (defun clone-metastore (url locality-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out."
