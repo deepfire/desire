@@ -115,6 +115,68 @@
                                    (128 nil))
              (git "diff" "--exit-code" "--summary" "HEAD" "--"))))))
 
+(defun git-repository-status (&optional directory)
+  "Examine status of the git repository within DIRECTORY and return lists of pathnames as multiple values.
+The lists of pathnames returned have following semantics:
+    - staged modified,
+    - staged deleted,
+    - staged new,
+    - unstaged modified,
+    - unstaged deleted."
+  (maybe-within-directory directory
+    (with-explanation ("determining status of git repository at ~S" *default-pathname-defaults*)
+      (multiple-value-bind (status output) (with-captured-executable-output ()
+                                             (with-shell-predicate
+                                                 (git "status")))
+        (declare (ignore status))
+        (with-input-from-string (s output)
+          (flet ((seek-past-marker ()
+                   (iter (for line = (read-line s nil nil))
+                         (unless line
+                           (error "~@<Premature EOF while reading from 'git status'.~:@>"))
+                         (while (not (string= line "#")))))
+                 (collect-prefixed ()
+                   (iter (for line = (read-line s nil nil))
+                         (unless (starts-with-subseq "#	" line)
+                           (finish))
+                         (unless (starts-with-subseq #(#\# #\Tab) line)
+                           (error "~@<Bad constituent ~S while reading from 'git status'.~:@>" line))
+                         (collect (subseq line 2))))
+                 (process-entries (list)
+                   (iter (for entry in list)
+                         (multiple-value-bind (modifid-p mod-suffix) (starts-with-subseq "new file:   " entry :return-suffix t)
+                           (multiple-value-bind (deled-p del-suffix) (starts-with-subseq "deleted:    " entry :return-suffix t)
+                             (multiple-value-bind (new-p new-suffix) (starts-with-subseq "modified:   " entry :return-suffix t)
+                               (cond (modifid-p (collect mod-suffix into new))
+                                     (deled-p   (collect del-suffix into deleted))
+                                     (new-p     (collect new-suffix into modified))
+                                     (t (error "~@<Bad constituent ~S while reading from 'git status'.~:@>" entry))))))
+                         (finally (return (values modified deleted new))))))
+            (iter outer
+                  (with staged-modified) (with staged-deleted) (with staged-new)
+                  (with unstaged-modified) (with unstaged-deleted)
+                  (with untracked)
+                  (for line = (read-line s nil nil))
+                  (while line)
+                  (switch (line :test #'string=)
+                    ("# Changes to be committed:"
+                     (seek-past-marker)
+                     (setf (values staged-modified staged-deleted staged-new)
+                           (process-entries (collect-prefixed))))
+                    ("# Changed but not updated:"
+                     (seek-past-marker)
+                     (setf (values unstaged-modified unstaged-deleted)
+                           (process-entries (collect-prefixed))))
+                    ("# Untracked files:"
+                     (seek-past-marker)
+                     (setf untracked (collect-prefixed)))
+                    (t
+                     (unless (or (starts-with-subseq "# On branch " line)
+                                 (string= line "nothing to commit (working directory clean)")
+                                 (string= line "nothing added to commit but untracked files present (use \"git add\" to track)"))
+                       (error "~@<Unrecognised header ~S while reading from 'git status'.~:@>" line))))
+                  (finally (return-from outer (values staged-modified staged-deleted staged-new unstaged-modified unstaged-deleted untracked))))))))))
+
 ;;;
 ;;; Config variables
 ;;;
