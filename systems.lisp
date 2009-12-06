@@ -48,7 +48,7 @@
          (pass1 (directory pass1-pattern))
          (blacklist-patterns (list* (subwild path '("test"))
                                     (subwild path '("tests"))
-                                    (subwild path '("darcs"))
+                                    (subwild path '("_darcs"))
                                     (when-let ((blacklist (module-system-path-blacklist module)))
                                       (list (subwild path blacklist))))))
     (funcall fn pass1 blacklist-patterns)))
@@ -58,7 +58,7 @@
     `(invoke-with-module-system-definitions-and-blacklists ,module ,repo-dir ,system-pathname-type
                                                            (lambda (,pathnames ,blacklists)
                                                              (flet ((blacklisted-p (x)
-                                                                      (notany (curry #'pathname-match-p x) ,blacklists)))
+                                                                      (some (curry #'pathname-match-p x) ,blacklists)))
                                                                (iter (for ,pathname in ,pathnames)
                                                                      ,@body))))))
 
