@@ -203,9 +203,11 @@ The lists of pathnames returned have following semantics:
 (defun gitremotes (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
-      (let* ((output (execution-output-string 'git "remote"))
-             (remote-names (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))
-        (mapcar (compose #'intern #'string-upcase) remote-names)))))
+      (multiple-value-bind (status output) (with-captured-executable-output ()
+                                             (git "remote"))
+        (declare (ignore status))
+        (let ((remote-names (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))
+          (mapcar (compose #'intern #'string-upcase) remote-names))))))
 
 (defun git-remote-present-p (name &optional directory)
   (member name (gitremotes directory) :test #'string=))
@@ -404,7 +406,9 @@ The lists of pathnames returned have following semantics:
 (defun git-branches (&optional directory)
   (maybe-within-directory directory
     (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
-      (let ((output (execution-output-string 'git "branch")))
+      (multiple-value-bind (status output) (with-captured-executable-output ()
+                                             (git "branch"))
+        (declare (ignore status))
         (mapcar (compose #'make-keyword #'string-upcase) 
                 (remove-if
                  (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
