@@ -22,7 +22,9 @@
 
 
 (defvar *follow-upstream* t
-  "Whether HEAD should be tracking upstream.
+  "Whether HEAD in local repositories should be tracking upstream, as long as
+either *DRIVE-GIT-MASTERS* or *DRIVE-GIT-MASTERS-MATCHING-TRACKERS* cause
+the master branches to be updated.
 Defaults to T.")
 
 (defvar *dirty-repository-behaviour* :reset

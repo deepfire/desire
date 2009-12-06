@@ -114,8 +114,8 @@ Note that the provided directory is the final directory in the gate locality.")
           ;; - above variables are bound
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
             (call-next-method)))
-        (when (or *follow-upstream* (directory-created-p))
-          (git-set-head-index-tree :tracker (if (directory-created-p) :reset *dirty-repository-behaviour*))))
+        (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
+                                               (t :continue))))
       (setf (git-repository-world-readable-p repo-dir) *default-world-readable*)))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir)
