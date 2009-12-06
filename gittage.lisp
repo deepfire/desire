@@ -450,6 +450,7 @@ in a temporary pseudo-commit."
                             (git-set-branch-index-tree)))
       (when (git-repository-changes-p)
         (ecase if-changes
+          (:continue)
           (:stash (git-stash))
           (:reset (git-set-branch-index-tree))
           (:error (git-error "~@<~:[Uns~;S~]taged changes in git repository ~S.~:@>"
