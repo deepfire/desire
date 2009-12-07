@@ -29,10 +29,33 @@
 (defgeneric run-module-test (type module-name &optional verbose-internals record-output)
   (:method :around (type module-name &optional verbose-internals record-output)
     (declare (ignore verbose-internals))
-    (with-recorded-status (:record-backtrace t :record-output record-output)
-      (unwind-protect (call-next-method)
-        (finish-output *standard-output*)
-        (finish-output *error-output*))))
+    (pergamum::invoke-with-maybe-prepended-output
+     record-output
+     (lambda ()
+       (multiple-value-bind (condition backtrace return-value)
+           (block block
+             (flet ((record-condition (c)
+                      (return-from block
+                        (values c (with-output-to-string (string-stream)
+                                    (backtrace most-positive-fixnum string-stream))))))
+               (handler-bind ((serious-condition #'record-condition)
+                              #+sbcl
+                              (sb-c:compiler-error #'record-condition)
+                              #+sbcl
+                              (sb-c:fatal-compiler-error #'record-condition))
+                 (values nil nil
+                         (unwind-protect (call-next-method)
+                           (finish-output *standard-output*)
+                           (finish-output *error-output*))))))
+         (list* :return-value return-value
+                (when condition (list* :condition condition
+                                       (when backtrace
+                                         `(:backtrace ,backtrace))))))))
+           ;; (with-recorded-status (:record-backtrace t :record-output record-output)
+           ;;   (unwind-protect (call-next-method)
+           ;;     (finish-output *standard-output*)
+           ;;     (finish-output *error-output*)))
+           )
   (:method ((o (eql :master-reachability-phase)) mn &optional verbose-internals record-output)
     (declare (ignore verbose-internals record-output))
     (touch-module mn))
