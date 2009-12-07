@@ -30,7 +30,7 @@
 (defparameter *purge-metastore-command* "rm -rf desr/git/.meta")
 (defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
 
-(defun cook-buildslave-command (module-names phase-names purge purge-metastore branch metastore-branch debug disable-debugger verbose)
+(defun cook-buildslave-command (expr purge purge-metastore branch metastore-branch debug disable-debugger verbose)
   (remove nil (list
                (when purge
                  *purge-command*)
@@ -40,15 +40,12 @@
                (format nil "bash climb.sh ~:[~;-v ~]~
                                           ~:[~;-b ~:*~(~A~) ~] ~:[~;-t ~:*~(~A~) ~]~
                                           ~:[~;-d ~]~:[~;-g ~]~
-                                          -x \"(progn (desr:ensure-module-systems-loadable :desire) ~
-                                                      (require :desire) ~
-                                                      (funcall (find-symbol \\\"BUILDSLAVE\\\" :desire) '~A '~A ~:[nil~;t~]) ~
-                                                      (funcall (find-symbol \\\"QUIT\\\" :sb-ext)))\" ~
+                                          -x ~S ~
                                           ~~/desr"
                        verbose
                        branch metastore-branch
                        debug disable-debugger
-                       module-names phase-names verbose))))
+                       (format nil expr)))))
 
 ;;;
 ;;; Result output vector management
@@ -396,21 +393,27 @@
 ;;;
 ;;; Buildmaster entry points
 ;;;
+(defun make-buildslave-invocation-command (phase-names module-names verbose)
+  `(progn
+     (buildslave ',module-names ',phase-names ,verbose)
+     (sb-ext:quit)))
+
 (defun ping-slave (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
                    purge purge-metastore branch metastore-branch debug disable-debugger verbose
-                   just-print-conditions)
-  (handler-case
-      (with-maybe-just-printing-conditions (t buildslave-error) just-print-conditions
-        (with-slave-connection (slave-pipe hostname username
-                                           (cook-buildslave-command nil nil purge
-                                                                    purge-metastore branch
-                                                                    metastore-branch
-                                                                    debug disable-debugger verbose)
-                                           verbose)
-          (declare (ignore slave-pipe))
-          t))
-    (buildslave-error (c)
-      (return-from ping-slave (values nil c)))))
+                   just-print-conditions dry-run &aux
+                   (command (cook-buildslave-command (make-buildslave-invocation-command nil nil verbose) purge
+                                                     purge-metastore branch
+                                                     metastore-branch
+                                                     debug disable-debugger verbose)))
+  (if dry-run
+      (format t "executing:~%~A~%" command)
+      (handler-case
+          (with-maybe-just-printing-conditions (t buildslave-error) just-print-conditions
+            (with-slave-connection (slave-pipe hostname username command verbose)
+              (declare (ignore slave-pipe))
+              t))
+        (buildslave-error (c)
+          (return-from ping-slave (values nil c))))))
 
 (defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
@@ -443,7 +446,7 @@
               (while (typep phase 'local-test-phase))
               (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication)
                     rest-phases phases))
-        (with-slave-connection (slave-pipe hostname username (cook-buildslave-command module-names (mapcar #'type-of rest-phases)
+        (with-slave-connection (slave-pipe hostname username (cook-buildslave-command (make-buildslave-invocation-command module-names (mapcar #'type-of rest-phases) verbose)
                                                                                       purge purge-metastore branch metastore-branch debug disable-debugger verbose)
                                 verbose-slave-communication)
           (iter (for (phase . phases) on rest-phases)
