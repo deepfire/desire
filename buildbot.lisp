@@ -405,7 +405,7 @@
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t))
+(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when slave-fetch '(slave-fetch-phase))
@@ -416,10 +416,11 @@
        :purge purge
        :debug debug
        :disable-debugger disable-debugger
-       :verbose verbose))
+       :verbose verbose
+       :verbose-slave-communication verbose-slave-communication))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*) modules
-            purge purge-metastore branch metastore-branch debug disable-debugger (verbose t))
+            purge purge-metastore branch metastore-branch debug disable-debugger (verbose t) verbose-slave-communication)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
          (module-names (or modules
@@ -437,7 +438,7 @@
                     rest-phases phases))
         (with-slave-connection (slave-pipe hostname username (cook-buildslave-command module-names (mapcar #'type-of rest-phases)
                                                                                       purge purge-metastore branch metastore-branch debug disable-debugger verbose)
-                                verbose)
+                                verbose-slave-communication)
           (iter (for (phase . phases) on rest-phases)
                 (setf (remote-phase-slave-stream phase) slave-pipe
                       result-marker (execute-test-phase m-r phase result-marker))))))))
