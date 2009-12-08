@@ -467,7 +467,7 @@ differ in only slight detail -- gate property, for example."
   (update-local-distributor-conversions w))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
-  (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc)))
+  (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc) :path nil))
 
 ;;;
 ;;; Remote methods
