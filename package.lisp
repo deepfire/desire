@@ -28,6 +28,26 @@
    #:svn
    #:rsync
    #:http
+   #:git-native-remote
+   #:git-http-remote
+   #:git-combined-remote
+   #:hg-http-remote
+   #:darcs-http-remote
+   #:cvs-rsync-remote
+   #:cvs-native-remote
+   #:svn-rsync-remote
+   #:svn-http-remote
+   #:svn-native-remote
+   #:tarball-http-remote
+   #:gate-native-remote
+   #:gate-http-remote
+   #:git-locality
+   #:hg-locality
+   #:darcs-locality
+   #:cvs-locality
+   #:svn-locality
+   #:tarball-locality
+   #:git-gate-locality
    ;;   types.lisp :: direct knowledge base manipulation
    #:map-distributors
    #:map-locations
@@ -72,13 +92,27 @@
    ;;   types.lisp :: metastore
    #:reset-metastore
    ;;   types.lisp :: global UI
-   #:clear-definitions #:init #:reload-definitions #:vcs-enabled-p #:*unsaved-definition-changes-p*
+   #:clear-definitions
+   #:init
+   #:reload-definitions
+   #:vcs-enabled-p
+   #:*unsaved-definition-changes-p*
    ;;   types.lisp :: locality
-   #:loc #:locality-pathname #:module-pathname #:locality-register-with-asdf
+   #:loc
+   #:locality-pathname
+   #:module-pathname
+   #:locality-register-with-asdf
    ;;   types.lisp :: module
-   #:remote-link-module #:remote-unlink-module #:module-best-remote #:module-best-distributor #:module-fetch-url
-   #:touch-module #:distributor-module-enabled-remote
-   #:module-locally-present-p #:module-publishable-p #:module-hidden-p
+   #:remote-link-module
+   #:remote-unlink-module
+   #:module-best-remote
+   #:module-best-distributor
+   #:module-fetch-url
+   #:touch-module
+   #:distributor-module-enabled-remote
+   #:module-locally-present-p
+   #:module-publishable-p
+   #:module-hidden-p
    #:module-system-definitions
    ;;   types.lisp :: system
    #:system-hidden-p
