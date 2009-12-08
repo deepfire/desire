@@ -30,6 +30,7 @@
 (defvar *combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
 (defvar *default-system-type*                      'asdf-system)
 (defvar *merge-remote-wishmasters*                 t   "Whether to merge definitions from remote wishmasters.")
+(defvar *verbose-repository-maintenance*           nil)
 
 ;;;
 ;;; Globals
@@ -393,10 +394,19 @@ differ in only slight detail -- gate property, for example."
 
 (defgeneric update-gate-conversions (locality)
   (:method ((o gate-locality))
+    (when *verbose-repository-maintenance*
+      (format t "~@<;; ~@;Updating module presence list in gate ~S.~:@>~%" (locality-pathname o)))
     (multiple-value-bind (publishable unpublishable hidden) (compute-locality-module-presence o)
-      (setf (gate-converted-module-names o) (mapcar #'name publishable)
-            (gate-unpublished-module-names o) (mapcar #'name unpublishable)
-            (gate-hidden-module-names o) (mapcar #'name hidden)))))
+      (let ((publishable-names (mapcar #'name publishable))
+            (unpublishable-names (mapcar #'name unpublishable))
+            (hidden-names (mapcar #'name hidden)))
+        (when *verbose-repository-maintenance*
+          (format t "~@<;; ~@;Publishable:~{ ~A~}~:@>~%" publishable-names)
+          (format t "~@<;; ~@;Unpublished:~{ ~A~}~:@>~%" unpublishable-names)
+          (format t "~@<;; ~@;Hidden:~{ ~A~}~:@>~%" hidden-names))
+        (setf (gate-converted-module-names o) publishable-names
+              (gate-unpublished-module-names o) unpublishable-names
+              (gate-hidden-module-names o) hidden-names)))))
 
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
   (update-gate-conversions o))
@@ -881,12 +891,14 @@ in any other package, return the canonical module name, as a symbol in the
 Optionally, when FORCE-TO is specified, the actual check is omitted and the
 value of FORCE-TO is assumed."
   (with-slots (scan-positive-localities) module
-    (lret ((presence (if forcep
-                         force-to
-                         (compute-module-presence module locality))))
+    (lret* ((actual-presence (compute-module-presence module locality))
+            (presence (if forcep force-to actual-presence)))
       (if presence
           (pushnew locality scan-positive-localities)
-          (removef scan-positive-localities locality)))))
+          (removef scan-positive-localities locality))
+      (when *verbose-repository-maintenance*
+        (format t "~@<;;; ~@;looked up ~A: ~:[missing~;present~], new presence list: ~S~:@>~%"
+                (name module) actual-presence (mapcar #'name scan-positive-localities))))))
 
 (defun module-locally-present-p (module-or-name &optional (locality (gate *self*)) check-when-present-p (check-when-missing-p t) &aux
                                  (module (coerce-to-module module-or-name)))

@@ -21,8 +21,6 @@
 (in-package :desire)
 
 
-(defvar *verbose-repository-maintenance* nil)
-
 (define-reported-condition module-systems-unloadable-error (module-error)
   ((systems :reader condition-systems :initarg :systems))
   (:report (module systems)
