@@ -96,6 +96,10 @@ locally present modules will be marked as converted."
         (syncformat t ";;; massaging present modules~%")
         (do-present-modules (module gate)
           (notice-module-repository module gate)))
+      (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
+              (do-modules (m)
+                (when (module-scan-positive-localities m)
+                  (collect (name m)))))
       (syncformat t ";;; tweaking environment for CL-LAUNCH~%")
       (sb-posix:putenv "LISP_FASL_CACHE=NIL")
       (syncformat t ";;; all done~%")
