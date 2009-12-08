@@ -720,7 +720,11 @@ This notably excludes converted modules."
   (unless keep-locations
     (do-remotes (r)
       (when (location-defines-module-p r m)
-        (removef (location-module-names r) (name m)))))
+        (removef (location-module-names r) (name m))
+        (when (typep r 'gate)
+          (removef (gate-converted-module-names r) (name m))
+          (removef (gate-unpublished-module-names r) (name m))
+          (removef (gate-hidden-module-names r) (name m))))))
   (do-remove-module m))
 
 (defun do-remove-system (s)
