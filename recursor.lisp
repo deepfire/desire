@@ -193,8 +193,8 @@
                   (error 'recursor-progress-halted :system-dictionary new-extended-system-dictionary))
                 (setf (values modules extended-system-dictionary) (values modules-new new-extended-system-dictionary))))))))
 
-(defgeneric satisfy-module (name locality system-type module-dictionary system-dictionary &key complete skip-present verbose)
-  (:method ((name symbol) locality system-type module-dictionary system-dictionary &key complete skip-present verbose)
+(defgeneric satisfy-module (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
+  (:method ((name symbol) locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
     (when verbose
       (syncformat t "~@<;;; ~@;modules: ~A~:@>~%" module-dictionary)
       (syncformat t "~@<;;; ~@;systems: ~A~:@>~%" system-dictionary))
@@ -208,19 +208,26 @@
          (values module-dictionary system-dictionary))
         (t
          (setf (car cell) :processing)
-         (when (not (and skip-present (module-locally-present-p module locality))) 
-           (update module locality))
-         (multiple-value-bind (module-deps new-system-dictionary) (module-dependencies module locality system-type complete system-dictionary verbose)
-           (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
-                  (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
-             (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
-             (multiple-value-prog1
-                 (if new-deps-from-this-module
-                     (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
-                                      :complete complete :skip-present skip-present :verbose verbose)
-                     (values new-module-dictionary new-system-dictionary)))))))))
-  (:method :around (name locality system-type module-dictionary system-dictionary &key complete skip-present verbose)
-    (declare (ignore complete skip-present verbose))
+         (let ((present-p (module-locally-present-p module locality)))
+           (when present-p
+             (unless skip-present
+               (update module locality)))
+           (if (or present-p (not skip-missing))
+               (multiple-value-bind (module-deps new-system-dictionary) (module-dependencies module locality system-type complete system-dictionary verbose)
+                 (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
+                        (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
+                   (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
+                   (multiple-value-prog1
+                       (if new-deps-from-this-module
+                           (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
+                                            :complete complete :skip-present skip-present :verbose verbose)
+                           (values new-module-dictionary new-system-dictionary)))))
+               (progn
+                 (syncformat t "~@<;;; ~@;Modules ~A is missing, but SKIP-MISSING was specified, moving on with fingers crossed.~:@>~%" name)
+                 (setf (cdr cell) :done)
+                 (values module-dictionary system-dictionary))))))))
+  (:method :around (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
+    (declare (ignore complete skip-present skip-missing verbose))
     (multiple-value-bind (new-module-dictionary new-system-dictionary) (call-next-method)
       (let ((cell (cdr (assoc name new-module-dictionary))))
         (assert cell)
@@ -228,17 +235,17 @@
         (setf (cdr cell) :done)
         (values new-module-dictionary new-system-dictionary)))))
 
-(defun satisfy-modules (module-names locality system-type module-dictionary system-dictionary toplevelp &key complete skip-present verbose)
+(defun satisfy-modules (module-names locality system-type module-dictionary system-dictionary toplevelp &key complete skip-present skip-missing verbose)
   (iter (for module-name in module-names)
         (for (values updated-module-dictionary updated-system-dictionary) = (satisfy-module module-name locality system-type module-dictionary system-dictionary
-                                                                                            :complete complete :skip-present skip-present :verbose verbose))
+                                                                                            :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose))
         (setf (values module-dictionary system-dictionary) (values updated-module-dictionary updated-system-dictionary))
         (finally
          (when-let ((undone (and toplevelp (mapcar #'car (remove-if #'cddr module-dictionary)))))
            (format t "WARNING: after all gyrations following modules were left unsatisfied:~{ ~S~}~%" undone))
          (return (values module-dictionary system-dictionary)))))
 
-(defun desire (desires &key complete skip-present (seal t) verbose)
+(defun desire (desires &key complete skip-present skip-missing (seal t) verbose)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
 Desire satisfaction means:
@@ -268,7 +275,7 @@ Defined keywords:
             (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
         (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
         (satisfy-modules desired-module-names (gate *self*) *default-system-type* module-dictionary system-dictionary :sure-as-hell
-                         :complete complete :skip-present skip-present :verbose verbose)
+                         :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose)
       
         (when *unsaved-definition-changes-p*
           (syncformat t "; Definitions modified, writing~:[~; and committing~] changes.~%" seal)

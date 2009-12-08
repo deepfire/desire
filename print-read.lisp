@@ -417,3 +417,7 @@ When SEAL-P is non-NIL, the changes are committed."
         (terpri definitions))
       (setf *unsaved-definition-changes-p* nil)
       (values))))
+
+(defun unsaved-definition-changes-p ()
+  "See whether there are unsaved changes to DEFINITIONS."
+  (git-repository-changes-p (meta *self*)))

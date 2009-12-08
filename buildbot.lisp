@@ -116,6 +116,8 @@
   (:default-initargs :action-description "test upstream repository reachability"))
 (defclass master-update-phase (local-test-phase) ()
   (:default-initargs :action-description "fetch upstream modules and convert them"))
+(defclass master-recurse-phase (local-test-phase) ()
+  (:default-initargs :action-description "unwind module dependencies"))
 (defclass slave-fetch-phase (remote-test-phase) ()
   (:default-initargs :action-description "fetch modules from wishmaster"))
 (defclass slave-recurse-phase (remote-test-phase) ()
@@ -232,6 +234,7 @@
 
 (defparameter *buildmaster-run-phases* '(master-reachability-phase
                                          master-update-phase
+                                         master-recurse-phase
                                          slave-fetch-phase
                                          slave-recurse-phase
                                          slave-load-phase
@@ -278,6 +281,13 @@
         (finally (return line))))
 
 (defgeneric execute-test-phase (buildmaster-run test-phase result-marker &key verbose)
+  (:method :around ((m-r buildmaster-run) (p master-recurse-phase) current-result &key verbose)
+    (declare (ignore verbose))
+    (when (unsaved-definition-changes-p)
+      (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS before ~A." (type-of p))))
+    (call-next-method)
+    (when (unsaved-definition-changes-p)
+      (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS after ~A." (type-of p)))))
   (:method :around ((m-r buildmaster-run) (p local-test-phase) result-marker &key verbose)
     (declare (ignore verbose))
     (with-active-phase (p)
@@ -295,6 +305,9 @@
   (:method ((m-r buildmaster-run) (p master-update-phase) current-result &key verbose)
     (declare (ignore verbose))
     (run-module-test :master-update-phase (result-module current-result) nil t))
+  (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key verbose)
+    (declare (ignore verbose))
+    (run-module-test :master-recurse-phase (result-module current-result) nil t))
   (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker &key verbose)
     (with-active-phase (p)
       (let ((*read-eval* nil)
@@ -418,9 +431,10 @@
                                           t)
          nil hostname username (remove-from-plist keys :hostname :username)))
 
-(defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
+(defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
+                       (when recurse '(master-recurse-phase))
                        (when slave-fetch '(slave-fetch-phase))
                        (when slave-recurse '(slave-recurse-phase))
                        (when slave-load '(slave-load-phase))

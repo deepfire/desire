@@ -117,51 +117,111 @@
    ;;   types.lisp :: system
    #:system-hidden-p
    ;;   types.lisp :: desires
-   #:add-desire #:module-desired-p
+   #:add-desire
+   #:module-desired-p
    ;;   types.lisp :: knobs
-   #:*default-system-type* #:*default-wishmaster* #:*default-world-readable* #:*desires* #:*self* #:root
+   #:*default-system-type*
+   #:*default-wishmaster*
+   #:*default-world-readable*
+   #:*desires*
+   #:*self*
+   #:root
    #:*combined-remotes-prefer-native-over-http*
    ;;   types.lisp :: conditions
-   #:desire-condition #:desire-error
-   #:definition-condition #:recursor-condition
-   #:definition-error #:recursor-error
-   #:simple-definition-error #:simple-recursor-error
-   #:distributor-condition #:remote-condition #:locality-condition #:module-condition #:system-condition #:application-condition #:repository-condition
-   #:distributor-error #:remote-error #:locality-error #:module-error #:system-error #:application-error #:repository-error
-   #:simple-distributor-error #:simple-remote-error #:simple-locality-error #:simple-module-error #:simple-system-error #:simple-application-error #:simple-repository-error 
-   #:recursor-progress-halted #:counterproductive-system-definition
-   #:insatiable-desire #:module-systems-unloadable-error
+   #:desire-condition
+   #:desire-error
+   #:definition-condition
+   #:recursor-condition
+   #:definition-error
+   #:recursor-error
+   #:simple-definition-error
+   #:simple-recursor-error
+   #:distributor-condition
+   #:remote-condition
+   #:locality-condition
+   #:module-condition
+   #:system-condition
+   #:application-condition
+   #:repository-condition
+   #:distributor-error
+   #:remote-error
+   #:locality-error
+   #:module-error
+   #:system-error
+   #:application-error
+   #:repository-error
+   #:simple-distributor-error
+   #:simple-remote-error
+   #:simple-locality-error
+   #:simple-module-error
+   #:simple-system-error
+   #:simple-application-error
+   #:simple-repository-error 
+   #:recursor-progress-halted
+   #:counterproductive-system-definition
+   #:insatiable-desire
+   #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module
-   #:module-status #:module-public-packages
+   #:module-status
+   #:module-public-packages
    ;; print-read.lisp
-   #:serialise-definitions #:read-definitions #:save-definitions #:read-definitions #:read-local-definitions
+   #:serialise-definitions
+   #:read-definitions
+   #:save-definitions
+   #:read-definitions
+   #:read-local-definitions
+   #:unsaved-definition-changes-p
    ;; systems.lisp
-   #:system-loadable-p #:ensure-system-loadable
-   #:ensure-module-systems-loadable #:module-systems-unloadable-error
+   #:system-loadable-p
+   #:ensure-system-loadable
+   #:ensure-module-systems-loadable
+   #:module-systems-unloadable-error
    ;; gittage.lisp
-   #:repo-var #:module-git-branches #:module-git-remotes #:module-add-git-remote #:ensure-module-git-remote
-   #:module-bare-p #:module-locally-present-p #:do-present-modules #:module-world-readable-p
+   #:repo-var
+   #:module-git-branches
+   #:module-git-remotes
+   #:module-add-git-remote
+   #:ensure-module-git-remote
+   #:module-bare-p
+   #:module-locally-present-p
+   #:do-present-modules
+   #:module-world-readable-p
    ;; branching.lisp
-   #:*follow-upstream* #:*drive-git-masters* #:*drive-git-masters-matching-trackers* #:*dirty-repository-behaviour*
+   #:*follow-upstream*
+   #:*drive-git-masters*
+   #:*drive-git-masters-matching-trackers*
+   #:*dirty-repository-behaviour*
    ;; import.lisp
    #:update
    ;; desire.lisp
    #:*fetch-errors-serious*
-   #:desire #:lust
+   #:desire
+   #:lust
    #:define-application 
-   #:fetch #:desire
+   #:fetch
+   #:desire
    #:purge-module-binaries
    ;; desire.lisp :: tests
    #:run-module-test
    #:with-slave-output-markers
-   #:buildslave #:*buildslave-remote-output-marker* #:*buildslave-remote-end-of-output-marker*
-   #:*buildslave-remote-test-output-marker* #:*buildslave-remote-end-of-test-output-marker*
+   #:buildslave
+   #:*buildslave-remote-output-marker*
+   #:*buildslave-remote-end-of-output-marker*
+   #:*buildslave-remote-test-output-marker*
+   #:*buildslave-remote-end-of-test-output-marker*
    ;; add-module.lisp
    #:*auto-lust*
-   #:add-distributor #:add-module #:add-module-reader #:install-add-module-reader #:steal-clbuild-projects-file
+   #:add-distributor
+   #:add-module
+   #:add-module-reader
+   #:install-add-module-reader
+   #:steal-clbuild-projects-file
    #:add-module-local
    ;; apropos.lisp
-   #:apropos-desr-list #:apropos-desr #:list-modules #:local-summary))
+   #:apropos-desr-list
+   #:apropos-desr
+   #:list-modules
+   #:local-summary))
 
 (in-package :desire)
 
