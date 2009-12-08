@@ -256,13 +256,17 @@ The value returned is the merged type for SUBJECT-REMOTE.")
   (or (system name :if-does-not-exist :continue)
       (make-instance type :name name :last-sync-time *read-universal-time* :synchronised-p t :module (module module-name))))
 
+;;; XXX: we need to carry over information, because we /do/ read DEFINITIONS routinely
 (defun read-module (name &key (umbrella name) (systems nil systems-specified-p) complex-systems path-whitelist path-blacklist)
-  (lret ((m (or (when-let ((existing-module (module name :if-does-not-exist :continue)))
-                  (remove-module existing-module :keep-locations t)
-                  nil)                   
-                (apply #'make-instance 'module :name name :last-sync-time *read-universal-time* :synchronised-p t :umbrella umbrella
-                       (append (when path-whitelist `(:path-whitelist ,path-whitelist))
-                               (when path-blacklist `(:path-blacklist ,path-blacklist)))))))
+  (lret ((m (let* ((preexisting-module (module name :if-does-not-exist :continue))
+                   (scan-positive-localities (when preexisting-module
+                                               (module-scan-positive-localities preexisting-module))))
+              (when preexisting-module
+                (remove-module preexisting-module :keep-locations t))
+              (apply #'make-instance 'module :name name :last-sync-time *read-universal-time* :synchronised-p t :umbrella umbrella
+                     :scan-positive-localities scan-positive-localities
+                     (append (when path-whitelist `(:path-whitelist ,path-whitelist))
+                             (when path-blacklist `(:path-blacklist ,path-blacklist)))))))
     (do-remotes (r)
       (when (location-defines-module-p r m)
         (pushnew r (module-remotes m))))

@@ -537,9 +537,8 @@ instead."
   ((umbrella :accessor module-umbrella :initarg :umbrella :documentation "Transitory?")
    (system-path-whitelist :accessor module-system-path-whitelist :initarg :path-whitelist :documentation "Specified.")
    (system-path-blacklist :accessor module-system-path-blacklist :initarg :path-blacklist :documentation "Specified.")
-   (scan-positive-localities :accessor module-scan-positive-localities :initarg :remotes :documentation "Cache. Locality scans should fill this one.")
+   (scan-positive-localities :accessor module-scan-positive-localities :initarg :scan-positive-localities :documentation "Cache. Locality scans should fill this one.")
    (remotes :accessor module-remotes :initarg :remotes :documentation "Cache. COMPUTE-MODULE-CACHES")
-   (localities :accessor module-localities :initarg :localities :documentation "Cache. COMPUTE-MODULE-CACHES")
    (systems :accessor module-systems :initarg :systems :documentation "Cache. COMPUTE-MODULE-CACHES"))
   (:default-initargs
    :registrator #'(setf module)
@@ -547,7 +546,8 @@ instead."
    :systems nil
    :path-whitelist nil
    :path-blacklist nil
-   :remotes nil :localities nil))
+   :scan-positive-localities nil
+   :remotes nil))
 
 (defclass origin-module (module) 
   ((status :accessor module-status :initarg :status)
