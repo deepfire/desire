@@ -320,7 +320,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
      --eval "
 (progn
   ;; configure desire verbosity
-  (setf executor:*execute-explanatory* ${EXPLAIN} executor:*execute-verbosely* ${VERBOSE})
+  (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
   (init \"${ROOT}/\" :wishmaster-branch :${METASTORE_BRANCH})
   (format t ${CONGRATULATING_MESSAGE})
   (let* ((app (app (quote ${APP}) :if-does-not-exist :continue))

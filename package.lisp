@@ -8,22 +8,67 @@
   (:export
    ;; dependencies.lisp
    #:name
+   ;;   knobs
+   #:*verbose-repository-maintenance*
    ;; types.lisp
-   #:desirable #:distributor #:location #:remote #:locality #:gate #:module #:system #:application #:app
-   #:git #:hg #:darcs #:cvs #:svn #:rsync #:http
+   #:desirable
+   #:distributor
+   #:location
+   #:remote
+   #:locality
+   #:gate
+   #:module
+   #:system
+   #:application
+   #:app
+   #:git
+   #:hg
+   #:darcs
+   #:cvs
+   #:svn
+   #:rsync
+   #:http
    ;;   types.lisp :: direct knowledge base manipulation
-   #:map-distributors #:map-locations #:map-remotes #:map-modules #:map-systems #:map-apps
-   #:do-distributors #:do-remotes #:do-distributor-modules
-   #:coerce-to-distributor #:coerce-to-remote #:coerce-to-module #:coerce-to-system #:coerce-to-application
-   #:remove-distributor #:remove-remote #:remove-module #:remove-system #:remove-app
+   #:map-distributors
+   #:map-locations
+   #:map-remotes
+   #:map-modules
+   #:map-systems
+   #:map-apps
+   #:do-distributors
+   #:do-remotes
+   #:do-distributor-modules
+   #:coerce-to-distributor
+   #:coerce-to-remote
+   #:coerce-to-module
+   #:coerce-to-system
+   #:coerce-to-application
+   #:remove-distributor
+   #:remove-remote
+   #:remove-module
+   #:remove-system
+   #:remove-app
    ;;   types.lisp :: distributors
-   #:wishmasterp #:do-wishmasters #:do-distributor-remotes #:do-distributor-modules #:compute-distributor-modules
+   #:wishmasterp
+   #:do-wishmasters
+   #:do-distributor-remotes
+   #:do-distributor-modules
+   #:compute-distributor-modules
    ;;   types.lisp :: location
-   #:location-module-names #:location-defines-module-p
+   #:location-module-names
+   #:location-defines-module-p
    ;;   types.lisp :: remote
-   #:gate-converted-module-names #:gate-unpublished-module-names #:gate-hidden-module-names
-   #:url #:parse-remote-namestring #:remote-disabled-p
-   #:credentials #:cred-name #:cred-username #:cred-password #:cred
+   #:gate-converted-module-names
+   #:gate-unpublished-module-names
+   #:gate-hidden-module-names
+   #:url
+   #:parse-remote-namestring
+   #:remote-disabled-p
+   #:credentials
+   #:cred-name
+   #:cred-username
+   #:cred-password
+   #:cred
    ;;   types.lisp :: metastore
    #:reset-metastore
    ;;   types.lisp :: global UI
@@ -53,7 +98,7 @@
    #:recursor-progress-halted #:counterproductive-system-definition
    #:insatiable-desire #:module-systems-unloadable-error
    ;;   types.lisp :: origin-module
-   #:module-status #:module-public-packages #:module-hidden-p
+   #:module-status #:module-public-packages
    ;; print-read.lisp
    #:serialise-definitions #:read-definitions #:save-definitions #:read-definitions #:read-local-definitions
    ;; systems.lisp
