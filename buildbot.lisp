@@ -30,7 +30,7 @@
 (defparameter *purge-metastore-command* "rm -rf desr/git/.meta")
 (defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
 
-(defun cook-buildslave-command (expr purge purge-metastore branch metastore-branch debug disable-debugger verbose)
+(defun cook-buildslave-command (expr &key purge purge-metastore (branch "master") metastore-branch (debug t) disable-debugger verbose)
   (remove nil (list
                (when purge
                  *purge-command*)
@@ -45,7 +45,7 @@
                        verbose
                        branch metastore-branch
                        debug disable-debugger
-                       (format nil expr)))))
+                       (format nil "~S" expr)))))
 
 ;;;
 ;;; Result output vector management
@@ -393,27 +393,30 @@
 ;;;
 ;;; Buildmaster entry points
 ;;;
-(defun make-buildslave-invocation-command (phase-names module-names verbose)
+(defun make-buildslave-evaluation-form (&rest body)
   `(progn
-     (buildslave ',module-names ',phase-names ,verbose)
+     (with-slave-output-markers ()
+       ,@body)
      (sb-ext:quit)))
 
-(defun ping-slave (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
-                   purge purge-metastore branch metastore-branch debug disable-debugger verbose
-                   just-print-conditions dry-run &aux
-                   (command (cook-buildslave-command (make-buildslave-invocation-command nil nil verbose) purge
-                                                     purge-metastore branch
-                                                     metastore-branch
-                                                     debug disable-debugger verbose)))
-  (if dry-run
-      (format t "executing:~%~A~%" command)
-      (handler-case
-          (with-maybe-just-printing-conditions (t buildslave-error) just-print-conditions
-            (with-slave-connection (slave-pipe hostname username command verbose)
-              (declare (ignore slave-pipe))
-              t))
-        (buildslave-error (c)
-          (return-from ping-slave (values nil c))))))
+(defun invoke-with-slave-evaluation (local-fn slave-form hostname username &rest keys &key print-slave-connection-conditions verbose-slave-communication &allow-other-keys)
+  (handler-case
+      (with-maybe-just-printing-conditions (t buildslave-error) print-slave-connection-conditions
+        (with-slave-connection (slave-pipe hostname username (apply #'cook-buildslave-command (make-buildslave-evaluation-form slave-form)
+                                                                    (remove-from-plist keys :print-slave-connection-conditions :verbose-slave-communication))
+                                           verbose-slave-communication)
+          (funcall local-fn slave-pipe)))
+    (buildslave-error (c)
+      (return-from invoke-with-slave-evaluation (values nil c)))))
+
+(defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key &allow-other-keys) &body body)
+  `(invoke-with-slave-evaluation (lambda (,slave-pipe) ,@body) ,slave-form ,hostname ,username ,@keys))
+
+(defun ping-slave (&rest keys &key (hostname *default-buildslave-host*) (username *default-buildslave-username*) &allow-other-keys)
+  (apply #'invoke-with-slave-evaluation (lambda (pipe)
+                                          (declare (ignore pipe))
+                                          t)
+         nil hostname username (remove-from-plist keys :hostname :username)))
 
 (defun one* (&optional (reachability t) (upstream t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
@@ -430,7 +433,7 @@
        :verbose-slave-communication verbose-slave-communication))
 
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*) modules
-            purge purge-metastore branch metastore-branch debug disable-debugger (verbose t) verbose-slave-communication)
+            purge branch metastore-branch debug disable-debugger (verbose t) verbose-slave-communication)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
          (module-names (or modules
@@ -446,9 +449,9 @@
               (while (typep phase 'local-test-phase))
               (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication)
                     rest-phases phases))
-        (with-slave-connection (slave-pipe hostname username (cook-buildslave-command (make-buildslave-invocation-command module-names (mapcar #'type-of rest-phases) verbose)
-                                                                                      purge purge-metastore branch metastore-branch debug disable-debugger verbose)
-                                verbose-slave-communication)
+        (with-slave-evaluation `(buildslave ',module-names ',(mapcar #'type-of rest-phases) ,verbose)
+            (slave-pipe hostname username :purge purge :branch branch :metastore-branch metastore-branch :debug debug :disable-debugger disable-debugger
+                        :verbose verbose :verbose-slave-communication verbose-slave-communication)
           (iter (for (phase . phases) on rest-phases)
                 (setf (remote-phase-slave-stream phase) slave-pipe
                       result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication))))))))

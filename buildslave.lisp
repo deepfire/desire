@@ -81,14 +81,20 @@
     (declare (ignore verbose-internals record-output))
     (not-implemented :slave-test-phase)))
 
+(defun invoke-with-slave-output-markers (stream fn)
+  (syncformat stream "~%~S~%" *buildslave-remote-output-marker*)
+  (funcall fn)
+  (syncformat stream "~%~S~%" *buildslave-remote-end-of-output-marker*))
+
+(defmacro with-slave-output-markers (() &body body)
+  `(invoke-with-slave-output-markers t (lambda () ,@body)))
+
 (defun buildslave (modules phases &optional verbose-internals)
   (let ((module-names (mapcar #'canonicalise-module-name modules))
         (phases (mapcar (compose #'make-keyword #'string-upcase #'string) phases)))
-    (syncformat t "~%~S~%" *buildslave-remote-output-marker*)
     (iter (for p in phases)
           (iter (for mn in module-names)
                 (syncformat t "(:name ~S :mode ~(~S~)~%~S~%" mn p *buildslave-remote-test-output-marker*)
                 (destructuring-bind (&key return-value condition backtrace) (run-module-test p mn verbose-internals)
                   (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                              condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) backtrace))))
-    (syncformat t "~%~S~%" *buildslave-remote-end-of-output-marker*)))
+                              condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) backtrace))))))

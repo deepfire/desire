@@ -74,6 +74,7 @@
    #:purge-module-binaries
    ;; desire.lisp :: tests
    #:run-module-test
+   #:with-slave-output-markers
    #:buildslave #:*buildslave-remote-output-marker* #:*buildslave-remote-end-of-output-marker*
    #:*buildslave-remote-test-output-marker* #:*buildslave-remote-end-of-test-output-marker*
    ;; add-module.lisp
