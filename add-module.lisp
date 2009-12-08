@@ -306,7 +306,7 @@ The values returned are:
     (when (location-defines-module-p locality name)
       (module-error name "~@<Module ~A is already provided by ~A.~:@>" name (locality-pathname locality)))
     (let ((repo-dir (module-pathname name locality)))
-      (unless (git-repository-present-p repo-dir t)
+      (unless (git-repository-present-p repo-dir)
         (module-error name "~@<Module ~A doesn't appear to have a repository with objects in ~S.~:@>" name repo-dir)))
     (let* ((present (module name :if-does-not-exist :continue))
            (m (or present (make-instance 'module :name name :umbrella name :path-whitelist path-whitelist :path-blacklist path-blacklist))))

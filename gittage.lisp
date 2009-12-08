@@ -43,15 +43,12 @@
                  (find-if (lambda (x) (= 2 (length (lastcar (pathname-directory x)))))
                           (directory (subdirectory directory '(".git" "objects" :wild))))))))
 
-(defun git-repository-present-p (&optional (directory *default-pathname-defaults*) full-check-p)
+(defun git-repository-present-p (&optional (directory *default-pathname-defaults*))
   "See if MODULE repository and source code is available at LOCALITY."
   (and (directory-exists-p directory)
        (within-directory (directory)
          (and (directory-exists-p (subdirectory* nil ".git"))
-              (not (null (git-branches)))
-              (if (not full-check-p)
-                  t
-                  (git-repository-has-objects-p nil))))))
+              (git-repository-has-objects-p nil)))))
 
 (defun git-repository-bare-p (&optional directory)
   (maybe-within-directory directory
