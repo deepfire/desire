@@ -55,16 +55,20 @@
 (defconstant initial-output-length (- page-size header-leeway))
 (defconstant output-size-scale-factor 4)
 
-(defun prepare-result-vector (n-phases n-phase-results modules locality)
-  (lret ((results (make-array (* n-phases n-phase-results) :fill-pointer t)))
+(defun prepare-result-vector (phases n-phase-results modules locality)
+  (lret* ((n-phases (length phases))
+          (results (make-array (* n-phases n-phase-results) :fill-pointer t)))
     (iter (with pathnames = (mapcar (rcurry #'module-pathname locality) modules))
+          (for phase in phases)
           (for phase-no below n-phases)
           (for base from 0 by n-phase-results)
           (iter (for i below n-phase-results)
                 (for m in modules)
-                (for p in pathnames)
+                (for pathname in pathnames)
                 (setf (aref results (+ base i))
-                      (make-instance 'result-not-yet :module m :path p :id (+ base i) :output (make-array initial-output-length :element-type 'character :adjustable t)))))
+                      (make-instance 'result-not-yet :phase phase :module m :id (+ base i)
+                                     :path pathname
+                                     :output (make-array initial-output-length :element-type 'character :adjustable t)))))
     (setf (fill-pointer results) 0)))
 
 (defgeneric append-result-output (result string &optional finalp)
@@ -186,7 +190,7 @@
                                        (for phase-type in phases)
                                        (collect (make-instance phase-type :nr i)))
           (slot-value o 'n-phases) n-phases
-          (slot-value o 'results) (prepare-result-vector n-phases n-phase-results modules locality)
+          (slot-value o 'results) (prepare-result-vector (slot-value o 'phases) n-phase-results modules locality)
           (slot-value o 'n-phase-results) n-phase-results)))
 
 (defun master-result (master-run i)
@@ -218,8 +222,7 @@
                        (master-run-n-phases o)))
                (incf (fill-pointer result-vector))
                (lret ((new-r (aref result-vector i)))
-                 (start-period new-r)
-                 (setf (result-commit-id new-r) (desr::ref-value '("tracker") (result-path new-r)))))
+                 (start-period new-r)))
               (t
                (end-period o)))))))
 

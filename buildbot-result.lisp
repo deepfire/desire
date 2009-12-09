@@ -39,9 +39,13 @@
 
 (define-action-root-class result (action webbable)
   ((module :accessor result-module :initarg :module)
-   (path :accessor result-path :initarg :path)
-   (commit-id :accessor result-commit-id :initarg :commit-id)
+   (phase :accessor result-phase :initarg :phase)
    (id :accessor result-id :initarg :id)
+   ;;
+   (hint-cache :accessor result-hint-cache :initform nil)
+   (hint-cache-final-p :accessor result-hint-cache-final-p :initform nil)
+   (path :accessor result-path :initarg :path)
+   ;;
    (output :accessor result-output :initarg :output)
    (output-bytes :accessor result-output-bytes :initform 0)
    (output-consumers :accessor result-output-consumers :type list :initform nil))
@@ -71,6 +75,39 @@
 
 (defparameter *popup-display-nlines-threshold* 15)
 
+(defgeneric emit-result-hint (phase result)
+  (:method :around ((o test-phase) (r result))
+    (let* ((*print-escape* nil)
+           (*print-length* nil)
+           (*print-circle* t)
+           (*print-level* nil))
+      (if (and (result-hint-cache r)
+               (or (result-hint-cache-final-p r)
+                   (typep r 'incomplete-action)))
+          (result-hint-cache r)
+          (setf (result-hint-cache-final-p r) (typep r 'complete-action)
+                (result-hint-cache r) (call-next-method)))))
+  (:method ((o test-phase) (r result))
+    (let ((condition-printed-form (when-let ((condition (action-condition r)))
+                                    (escape-string (princ-to-string condition)))))
+      (with-output-to-string (s)
+        (write-string "Module: " s) (write-string (symbol-name (name (result-module r))) s)
+        (when (next-method-p)
+          (write-string (call-next-method) s))
+        (when (and condition-printed-form
+                   (> *popup-display-nlines-threshold* (count #\Newline condition-printed-form)))
+          (write-string "<br><br>encountered condition:<br><pre>" s)
+          (write-string condition-printed-form s)
+          (write-string "</pre>" s)))))
+  (:method ((o master-update-phase) (r result))
+    (let ((commit-id-string (desr::cook-refval (desr::ref-value "HEAD" (result-path r)))))
+      (multiple-value-bind (commit-id author date) (desr::git-commit-log commit-id-string (result-path r))
+        (declare (ignore commit-id))
+        (concatenate 'string
+                     "<pre>Commit-ID: " commit-id-string "</pre><br>"
+                     "<pre>Author:    " author "</pre><br>"
+                     "<pre>Date:      " date "</pre><br>")))))
+
 (defgeneric emit-with-result-emission (stream result fn)
   (:method ((stream stream) (o result) (fn function))
     (with-html-output (stream)
@@ -78,14 +115,7 @@
             (funcall fn)
             (let ((condition (action-condition o)))
               (htm
-               (:div :class "nhint"
-                     (let* ((*print-escape* nil)
-                            (*print-length* nil)
-                            (*print-circle* t)
-                            (*print-level* nil)
-                            (condition-printed-form (when condition (escape-string (princ-to-string condition)))))
-                       (fmt "~A~:[~;<br><br>encountered condition:<br><pre>~A</pre>~]" (string-downcase (symbol-name (name (result-module o))))
-                            (and condition (> *popup-display-nlines-threshold* (count #\Newline condition-printed-form))) condition-printed-form)))
+               (:div :class "nhint" (str (emit-result-hint (result-phase o) o)))
                (:div :class (web-class o)
                      (str (web-marker o))
                      :br
