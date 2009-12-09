@@ -147,12 +147,12 @@
   (let (normally-executed-p
         termination-done-p)
     (unwind-protect
-         (handler-case (multiple-value-prog1 (funcall fn)
-                         (setf normally-executed-p t))
-           (serious-condition (c)
-             (terminate-action action :condition c)
-             (setf termination-done-p t)
-             (error c)))
+         (handler-bind ((serious-condition (lambda (c)
+                                             (terminate-action action :condition c)
+                                             (setf termination-done-p t)
+                                             nil)))
+           (multiple-value-prog1 (funcall fn)
+             (setf normally-executed-p t)))
       (unless (or normally-executed-p termination-done-p)
         (terminate-action action)))))
 
