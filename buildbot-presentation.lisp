@@ -252,7 +252,7 @@
   display: none;
   background: #FFE4B5;
   position: absolute;
-  bottom: -3em;
+  bottom: 3em;
   left: 1em;
   z-index: 10;
 }

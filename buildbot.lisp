@@ -47,165 +47,9 @@
                        debug disable-debugger
                        (format nil "~S" expr)))))
 
-;;;
-;;; Result output vector management
-;;;
-(defconstant header-leeway 32)
-(defconstant page-size (virtual-memory-page-size))
-(defconstant initial-output-length (- page-size header-leeway))
-(defconstant output-size-scale-factor 4)
-
-(defun prepare-result-vector (phases n-phase-results modules locality)
-  (lret* ((n-phases (length phases))
-          (results (make-array (* n-phases n-phase-results) :fill-pointer t)))
-    (iter (with pathnames = (mapcar (rcurry #'module-pathname locality) modules))
-          (for phase in phases)
-          (for phase-no below n-phases)
-          (for base from 0 by n-phase-results)
-          (iter (for i below n-phase-results)
-                (for m in modules)
-                (for pathname in pathnames)
-                (setf (aref results (+ base i))
-                      (make-instance 'result-not-yet :phase phase :module m :id (+ base i)
-                                     :path pathname
-                                     :output (make-array initial-output-length :element-type 'character :adjustable t)))))
-    (setf (fill-pointer results) 0)))
-
-(defgeneric append-result-output (result string &optional finalp)
-  (:method ((o result) string &optional finalp)
-    (let ((used-bytes (result-output-bytes o))
-          (rvec (result-output o)))
-      (if finalp
-          (setf (result-output o)
-                (if (zerop used-bytes)
-                    string
-                    (concatenate 'string (subseq rvec 0 used-bytes) string))
-                (result-output-bytes o) (length string))
-          (let* ((length (length string))
-                 (required-length (+ used-bytes length 1)) ; we do newlines manually
-                 (rvec-length (array-dimension rvec 0)))
-            (when (< rvec-length required-length)
-              (let ((fitting-length (ash 1 (+ (integer-length required-length)                     ; Quadruple, while we're going for speed and
-                                              (if (> (integer-length required-length) 20) 0 1))))) ; double when we've got to resort to compactness.
-                (setf rvec (adjust-array rvec fitting-length)
-                      (result-output o) rvec)))
-            (setf (subseq rvec used-bytes (1- required-length)) string
-                  (aref rvec (1- required-length)) #\Newline
-                  (result-output-bytes o) required-length))))))
-
-;;;
-;;; Test phase
-;;;
-(defclass test-phase (action) 
-  ((action-description :reader phase-action-description :initarg :action-description)
-   (nr :reader phase-nr :initarg :nr)))
-
-(defclass interrupted-test-phase (unhandled-failure test-phase) ())
-
-(define-action-root-class local-test-phase (test-phase)
-  ()
-  (:subclass-to-action-class-map
-   (unhandled-failure interrupted-local-test-phase)))
-(define-action-root-class remote-test-phase (test-phase)
-  ((hostname :reader remote-phase-hostname :initarg :hostname)
-   (username :reader remote-phase-username :initarg :username)
-   (slave-stream :accessor remote-phase-slave-stream))
-  (:subclass-to-action-class-map
-   (unhandled-failure interrupted-remote-test-phase)))
-
-(defclass interrupted-local-test-phase (interrupted-test-phase local-test-phase) ())
-(defclass interrupted-remote-test-phase (interrupted-test-phase remote-test-phase) ())
-
-(defclass master-reachability-phase (local-test-phase) ()
-  (:default-initargs :action-description "test upstream repository reachability"))
-(defclass master-update-phase (local-test-phase) ()
-  (:default-initargs :action-description "fetch upstream modules and convert them"))
-(defclass master-recurse-phase (local-test-phase) ()
-  (:default-initargs :action-description "unwind module dependencies"))
-(defclass slave-fetch-phase (remote-test-phase) ()
-  (:default-initargs :action-description "fetch modules from wishmaster"))
-(defclass slave-recurse-phase (remote-test-phase) ()
-  (:default-initargs :action-description "unwind module dependencies"))
-(defclass slave-load-phase (remote-test-phase) ()
-  (:default-initargs :action-description "load modules"))
-(defclass slave-test-phase (remote-test-phase) ()
-  (:default-initargs :action-description "test modules"))
-
-(defgeneric describe-phase (test-phase)
-  (:method ((o test-phase))
-    (format nil "~A on ~:[the wishmaster~;a buildslave~]; ~:[not started~; started ~:*~A~]~:[~;, finished ~:*~A~]"
-            (phase-action-description o) (typep o 'remote-test-phase)
-            (when (period-started-p o)
-              (multiple-value-call #'print-decoded-time
-                (decode-universal-time (period-start-time o))))
-            (when (period-ended-p o)
-              (multiple-value-call #'print-decoded-time
-                (decode-universal-time (period-end-time o)))))))
-
-;;;
-;;; Buildmaster run
-;;;
-(define-action-root-class buildmaster-run (action)
-  ((lock :reader master-run-lock :initarg :lock)
-   (condvar :reader master-run-condvar :initarg :condvar)
-   (modules :reader master-run-modules :initarg :modules)
-   (phases :reader master-run-phases :initarg :phases)
-   (n-phases :reader master-run-n-phases :initarg :n-phases)
-   (n-phase-results :reader master-run-n-phase-results :initarg :n-phase-results)
-   (results :reader master-run-results :initarg :results))
-  (:subclass-to-action-class-map
-   (unhandled-failure interrupted-buildmaster-run))
-  (:default-initargs
-   :lock (bordeaux-threads:make-lock)
-   :condvar (bordeaux-threads:make-condition-variable)
-   :start-time (get-universal-time)
-   :phases '(master-update-phase
-             slave-fetch-phase
-             slave-load-phase)))
-
-(defclass interrupted-buildmaster-run (unhandled-failure buildmaster-run) ())
-
-(defmethod terminate-action :after ((o buildmaster-run) &key condition &allow-other-keys)
-  (declare (ignore condition))
-  (let ((result-vector (master-run-results o)))
-    (setf (fill-pointer result-vector) (array-dimension result-vector 0))))
-
-(defvar *buildmaster-runs* nil)
-
-(defun master-run-n-complete-results (master-run)
-  "Not meant to be precise: can underreport without lock held."
-  (if (period-ended-p master-run)
-      (* (master-run-n-phases master-run)
-         (master-run-n-phase-results master-run))
-      (1- (fill-pointer (master-run-results master-run)))))
-
-(defmacro with-master-run-lock ((master) &body body)
-  `(bordeaux-threads:with-lock-held ((master-run-lock ,master))
-     ,@body))
-
-(defmethod initialize-instance :after ((o buildmaster-run) &key modules phases locality)
-  (let ((n-phase-results (length modules))
-        (n-phases (length phases)))
-    (setf (slot-value o 'phases) (iter (for i from 0)
-                                       (for phase-type in phases)
-                                       (collect (make-instance phase-type :nr i)))
-          (slot-value o 'n-phases) n-phases
-          (slot-value o 'results) (prepare-result-vector (slot-value o 'phases) n-phase-results modules locality)
-          (slot-value o 'n-phase-results) n-phase-results)))
-
-(defun master-result (master-run i)
-  (declare (type buildmaster-run master-run))
-  (aref (master-run-results master-run) i))
-
-(defun first-phase-result-p (master-run result)
-  (< (result-id result) (master-run-n-phase-results master-run)))
-
-(defun previous-phase-result (master-run result)
-  (master-result master-run (- (result-id result) (master-run-n-phase-results master-run))))
-
-(defun previous-phase-result-success-p (master-run result)
-  (typep (previous-phase-result master-run result) 'success))
-
+;;;;
+;;;; Generator/presentation communication
+;;;;
 (defgeneric advance-result (master-run &optional ranp successp condition backtrace)
   (:method ((o buildmaster-run) &optional ranp successp condition backtrace)
     (let* ((result-vector (master-run-results o))
@@ -235,6 +79,9 @@
           (bordeaux-threads:condition-wait (master-run-condvar o) (master-run-lock o)))
         r))))
 
+;;;;
+;;;; Phase management
+;;;;
 (defparameter *buildmaster-run-phases* '(master-reachability-phase
                                          master-update-phase
                                          master-recurse-phase
@@ -257,9 +104,9 @@
          (invoke-with-active-phase ,phase (lambda () ,@body)))
       `(invoke-with-active-phase ,phase (lambda () ,@body))))
 
-;;;
-;;; Remote phase shenanigans
-;;;
+;;;;
+;;;; Remote phase shenanigans
+;;;;
 (defun read-string-list (string &optional (start 0) end)
   (let ((end (or end (length string)))
         (*read-eval* nil))
@@ -359,9 +206,9 @@
                       (buildmaster-error "~@<Corrupt initial line while reading module ~A.~:@>" (name m)))))
               (finally (return r)))))))
 
-;;;
-;;; Slave connection
-;;;
+;;;;
+;;;; Slave connection
+;;;;
 (defvar *implementation-debugger-signature*
   #+sbcl "debugger invoked on a")
 (defvar *implementation-unhandled-condition-signature*
@@ -425,9 +272,9 @@
 (defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key &allow-other-keys) &body body)
   `(invoke-with-slave-evaluation (lambda (,slave-pipe) ,@body) ,slave-form ,hostname ,username ,@keys))
 
-;;;
-;;; Buildmaster entry points
-;;;
+;;;;
+;;;; Buildmaster entry points
+;;;;
 (defun ping-slave (&rest keys &key (hostname *default-buildslave-host*) (username *default-buildslave-username*) &allow-other-keys)
   (apply #'invoke-with-slave-evaluation (lambda (pipe)
                                           (declare (ignore pipe))

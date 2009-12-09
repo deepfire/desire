@@ -21,39 +21,6 @@
 (in-package :desire-buildbot)
 
 
-(defclass webbable ()
-  ((description :reader web-description :initarg :description)
-   (class :reader web-class :initarg :class)
-   (marker :reader web-marker :initarg :marker)))
-
-(defmacro define-webbable-class (name superclasses slots &rest class-options)
-  (if-let ((web-initargs (assoc :web-initargs class-options)))
-    (let ((web-initargs (rest web-initargs)))
-      `(defclass ,name (,@superclasses)
-         ((description :allocation :class :initform ,(getf web-initargs :description))
-          (class :allocation :class :initform ,(getf web-initargs :class))
-          (marker :allocation :class :initform ,(getf web-initargs :marker))
-          ,@slots)
-         ,@(remove :web-initargs class-options :key #'car)))
-    (error "~@<No web-initargs class option was specified.~:@>")))
-
-(define-action-root-class result (action webbable)
-  ((module :accessor result-module :initarg :module)
-   (phase :accessor result-phase :initarg :phase)
-   (id :accessor result-id :initarg :id)
-   ;;
-   (hint-cache :accessor result-hint-cache :initform nil)
-   (hint-cache-final-p :accessor result-hint-cache-final-p :initform nil)
-   (path :accessor result-path :initarg :path)
-   ;;
-   (output :accessor result-output :initarg :output)
-   (output-bytes :accessor result-output-bytes :initform 0)
-   (output-consumers :accessor result-output-consumers :type list :initform nil))
-  (:subclass-to-action-class-map
-   (success result-success)
-   (failure result-failure)
-   (unhandled-failure result-unhandled-failure)))
-
 (define-webbable-class result-not-yet (result incomplete-action) ()
   (:web-initargs
    :class "nevr" :marker "n" :description "the test was never run"))
