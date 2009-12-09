@@ -172,9 +172,37 @@ systems as the secondary value.")
         (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY signalled during ASDF:FIND-SYSTEM~:@>" 'system)
         t))))
 
+;;;;
+;;;; ASDF
+;;;;
+(defun asdf-hidden-system-names (pathname)
+  "Find out names of ASDF systems hiding in .asd in PATHNAME.
+A hidden system is a system with a definition residing in a file named
+differently from that system's name."
+  (let ((primary-system-name (string-upcase (pathname-name pathname)))
+        (*read-eval* nil)
+        (*readtable* (copy-readtable)))
+    (set-dispatch-macro-character #\# #\. (lambda (stream &optional char sharp)
+                                            (declare (ignore char sharp))
+                                            (read stream)
+                                            nil))
+    (with-open-file (s pathname)
+      (flet ((form-defsystem-p (f)
+               (and (consp f)
+                    (string= "DEFSYSTEM" (symbol-name (first f)))
+                    (or (stringp (second f))
+                        (symbolp (second f))))))
+        (iter (for form = (read s nil 'das-eof))
+              (until (eq 'das-eof form))
+              (when (form-defsystem-p form)
+                (let ((system-name (string-upcase (string (second form)))))
+                  (when (not (string= primary-system-name system-name))
+                    (collect system-name)))))))))
+
 ;;;
-;;; ASDF
+;;; The historic, painful version of the above.
 ;;;
+#+(or)
 (defun asdf-hidden-system-names (system &aux (name (name system)))
   "Find out names of ASDF systems hiding in SYSTEM.
 A hidden system is a system with a definition residing in a file named

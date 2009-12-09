@@ -139,7 +139,7 @@
                          (when (typep system 'asdf-system)
                            ;; A hidden system is a system definition residing in a file named differently from main system's name.
                            ;; Find them.
-                           (let* ((raw-hidden-system-names (asdf-hidden-system-names system))
+                           (let* ((raw-hidden-system-names (asdf-hidden-system-names path))
                                   (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names known-local-visible :test #'equal)))
                              (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
                                    (when verbose
