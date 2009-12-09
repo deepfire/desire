@@ -86,27 +86,32 @@
                    (typep r 'incomplete-action)))
           (result-hint-cache r)
           (setf (result-hint-cache-final-p r) (typep r 'complete-action)
-                (result-hint-cache r) (call-next-method)))))
+                (result-hint-cache r)
+                (let ((condition-printed-form (when-let ((condition (action-condition r)))
+                                                (escape-string (princ-to-string condition)))))
+                  (with-output-to-string (s)
+                    (write-string "<pre>Module:    " s) (write-string (symbol-name (name (result-module r))) s) (write-string "</pre><br>" s)
+                    (write-string (call-next-method) s)
+                    (when (and condition-printed-form
+                               (> *popup-display-nlines-threshold* (count #\Newline condition-printed-form)))
+                      (write-string "<br><br>encountered condition:<br><pre>" s)
+                      (write-string condition-printed-form s)
+                      (write-string "</pre>" s))))))))
   (:method ((o test-phase) (r result))
-    (let ((condition-printed-form (when-let ((condition (action-condition r)))
-                                    (escape-string (princ-to-string condition)))))
-      (with-output-to-string (s)
-        (write-string "Module: " s) (write-string (symbol-name (name (result-module r))) s)
-        (when (next-method-p)
-          (write-string (call-next-method) s))
-        (when (and condition-printed-form
-                   (> *popup-display-nlines-threshold* (count #\Newline condition-printed-form)))
-          (write-string "<br><br>encountered condition:<br><pre>" s)
-          (write-string condition-printed-form s)
-          (write-string "</pre>" s)))))
+    "")
   (:method ((o master-update-phase) (r result))
-    (let ((commit-id-string (desr::cook-refval (desr::ref-value "HEAD" (result-path r)))))
-      (multiple-value-bind (commit-id author date) (desr::git-commit-log commit-id-string (result-path r))
+    (let* ((head-commit-id (desr::get-head (result-path r)))
+           (head-commit-id-string (desr::cook-refval head-commit-id)))
+      (multiple-value-bind (commit-id author date) (desr::git-commit-log head-commit-id (result-path r))
         (declare (ignore commit-id))
         (concatenate 'string
-                     "<pre>Commit-ID: " commit-id-string "</pre><br>"
+                     "<pre>Commit-ID: " head-commit-id-string "</pre><br>"
                      "<pre>Author:    " author "</pre><br>"
                      "<pre>Date:      " date "</pre><br>")))))
+
+(defun invalidate-result-hint-cache (&optional (buildmaster-run (first *buildmaster-runs*)))
+  (iter (for r in-vector (master-run-results buildmaster-run))
+        (setf (result-hint-cache r) nil)))
 
 (defgeneric emit-with-result-emission (stream result fn)
   (:method ((stream stream) (o result) (fn function))
