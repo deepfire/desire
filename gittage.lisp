@@ -535,4 +535,4 @@ and commit message of the corresponding commit as multiple values."
               (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
             (let ((message (string-right-trim '(#\Newline)
                                               (subseq output (+ 5 posn)))))
-              (make-commit (parse-commit-id commit-id) author date message))))))))
+              (make-commit (parse-commit-id commit-id) date author message))))))))
