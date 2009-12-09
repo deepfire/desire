@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil -*-
 ;;;
-;;;  (c) copyright 2007-2008 by
+;;;  (c) copyright 2007-2009 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -243,15 +243,18 @@ The lists of pathnames returned have following semantics:
   (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
     (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
 
+(defun parse-commit-id (string)
+  (parse-integer string :radix #x10))
+
 (defun %read-ref (pathname)
-  (lret ((refval (parse-integer (file-as-string pathname) :radix #x10)))
+  (lret ((refval (parse-commit-id (file-as-string pathname))))
     (unless (not (minusp refval))
       (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval))))
 
 (defun parse-refval (string)
   (if (equalp (subseq string 0 5) "ref: ")
       (values (split-sequence #\/ (subseq string 5)))
-      (values nil (parse-integer string :radix #x10))))
+      (values nil (parse-commit-id  string))))
 
 (defun cook-refval (refvalue &optional prepend-refs)
   (etypecase refvalue
@@ -464,3 +467,30 @@ in a temporary pseudo-commit."
       (ensure-clean-repository if-changes)
       (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
         (git "checkout" (flatten-path-list ref))))))
+
+;;;;
+;;;; Queries
+;;;;
+(defun git-commit-log (ref &optional repository-dir)
+  "Given a REF and an optional REPOSITORY-DIR, return the commit id, author, date
+and commit message of the corresponding commit as multiple values."
+  (maybe-within-directory repository-dir
+    (with-explanation ("querying commit log of ~S at ~S" ref *default-pathname-defaults*)
+      (multiple-value-bind (status output) (with-captured-executable-output ()
+                                             (git "log" "-1" (cook-refval ref)))
+        (declare (ignore status))
+        (with-input-from-string (s output)
+          (let ((commit-id-line (read-line s nil nil))
+                (author-line (read-line s nil nil))
+                (date-line (read-line s nil nil)))
+            (multiple-value-bind (commit-id-good-p commit-id)    (and commit-id-line (starts-with-subseq "commit " commit-id-line :return-suffix t))
+              (multiple-value-bind (author-good-p author) (and author-line (starts-with-subseq "Author: " author-line :return-suffix t))
+                (multiple-value-bind (date-good-p date)   (and date-line (starts-with-subseq "Date:   " date-line :return-suffix t))
+                  (unless (and commit-id-good-p author-good-p date-good-p)
+                    (git-error "~@<Error parsing commit log of ~S at ~S.~:@>" ref *default-pathname-defaults*))
+                  (let ((message (string-right-trim '(#\Newline)
+                                                    (subseq output (+ (length commit-id-line) 1
+                                                                      (length author-line) 1
+                                                                      (length date-line) 1
+                                                                      1 4)))))
+                    (values (parse-commit-id commit-id) author date message)))))))))))
