@@ -1024,10 +1024,10 @@ The value returned is the list of found modules."
                              unpublishable-modules
                              hidden-modules)))))
 
-(defmacro do-present-modules ((module &optional (locality '(gate *self*))) &body body)
+(defmacro do-present-modules ((module &optional (locality '(gate *self*)) block-name) &body body)
   "Iterate the BODY over all modules cached as present in LOCALITY, with MODULE specifying
-   the driven variable binding."
-  `(do-modules (,module)
+the driven variable binding."
+  `(do-modules (,module ,@(when block-name `(,block-name)))
      (when (module-locally-present-p ,module ,locality nil nil)
        ,@body)))
 
