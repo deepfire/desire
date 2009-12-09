@@ -104,9 +104,6 @@
          (invoke-with-active-phase ,phase (lambda () ,@body)))
       `(invoke-with-active-phase ,phase (lambda () ,@body))))
 
-;;;;
-;;;; Remote phase shenanigans
-;;;;
 (defun read-string-list (string &optional (start 0) end)
   (let ((end (or end (length string)))
         (*read-eval* nil))
@@ -116,7 +113,7 @@
             (collect elt)))))
 
 (defun report-line (i line)
-  (format t "~3D> ~S~%" i line))
+  (format t "~4D> ~S~%" i line))
 
 (defun line-marker-p (line marker)
   (and (plusp (length line))

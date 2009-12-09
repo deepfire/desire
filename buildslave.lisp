@@ -47,10 +47,8 @@
                          (unwind-protect (call-next-method)
                            (finish-output *standard-output*)
                            (finish-output *error-output*))))))
-         (list* :return-value return-value
-                (when condition (list* :condition condition
-                                       (when backtrace
-                                         `(:backtrace ,backtrace))))))))
+         (list* :return-value return-value (when condition
+                                             (list :condition condition :backtrace backtrace))))))
            ;; (with-recorded-status (:record-backtrace t :record-output record-output)
            ;;   (unwind-protect (call-next-method)
            ;;     (finish-output *standard-output*)

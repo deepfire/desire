@@ -102,8 +102,8 @@
                                     (grab-result o i))
                                   (finish-output stream))))))))))))
 
-(defgeneric emit-master-run (stream master-run complete-p &optional header-p)
-  (:method (stream (o buildmaster-run) complete-p &optional header-p)
+(defgeneric emit-master-run (stream master-run complete-p nr &optional header-p)
+  (:method (stream (o buildmaster-run) complete-p nr &optional header-p)
     (with-html-output (stream)
       (:div :class "run"
             (:div (str (multiple-value-call #'print-decoded-time
@@ -127,68 +127,73 @@
                                          (format nil "failed, with uncaught exception, with ~D tests complete"
                                                  (master-run-n-complete-results o))))) ".")
             (when complete-p
-              (when header-p
-                (emit-master-run-header stream o))
-              (finish-output stream)
-              (emit-master-run-results stream o))))))
+              (let ((*master-run-nr* nr))
+                (when header-p
+                  (emit-master-run-header stream o))
+                (finish-output stream)
+                (emit-master-run-results stream o)))))))
 
 ;; "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
 (defun cl-waterfall ()
   (let* ((hostname (string-downcase (string (name *self*))))
          (parameters (iter (for (param . value) in (get-parameters*))
-                           (appending (list (intern (string-upcase param) :keyword) value))))
-         (mode (or (when-let ((mode (getf parameters :mode)))
-                     (make-keyword (string-upcase mode)))
-                   :overview)))
-    (ecase mode
-      (:output
-       (setf (content-type*) "text/plain")
-       (when-let ((m-r (first *buildmaster-runs*)))
-         (when-let* ((result-id (or (let ((result-id (getf parameters :result-id)))
-                                      (and result-id (ignore-errors (parse-integer result-id))))
-                                    (buildmaster-error "~@<In result output mode: no result id provided.~:@>")))
-                     (r (master-result m-r result-id)))
-           (subseq (result-output r) 0 (result-output-bytes r)))))
-      (:cond
-        (setf (content-type*) "text/plain")
-        (when-let ((m-r (first *buildmaster-runs*)))
-          (when-let* ((result-id (or (let ((result-id (getf parameters :result-id)))
-                                       (and result-id (ignore-errors (parse-integer result-id))))
-                                     (buildmaster-error "~@<In result condition mode: no result id provided.~:@>")))
-                      (r (master-result m-r result-id)))
-            (concatenate 'string
-                         (when-let ((condition (action-condition r)))
-                           (format nil "~A~%" condition))
-                         (when-let ((backtrace (action-backtrace r)))
-                           (format nil "~%The backtrace was:~%~%~A~%" backtrace))))))
-      (:runcond
-       (setf (content-type*) "text/plain")
-       (when-let* ((m-r (first *buildmaster-runs*))
-                   (condition (and (not (processingp m-r)) (terminatedp m-r) (action-condition m-r))))
-         (format nil "~A~%" condition)))
-      (:overview
-       (let* ((binary-stream (send-headers))
-              (stream (flexi-streams:make-flexi-stream binary-stream)))
-         (with-html-output (stream nil :prologue t)
-           (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
-                  (:head (:title "desire buildbot waterfall on " (str hostname))
-                         (:style :type "text/css" (str *style*)))
-                  (:body :class "body"
-                         (:div :class "header"
-                               "Hello, this is buildmaster on " (str hostname) " speaking." (:br)
-                               "Local time is " (str (multiple-value-call #'print-decoded-time
-                                                       (get-decoded-time))) ".")
-                         (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
-                           (cond (first-run
-                                  (print-legend stream)
-                                  (emit-master-run stream first-run t t)
-                                  (dolist (run rest-runs)
-                                    (emit-master-run stream run t)))
-                                 (t
-                                  (htm :br
-                                       (:div :class "no-runs"
-                                             "There have been no buildmaster runs to speak of."))))))))
-         (finish-output stream))))))
+                           (appending (list (intern (string-upcase param) :keyword) value)))))
+    (flet ((get-int-param (key)
+             (when-let ((value (getf parameters key)))
+               (ignore-errors (parse-integer value))))
+           (get-keyword-param (key)
+             (when-let ((value (getf parameters key)))
+               (make-keyword (string-upcase value)))))
+      (let* ((run-nr (or (get-int-param :nr) 0))
+             (result-id (or (get-int-param :result-id) 0))
+             (mode (or (get-keyword-param :mode) :overview))
+             ;;
+             (m-r (nth run-nr *buildmaster-runs*))
+             (r (when m-r (master-result m-r result-id))))
+        (ecase mode
+          (:output
+           (setf (content-type*) "text/plain")
+           (when r
+             (subseq (result-output r) 0 (result-output-bytes r))))
+          (:cond
+            (setf (content-type*) "text/plain")
+            (when r
+              (concatenate 'string
+                           (when-let ((condition (action-condition r)))
+                             (format nil "~A~%" condition))
+                           (when-let ((backtrace (action-backtrace r)))
+                             (format nil "~%The backtrace was:~%~%~A~%" backtrace)))))
+          (:runcond
+           (setf (content-type*) "text/plain")
+           (when-let ((condition (and m-r
+                                      (not (processingp m-r))
+                                      (terminatedp m-r)
+                                      (action-condition m-r))))
+             (format nil "~A~%" condition)))
+          (:overview
+           (let* ((binary-stream (send-headers))
+                  (stream (flexi-streams:make-flexi-stream binary-stream)))
+             (with-html-output (stream nil :prologue t)
+               (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
+                      (:head (:title "desire buildbot waterfall on " (str hostname))
+                             (:style :type "text/css" (str *style*)))
+                      (:body :class "body"
+                             (:div :class "header"
+                                   "Hello, this is buildmaster on " (str hostname) " speaking." (:br)
+                                   "Local time is " (str (multiple-value-call #'print-decoded-time
+                                                           (get-decoded-time))) ".")
+                             (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
+                               (cond (first-run
+                                      (print-legend stream)
+                                      (emit-master-run stream first-run t 0 t)
+                                      (iter (for run in rest-runs)
+                                            (for nr from 1)
+                                            (emit-master-run stream run t nr)))
+                                     (t
+                                      (htm :br
+                                           (:div :class "no-runs"
+                                                 "There have been no buildmaster runs to speak of."))))))))
+             (finish-output stream))))))))
 
 (defun start-cl-waterfall (&optional (prefix "/desire-waterfall"))
   (push (create-regex-dispatcher prefix 'cl-waterfall) *dispatch-table*))

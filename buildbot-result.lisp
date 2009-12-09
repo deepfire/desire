@@ -21,6 +21,8 @@
 (in-package :desire-buildbot)
 
 
+(defvar *master-run-nr*)
+
 (define-webbable-class result-not-yet (result incomplete-action) ()
   (:web-initargs
    :class "nevr" :marker "n" :description "the test was never run"))
@@ -92,11 +94,11 @@
                      (str (web-marker o))
                      :br
                      (unless (typep o 'result-not-yet) 
-                       (fmt "<a href='/desire-waterfall?mode=output&result-id=~D'>out</a>" (result-id o)))
+                       (fmt "<a href='/desire-waterfall?mode=output&nr=~D&result-id=~D'>out</a>" *master-run-nr* (result-id o)))
                      (when condition
                        (htm
                         :br
-                        (fmt "<a href='/desire-waterfall?mode=cond&result-id=~D'>co</a>" (result-id o)))))))))))
+                        (fmt "<a href='/desire-waterfall?mode=cond&nr=~D&result-id=~D'>co</a>" *master-run-nr* (result-id o)))))))))))
 
 (defmacro with-result-emission ((stream result) &body body)
   `(emit-with-result-emission ,stream ,result (lambda () ,@body)))
