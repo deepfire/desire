@@ -464,7 +464,7 @@
               (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication)
                     rest-phases phases))
         (handler-case
-            (with-slave-evaluation `(buildslave ',module-names ',(mapcar #'type-of rest-phases) ,verbose)
+            (with-slave-evaluation `(buildslave ',module-names ',(mapcar (compose #'make-keyword #'type-of) rest-phases) ,verbose)
                 (slave-pipe hostname username :purge purge :branch branch :metastore-branch metastore-branch :debug debug :disable-debugger disable-debugger
                             :verbose verbose :verbose-slave-communication verbose-slave-communication)
               (iter (for (phase . phases) on rest-phases)
