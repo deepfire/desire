@@ -185,6 +185,7 @@
   ((module :accessor result-module :initarg :module)
    (phase :accessor result-phase :initarg :phase)
    (id :accessor result-id :initarg :id)
+   (commit :accessor result-commit)
    ;;
    (hint-cache :accessor result-hint-cache :initform nil)
    (hint-cache-final-p :accessor result-hint-cache-final-p :initform nil)

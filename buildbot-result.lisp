@@ -69,14 +69,11 @@
   (:method ((o test-phase) (r result))
     "")
   (:method ((o master-update-phase) (r result))
-    (let* ((head-commit-id (desr::get-head (result-path r)))
-           (head-commit-id-string (desr::cook-refval head-commit-id)))
-      (multiple-value-bind (commit-id author date) (desr::git-commit-log head-commit-id (result-path r))
-        (declare (ignore commit-id))
-        (concatenate 'string
-                     "<pre>Commit-ID: " head-commit-id-string "</pre><br>"
-                     "<pre>Author:    " author "</pre><br>"
-                     "<pre>Date:      " date "</pre><br>")))))
+    (let ((commit (result-commit r)))
+      (concatenate 'string
+                   "<pre>Commit-ID: " (desr::cook-refval (desr::commit-id commit)) "</pre><br>"
+                   "<pre>Author:    " (desr::commit-author commit) "</pre><br>"
+                   "<pre>Date:      " (desr::commit-date commit) "</pre><br>"))))
 
 (defun invalidate-result-hint-cache (&optional (buildmaster-run (first *buildmaster-runs*)))
   (iter (for r in-vector (master-run-results buildmaster-run))

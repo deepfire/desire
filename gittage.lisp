@@ -35,9 +35,24 @@
 
 (define-simple-error git-error)
 
-;;;
-;;; Repositories
-;;;
+;;;;
+;;;; Commits
+;;;;
+(defclass commit ()
+  ((id :reader commit-id :initarg :id)
+   (date :reader commit-date :initarg :date)
+   (author :reader commit-author :initarg :author)
+   (message :reader commit-message :initarg :message)))
+
+(defclass git-commit (commit)
+  ())
+
+(defun make-commit (id date author message)
+  (make-instance 'git-commit :id id :date date :author author :message message))
+
+;;;;
+;;;; Repositories
+;;;;
 (defun git-repository-has-objects-p (directory)
   (not (null (or (directory (subfile directory '(".git" "objects" "pack" :wild) :type :wild))
                  (find-if (lambda (x) (= 2 (length (lastcar (pathname-directory x)))))
@@ -520,4 +535,4 @@ and commit message of the corresponding commit as multiple values."
               (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
             (let ((message (string-right-trim '(#\Newline)
                                               (subseq output (+ 5 posn)))))
-              (values (parse-commit-id commit-id) author date message))))))))
+              (make-commit (parse-commit-id commit-id) author date message))))))))
