@@ -471,6 +471,34 @@ in a temporary pseudo-commit."
 ;;;;
 ;;;; Queries
 ;;;;
+(defmacro if-bind (var test &body then/else)
+  "Anaphoric IF control structure.
+
+VAR (a symbol) will be bound to the primary value of TEST. If
+TEST returns a true value then THEN will be executed, otherwise
+ELSE will be executed."
+  (assert (first then/else)
+          (then/else)
+          "IF-BIND missing THEN clause.")
+  (destructuring-bind (then &optional else)
+      then/else
+    `(let ((,var ,test))
+       (if ,var ,then ,else))))
+
+(defmacro cond-bind (var &body clauses)
+  "Just like COND but VAR will be bound to the result of the
+  condition in the clause when executing the body of the clause."
+  (if clauses
+      (destructuring-bind ((test &rest body) &rest others)
+          clauses
+        `(if-bind ,var ,test
+                  (progn ,@body)
+                  (cond-bind ,var ,@others)))
+      nil))
+
+(defun prefixp (prefix sequence)
+  (nth-value 1 (starts-with-subseq prefix sequence :return-suffix t)))
+
 (defun git-commit-log (ref &optional repository-dir)
   "Given a REF and an optional REPOSITORY-DIR, return the commit id, author, date
 and commit message of the corresponding commit as multiple values."
@@ -480,17 +508,16 @@ and commit message of the corresponding commit as multiple values."
                                              (git "log" "-1" (cook-refval ref)))
         (declare (ignore status))
         (with-input-from-string (s output)
-          (let ((commit-id-line (read-line s nil nil))
-                (author-line (read-line s nil nil))
-                (date-line (read-line s nil nil)))
-            (multiple-value-bind (commit-id-good-p commit-id)    (and commit-id-line (starts-with-subseq "commit " commit-id-line :return-suffix t))
-              (multiple-value-bind (author-good-p author) (and author-line (starts-with-subseq "Author: " author-line :return-suffix t))
-                (multiple-value-bind (date-good-p date)   (and date-line (starts-with-subseq "Date:   " date-line :return-suffix t))
-                  (unless (and commit-id-good-p author-good-p date-good-p)
-                    (git-error "~@<Error parsing commit log of ~S at ~S.~:@>" ref *default-pathname-defaults*))
-                  (let ((message (string-right-trim '(#\Newline)
-                                                    (subseq output (+ (length commit-id-line) 1
-                                                                      (length author-line) 1
-                                                                      (length date-line) 1
-                                                                      1 4)))))
-                    (values (parse-commit-id commit-id) author date message)))))))))))
+          (let (commit-id author date (posn 0))
+            (iter (for line = (read-line s nil nil))
+                  (while (and line (plusp (length line))))
+                  (incf posn (1+ (length line)))
+                  (cond-bind suffix
+                    ((prefixp "commit " line)  (setf commit-id suffix))
+                    ((prefixp "Author: " line) (setf author suffix))
+                    ((prefixp "Date:   " line) (setf date suffix))))
+            (unless (and commit-id author date)
+              (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
+            (let ((message (string-right-trim '(#\Newline)
+                                              (subseq output (+ 5 posn)))))
+              (values (parse-commit-id commit-id) author date message))))))))
