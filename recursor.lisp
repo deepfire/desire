@@ -208,24 +208,24 @@
          (values module-dictionary system-dictionary))
         (t
          (setf (car cell) :processing)
-         (let ((present-p (module-locally-present-p module locality)))
-           (when present-p
-             (unless skip-present
-               (update module locality)))
-           (if (or present-p (not skip-missing))
-               (multiple-value-bind (module-deps new-system-dictionary) (module-dependencies module locality system-type complete system-dictionary verbose)
-                 (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
-                        (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
-                   (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
-                   (multiple-value-prog1
-                       (if new-deps-from-this-module
-                           (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
-                                            :complete complete :skip-present skip-present :verbose verbose)
-                           (values new-module-dictionary new-system-dictionary)))))
-               (progn
-                 (syncformat t "~@<;;; ~@;Modules ~A is missing, but SKIP-MISSING was specified, moving on with fingers crossed.~:@>~%" name)
-                 (setf (cdr cell) :done)
-                 (values module-dictionary system-dictionary))))))))
+         (let ((present-before-update-p (module-locally-present-p module locality)))
+           (unless (or (and skip-present present-before-update-p)
+                       (and skip-missing (not present-before-update-p)))
+             (update module locality)))
+         (if (module-locally-present-p module locality)
+             (multiple-value-bind (module-deps new-system-dictionary) (module-dependencies module locality system-type complete system-dictionary verbose)
+               (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
+                      (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
+                 (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
+                 (multiple-value-prog1
+                     (if new-deps-from-this-module
+                         (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
+                                          :complete complete :skip-present skip-present :verbose verbose)
+                         (values new-module-dictionary new-system-dictionary)))))
+             (progn
+               (syncformat t "~@<;;; ~@;Modules ~A is missing, but SKIP-MISSING was specified, moving on with fingers crossed.~:@>~%" name)
+               (setf (cdr cell) :done)
+               (values module-dictionary system-dictionary)))))))
   (:method :around (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
     (declare (ignore complete skip-present skip-missing verbose))
     (multiple-value-bind (new-module-dictionary new-system-dictionary) (call-next-method)
