@@ -570,19 +570,19 @@ instead."
 (defgeneric remote-link-module (remote module &key &allow-other-keys)
   (:documentation
    "Establish a 'publishes' relationship between REMOTE and MODULE.")
-  (:method ((r remote) (m module) &key &allow-other-keys)
-    (location-link-module r m)
-    (pushnew r (module-remotes m)))
   (:method :around ((r wrinkle-mixin) (m module) &key wrinkle)
     (when (and wrinkle
                (not (string= wrinkle (down-case-name m))))
       (push (cons (name m) wrinkle) (wrinkles r)))
-    (call-next-method)))
+    (call-next-method))
+  (:method ((r remote) (m module) &key &allow-other-keys)
+    (location-link-module r m)
+    (pushnew r (module-remotes m))))
 
 (defgeneric remote-unlink-module (remote module)
   (:documentation
    "Undo a 'publishes' relationship between REMOTE and MODULE.")
-  (:method ((r wrinkle-mixin) (m module))
+  (:method :around ((r wrinkle-mixin) (m module))
     (removef (wrinkles r) (name m) :key #'car)
     (call-next-method))
   (:method ((r remote) (m module))
