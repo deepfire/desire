@@ -169,7 +169,9 @@
                                       (not (processingp m-r))
                                       (terminatedp m-r)
                                       (action-condition m-r))))
-             (format nil "~A~%" condition)))
+             (format nil "~A~%" condition)
+             (when-let ((backtrace (action-backtrace m-r)))
+               (format nil "~%the backtrace was:~%~A~%" backtrace))))
           (:overview
            (let* ((binary-stream (send-headers))
                   (stream (flexi-streams:make-flexi-stream binary-stream)))
