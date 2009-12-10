@@ -337,6 +337,15 @@ differ in only slight detail -- gate property, for example."
 
 (defclass git-gate-locality (gate-native-remote git-locality gate-locality) ())
 
+;;;;
+;;;; Here are the constraints on the remote class precedence lists, as imposed by
+;;;; generic functions.
+;;;; The notation used is "X < Y" meaning that X precedes Y in the class precedence list.
+;;;;
+;;;; REMOTE < NONGIT-MIXIN < SEPARATE-CLONE, by FETCH-MODULE-USING-REMOTE :AROUND
+;;;; REMOTE < WRINKLE-MIXIN, by URL-USING-MODULE :AROUND
+;;;;
+
 ;;;
 ;;; Welcome to layers of crap upon layers of crap.
 ;;;
