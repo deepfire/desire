@@ -258,27 +258,34 @@
        ,@body)
      (sb-ext:quit)))
 
-(defun invoke-with-slave-evaluation (local-fn slave-form hostname username &rest keys &key print-slave-connection-conditions verbose-slave-communication &allow-other-keys)
+(defun invoke-with-slave-evaluation (slave-form local-fn hostname username &rest keys &key print-slave-connection-conditions verbose-slave-communication &allow-other-keys)
   (handler-case
       (with-maybe-just-printing-conditions (t buildslave-error) print-slave-connection-conditions
-        (with-slave-connection (slave-pipe hostname username (apply #'cook-buildslave-command (make-buildslave-evaluation-form slave-form)
-                                                                    (remove-from-plist keys :print-slave-connection-conditions :verbose-slave-communication))
-                                           verbose-slave-communication)
-          (funcall local-fn slave-pipe)))
+        (let ((slave-form (make-buildslave-evaluation-form slave-form)))
+          (when verbose-slave-communication
+            (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
+          (with-slave-connection (slave-pipe hostname username (apply #'cook-buildslave-command slave-form
+                                                                      (remove-from-plist keys :print-slave-connection-conditions :verbose-slave-communication))
+                                             verbose-slave-communication)
+            (funcall local-fn slave-pipe))))
     (buildslave-error (c)
       (return-from invoke-with-slave-evaluation (values nil c)))))
 
 (defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key &allow-other-keys) &body body)
-  `(invoke-with-slave-evaluation (lambda (,slave-pipe) ,@body) ,slave-form ,hostname ,username ,@keys))
+  `(invoke-with-slave-evaluation ,slave-form (lambda (,slave-pipe) ,@body) ,hostname ,username ,@keys))
 
 ;;;;
 ;;;; Buildmaster entry points
 ;;;;
-(defun ping-slave (&rest keys &key (hostname *default-buildslave-host*) (username *default-buildslave-username*) &allow-other-keys)
-  (apply #'invoke-with-slave-evaluation (lambda (pipe)
-                                          (declare (ignore pipe))
-                                          t)
-         nil hostname username (remove-from-plist keys :hostname :username)))
+(defun ping-slave (&rest keys &key call-buildslave (hostname *default-buildslave-host*) (username *default-buildslave-username*) &allow-other-keys)
+  (apply #'invoke-with-slave-evaluation (cond
+                                          (call-buildslave
+                                           `(buildslave nil `(:slave-fetch-phase) t)))
+         (lambda (pipe)
+           (declare (ignore pipe))
+           t)
+         hostname username :verbose-slave-communication (getf keys :verbose-slave-communication call-buildslave)
+         (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication)))
 
 (defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
