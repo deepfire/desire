@@ -102,21 +102,26 @@ Note that the provided directory is the final directory in the gate locality.")
     (with-error-resignaling (executable-failure
                              ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
       (within-directory (repo-dir :if-does-not-exist :create)
-        (unless (directory-created-p)
-          (unless (git-repository-has-objects-p nil)
-            (error 'empty-repository :pathname repo-dir))
-          (when *follow-upstream*
-            (ensure-clean-repository *dirty-repository-behaviour*)))
-        (let ((*new-repository-p* (directory-created-p))
-              (*source-remote* o))
-          ;; at this point several facts apply:
-          ;; - the directory of the module's repository within the gate exists, maybe without .git, and we're in that directory
-          ;; - above variables are bound
-          (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
-            (call-next-method)))
-        (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
-                                               (t :continue))))
-      (setf (git-repository-world-readable-p repo-dir) *default-world-readable*)))
+        (handler-case (progn
+                        (unless (directory-created-p)
+                          (unless (git-repository-has-objects-p nil)
+                            (error 'empty-repository :pathname repo-dir))
+                          (when *follow-upstream*
+                            (ensure-clean-repository *dirty-repository-behaviour*)))
+                        (let ((*new-repository-p* (directory-created-p))
+                              (*source-remote* o))
+                          ;; at this point several facts apply:
+                          ;; - the directory of the module's repository within the gate exists, maybe without .git, and we're in that directory
+                          ;; - above variables are bound
+                          (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
+                            (call-next-method)))
+                        (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
+                                                               (t :continue)))
+                        (setf (git-repository-world-readable-p) *default-world-readable*))
+          (error (c)
+            (when (directory-created-p)
+              (fad:delete-directory-and-files repo-dir))
+            (error c))))))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
