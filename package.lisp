@@ -124,6 +124,7 @@
    #:*default-system-type*
    #:*default-wishmaster*
    #:*default-world-readable*
+   #:*default-publishable*
    #:*desires*
    #:*self*
    #:root

@@ -25,7 +25,8 @@
 ;;;
 (defvar *bootstrap-wishmaster-url*                "git://git.feelingofgreen.ru")
 (defvar *desires*                                  nil "List of import descriptions.")
-(defvar *default-world-readable*                   t   "Whether to publish GIT repositories by default.")
+(defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
+(defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")
 (defvar *self*                                     nil "Possibly unknown distributor whom we identify as.")
 (defvar *combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
 (defvar *default-system-type*                      'asdf-system)

@@ -272,6 +272,8 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                                 :test-function (of-type 'repository-not-clean-during-fetch)
                                 :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))
                  (with-maybe-unaffected-executable-output (pass-output)
-                   (fetch-module-using-remote best-remote name url repo-dir))))
+                   (fetch-module-using-remote best-remote name url repo-dir)
+                   (when *default-publishable*
+                     (pushnew name (gate-converted-module-names locality))))))
              (syncformat t ";; Done fetching module ~A~%" name))))
     (values)))
