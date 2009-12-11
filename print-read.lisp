@@ -93,9 +93,11 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
   (and (eq (name module) (module-umbrella module))
        (not (module-system-path-whitelist module))
        (not (module-system-path-blacklist module))
-       (or (null (module-systems module))
-           (and (endp (rest (module-systems module)))
-                (system-simple-p (first (module-systems module)))))))
+       (or (null (module-systems module)) ; printed as "(foo)"
+           (destructuring-bind (first-system &rest others) (module-systems module) ; printed as "foo"
+             (and (null others)
+                  (eq (name module) (name first-system))
+                  (system-simple-p first-system))))))
 
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o) (transport o)))))
   (let ((*print-case* :downcase))
@@ -111,7 +113,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
               (string (name o)))
             (slot-or-abort-print-object stream o 'path)
             (let ((module-names (iter (for m in (sort (mapcar #'module (slot-or-abort-print-object stream o 'module-names)) #'string< :key #'name))
-                                      (collect (if (module-systems m)
+                                      (collect (if (find (name m) (module-systems m) :key #'name)
                                                    (down-case-name m)
                                                    (list (down-case-name m)))))))
               (append (when-let ((port (remote-distributor-port o)))
@@ -129,11 +131,6 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (list `(:credentials ,credentials)))))
             (when-let ((wrinkles (and (typep o 'wrinkle-mixin) (slot-or-abort-print-object stream o 'wrinkles))))
               `(:wrinkles ,wrinkles)))))
-
-(defun system-implied-p (system)
-  "See it the definition of SYSTEM is implied, and is therefore subject 
-to omission from DEFINITIONS."
-  (system-simple-p system))
 
 (defgeneric merge-remote-type (source owner subject-remote source-proposed-type)
   (:documentation
@@ -173,9 +170,9 @@ The value returned is the merged type for SUBJECT-REMOTE.")
          (subject (find predicted-name (distributor-remotes owner) :key #'name))
          (merged-type (merge-remote-type source owner subject type))
          ;; compute modules
-         (systemless-modules (mapcar #'car (remove-if-not #'consp modules)))
+         (selfless-modules (mapcar #'car (remove-if-not #'consp modules)))
          (modules (remove-if #'consp modules))
-         (merged-module-names (merge-slot-value source owner subject 'module-names (append modules systemless-modules)))
+         (merged-module-names (merge-slot-value source owner subject 'module-names (append modules selfless-modules)))
          (modules-for-disconnection (when subject (set-difference merged-module-names (location-module-names subject))))
          (merged-converted-modules (merge-slot-value source owner subject 'converted-module-names converted-module-names)))
     (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject merged-type))
@@ -193,17 +190,22 @@ The value returned is the merged type for SUBJECT-REMOTE.")
         (dolist (m modules-for-disconnection)
           (when-let ((m (module m :if-does-not-exist :continue)))
             (remote-unlink-module subject m))))
-      (let ((amended-modules (intersection merged-module-names modules))
-            (amended-systemless-modules (intersection merged-module-names systemless-modules)))
-        (dolist (m-name (intersection merged-module-names (append amended-modules amended-systemless-modules)))
-          (lret ((m (or (module m-name :if-does-not-exist :continue)
-                        (make-instance 'module :name m-name :umbrella m-name
-                                       :last-sync-time *read-universal-time* :synchronised-p t))))
+      (let ((amended-modules          (intersection merged-module-names modules))
+            (amended-selfless-modules (intersection merged-module-names selfless-modules)))
+        (dolist (m-name (append amended-selfless-modules amended-modules))
+          (let ((m (or (module m-name :if-does-not-exist :continue)
+                       ;; Go ahead and opportunistically create a simple module.
+                       ;; If there are any amendments, the latter explicit module declaration will take over.
+                       (make-instance 'module :name m-name :umbrella m-name
+                                      :last-sync-time *read-universal-time* :synchronised-p t))))
             (remote-link-module *read-time-enclosing-remote* m)
-            (unless (or (system m-name :if-does-not-exist :continue)
-                        (member m-name amended-systemless-modules))
-              (make-instance *default-system-type* :name m-name :module m
-                             :last-sync-time *read-universal-time* :synchronised-p t))))))))
+            (let ((selfless-p (member m-name amended-selfless-modules)) ; the declaration
+                  (has-self-p (system m-name :if-does-not-exist :continue))) ; current status
+              (cond ((and selfless-p has-self-p)
+                     (remove-system has-self-p))
+                    ((not (or selfless-p has-self-p))
+                     (make-instance *default-system-type* :name m-name :module m
+                                    :last-sync-time *read-universal-time* :synchronised-p t))))))))))
 
 (defun print-gate-local-definitions (gate stream)
   (let ((*print-case* :downcase))
@@ -393,7 +395,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
       (format stream "~%~%;;;~%;;; Modules~%;;;")
       (iter (for m in (sorted-hash-table-entries *modules*)) (unless (module-simple-p m) (print m stream)))
       (format stream "~%~%;;;~%;;; Systems~%;;;")
-      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (system-implied-p s) (print s stream)))
+      (iter (for s in (sorted-hash-table-entries *systems*)) (unless (system-simple-p s) (print s stream)))
       (format stream "~%~%;;;~%;;; Applications~%;;;")
       (iter (for a in (sorted-hash-table-entries *apps*)) (print a stream)))))
 
