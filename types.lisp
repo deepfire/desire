@@ -899,8 +899,8 @@ in any other package, return the canonical module name, as a symbol in the
   (if-let ((m (module name :if-does-not-exist :continue)))
     (name m)
     (etypecase name
-      (symbol (intern (symbol-name name) :desire))
-      (string (intern name :desire)))))
+      (symbol (intern (string-upcase (symbol-name name)) :desire))
+      (string (intern (string-upcase name) :desire)))))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
   (git-repository-present-p (module-pathname module locality)))
