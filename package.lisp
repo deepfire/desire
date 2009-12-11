@@ -112,6 +112,7 @@
    #:module-best-remote
    #:module-best-distributor
    #:module-fetch-url
+   #:module-wrinkle
    #:touch-module
    #:distributor-module-enabled-remote
    #:module-locally-present-p

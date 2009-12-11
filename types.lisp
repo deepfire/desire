@@ -141,17 +141,32 @@ SAVE-DEFINITIONS was called.")
 (defun vcs-enabled-p (type)
   (class-slot type 'enabled-p))
 
-(defgeneric remote-wrinkle (remote module-name)
+(defgeneric remote-module-wrinkle (remote module-name)
   (:method ((r wrinkle-mixin) module-name)
     (cadr (assoc module-name (wrinkles r) :test #'string=))))
 
-(defgeneric set-remote-wrinkle (remote module-name wrinkle)
+(defgeneric set-remote-module-wrinkle (remote module-name wrinkle)
   (:method ((r wrinkle-mixin) module-name wrinkle)
-    (if-let ((cell (assoc module-name (wrinkles r) :test #'string=)))
-      (setf (cadr cell) wrinkle)
-      (push (list (canonicalise-module-name module-name) wrinkle) (wrinkles r)))))
+    (if wrinkle
+        (if-let ((cell (assoc module-name (wrinkles r) :test #'string=)))
+          (setf (cadr cell) wrinkle)
+          (push (list (canonicalise-module-name module-name) wrinkle) (wrinkles r)))
+        (removef (wrinkles r) module-name :key #'car :test #'string=))))
 
-(defsetf remote-wrinkle set-remote-wrinkle)
+(defun module-wrinkle (module &aux
+                       (module (coerce-to-module module)))
+  "Get the 'quirk' or 'wrinkle' string associated with MODULE within
+its 'best remote'."
+  (remote-module-wrinkle (module-best-remote module) (name module)))
+
+(defun set-module-wrinkle (module wrinkle &aux
+                           (module (coerce-to-module module)))
+  "Set the 'quirk' or 'wrinkle' string associated with MODULE within
+its 'best remote'."
+  (declare (type (or null string) wrinkle))
+  (set-remote-module-wrinkle (module-best-remote module) (name module) wrinkle))
+
+(defsetf module-wrinkle set-module-wrinkle)
 
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
@@ -875,7 +890,7 @@ to DIRECTORY."
                        maybe-wrinkle))))
   (:method :around ((r wrinkle-mixin) module)
            (values (call-next-method)
-                   (remote-wrinkle r (when module (coerce-to-name module)))))
+                   (remote-module-wrinkle r (when module (coerce-to-name module)))))
   (:method (r m) "://")
   (:method ((r cvs-native-remote) m)
     (let ((c (module-credentials r (coerce-to-name m))))
