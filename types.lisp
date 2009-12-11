@@ -1074,6 +1074,14 @@ the driven variable binding."
      (when (module-locally-present-p ,module ,locality nil nil)
        ,@body)))
 
+(defun missing-modules (&optional (locality (gate *self*)))
+  (do-modules (m)
+    (unless (or (location-defines-module-p locality m)
+                (member (string (name m))
+                        '("ASDF-BINARY-LOCATIONS" "ASDF-SYSTEM-CONNECTIONS" "CLBUILD" "COMMON-DB" "CVSPS"  "DARCS2GIT" "ECL" "FARE-UTILS" "GIT" "LIBPCIACCESS" "OGRE" "SBCL" "SALZA")
+                        :test #'string=))
+      (collect (name m)))))
+
 ;;;;
 ;;;; Metastore: communication with other desire nodes
 ;;;;
