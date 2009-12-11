@@ -119,3 +119,8 @@ locally present modules will be marked as converted."
   (read-definitions :force-source t)
   ;; Metastore subscriptions?
   )
+
+(defun self-check ()
+  #+sbcl
+  (= (sb-kernel::get-lisp-obj-address (distributor :git.feelingofgreen.ru))
+     (sb-kernel::get-lisp-obj-address *self*)))
