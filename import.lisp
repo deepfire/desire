@@ -231,11 +231,19 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
       (declare (ignore url))
       (with-output-to-file (stream (subfile* from-repo-dir "CVSROOT" "config") :if-exists :supersede)
         (format stream "LockDir=~A~%" (cvs-locality-lock-path o)))
-      (let ((final-module-name (or cvs-module-name (downstring name))))
-        (unless (directory-exists-p (subdirectory* from-repo-dir final-module-name))
-          (definition-error "~@<During import of ~A from ~S: CVS module ~S does not exist.~:@>" name from-repo-dir final-module-name))
+      (let ((final-cvs-module-name (or cvs-module-name (downstring name))))
+        (unless (directory-exists-p (subdirectory* from-repo-dir final-cvs-module-name))
+          (iter (for guess in '("src"))
+                (when (directory-exists-p (subdirectory* from-repo-dir guess))
+                  (format t "~@<;;; ~@;During import of ~A from ~S: CVS module ~S does not exist, guessed an alternative: ~S.  Recording that as the new wrinkle.~:@>~%"
+                          name from-repo-dir final-cvs-module-name guess)
+                  (setf final-cvs-module-name guess)
+                  (set-remote-module-wrinkle *source-remote* name guess)
+                  (leave))
+                (finally
+                 (definition-error "~@<During import of ~A from ~S: CVS module ~S does not exist, and it's name couldn't be guessed.~:@>" name from-repo-dir final-cvs-module-name))))
         (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module name :locality (gate *self*)))
-          (git "cvsimport" "-v" "-C" *default-pathname-defaults* "-d" (format nil ":local:~A" (string-right-trim "/" (namestring from-repo-dir))) final-module-name)))))
+          (git "cvsimport" "-v" "-C" *default-pathname-defaults* "-d" (format nil ":local:~A" (string-right-trim "/" (namestring from-repo-dir))) final-cvs-module-name)))))
   (:method ((o svn-locality) name from-repo-dir)
     (when *new-repository-p*
       (multiple-value-bind (url wrinkle) (url *source-remote* name)
