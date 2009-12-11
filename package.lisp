@@ -103,6 +103,9 @@
    #:module-pathname
    #:locality-register-with-asdf
    #:update-conversions
+   #:hide-module
+   #:make-module-unpublished
+   #:declare-module-converted
    ;;   types.lisp :: module
    #:remote-link-module
    #:remote-unlink-module

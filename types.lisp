@@ -1011,6 +1011,19 @@ If it is hidden, unhide it."
   (setf (git-repository-world-readable-p (module-pathname module locality)) t)
   (removef (gate-hidden-module-names locality) name))
 
+(defun declare-module-converted (module &optional (locality (gate *self*)) &aux
+                                 (module (coerce-to-module module))
+                                 (name (name module)))
+  "Advertise MODULE as converted by LOCALITY."
+  (unless (typep locality 'gate-locality)
+    (desire-error "~@<The locality argument must be a local gate.~:@>"))
+  (when (find name (location-module-names locality))
+    (module-error "~@<Cannot declare ~A as converted by local gate ~A, as it is already released there.~:@>"
+                  name (name locality)))
+  (pushnew name (gate-converted-module-names locality))
+  (removef (gate-unpublished-module-names locality) name)
+  (removef (gate-hidden-module-names locality) name))
+
 (defun module-hidden-p (module &optional (locality (gate *self*)))
   "Determine whether MODULE is hidden, with regard to LOCALITY.
 This is a function of MODULE repository's anonymous accessibility."
