@@ -419,6 +419,9 @@ differ in only slight detail -- gate property, for example."
               (gate-unpublished-module-names o) unpublishable-names
               (gate-hidden-module-names o) hidden-names)))))
 
+(defun update-conversions ()
+  (update-gate-conversions (gate *self*)))
+
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
   (update-gate-conversions o))
 

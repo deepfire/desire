@@ -102,6 +102,7 @@
    #:locality-pathname
    #:module-pathname
    #:locality-register-with-asdf
+   #:update-conversions
    ;;   types.lisp :: module
    #:remote-link-module
    #:remote-unlink-module
