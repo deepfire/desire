@@ -140,15 +140,17 @@ SAVE-DEFINITIONS was called.")
 (defun vcs-enabled-p (type)
   (class-slot type 'enabled-p))
 
-(defgeneric remote-module-wrinkle (remote module-name)
+(defgeneric remote-wrinkle (remote module-name)
   (:method ((r wrinkle-mixin) module-name)
     (cadr (assoc module-name (wrinkles r) :test #'string=))))
 
-(defgeneric set-remote-module-wrinkle (remote module-name wrinkle)
+(defgeneric set-remote-wrinkle (remote module-name wrinkle)
   (:method ((r wrinkle-mixin) module-name wrinkle)
     (if-let ((cell (assoc module-name (wrinkles r) :test #'string=)))
       (setf (cadr cell) wrinkle)
-      (push (list (name (coerce-to-module module-name)) wrinkle) (wrinkles r)))))
+      (push (list (canonicalise-module-name module-name) wrinkle) (wrinkles r)))))
+
+(defsetf remote-wrinkle set-remote-wrinkle)
 
 (defun find-and-register-tools-for-remote-type (type)
   "Find and make available executables for fetching from remotes of TYPE.
@@ -869,7 +871,7 @@ to DIRECTORY."
                        maybe-wrinkle))))
   (:method :around ((r wrinkle-mixin) module)
            (values (call-next-method)
-                   (remote-module-wrinkle r (when module (coerce-to-name module)))))
+                   (remote-wrinkle r (when module (coerce-to-name module)))))
   (:method (r m) "://")
   (:method ((r cvs-native-remote) m)
     (let ((c (module-credentials r (coerce-to-name m))))
