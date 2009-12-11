@@ -118,7 +118,7 @@ of a module URL and try to deduce name of the module."
                       (first (last pathname-component-list 2)))
                      (t
                       last))))
-    (make-keyword (string-upcase name))))
+    (canonicalise-module-name name)))
 
 (defun compute-umbrellised-remote-path (pathname-component-list)
   "This /only/ works for pathname component lists that take over domain name."
