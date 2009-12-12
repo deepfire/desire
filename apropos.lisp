@@ -76,23 +76,32 @@
     (terpri))
   (values))
 
-(defun local-summary (&optional (stream *standard-output*))
+(defun local-summary (&optional (print-unpublished t) (print-hidden t) (stream *standard-output*))
   "Produce a summary about locally available modules."
   (let* ((gate (gate *self*))
          (origin (sort (copy-list (location-module-names gate)) #'string<))
          (converted (sort (copy-list (gate-converted-module-names gate)) #'string<))
          (unpublished (sort (copy-list (gate-unpublished-module-names gate)) #'string<))
-         (hidden (sort (copy-list (gate-hidden-module-names gate)) #'string<)))
+         (hidden (sort (copy-list (gate-hidden-module-names gate)) #'string<))
+         (present (append origin converted unpublished hidden))
+         (missing (do-modules (m)
+                    (unless (member (name m) present)
+                      (collect (name m))))))
     (format stream "~A is a ~:[local~;well-known~] distributor.~%~
                     The local gate contains a total of ~D known modules, among which are:~%"
             (name *self*) (distributor (name *self*) :if-does-not-exist :continue)
-            (+ (length origin) (length converted) (length unpublished) (length hidden)))
+            (reduce #'+ (list origin converted
+                              (when print-unpublished unpublished)
+                              (when print-hidden hidden))
+                    :key #'length))
     (when origin
       (format stream "~3,' D released:   ~@<~{ ~A~}~:@>~%" (length origin) origin))
     (when converted
       (format stream "~3,' D converted:  ~@<~{ ~A~}~:@>~%" (length converted) converted))
-    (when unpublished
+    (when (and print-unpublished unpublished)
       (format stream "~3,' D unpublished:~@<~{ ~A~}~:@>~%" (length unpublished) unpublished))
-    (when hidden
-      (format stream "~3,' D hidden:     ~@<~{ ~A~}~:@>~%" (length hidden) hidden)))
+    (when (and print-hidden hidden)
+      (format stream "~3,' D hidden:     ~@<~{ ~A~}~:@>~%" (length hidden) hidden))
+    (when missing
+      (format stream "~3,' D not present:~@<~{ ~A~}~:@>~%" (length missing) missing)))
   (values))
