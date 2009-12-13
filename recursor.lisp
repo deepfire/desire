@@ -273,7 +273,7 @@ Defined keywords:
    - COMPLETE - whether to obtain all modules' systems, even those not
      part of main module systems' complete dependency graphs."
   (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list nil m))) desires)))
-    (when-let ((desired-module-names (mapcar #'canonicalise-module-name (mapcan #'rest interpreted-desires))))
+    (when-let ((desired-module-names (mapcar #'canonicalise-name (mapcan #'rest interpreted-desires))))
       (let ((module-dictionary nil)
             (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
         (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))

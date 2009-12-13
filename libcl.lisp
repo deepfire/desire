@@ -24,9 +24,8 @@
 (defvar *libcl-project-index* "http://libcl.com/libcl-current/index.html")
 
 (defun examine-libcl ()
-  (let ((libcl-module-names (mapcar (compose (rcurry #'intern #.*package*) #'string-upcase)
-                                    (extract-delimited-substrings (get-url-contents-as-string *libcl-project-index*)
-                                                                  "<tr><td>" #\<))))
+  (let ((libcl-module-names (mapcar #'canonicalise-name (extract-delimited-substrings (get-url-contents-as-string *libcl-project-index*)
+                                                                                      "<tr><td>" #\<))))
     (multiple-value-bind (known missing) (unzip (rcurry #'module :if-does-not-exist :continue) libcl-module-names)
       (format t "~@<Known modules: ~;~{ ~A~}~@>~%~
                  ~@<Missing modules: ~;~{ ~A~}~@>~%"

@@ -92,7 +92,7 @@
   `(invoke-with-slave-output-markers t (lambda () ,@body)))
 
 (defun buildslave (modules phases &optional verbose-internals)
-  (let ((module-names (mapcar #'canonicalise-module-name modules))
+  (let ((module-names (mapcar #'canonicalise-name modules))
         (phases (mapcar (compose #'make-keyword #'string-upcase #'string) phases)))
     (iter (for p in phases)
           (iter (for mn in module-names)

@@ -219,7 +219,7 @@ The lists of pathnames returned have following semantics:
                                              (git "remote"))
         (declare (ignore status))
         (let ((remote-names (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))
-          (mapcar (compose #'intern #'string-upcase) remote-names))))))
+          (mapcar #'canonicalise-name remote-names))))))
 
 (defun git-remote-present-p (name &optional directory)
   (member name (gitremotes directory) :test #'string=))

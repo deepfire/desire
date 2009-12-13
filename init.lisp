@@ -72,7 +72,7 @@ locally present modules will be marked as converted."
       (setf *self* (if-let ((d (and as (distributor as))))
                      (progn (syncformat t ";;; Trying to establish self as ~A~%" as)
                             (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
-                     (let ((local-name (intern (string-upcase (machine-instance)) #.*package*)))
+                     (let ((local-name (canonicalise-name (machine-instance))))
                        (syncformat t ";;; Establishing self as non-well-known distributor ~A~%" local-name)
                        (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
                                       :omit-registration t))))

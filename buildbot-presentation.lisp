@@ -137,7 +137,7 @@
 (defun cl-waterfall ()
   (let* ((hostname (string-downcase (string (name *self*))))
          (parameters (iter (for (param . value) in (get-parameters*))
-                           (appending (list (intern (string-upcase param) :keyword) value)))))
+                           (appending (list (make-keyword (string-upcase param)) value)))))
     (flet ((get-int-param (key)
              (when-let ((value (getf parameters key)))
                (ignore-errors (parse-integer value))))

@@ -79,7 +79,7 @@ Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
                (lret ((system (or (lret ((present-system (system name :if-does-not-exist :continue)))
                                     (when present-system
                                       (check-present-system-sanity present-system)))
-                                  (register-new-system (intern (string-upcase name)) path))))
+                                  (register-new-system (canonicalise-name name) path))))
                  (setf (system-pathname system) path)
                  (ensure-system-loadable system path nil locality))))
       (iter (for path in sysfiles)

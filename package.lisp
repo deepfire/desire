@@ -48,6 +48,8 @@
    #:svn-locality
    #:tarball-locality
    #:git-gate-locality
+   ;;
+   #:canonicalise-name
    ;;   types.lisp :: direct knowledge base manipulation
    #:map-distributors
    #:map-locations

@@ -150,7 +150,7 @@ SAVE-DEFINITIONS was called.")
     (if wrinkle
         (if-let ((cell (assoc module-name (wrinkles r) :test #'string=)))
           (setf (cadr cell) wrinkle)
-          (push (list (canonicalise-module-name module-name) wrinkle) (wrinkles r)))
+          (push (list (canonicalise-name module-name) wrinkle) (wrinkles r)))
         (removef (wrinkles r) module-name :key #'car :test #'string=))))
 
 (defun module-wrinkle (module &aux
@@ -910,15 +910,15 @@ to DIRECTORY."
                           (module module :if-does-not-exist :continue))
                         module)))
 
-(defun canonicalise-module-name (name)
-  "Given a module's NAME, whether in form of a string, keyword or a symbol
-in any other package, return the canonical module name, as a symbol in the
+(defun canonicalise-name (name &optional preserve-case (package (load-time-value (find-package :desire))))
+  "Given an object's NAME, whether in form of a string, keyword or a symbol
+in any other package, return the canonical name, as a symbol in the
 'DESIRE' package.."
-  (if-let ((m (module name :if-does-not-exist :continue)))
-    (name m)
-    (etypecase name
-      (symbol (intern (string-upcase (symbol-name name)) :desire))
-      (string (intern (string-upcase name) :desire)))))
+  (intern (xform (not preserve-case) #'string-upcase
+                 (etypecase name
+                   (symbol (symbol-name name))
+                   (string name)))
+          package))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
   (git-repository-present-p (module-pathname module locality)))

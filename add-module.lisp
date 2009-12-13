@@ -118,7 +118,7 @@ of a module URL and try to deduce name of the module."
                       (first (last pathname-component-list 2)))
                      (t
                       last))))
-    (canonicalise-module-name name)))
+    (canonicalise-name name)))
 
 (defun compute-umbrellised-remote-path (pathname-component-list)
   "This /only/ works for pathname component lists that take over domain name."
@@ -255,7 +255,7 @@ The values returned are:
                             (make-remote type domain-name-takeover dist port (or deduced-path path) :name remote-name))))
           (values (or remote new-remote)
                   cred
-                  module-name (intern (string-upcase subdomain) (find-package :desire))
+                  module-name (canonicalise-name subdomain)
                   (not (null new-remote))))))))
 
 (defun ensure-remote-module (remote module-name umbrella-name &key credentials path-whitelist path-blacklist)
@@ -300,7 +300,7 @@ The values returned are:
   (set-dispatch-macro-character #\# char 'add-module-reader *readtable*))
 
 (defun add-module-local (name &optional (mode :publish) (locality (gate *self*)) &key path-whitelist path-blacklist)
-  (let ((name (canonicalise-module-name name)))
+  (let ((name (canonicalise-name name)))
     (unless (typep locality 'gate)
       (locality-error locality "~@<Asked to add module ~A to a non-gate ~A.~:@>" name locality))
     (when (location-defines-module-p locality name)
