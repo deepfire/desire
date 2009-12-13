@@ -640,11 +640,14 @@ instead."
   ((module :accessor system-module :initarg :module :documentation "Specified.")
    (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name
                              :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
+   (pathname :accessor system-pathname :initarg :pathname :documentation "Cache.")
    (applications :accessor system-applications :initarg :applications :documentation "Cache."))
   (:default-initargs
    :registrator #'(setf system)
    :definition-pathname-name nil
-   :module nil :applications nil)
+   :pathname nil
+   :module nil
+   :applications nil)
   (:documentation
    "Note that we don't remember how to find systems within the module's
 directory hierarchy, as we rely on the recursor to properly register the

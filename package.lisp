@@ -119,8 +119,11 @@
    #:module-publishable-p
    #:module-hidden-p
    #:module-system-definitions
+   #:discover-and-register-module-systems
    ;;   types.lisp :: system
+   #:system-module
    #:system-hidden-p
+   #:system-pathname
    ;;   types.lisp :: desires
    #:add-desire
    #:module-desired-p
