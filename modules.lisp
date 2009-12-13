@@ -114,6 +114,50 @@ system TYPE within LOCALITY."
                                             (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
                                           (collect (ensure-system hidden-system-name path)))))))))))))
 
+;;;;
+;;;; Module <-> system mapping heuristic
+;;;;
+;;; XXX: heuristics
+;;; Why do we have this?
+;;; Arguably naturally: we don't want to split projects at system granularity.
+(defun module-central-system (module &optional (if-does-not-exist :error) &aux
+                              (module (coerce-to-module module))
+                              (systems (module-systems module)))
+  "Answer the question -- what does it mean to load this particular module?"
+  (cond ((null systems)
+         (module-error module "~@<Module ~A has no systems, and hence no central system.~:@>" (name module)))
+        ((endp (rest systems))
+         (first systems))
+        ((find (name module) systems :key #'name))
+        ((let ((non-test-systems (remove-if (curry #'search "TEST") systems :key (compose #'symbol-name #'name))))
+           (cond ((endp (rest non-test-systems))
+                  (first non-test-systems))
+                 ((let ((fair-guesses (remove-if-not (curry #'search (symbol-name (name module))) non-test-systems :key (compose #'symbol-name #'name))))
+                    (when (endp (rest fair-guesses))
+                      (first fair-guesses)))))))
+        (t
+         (case if-does-not-exist
+           (:continue)
+           (:error (module-error module "~@<Unresolved ambiguity: failed to guess the system central in module ~A, among ~A.~:@>"
+                                 (name module) (mapcar #'name systems)))))))
+
+;;;;
+;;;; System loadability
+;;;;
+(defun ensure-module-systems-loadable (module &optional (locality (gate *self*)) &aux
+                                       (module (coerce-to-module module)))
+  "Try making MODULE's systems loadable, defaulting to LOCALITY.
+Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
+  (dolist (s (module-systems module))
+    (when *verbose-repository-maintenance*
+      (format t "~@<;;; ~@;Ensuring loadability of ~A ~A~:@>~%" (type-of s) (name s)))
+    (ensure-system-loadable s (not (system-hidden-p s)) locality)))
+
+;;;;
+;;;; Module repository maintenance hook
+;;;;
+;;; Branching model management.
+;;; System loadability.
 (defgeneric notice-module-repository (module &optional locality)
   (:documentation
    "Ensure that the repository corresponding to MODULE within LOCALITY
