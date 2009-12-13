@@ -99,6 +99,7 @@
               MISSING unknown systems, returning them as multiple values."
                (declare (special *syspath*))
                (if-let ((name (next-unsatisfied-system system-dictionary)))
+      (let* ((all-sysfiles (compute-module-system-definitions module system-type locality))
                  (progn
                    (if-let ((system (system name :if-does-not-exist :continue)))
                      (let* ((path (or (syspath name)
@@ -159,7 +160,6 @@
                                    (collect (if complete
                                                 (make-wanted-missing hidden-system-name)
                                                 (make-unwanted-missing hidden-system-name))))))))))
-      (let* ((all-sysfiles (module-system-definitions module system-type locality))
              (main-sysfile (find (string-downcase (module-central-system-name module)) all-sysfiles :key #'pathname-name :test #'string=))
              (other-sysfiles (remove main-sysfile all-sysfiles)))
         ;; This doesn't deal with other modules providing same systems. Will silently break.
