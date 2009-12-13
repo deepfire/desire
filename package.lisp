@@ -122,9 +122,11 @@
    #:module-hidden-p
    #:module-system-definitions
    #:discover-and-register-module-systems
+   #:do-present-modules
    ;;   types.lisp :: system
    #:system-module
    #:system-hidden-p
+   #:do-present-systems
    #:system-pathname
    ;;   types.lisp :: desires
    #:add-desire
@@ -195,7 +197,6 @@
    #:ensure-module-git-remote
    #:module-bare-p
    #:module-locally-present-p
-   #:do-present-modules
    #:module-world-readable-p
    ;; branching.lisp
    #:*follow-upstream*

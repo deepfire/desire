@@ -689,7 +689,7 @@ Find out whether SYSTEM is hidden."
 (define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :remover %remove-module :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
 (define-root-container *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
 (define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
-(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems)
+(define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems :if-exists :error :iterator do-systems)
 (define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
 (define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-root-container *localities*     loc           :type locality :mapper map-localities :if-exists :error)
@@ -1084,6 +1084,13 @@ the driven variable binding."
                         '("ASDF-BINARY-LOCATIONS" "ASDF-SYSTEM-CONNECTIONS" "CLBUILD" "COMMON-DB" "CVSPS"  "DARCS2GIT" "ECL" "FARE-UTILS" "GIT" "LIBPCIACCESS" "OGRE" "SBCL" "SALZA")
                         :test #'string=))
       (collect (name m)))))
+
+(defmacro do-present-systems ((system &optional (locality '(gate *self*)) block-name) &body body)
+  "Iterate the BODY over all systems whose modules are cached as being present in LOCALITY,
+with SYSTEM specifying the driven variable binding."
+  `(do-systems (,system ,@(when block-name `(,block-name)))
+     (when (module-locally-present-p (system-module ,system) ,locality nil nil)
+       ,@body)))
 
 ;;;;
 ;;;; Metastore: communication with other desire nodes
