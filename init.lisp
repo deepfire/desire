@@ -31,6 +31,12 @@
     (ensure-directories-exist (subdirectory* directory "tmp")))
   directory)
 
+(defun ensure-committer-identity ()
+  (unless (gitvar 'user.name)
+    (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
+      (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
+      (setf (gitvar 'user.name nil t) username))))
+
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
   (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
@@ -51,24 +57,39 @@ locally present modules will be marked as converted."
          (absolute-path (if (pathname-absolute-p path)
                             path
                             (merge-pathnames path))))
+    ;;
+    ;; Storage
+    ;;
     (ensure-root-sanity (parse-namestring absolute-path))
     (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) absolute-path))
            (meta-path (merge-pathnames #p".meta/" gate-path))
            (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
+      ;;
+      ;; Reset
+      ;;
       (clear-definitions)
-      ;; this is crap
+      ;;
+      ;; Set up tools
+      ;;
+      ;; NOTE: there's some profound crap there 
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
         (setf git '(git) hg '(hg python)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
-      ;; this is crap just as well
       (with-class-slot (git hg darcs cvs svn tarball) enabled-p
         (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
         (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+      (ensure-committer-identity)
+      ;;
+      ;; Get initial definitions
+      ;;
       (unless (metastore-present-p meta-path '(definitions))
         (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S~:@>~%" meta-path *bootstrap-wishmaster-url*)
         (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))
       (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
       (read-definitions :force-source t :metastore meta-path)
+      ;;
+      ;; Set up *SELF* and complete definitions
+      ;;
       (setf *self* (if-let ((d (and as (distributor as))))
                      (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
                             (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
@@ -77,21 +98,25 @@ locally present modules will be marked as converted."
                        (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
                                       :omit-registration t))))
       (read-local-definitions :metastore localmeta-path)
-      (unless (gitvar 'user.name)
-        (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
-          (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
-          (setf (gitvar 'user.name nil t) username)))
       (reestablish-metastore-subscriptions meta-path)
       (when merge-remote-wishmasters
         (syncformat t ";;; Merging definitions from remote wishmasters...~%")
         (merge-remote-wishmasters))
       (setf *unsaved-definition-changes-p* nil)
-      (syncformat t ";;; Determining available tools and deducing accessible remotes~%")
+      ;;
+      ;; Set up tools for import
+      ;;
+      (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
       (determine-tools-and-update-remote-accessibility)
-      ;; do some gate maintenance
+      ;;
+      ;; Generic part of system loadability
+      ;;
+      (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
+      (register-locality-with-system-backend *default-system-type* (gate *self*))
+      ;;
+      ;; Branch model maintenance and individual system loadability
+      ;;
       (let ((gate (gate *self*)))
-        (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname gate) *default-system-type*)
-        (register-locality-with-system-backend *default-system-type* gate)
         (syncformat t ";;; Massaging present modules~%")
         (do-present-modules (module gate)
           (notice-module-repository module gate)))
@@ -100,6 +125,9 @@ locally present modules will be marked as converted."
                       (when (module-scan-positive-localities m)
                         (collect (string (name m)))))
                     #'string<))
+      ;;
+      ;; Quirks
+      ;;
       (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
       (sb-posix:putenv "LISP_FASL_CACHE=NIL")
       (syncformat t ";;; All done~%")
