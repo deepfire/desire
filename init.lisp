@@ -76,7 +76,6 @@ locally present modules will be marked as converted."
                        (syncformat t ";;; Establishing self as non-well-known distributor ~A~%" local-name)
                        (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
                                       :omit-registration t))))
-      (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
       (read-local-definitions :metastore localmeta-path)
       (unless (gitvar 'user.name)
         (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
