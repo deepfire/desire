@@ -91,8 +91,9 @@ system TYPE within LOCALITY."
                                     (when present-system
                                       (check-present-system-sanity present-system)))
                                   (register-new-system (canonicalise-name name) path))))
-                 (setf (system-pathname system) path)
-                 (ensure-system-loadable system path nil locality))))
+                 (setf (slot-value system 'definition-pathname) path
+                       (slot-value system 'definition-write-date) (file-write-date path))
+                 (ensure-system-loadable system path locality))))
       (iter (for path in sysfiles)
             (for name in sysnames)
             (let ((type (system-type-from-definition path)))

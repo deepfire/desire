@@ -54,9 +54,10 @@ For case-insensitive systems the name is in upper case.")
   (:method ((type (eql 'asdf-system)) pathname)
     (string-upcase (pathname-name pathname))))
 
-(defgeneric system-canonical-definition-name (system)
+(defgeneric system-canonical-definition-pathname-name (system)
   (:documentation
-   "Return the canonical definition patname name for SYSTEM.")
+   "Return the canonical definition patname name for SYSTEM.
+Only used in COMPUTE-SYSTEM-DEFINITION-PATHNAME.")
   (:method ((o asdf-system))
     (downstring (name o))))
 
@@ -73,15 +74,14 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
   (:method ((type (eql 'asdf-system)) locality)
     (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
 
-(defun ensure-system-loadable (system &optional path check-path-sanity (locality (gate *self*)))
-  "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
-   definition path within its module within LOCALITY."
-  (when-let ((definition-pathname (or path (system-definition-pathname system (module-pathname (system-module system) locality) :if-does-not-exist :continue))))
-    (unless (string= (down-case-name system) (pathname-name definition-pathname))
-      (when check-path-sanity
-        (system-error system "~@<Asked to ensure loadability of system ~A at non-conforming path ~S. Hidden system?~:@>" (name system) definition-pathname)))
-    (ensure-symlink (system-definition-registry-symlink-path system locality)
-                    definition-pathname)))
+(defgeneric ensure-system-loadable (system &optional path locality)
+  (:documentation
+   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
+definition path within its module within LOCALITY.")
+  (:method ((o asdf-system) &optional path (locality (gate *self*)))
+    (when-let ((definition-pathname (or path (system-definition-pathname o))))
+      (ensure-symlink (system-definition-registry-symlink-path o locality)
+                      definition-pathname))))
 
 (defgeneric system-definition-registry-symlink-path (system &optional locality)
   (:documentation
@@ -91,24 +91,21 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
   (:method ((o asdf-system) &optional (locality (gate *self*)))
     (locality-asdf-registry-path locality)))
 
-(defgeneric system-dependencies (system)
+(defgeneric compute-system-dependencies (system)
   (:documentation
-   "Inspect SYSTEM for systems it depends upon, and return a list of
-known system objects as the primary value, and a list of names of unknown
-systems as the secondary value.")
+   "Return a list of names of systems SYSTEM depends upon.")
   (:method :around ((s system))
            (handler-case (let ((*break-on-signals* nil))
                            (call-next-method))
              (error (c)
-               (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c))))
+               (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c)))) ;
   (:method ((s asdf-system) &aux (name (down-case-name s)))
-    (unless (asdf-system-name-blacklisted-p name)
-      (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system name)))))
-            (for sanitised-depname = (string-upcase (string (xform-if #'consp #'second depname)))) ;; Drop version on the floor.
-            (if-let ((depsystem (system sanitised-depname :if-does-not-exist :continue)))
-              (collect depsystem into known-systems)
-              (collect sanitised-depname into unknown-names))
-            (finally (return (values known-systems unknown-names)))))))
+    (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system name)))))
+          (destructuring-bind (name &optional version) (if (consp depname)
+                                                           (list (second depname) (first depname))
+                                                           (list depname))
+            (declare (ignore version))
+            (collect (canonicalise-name name))))))
 
 (defgeneric system-loadable-p (system &optional locality)
   (:documentation
@@ -121,17 +118,60 @@ systems as the secondary value.")
   (:method ((o symbol) &optional (locality (gate *self*)))
     (system-loadable-p (system o) locality))
   (:method ((o asdf-system) &optional (locality (gate *self*)))
-    (handler-case (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
-                              (system-definition-pathname o (module-pathname (system-module o) locality) :if-does-not-exist :continue))
-                       (let ((name (down-case-name o)))
-                         (or (asdf-system-name-blacklisted-p name)
-                             (asdf:find-system name nil))))
-      (asdf:missing-dependency () ;; CXML...
-        (warn "~@<~S misbehaves: ASDF:MISSING-DEPENDENCY signalled during ASDF:FIND-SYSTEM~:@>" 'system)
-        t))))
+    (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
+                (system-definition-pathname o))
+         (let ((name (down-case-name o)))
+           (or (asdf-system-name-blacklisted-p name)
+               (asdf:find-system name nil))))))
 
 ;;;;
-;;;; ASDF
+;;;; Dependencies
+;;;;
+(defgeneric recompute-direct-system-dependencies-one (system)
+  (:method ((o system))
+    (setf (slot-value o 'direct-dependency-names) (compute-system-dependencies o))))
+
+(defun recompute-direct-system-dependencies ()
+  (do-present-systems (s)
+    (recompute-direct-system-dependencies-one s)))
+
+(defun recompute-full-system-dependencies ()
+  (let ((present-systems (do-present-systems (s) (collect s)))
+        (sys (make-hash-table :test 'eq))
+        (removed-links (make-hash-table :test 'eq)))
+    (with-container sys (sys :type system)
+      (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
+        (dolist (s present-systems)
+          (setf (sys (name s)) s))
+        (labels ((do-calc-sysdeps (depstack s)
+                   ;; XXX: ensure-slot-value special form ?
+                   (cond ((slot-boundp s 'dependencies)
+                          (slot-value s 'dependencies))
+                         ((member s depstack) ; dependency loop?
+                          (push (name s) (removed-links (first depstack)))
+                          (deletef (slot-value (first depstack) 'direct-dependency-names) (name s))
+                          ;; not re-adding dependencies
+                          nil)
+                         (t
+                          (setf (slot-value s 'dependencies)
+                                (apply #'append (curry #'do-calc-sysdeps (cons s depstack))
+                                       (mapcar (rcurry #'sys) (system-direct-dependency-names s)))))))
+                 (sysdeps (s)
+                   (unwind-protect (do-calc-sysdeps nil s)
+                     (do-removed-links (from to-names)
+                       (nconcf (slot-value from 'direct-dependency-names) to-names))
+                     (clrhash removed-links))))
+          (dolist (s present-systems)
+            (sysdeps s)
+            (let ((known-deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))
+              (setf (slot-value s 'definition-complete-p) (not (find nil known-deps))))))))))
+
+;;;;
+;;;; o/~ Below zero, below my need for words o/~
+;;;; o/~ Feel you lifeform, not human. o/~
+;;;; ...
+;;;; o/~ Of all the big mistakes I've done o/~
+;;;; o/~ The small ones will remain... o/~
 ;;;;
 (defun asdf-hidden-system-names (pathname)
   "Find out names of ASDF systems hiding in .asd in PATHNAME.

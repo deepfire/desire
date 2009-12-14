@@ -640,8 +640,12 @@ instead."
   ((module :accessor system-module :initarg :module :documentation "Specified.")
    (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name
                              :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
-   (pathname :accessor system-pathname :initarg :pathname :documentation "Cache.")
-   (applications :accessor system-applications :initarg :applications :documentation "Cache."))
+   (definition-pathname :reader system-definition-pathname :initarg :definition-pathname :documentation "Cache.")
+   (definition-write-date :reader system-definition-write-date :initarg :definition-write-date :documentation "Cache.")
+   (direct-dependency-names :reader system-direct-dependency-names :documentation "List of system names. Cache.")
+   (dependencies :reader system-dependencies :documentation "Complete list of dependency objects. Cache.")
+   (definition-complete-p :reader system-definition-complete-p :documentation "All dependencies are known systems. Cache.")
+   (applications :accessor system-applications :initarg :applications :documentation "List of applications. Cache."))
   (:default-initargs
    :registrator #'(setf system)
    :definition-pathname-name nil

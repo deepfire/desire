@@ -126,8 +126,9 @@
    ;;   types.lisp :: system
    #:system-module
    #:system-hidden-p
+   #:system-definition-pathname
+   #:system-definition-write-date
    #:do-present-systems
-   #:system-pathname
    ;;   types.lisp :: desires
    #:add-desire
    #:module-desired-p
