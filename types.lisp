@@ -649,6 +649,7 @@ instead."
   (:default-initargs
    :registrator #'(setf system)
    :definition-pathname-name nil
+   :definition-write-date nil
    :pathname nil
    :module nil
    :applications nil)
