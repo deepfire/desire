@@ -94,26 +94,32 @@ system TYPE within LOCALITY."
                  (setf (slot-value system 'definition-pathname) path
                        (slot-value system 'definition-write-date) (file-write-date path))
                  (ensure-system-loadable system path locality))))
-      (iter (for path in sysfiles)
-            (for name in sysnames)
-            (let ((type (system-type-from-definition path)))
-              (unless (eq type system-type)
-                (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type type path))
-              (when verbose
-                (format t "~@<;;;; ~@;Adding visible system ~A at ~S, and its hidden systems.~:@>~%" name path))
-              (let ((system (ensure-system name path)))
-                (collect (list* system
-                                ;; A hidden system is a system definition residing in a file named differently from main system's name.
-                                ;; Find them.
-                                ;; XXX: heuristics
-                                (when (typep system 'asdf-system)
-                                  (let* ((raw-hidden-system-names (asdf-hidden-system-names path))
-                                         ;; this is only useful for the LOAD-based legacy method of hidden system name discovery
-                                         (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names sysnames :test #'equal)))
-                                    (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
-                                          (when verbose
-                                            (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
-                                          (collect (ensure-system hidden-system-name path)))))))))))))
+      (setf (module-systems module)
+            (iter (for path in sysfiles)
+                  (for name in sysnames)
+                  (let ((type (system-type-from-definition path)))
+                    (unless (eq type system-type)
+                      (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type type path))
+                    (when verbose
+                      (format t "~@<;;;; ~@;Adding visible system ~A at ~S, and its hidden systems.~:@>~%" name path))
+                    (let ((system (ensure-system name path)))
+                      (collect (list* system
+                                      ;; A hidden system is a system definition residing in a file named differently from main system's name.
+                                      ;; Find them.
+                                      ;; XXX: heuristics
+                                      (when (typep system 'asdf-system)
+                                        (let* ((raw-hidden-system-names (asdf-hidden-system-names path))
+                                               ;; this is only useful for the LOAD-based legacy method of hidden system name discovery
+                                               (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names sysnames :test #'equal)))
+                                          (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
+                                                (when verbose
+                                                  (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
+                                                (collect (ensure-system hidden-system-name path))))))))))))))
+
+(defun discover-and-register-systems (&optional verbose (system-type *default-system-type*) (locality (gate *self*)))
+  "Scan repositories of modules present within LOCALITY for system definitions."
+  (do-present-modules (m locality)
+    (discover-and-register-module-systems m verbose system-type locality)))
 
 ;;;;
 ;;;; Module <-> system mapping heuristic
@@ -143,6 +149,22 @@ system TYPE within LOCALITY."
                                  (name module) (mapcar #'name systems)))))))
 
 ;;;;
+;;;; Dependencies
+;;;;
+(defun module-dependencies (module &optional complete verbose &aux
+                            (module (coerce-to-module module)))
+  (let* ((all-systems (module-systems module))
+         (main-system (module-central-system module))
+         (other-systems (remove main-system all-systems))
+         (required-systems (list* main-system (when complete other-systems))))
+    (when verbose
+      (format t "~@<;;;; ~@;Determining dependencies of module ~A.  Main system: ~A.  ~
+                              Other systems: ~A.  Required systems: ~A.~:@>~%"
+              (name module) (name main-system) (mapcar #'name other-systems) (mapcar #'name required-systems)))
+    (remove-duplicates (mapcar #'system-module (mapcan #'system-dependencies required-systems))
+                       :test #'eq)))
+
+;;;;
 ;;;; System loadability
 ;;;;
 (defun ensure-module-systems-loadable (module &optional (locality (gate *self*)) &aux
@@ -158,14 +180,19 @@ Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
 ;;;; Module repository maintenance hook
 ;;;;
 ;;; Branching model management.
-;;; System loadability.
-(defgeneric notice-module-repository (module &optional locality)
+;;; System discovery, loadability and dependencies.
+(defgeneric notice-module-repository (module &optional compute-system-dependencies locality)
   (:documentation
    "Ensure that the repository corresponding to MODULE within LOCALITY
 meets desire's operational requirements.")
-  (:method ((o module) &optional (locality (gate *self*)))
+  (:method ((o module) &optional (compute-system-dependencies t) (locality (gate *self*)))
     (let ((repo-dir (module-pathname o locality)))
       (when *verbose-repository-maintenance*
         (format t "~@<;; ~@;Processing ~A's repository at ~S~:@>~%" (name o) repo-dir))
       (ensure-tracker-branch repo-dir (ref-value "master" repo-dir))
-      (ensure-module-systems-loadable o locality))))
+      (discover-and-register-module-systems o *verbose-repository-maintenance* *default-system-type* locality)
+      (when compute-system-dependencies
+        (when-let ((changed-systems (remove-if #'system-dependencies-up-to-date-p (module-systems o))))
+          (dolist (s changed-systems)
+            (recompute-direct-system-dependencies-one s))
+          (recompute-full-system-dependencies-set changed-systems))))))

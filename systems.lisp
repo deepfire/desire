@@ -91,7 +91,7 @@ definition path within its module within LOCALITY.")
   (:method ((o asdf-system) &optional (locality (gate *self*)))
     (locality-asdf-registry-path locality)))
 
-(defgeneric compute-system-dependencies (system)
+(defgeneric compute-direct-system-dependencies (system)
   (:documentation
    "Return a list of names of systems SYSTEM depends upon.")
   (:method :around ((s system))
@@ -129,13 +129,23 @@ definition path within its module within LOCALITY.")
 ;;;;
 (defgeneric recompute-direct-system-dependencies-one (system)
   (:method ((o system))
-    (setf (slot-value o 'direct-dependency-names) (compute-system-dependencies o))))
+    (setf (slot-value o 'direct-dependency-names) (compute-direct-system-dependencies o))))
+
+(defgeneric system-dependencies-up-to-date-p (system)
+  (:method ((o system))
+    (= (file-write-date (system-definition-pathname o)) (system-definition-write-date o))))
+
+(defgeneric direct-system-dependencies (system)
+  (:method ((o system))
+    (if (system-dependencies-up-to-date-p o)
+        (system-direct-dependency-names o)
+        (recompute-direct-system-dependencies-one o))))
 
 (defun recompute-direct-system-dependencies ()
   (do-present-systems (s)
     (recompute-direct-system-dependencies-one s)))
 
-(defun recompute-full-system-dependencies ()
+(defun recompute-full-system-dependencies-set (systems)
   (let ((present-systems (do-present-systems (s) (collect s)))
         (sys (make-hash-table :test 'eq))
         (removed-links (make-hash-table :test 'eq)))
@@ -161,10 +171,16 @@ definition path within its module within LOCALITY.")
                      (do-removed-links (from to-names)
                        (nconcf (slot-value from 'direct-dependency-names) to-names))
                      (clrhash removed-links))))
+          (dolist (s (if (eq systems t)
+                         present-systems
+                         systems))
+            (sysdeps s))
           (dolist (s present-systems)
-            (sysdeps s)
             (let ((known-deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))
               (setf (slot-value s 'definition-complete-p) (not (find nil known-deps))))))))))
+
+(defun recompute-full-system-dependencies ()
+  (recompute-full-system-dependencies-set t))
 
 ;;;;
 ;;;; o/~ Below zero, below my need for words o/~

@@ -114,12 +114,16 @@ locally present modules will be marked as converted."
       (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
       (register-locality-with-system-backend *default-system-type* (gate *self*))
       ;;
-      ;; Branch model maintenance and individual system loadability
+      ;; Per-repository branch model maintenance, system discovery and loadability
       ;;
-      (let ((gate (gate *self*)))
-        (syncformat t ";;; Massaging present modules~%")
-        (do-present-modules (module gate)
-          (notice-module-repository module gate)))
+      (syncformat t ";;; Massaging present modules~%")
+      (do-present-modules (module)
+        (notice-module-repository module nil))
+      ;;
+      ;; System dependency calculation, in bulk
+      ;;
+      (recompute-direct-system-dependencies)
+      (recompute-full-system-dependencies)
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
               (sort (do-modules (m)
                       (when (module-scan-positive-localities m)
