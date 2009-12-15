@@ -80,7 +80,7 @@ system TYPE within LOCALITY."
                  (system-error system "~@<During system discovery in module ~A: found a definition for system ~A from module ~A.~:@>"
                                (name module) (name system) (name (system-module system)))))
              (register-new-system (name path)
-               (syncformat t "~@<;; ~;Registering a previously unknown system ~A at ~S~:@>~%" name path)
+               (syncformat t "~@<;; ~@;Registering a previously unknown system ~A at ~S~:@>~%" name path)
                (setf *unsaved-definition-changes-p* t)
                (make-instance system-type :name name :module module
                               :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
@@ -103,18 +103,18 @@ system TYPE within LOCALITY."
                     (when verbose
                       (format t "~@<;;;; ~@;Adding visible system ~A at ~S, and its hidden systems.~:@>~%" name path))
                     (let ((system (ensure-system name path)))
-                      (collect (list* system
-                                      ;; A hidden system is a system definition residing in a file named differently from main system's name.
-                                      ;; Find them.
-                                      ;; XXX: heuristics
-                                      (when (typep system 'asdf-system)
-                                        (let* ((raw-hidden-system-names (asdf-hidden-system-names path))
-                                               ;; this is only useful for the LOAD-based legacy method of hidden system name discovery
-                                               (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names sysnames :test #'equal)))
-                                          (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
-                                                (when verbose
-                                                  (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
-                                                (collect (ensure-system hidden-system-name path))))))))))))))
+                      (appending (list* system
+                                        ;; A hidden system is a system definition residing in a file named differently from main system's name.
+                                        ;; Find them.
+                                        ;; XXX: heuristics
+                                        (when (typep system 'asdf-system)
+                                          (let* ((raw-hidden-system-names (asdf-hidden-system-names path))
+                                                 ;; this is only useful for the LOAD-based legacy method of hidden system name discovery
+                                                 (raw-hidden-system-names-minus-known (set-difference raw-hidden-system-names sysnames :test #'equal)))
+                                            (iter (for hidden-system-name in raw-hidden-system-names-minus-known)
+                                                  (when verbose
+                                                    (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
+                                                  (collect (ensure-system hidden-system-name path))))))))))))))
 
 (defun discover-and-register-systems (&optional verbose (system-type *default-system-type*) (locality (gate *self*)))
   "Scan repositories of modules present within LOCALITY for system definitions."
