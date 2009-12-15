@@ -120,7 +120,7 @@
    #:module-locally-present-p
    #:module-publishable-p
    #:module-hidden-p
-   #:compute-module-system-definitions
+   #:find-module-system-definitions
    #:discover-and-register-module-systems
    #:do-present-modules
    ;;   types.lisp :: system

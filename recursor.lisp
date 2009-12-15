@@ -89,7 +89,7 @@
                    (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
                    (add-system-dependencies module system modules system-dictionary))
                  (values modules system-dictionary))))
-      (let* ((all-sysfiles (compute-module-system-definitions module system-type locality))
+      (let* ((all-sysfiles (find-module-system-definitions module system-type locality))
              (main-sysfile (find (string-downcase (module-central-system-name module)) all-sysfiles :key #'pathname-name :test #'string=))
              (other-sysfiles (remove main-sysfile all-sysfiles)))
         ;; This doesn't deal with other modules providing same systems. Will silently break.

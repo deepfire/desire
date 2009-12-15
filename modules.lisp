@@ -49,7 +49,7 @@
                                                                (iter (for ,pathname in ,pathnames)
                                                                      ,@body))))))
 
-(defun compute-module-system-definitions (module &optional (type *default-system-type*) (locality (gate *self*)))
+(defun find-module-system-definitions (module &optional (type *default-system-type*) (locality (gate *self*)))
   "Return a list of all MODULE's system definition pathnames corresponding to
 system TYPE within LOCALITY."
   (do-module-system-definitions (path module (module-pathname module locality) (system-type-to-file-type type))
@@ -70,7 +70,7 @@ system TYPE within LOCALITY."
 
 (defun discover-and-register-module-systems (module &optional verbose (system-type *default-system-type*) (locality (gate *self*)) &aux
                                              (module (coerce-to-module module)))
-  (let* ((sysfiles (compute-module-system-definitions module system-type locality))
+  (let* ((sysfiles (find-module-system-definitions module system-type locality))
          (sysnames (mapcar (curry #'system-name-from-definition system-type) sysfiles)))
     (labels ((check-present-system-sanity (system)
                (unless (typep system system-type)
