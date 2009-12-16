@@ -99,13 +99,8 @@ definition path within its module within LOCALITY.")
                            (call-next-method))
              (error (c)
                (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its dependencies: ~A~:@>~%" (name s) c)))) ;
-  (:method ((s asdf-system) &aux (name (down-case-name s)))
-    (iter (for depname in (cdr (assoc 'asdf:load-op (asdf:component-depends-on 'asdf:load-op (asdf:find-system name)))))
-          (destructuring-bind (name &optional version) (if (consp depname)
-                                                           (list (second depname) (first depname))
-                                                           (list depname))
-            (declare (ignore version))
-            (collect (canonicalise-name name))))))
+  (:method ((s asdf-system))
+    (asdf-system-dependencies s)))
 
 (defgeneric system-loadable-p (system &optional locality)
   (:documentation
@@ -210,7 +205,7 @@ definition path within its module within LOCALITY.")
               (destructuring-bind (defsystem name &key depends-on &allow-other-keys) form
                 (declare (ignore defsystem))
                 (when (string-equal name (name system))
-                  (mapcar (compose #'string-upcase #'string) depends-on)))))))
+                  (mapcar #'canonicalise-name depends-on)))))))
 
 (defun asdf-hidden-system-names (pathname)
   "Find out names of ASDF systems hiding in .asd in PATHNAME.
