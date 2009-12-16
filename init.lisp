@@ -101,13 +101,16 @@ locally present modules will be marked as converted."
       ;;
       ;; Set up *SELF* and complete definitions
       ;;
-      (setf *self* (if-let ((d (and as (distributor as))))
-                     (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
-                            (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
-                     (let ((local-name (canonicalise-name (machine-instance))))
-                       (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
-                       (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
-                                      :omit-registration t))))
+      (setf *self* (with-measured-time-lapse (sec)
+                       (if-let ((d (and as (distributor as))))
+                         (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
+                                (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
+                         (let ((local-name (canonicalise-name (machine-instance))))
+                           (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
+                           (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
+                                          :omit-registration t)))
+                     (when verbose
+                       (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
       (read-local-definitions :metastore localmeta-path)
       (reestablish-metastore-subscriptions meta-path)
       (when merge-remote-wishmasters
@@ -128,16 +131,23 @@ locally present modules will be marked as converted."
       ;; Per-repository branch model maintenance, system discovery and loadability
       ;;
       (syncformat t ";;; Massaging present modules~%")
-      (do-present-modules (module)
+      (with-measured-time-lapse (sec)
+          (do-present-modules (module)
+            (when verbose
+              (syncformat t ";;; Processing module ~A~%" (name module)))
+            (notice-module-repository module nil))
         (when verbose
-          (syncformat t ";;; Processing ~A~%" (name module)))
-        (notice-module-repository module nil))
+          (syncformat t ";;; Ensured branches and performed system discovery in ~D seconds.~%" sec)))
       ;;
       ;; System dependency calculation, in bulk
       ;;
-      (recompute-direct-system-dependencies :verbose verbose)
+      (with-measured-time-lapse (sec) (recompute-direct-system-dependencies :verbose verbose)
+        (when verbose
+          (syncformat t ";;; Queried direct system dependencies in ~D seconds.~%" sec)))
       (enumerate-host-systems)
-      (recompute-full-system-dependencies :verbose verbose)
+      (with-measured-time-lapse (sec) (recompute-full-system-dependencies :verbose verbose)
+        (when verbose
+          (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec)))
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
               (sort (do-modules (m)
                       (when (module-scan-positive-localities m)
