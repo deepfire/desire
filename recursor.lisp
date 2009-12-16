@@ -29,10 +29,6 @@
   ((system-dictionary :reader condition-system-dictionary :initarg :system-dictionary))
   (:report (system-dictionary previous-system-dictionary)
            "~@<Progress halted while processing system dictionary ~S.~:@>" system-dictionary))
-(define-reported-condition system-name-conflict (recursor-error module-error system-error)
-  ()
-  (:report ()
-           "~@<System name conflict.~:@>"))
 
 ;; system dictionary
 (defun make-unwanted-missing (name) (cons name (cons nil nil)))

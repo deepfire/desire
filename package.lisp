@@ -190,6 +190,8 @@
    #:ensure-system-loadable
    #:ensure-module-systems-loadable
    #:module-systems-unloadable-error
+   ;; modules.lisp
+   #:system-name-conflict
    ;; gittage.lisp
    #:repo-var
    #:module-git-branches
