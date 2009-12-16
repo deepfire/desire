@@ -118,11 +118,8 @@ definition path within its module within LOCALITY.")
   (:method ((o symbol) &optional (locality (gate *self*)))
     (system-loadable-p (system o) locality))
   (:method ((o asdf-system) &optional (locality (gate *self*)))
-    (and (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
-                (system-definition-pathname o))
-         (let ((name (down-case-name o)))
-           (or (asdf-system-name-blacklisted-p name)
-               (asdf:find-system name nil))))))
+    (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
+           (system-definition-pathname o))))
 
 ;;;;
 ;;;; Dependencies
