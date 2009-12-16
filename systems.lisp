@@ -199,6 +199,13 @@ definition path within its module within LOCALITY.")
 (defmacro do-asd-defsystems ((form stream) &body body)
   `(map-asd-defsystems ,stream (lambda (,form) ,@body)))
 
+(defun normalise-asdf-sysdep (dep)
+  "Given an ASDF system dependency, normalise it by returning the name depended upon
+as the primary value, and the required version, whenever present as the secondary value."
+  (if (consp dep)
+      (values (second dep) (first dep))
+      dep))
+
 (defun asdf-system-dependencies (system)
   "Parse an .asd as if it were declarative."
   (with-open-file (s (system-definition-pathname system))
@@ -207,7 +214,7 @@ definition path within its module within LOCALITY.")
               (destructuring-bind (defsystem name &key depends-on &allow-other-keys) form
                 (declare (ignore defsystem))
                 (when (string-equal name (name system))
-                  (mapcar #'canonicalise-name depends-on)))))))
+                  (mapcar (compose #'canonicalise-name #'normalise-asdf-sysdep) depends-on)))))))
 
 (defun asdf-hidden-system-names (pathname)
   "Find out names of ASDF systems hiding in .asd in PATHNAME.
