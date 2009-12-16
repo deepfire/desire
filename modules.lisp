@@ -37,8 +37,11 @@
 ;;;;
 (defun invoke-with-module-system-definitions-and-blacklists (module repo-dir system-pathname-type fn)
   (let* ((path (truename repo-dir))
-         (pass1-pattern (subwild path (module-system-path-whitelist module) :name :wild :type system-pathname-type))
-         (pass1 (directory pass1-pattern))
+         (subdirs (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=)) 
+                             (directory (subdirectory path '(:wild)))))
+         (pass1 (append (directory (subfile path '(:wild) :type "asd"))
+                        (iter (for subdir in subdirs)
+                              (appending (directory (subwild subdir '(:wild) :type "asd"))))))
          (blacklist-patterns (list* (subwild path '("test"))
                                     (subwild path '("tests"))
                                     (subwild path '("_darcs"))
