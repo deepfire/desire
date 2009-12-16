@@ -133,12 +133,13 @@ definition path within its module within LOCALITY.")
         (system-direct-dependency-names o)
         (recompute-direct-system-dependencies-one o))))
 
-(defun recompute-direct-system-dependencies ()
+(defun recompute-direct-system-dependencies (&key verbose)
   (do-present-systems (s)
-    (syncformat t ";;; Processing system ~A~%" (name s))
+    (when verbose
+      (syncformat t ";;; Processing system ~A~%" (name s)))
     (recompute-direct-system-dependencies-one s)))
 
-(defun recompute-full-system-dependencies-set (systems)
+(defun recompute-full-system-dependencies-set (systems &optional verbose)
   (let ((present-systems (do-present-systems (s) (collect s)))
         (removed-links (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
@@ -166,14 +167,15 @@ definition path within its module within LOCALITY.")
         (dolist (s (if (eq systems t)
                        present-systems
                        systems))
-          (syncformat t ";;; Processing system fulldeps ~A~%" (name s))
+          (when verbose
+            (syncformat t ";;; Processing system fulldeps ~A~%" (name s)))
           (sysdeps s))
         (dolist (s present-systems)
           (let ((deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))
             (setf (slot-value s 'definition-complete-p) (not (find 'missing-systems deps :key #'type-of)))))))))
 
-(defun recompute-full-system-dependencies ()
-  (recompute-full-system-dependencies-set t))
+(defun recompute-full-system-dependencies (&key verbose)
+  (recompute-full-system-dependencies-set t verbose))
 
 ;;;;
 ;;;; o/~ Below zero, below my need for words o/~

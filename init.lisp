@@ -56,7 +56,7 @@
     (find-executable 'make)
     (find-executable 'cp)))
 
-(defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master))
+(defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
   "Make Desire fully functional, with PATH chosen as storage location.
 
 AS, when specified, will be interpreted as a distributor name, whose
@@ -129,14 +129,15 @@ locally present modules will be marked as converted."
       ;;
       (syncformat t ";;; Massaging present modules~%")
       (do-present-modules (module)
-        (syncformat t ";;; Processing ~A~%" (name module))
+        (when verbose
+          (syncformat t ";;; Processing ~A~%" (name module)))
         (notice-module-repository module nil))
       ;;
       ;; System dependency calculation, in bulk
       ;;
-      (recompute-direct-system-dependencies)
+      (recompute-direct-system-dependencies :verbose verbose)
       (enumerate-host-systems)
-      (recompute-full-system-dependencies)
+      (recompute-full-system-dependencies :verbose verbose)
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
               (sort (do-modules (m)
                       (when (module-scan-positive-localities m)
