@@ -28,6 +28,10 @@
    #:svn
    #:rsync
    #:http
+   #:missing
+   #:asdf
+   #:mudballs
+   #:xcvb
    #:git-native-remote
    #:git-http-remote
    #:git-combined-remote
@@ -48,6 +52,10 @@
    #:svn-locality
    #:tarball-locality
    #:git-gate-locality
+   #:missing-system
+   #:asdf-system
+   #:mudballs-system
+   #:xcvb-system
    ;;
    #:canonicalise-name
    ;;   types.lisp :: direct knowledge base manipulation

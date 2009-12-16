@@ -632,27 +632,46 @@ instead."
 (defclass system-type-mixin ()
   ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
 
+(defclass missing () ())
 (defclass asdf (system-type-mixin) () (:default-initargs :pathname-type "asd"))
 (defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
 (defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
 
 (defclass system (desirable)
-  ((module :accessor system-module :initarg :module :documentation "Specified.")
-   (definition-pathname-name :accessor system-definition-pathname-name :initarg :definition-pathname-name
-                             :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
-   (definition-pathname :reader system-definition-pathname :initarg :definition-pathname :documentation "Cache.")
-   (definition-write-date :reader system-definition-write-date :initarg :definition-write-date :documentation "Cache.")
-   (direct-dependency-names :reader system-direct-dependency-names :documentation "List of system names. Cache.")
-   (dependencies :reader system-dependencies :documentation "Complete list of dependency objects. Cache.")
-   (definition-complete-p :reader system-definition-complete-p :documentation "All dependencies are known systems. Cache.")
-   (applications :accessor system-applications :initarg :applications :documentation "List of applications. Cache."))
+  ((module :accessor system-module             :initarg :module
+                                               :documentation "Specified.")
+   (applications :accessor system-applications :initarg :applications
+                                               :documentation "List of applications. Cache.")
+   (definition-pathname-name :accessor system-definition-pathname-name
+                                               :initarg :definition-pathname-name
+                                               :documentation "Specified, see documentation for SYSTEM-HIDDEN-P.")
+   (direct-dependency-names :reader system-direct-dependency-names
+                                               :initarg :direct-dependency-names
+                                               :documentation "List of system names. Cache.")
+   (dependencies :reader system-dependencies   :initarg :dependencies
+                                               :documentation "Complete list of dependency objects. Cache.")
+   (definition-complete-p :reader system-definition-complete-p
+                                               :initarg :definition-complete-p
+                                               :documentation "All dependencies are known systems. Cache."))
   (:default-initargs
    :registrator #'(setf system)
-   :definition-pathname-name nil
-   :definition-write-date nil
-   :pathname nil
    :module nil
-   :applications nil)
+   :applications nil
+   :definition-pathname-name nil))
+
+(defclass missing-system (missing system) 
+  ()
+  (:default-initargs
+   :direct-dependency-names nil
+   :dependencies nil
+   :definition-complete-p nil))
+
+(defclass known-system (system)
+  ((definition-pathname :reader system-definition-pathname :initarg :definition-pathname :documentation "Cache.")
+   (definition-write-date :reader system-definition-write-date :initarg :definition-write-date :documentation "Cache."))
+  (:default-initargs
+   :pathname nil
+   :definition-write-date nil)
   (:documentation
    "Note that we don't remember how to find systems within the module's
 directory hierarchy, as we rely on the recursor to properly register the
@@ -666,11 +685,11 @@ the definition file for such systems.
 Find out whether SYSTEM is hidden."
   (not (null (system-definition-pathname-name system))))
 
-(defclass asdf-system (asdf system) ())
-(defclass mudball-system (mudball system) ())
-(defclass xcvb-system (xcvb system) ())
+(defclass asdf-system (asdf known-system) ())
+(defclass mudball-system (mudball known-system) ())
+(defclass xcvb-system (xcvb known-system) ())
 
-(defmethod initialize-instance :after ((o system) &key module &allow-other-keys)
+(defmethod initialize-instance :after ((o known-system) &key module &allow-other-keys)
   (appendf (module-systems module) (list o)))
 
 ;;;;
