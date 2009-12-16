@@ -189,30 +189,43 @@ definition path within its module within LOCALITY.")
 ;;;; o/~ Of all the big mistakes I've done o/~
 ;;;; o/~ The small ones will remain... o/~
 ;;;;
+(defun map-asd-defsystems (stream fn)
+  (with-safe-reader-context ()
+    (flet ((form-defsystem-p (f)
+             (and (consp f)
+                  (string= "DEFSYSTEM" (symbol-name (first f)))
+                  (or (stringp (second f))
+                      (symbolp (second f))))))
+      (iter (for form = (handler-case (read stream nil 'das-eof)
+                          (serious-condition ())))
+            (until (eq 'das-eof form))
+            (when (form-defsystem-p form)
+              (collect (funcall fn form)))))))
+
+(defmacro do-asd-defsystems ((form stream) &body body)
+  `(map-asd-defsystems ,stream (lambda (,form) ,@body)))
+
+(defun asdf-system-dependencies (system)
+  "Parse an .asd as if it were declarative."
+  (with-open-file (s (system-definition-pathname system))
+    (remove nil
+            (do-asd-defsystems (form s)
+              (destructuring-bind (defsystem name &key depends-on &allow-other-keys) form
+                (declare (ignore defsystem))
+                (when (string-equal name (name system))
+                  (mapcar (compose #'string-upcase #'string) depends-on)))))))
+
 (defun asdf-hidden-system-names (pathname)
   "Find out names of ASDF systems hiding in .asd in PATHNAME.
 A hidden system is a system with a definition residing in a file named
 differently from that system's name."
-  (let ((primary-system-name (string-upcase (pathname-name pathname)))
-        (*read-eval* nil)
-        (*readtable* (copy-readtable)))
-    (set-dispatch-macro-character #\# #\. (lambda (stream &optional char sharp)
-                                            (declare (ignore char sharp))
-                                            (let ((*read-suppress* t))
-                                              (read stream nil nil t))))
+  (let ((primary-system-name (string-upcase (pathname-name pathname))))
     (with-open-file (s pathname)
-      (flet ((form-defsystem-p (f)
-               (and (consp f)
-                    (string= "DEFSYSTEM" (symbol-name (first f)))
-                    (or (stringp (second f))
-                        (symbolp (second f))))))
-        (iter (for form = (handler-case (read s nil 'das-eof)
-                            (serious-condition ())))
-              (until (eq 'das-eof form))
-              (when (form-defsystem-p form)
+      (remove nil
+              (do-asd-defsystems (form s)
                 (let ((system-name (string-upcase (string (second form)))))
                   (when (not (string= primary-system-name system-name))
-                    (collect system-name)))))))))
+                    system-name)))))))
 
 ;;;
 ;;; The historic, painful version of the above.
