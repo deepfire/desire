@@ -579,6 +579,9 @@ instead."
    :scan-positive-localities nil
    :remotes nil))
 
+(defclass host-module (module)
+  ())
+
 (defclass origin-module (module) 
   ((status :accessor module-status :initarg :status)
    (public-packages :accessor module-public-packages :initarg :public-packages))
@@ -632,7 +635,7 @@ instead."
 (defclass system-type-mixin ()
   ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
 
-(defclass missing () ())
+(defclass unknown () ())
 (defclass asdf (system-type-mixin) () (:default-initargs :pathname-type "asd"))
 (defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
 (defclass xcvb (system-type-mixin) () (:default-initargs :pathname-type "xcvb"))
@@ -659,7 +662,7 @@ instead."
    :applications nil
    :definition-pathname-name nil))
 
-(defclass missing-system (missing system) 
+(defclass unknown-system (unknown system) 
   ()
   (:default-initargs
    :direct-dependency-names nil

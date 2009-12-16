@@ -21,6 +21,17 @@
 (in-package :desire)
 
 
+(defparameter *implementation-provided-system-names*
+  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
+  #-sbcl nil)
+
+(defun enumerate-host-systems ()
+  (let* ((name (canonicalise-name ""))
+         (host-module (make-instance 'host-module :name name :umbrella name :last-sync-time (get-universal-time) :synchronised-p t
+                                     :scan-positive-localities (list (gate *self*)))))
+    (dolist (sname *implementation-provided-system-names*)
+      (make-instance 'asdf-system :name (canonicalise-name sname) :module host-module :direct-dependency-names nil :dependencies nil))))
+
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
     (desire-error "~@<The specified root at ~S does not exist.~:@>" directory))
@@ -124,6 +135,7 @@ locally present modules will be marked as converted."
       ;; System dependency calculation, in bulk
       ;;
       (recompute-direct-system-dependencies)
+      (enumerate-host-systems)
       (recompute-full-system-dependencies)
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
               (sort (do-modules (m)

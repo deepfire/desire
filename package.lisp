@@ -28,7 +28,7 @@
    #:svn
    #:rsync
    #:http
-   #:missing
+   #:unknown
    #:asdf
    #:mudballs
    #:xcvb
@@ -52,7 +52,9 @@
    #:svn-locality
    #:tarball-locality
    #:git-gate-locality
-   #:missing-system
+   #:host-module
+   #:origin-module
+   #:unknown-system
    #:asdf-system
    #:mudballs-system
    #:xcvb-system

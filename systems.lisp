@@ -140,41 +140,37 @@ definition path within its module within LOCALITY.")
 
 (defun recompute-full-system-dependencies-set (systems)
   (let ((present-systems (do-present-systems (s) (collect s)))
-        (sys (make-hash-table :test 'eq))
         (removed-links (make-hash-table :test 'eq)))
-    (with-container sys (sys :type system)
-      (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
+    (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
+      (labels ((do-calc-sysdeps (depstack s)
+                 ;; XXX: ensure-slot-value special form ?
+                 (cond ((slot-boundp s 'dependencies)
+                        (slot-value s 'dependencies))
+                       ((member s depstack) ; dependency loop?
+                        (push (name s) (removed-links (first depstack)))
+                        (deletef (slot-value (first depstack) 'direct-dependency-names) (name s))
+                        ;; not re-adding dependencies
+                        nil)
+                       (t
+                        (setf (slot-value s 'dependencies)
+                              (apply #'append
+                                     (mapcar (curry #'do-calc-sysdeps (cons s depstack))
+                                             (iter (for depname in (system-direct-dependency-names s))
+                                                   (collect (or (system depname :if-does-not-exist :continue)
+                                                                (make-instance 'unknown-system :name depname))))))))))
+               (sysdeps (s)
+                 (unwind-protect (do-calc-sysdeps nil s)
+                   (do-removed-links (from to-names)
+                     (nconcf (slot-value from 'direct-dependency-names) to-names))
+                   (clrhash removed-links))))
+        (dolist (s (if (eq systems t)
+                       present-systems
+                       systems))
+          (syncformat t ";;; Processing system fulldeps ~A~%" (name s))
+          (sysdeps s))
         (dolist (s present-systems)
-          (setf (sys (name s)) s))
-        (labels ((do-calc-sysdeps (depstack s)
-                   ;; XXX: ensure-slot-value special form ?
-                   (cond ((slot-boundp s 'dependencies)
-                          (slot-value s 'dependencies))
-                         ((member s depstack) ; dependency loop?
-                          (push (name s) (removed-links (first depstack)))
-                          (deletef (slot-value (first depstack) 'direct-dependency-names) (name s))
-                          ;; not re-adding dependencies
-                          nil)
-                         (t
-                          (setf (slot-value s 'dependencies)
-                                (apply #'append
-                                       (mapcar (curry #'do-calc-sysdeps (cons s depstack))
-                                               (iter (for depname in (system-direct-dependency-names s))
-                                                     (collect (or (sys depname :if-does-not-exist :continue)
-                                                                  (make-instance 'missing-system :name depname))))))))))
-                 (sysdeps (s)
-                   (unwind-protect (do-calc-sysdeps nil s)
-                     (do-removed-links (from to-names)
-                       (nconcf (slot-value from 'direct-dependency-names) to-names))
-                     (clrhash removed-links))))
-          (dolist (s (if (eq systems t)
-                         present-systems
-                         systems))
-            (syncformat t ";;; Processing system fulldeps ~A~%" (name s))
-            (sysdeps s))
-          (dolist (s present-systems)
-            (let ((deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))
-              (setf (slot-value s 'definition-complete-p) (not (find 'missing-systems deps :key #'type-of))))))))))
+          (let ((deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))
+            (setf (slot-value s 'definition-complete-p) (not (find 'missing-systems deps :key #'type-of)))))))))
 
 (defun recompute-full-system-dependencies ()
   (recompute-full-system-dependencies-set t))

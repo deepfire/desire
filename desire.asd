@@ -27,7 +27,7 @@
                (:file "import" :depends-on ("modules"))
                (:file "init" :depends-on ("print-read" "modules"))
                ;; Tier 6
-               (:file "recursor" :depends-on ("import"))
+               (:file "recursor" :depends-on ("import" "init"))
                ;; Tier at-the-end-of-it-all
                (:file "add-module" :depends-on ("types"))
                (:file "apropos" :depends-on ("types"))

@@ -21,10 +21,6 @@
 (in-package :desire)
 
 
-(defparameter *implementation-provided-systems*
-  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
-  #-sbcl nil)
-
 (define-reported-condition recursor-progress-halted (recursor-error)
   ((system-dictionary :reader condition-system-dictionary :initarg :system-dictionary))
   (:report (system-dictionary previous-system-dictionary)
@@ -173,7 +169,7 @@
            (format t "~@<;;; ~@;Recomputing system dependencies...~:@>~%"))
          (recompute-full-system-dependencies-set
           (iter (for (name nil . satisfied) in updated-system-dictionary)
-                (unless (member name *implementation-provided-systems* :test #'string=)
+                (unless (member name *implementation-provided-system-names* :test #'string=)
                   (collect (system name)))))
          (return (values module-dictionary system-dictionary)))))
 
@@ -204,7 +200,7 @@ Defined keywords:
   (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list nil m))) desires)))
     (when-let ((desired-module-names (mapcar #'canonicalise-name (mapcan #'rest interpreted-desires))))
       (let ((module-dictionary nil)
-            (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-systems*)))
+            (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-system-names*)))
         (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
         (satisfy-modules desired-module-names (gate *self*) *default-system-type* module-dictionary system-dictionary :sure-as-hell
                          :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose)
