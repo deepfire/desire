@@ -135,6 +135,7 @@ definition path within its module within LOCALITY.")
 
 (defun recompute-direct-system-dependencies ()
   (do-present-systems (s)
+    (syncformat t ";;; Processing system ~A~%" (name s))
     (recompute-direct-system-dependencies-one s)))
 
 (defun recompute-full-system-dependencies-set (systems)
@@ -166,6 +167,7 @@ definition path within its module within LOCALITY.")
           (dolist (s (if (eq systems t)
                          present-systems
                          systems))
+            (syncformat t ";;; Processing system fulldeps ~A~%" (name s))
             (sysdeps s))
           (dolist (s present-systems)
             (let ((known-deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))

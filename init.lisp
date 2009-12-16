@@ -118,6 +118,7 @@ locally present modules will be marked as converted."
       ;;
       (syncformat t ";;; Massaging present modules~%")
       (do-present-modules (module)
+        (syncformat t ";;; Processing ~A~%" (name module))
         (notice-module-repository module nil))
       ;;
       ;; System dependency calculation, in bulk

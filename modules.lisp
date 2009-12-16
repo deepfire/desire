@@ -122,8 +122,8 @@ system TYPE within LOCALITY."
                                                         (format t "~@<;;;; ~@;Processing hidden system ~A at ~S.~:@>~%" hidden-system-name path))
                                                       (collect (ensure-system hidden-system-name path))))))))
                       (system-name-conflict (c)
-                        (format *debug-io* "~A~%" c)
-                        (format *debug-io* "~@<;;; ~@;Ignoring system definition ~S within module ~A.~:@>~%" path (name module))))))))))
+                        (format *debug-io* "~@<;;;; ~@;~A~:@>~%" c)
+                        (format *debug-io* "~@<;;;; ~@;Ignoring system definition ~S within module ~A.~:@>~%" path (name module))))))))))
 
 (defun discover-and-register-systems (&optional verbose (system-type *default-system-type*) (locality (gate *self*)))
   "Scan repositories of modules present within LOCALITY for system definitions."
