@@ -209,12 +209,12 @@ as the primary value, and the required version, whenever present as the secondar
 (defun asdf-system-dependencies (system)
   "Parse an .asd as if it were declarative."
   (with-open-file (s (system-definition-pathname system))
-    (remove nil
-            (do-asd-defsystems (form s)
-              (destructuring-bind (defsystem name &key depends-on &allow-other-keys) form
-                (declare (ignore defsystem))
-                (when (string-equal name (name system))
-                  (mapcar (compose #'canonicalise-name #'normalise-asdf-sysdep) depends-on)))))))
+    (apply #'nconc
+           (do-asd-defsystems (form s)
+             (destructuring-bind (defsystem name &key depends-on &allow-other-keys) form
+               (declare (ignore defsystem))
+               (when (string-equal name (name system))
+                 (mapcar (compose #'canonicalise-name #'normalise-asdf-sysdep) depends-on)))))))
 
 (defun asdf-hidden-system-names (pathname)
   "Find out names of ASDF systems hiding in .asd in PATHNAME.
