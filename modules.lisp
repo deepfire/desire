@@ -36,17 +36,21 @@
 ;;;; System discovery
 ;;;;
 (defun invoke-with-module-system-definitions-and-blacklists (module repo-dir system-pathname-type fn)
-  (let* ((path (truename repo-dir))
-         (subdirs (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=)) 
-                             (directory (subdirectory path '(:wild)))))
-         (pass1 (append (directory (subfile path '(:wild) :type "asd"))
-                        (iter (for subdir in subdirs)
-                              (appending (directory (subwild subdir '(:wild) :type "asd"))))))
-         (blacklist-patterns (list* (subwild path '("test"))
-                                    (subwild path '("tests"))
-                                    (subwild path '("_darcs"))
-                                    (when-let ((blacklist (module-system-path-blacklist module)))
-                                      (list (subwild path blacklist))))))
+  (let* ((totally-black (eq t (module-system-path-blacklist module)))
+         (path (truename repo-dir))
+         (subdirs (unless totally-black
+                    (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=)) 
+                               (directory (subdirectory path '(:wild))))))
+         (pass1 (unless totally-black
+                  (append (directory (subfile path '(:wild) :type "asd"))
+                          (iter (for subdir in subdirs)
+                                (appending (directory (subwild subdir '(:wild) :type "asd")))))))
+         (blacklist-patterns (unless totally-black
+                               (list* (subwild path '("test"))
+                                      (subwild path '("tests"))
+                                      (subwild path '("_darcs"))
+                                      (when-let ((blacklist (module-system-path-blacklist module)))
+                                        (list (subwild path blacklist)))))))
     (funcall fn pass1 blacklist-patterns)))
 
 (defmacro do-module-system-definitions ((pathname module repo-dir system-pathname-type) &body body)
