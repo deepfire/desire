@@ -133,6 +133,8 @@
                 (finish-output stream)
                 (emit-master-run-results stream o)))))))
 
+(defvar *style*)
+
 ;; "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
 (defun cl-waterfall ()
   (let* ((hostname (string-downcase (string (name *self*))))
@@ -200,7 +202,7 @@
 (defun start-cl-waterfall (&optional (prefix "/desire-waterfall"))
   (push (create-regex-dispatcher prefix 'cl-waterfall) *dispatch-table*))
 
-(defparameter *style*
+(setf *style*
   "<!--
 .body {
   overflow: scroll;

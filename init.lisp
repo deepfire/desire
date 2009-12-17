@@ -21,10 +21,6 @@
 (in-package :desire)
 
 
-(defparameter *implementation-provided-system-names*
-  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
-  #-sbcl nil)
-
 (defun enumerate-host-systems ()
   (let* ((name (canonicalise-name ""))
          (host-module (make-instance 'host-module :name name :umbrella name :last-sync-time (get-universal-time) :synchronised-p t

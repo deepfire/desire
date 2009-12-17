@@ -46,6 +46,10 @@
 (defvar *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
 (defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 
+(defparameter *implementation-provided-system-names*
+  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
+  #-sbcl nil)
+
 (defvar *unsaved-definition-changes-p* nil
   "Whether the idea about the world changed, since INIT was performed, or
 SAVE-DEFINITIONS was called.")
