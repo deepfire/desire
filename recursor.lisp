@@ -50,22 +50,29 @@
              (subj (find-if #'syscell-wanted-missingp system-dictionary :key #'cell)))
            ((setf system-satisfiedp) (val system-dictionary sysname)
              (setf (celldr (entry system-dictionary sysname #'string=)) val))
+           (mark-system-wanted (name dictionary)
+             (if-let ((entry (entry dictionary name #'string=)))
+               (setf (cellar entry) :wanted
+                     dictionary dictionary)
+               (cons (make-wanted-missing name) dictionary)))
            (add-system-dependencies (module system modules system-dictionary)
              "Given a MODULE's SYSTEM, detect its dependencies and, accordingly, extend the sets
               of known REQUIRED systems, MODULES and MISSING unknown systems, returning them
               as multiple values."
-             (multiple-value-bind (known unknown) (unzip (rcurry #'system :if-does-not-exist :continue) (direct-system-dependencies system))
-               (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module)
-                                                                               (mapcar #'system known))
-                 (let ((extended-system-dictionary system-dictionary))
-                   (dolist (newdep (append (mapcar (compose #'string #'name) local-newdeps)
-                                           unknown))
-                     (if-let ((entry (entry system-dictionary newdep #'string=)))
-                       (setf (cellar entry) :wanted)
-                       (setf extended-system-dictionary (cons (make-wanted-missing newdep) extended-system-dictionary))))
-                   ;; NOTE: on module boundaries we lose precise system dependency names
-                   (values (append (mapcar (compose #'name #'system-module) othermodule-newdeps) modules)
-                           extended-system-dictionary)))))
+             (multiple-value-bind (maybe-known unknown) (unzip (rcurry #'system :if-does-not-exist :continue) (direct-system-dependencies system))
+               (multiple-value-bind (known known-unknown) (unzip #'system-known-p maybe-known)
+                 (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module)
+                                                                                 (mapcar #'system known))
+                   (let ((extended-system-dictionary system-dictionary))
+                     (dolist (newdep (append (mapcar (compose #'string #'name) (append local-newdeps
+                                                                                       known-unknown))
+                                             unknown))
+                       (setf extended-system-dictionary (mark-system-wanted newdep extended-system-dictionary)))
+                     ;; NOTE: on module boundaries we lose precise system dependency names
+                     (values (append (mapcar (compose #'name #'system-module)
+                                             (remove-if #'system-host-p othermodule-newdeps)) ; drop host-provided systems
+                                     modules)
+                             extended-system-dictionary))))))
            (satisfy-next-system (module system-type &optional modules system-dictionary)
              "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
               the fallout. Return the modified sets of known REQUIRED systems, MODULES and
@@ -75,7 +82,7 @@
                  (when verbose
                    (format t ";;;; processing known system ~A~%" name))
                  (unless (typep system system-type)
-                   (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type (type-of system) (system-pathname system)))
+                   (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type (type-of system) (system-definition-pathname system)))
                  (unless (typep system system-type)
                    (recursor-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
                  (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added

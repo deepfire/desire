@@ -22,11 +22,8 @@
 
 
 (defun enumerate-host-systems ()
-  (let* ((name (canonicalise-name ""))
-         (host-module (make-instance 'host-module :name name :umbrella name :last-sync-time (get-universal-time) :synchronised-p t
-                                     :scan-positive-localities (list (gate *self*)))))
-    (dolist (sname *implementation-provided-system-names*)
-      (make-instance 'asdf-system :name (canonicalise-name sname) :module host-module :direct-dependency-names nil :dependencies nil))))
+  (dolist (sname *implementation-provided-system-names*)
+    (make-instance 'host-system :name (canonicalise-name sname))))
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)

@@ -29,8 +29,8 @@
 (define-reported-condition system-name-conflict (system-error module-error)
   ()
   (:report (module system)
-           "~@<During system discovery in module ~A: found a definition for system ~A from module ~A.~:@>"
-           (name module) (name system) (name (system-module system))))
+           "~@<During system discovery in module ~A: found a definition for system ~A from ~:[host-provided system set~;module ~A~].~:@>"
+           (name module) (name system) (system-module system) (name (system-module system))))
 
 ;;;;
 ;;;; System discovery
@@ -73,6 +73,10 @@ system TYPE within LOCALITY."
   "Return the pathname of a SYSTEM's definition within REPOSITORY."
   (let ((name (or (system-definition-pathname-name system) (system-canonical-definition-pathname-name system)))
         (type (system-pathname-type system)))
+    (when (system-host-p system)
+      (system-error system "~@<Asked to compute pathname of a host-provided system ~A.~:@>" name))
+    (when (not (system-known-p system))
+      (system-error system "~@<Asked to compute pathname of unknown system ~A.~:@>" name))
     (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
         (do-module-system-definitions (path (system-module system) repository type)
           (finding path such-that (and (string= name (pathname-name path))
@@ -180,8 +184,12 @@ system TYPE within LOCALITY."
       (format t "~@<;;;; ~@;Determining dependencies of module ~A.  Main system: ~A.  ~
                               Other systems: ~A.  Required systems: ~A.~:@>~%"
               (name module) (name main-system) (mapcar #'name other-systems) (mapcar #'name required-systems)))
-    (remove-duplicates (mapcar #'system-module (mapcan #'system-dependencies required-systems))
-                       :test #'eq)))
+    (let ((sysdeps (remove-if #'system-host-p (mapcan #'system-dependencies required-systems))))
+      (when-let ((unknown-sysdeps (remove-if #'system-known-p sysdeps)))
+        (module-error module "~@<Module ~A depends on unknown systems: ~A~:@>" (name module) (mapcar #'name unknown-sysdeps)))
+      (when-let ((incomplete-sysdeps (remove-if #'system-definition-complete-p sysdeps)))
+        (module-error module "~@<While calculating system dependencies of module ~A: incomplete sysdeps ~A with no unknown sysdeps.~:@>" (name module) (mapcar #'name incomplete-sysdeps)))
+      (remove-duplicates (mapcar #'system-module sysdeps) :test #'eq))))
 
 ;;;;
 ;;;; System loadability

@@ -583,9 +583,6 @@ instead."
    :scan-positive-localities nil
    :remotes nil))
 
-(defclass host-module (module)
-  ())
-
 (defclass origin-module (module) 
   ((status :accessor module-status :initarg :status)
    (public-packages :accessor module-public-packages :initarg :public-packages))
@@ -639,6 +636,7 @@ instead."
 (defclass system-type-mixin ()
   ((pathname-type :accessor system-pathname-type :initarg :pathname-type)))
 
+(defclass host-provided () ())
 (defclass unknown () ())
 (defclass asdf (system-type-mixin) () (:default-initargs :pathname-type "asd"))
 (defclass mudball (system-type-mixin) () (:default-initargs :pathname-type "mb"))
@@ -666,9 +664,18 @@ instead."
    :applications nil
    :definition-pathname-name nil))
 
-(defclass unknown-system (unknown system) 
+(defclass host-system (host-provided system)
   ()
   (:default-initargs
+   :module nil
+   :direct-dependency-names nil
+   :dependencies nil
+   :definition-complete-p t))
+
+(defclass unknown-system (unknown system)
+  ()
+  (:default-initargs
+   :module nil
    :direct-dependency-names nil
    :dependencies nil
    :definition-complete-p nil))
@@ -692,12 +699,21 @@ the definition file for such systems.
 Find out whether SYSTEM is hidden."
   (not (null (system-definition-pathname-name system))))
 
+(defun system-host-p (system)
+  "Whether SYSTEM is provided by the host implementation."
+  (typep system 'host-system))
+
+(defun system-known-p (system)
+  "Whether SYSTEM is mentioned in DEFINITIONS."
+  (not (typep system 'unknown-system)))
+
 (defclass asdf-system (asdf known-system) ())
 (defclass mudball-system (mudball known-system) ())
 (defclass xcvb-system (xcvb known-system) ())
 
 (defmethod initialize-instance :after ((o known-system) &key module &allow-other-keys)
-  (appendf (module-systems module) (list o)))
+  (when module ; take host-provided systems into account
+    (appendf (module-systems module) (list o))))
 
 ;;;;
 ;;;; Applications
@@ -792,14 +808,16 @@ This notably excludes converted modules."
   (do-remove-module m))
 
 (defun do-remove-system (s)
+  (when (system-host-p s)
+    (system-error s "~@<Trying to remove host-provided system ~A.~:@>" (name s)))
   (dolist (a (system-applications s))
     (%remove-app a))
   (%remove-system (name s)))
 
 (defun remove-system (system-designator &aux
                       (s (coerce-to-system system-designator)))
-  (removef (module-systems (system-module s)) s)
-  (do-remove-system s))
+  (do-remove-system s)
+  (removef (module-systems (system-module s)) s))
 
 (defun remove-app (app-designator &aux
                    (a (coerce-to-application app-designator)))
@@ -1120,7 +1138,9 @@ the driven variable binding."
   "Iterate the BODY over all systems whose modules are cached as being present in LOCALITY,
 with SYSTEM specifying the driven variable binding."
   `(do-systems (,system ,@(when block-name `(,block-name)))
-     (when (module-locally-present-p (system-module ,system) ,locality nil nil)
+     (when (and (system-known-p ,system)
+                (or (system-host-p ,system)
+                    (module-locally-present-p (system-module ,system) ,locality nil nil)))
        ,@body)))
 
 ;;;;

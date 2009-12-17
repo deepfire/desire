@@ -28,6 +28,7 @@
    #:svn
    #:rsync
    #:http
+   #:host-provided
    #:unknown
    #:asdf
    #:mudballs
@@ -52,8 +53,8 @@
    #:svn-locality
    #:tarball-locality
    #:git-gate-locality
-   #:host-module
    #:origin-module
+   #:host-system
    #:unknown-system
    #:asdf-system
    #:mudballs-system
@@ -136,6 +137,8 @@
    ;;   types.lisp :: system
    #:system-module
    #:system-hidden-p
+   #:system-host-p
+   #:system-known-p
    #:system-definition-pathname
    #:system-definition-write-date
    #:do-present-systems
