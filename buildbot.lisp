@@ -156,7 +156,7 @@
       (setf (result-commit current-result) (desr::git-commit-log '("tracker") (result-path current-result)))))
   (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key verbose)
     (declare (ignore verbose))
-    (run-module-test :master-recurse-phase (result-module current-result) nil t))
+    (run-module-test :master-recurse-phase (name (result-module current-result)) nil t))
   (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker &key verbose)
     (with-active-phase (p)
       (let ((*read-eval* nil)
