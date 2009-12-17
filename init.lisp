@@ -159,12 +159,47 @@ locally present modules will be marked as converted."
   (init (root *self*) :as (when (distributor (name *self*) :if-does-not-exist :continue)
                             (name *self*))))
 
+(defun reinstall-old-self-and-fix-gate (self)
+  (lret ((incumbent-gate (gate (distributor (name self))))
+         (old-gate (gate self)))
+    (change-class incumbent-gate 'git-gate-locality :pathname (locality-pathname old-gate))
+    (setf (distributor (name self)) self
+          (gate self) incumbent-gate
+          (remote-distributor incumbent-gate) self
+          (distributor-remotes self) (list incumbent-gate))))
+
+(defun carry-over-module-locality-presence-cache-from-old-gate (old-gate self)
+  (let ((fixed-gate (gate self)))
+    ;; restore module locality presence cache
+    (let ((oldmodule-scapolos (make-hash-table :test 'eq))
+          (old-gate-modules (append (location-module-names old-gate)
+                                    (gate-converted-module-names old-gate)
+                                    (gate-unpublished-module-names old-gate)
+                                    (gate-hidden-module-names old-gate)))
+          (fixed-gate-modules (append (location-module-names fixed-gate)
+                                      (gate-converted-module-names fixed-gate)
+                                      (gate-unpublished-module-names fixed-gate)
+                                      (gate-hidden-module-names fixed-gate))))
+      (with-container oldmodule-scapolos (oldmodule-scapolos :type list)
+        (dolist (m old-gate-modules)
+          (setf (oldmodule-scapolos (name m)) (module-scan-positive-localities m)))
+        (dolist (m fixed-gate-modules)
+          (setf (module-scan-positive-localities m) (when (oldmodule-scapolos (name m))
+                                                      (list fixed-gate))))))))
+
 (defun reload-definitions (&key reset-metastore)
-  "Lose all unsaved definitions by replacing them with those from the metastore."
+  "Lose all unsaved definitions by replacing them with those from the metastore,
+without losing *SELF*.
+This is a complex operation, because not losing *SELF* implies that we have
+to patch the newfangled world according to that."
   (clear-definitions)
   (when reset-metastore
     (reset-metastore))
   (read-definitions :force-source t)
+  (let ((old-gate (reinstall-old-self-and-fix-gate *self*)))
+    ;; now we can refill the hidden and unpublished slots
+    (read-local-definitions)
+    (carry-over-module-locality-presence-cache-from-old-gate old-gate *self*))
   ;; Metastore subscriptions?
   )
 
