@@ -68,7 +68,8 @@
                (lret ((new-r (aref result-vector i)))
                  (start-period new-r)))
               (t
-               (end-period o)))))))
+               (end-period o)
+               nil))))))
 
 (defgeneric grab-result (master i)
   (:method ((o buildmaster-run) (i integer))
@@ -84,6 +85,7 @@
 ;;;;
 (defparameter *buildmaster-run-phases* '(master-reachability-phase
                                          master-update-phase
+                                         master-discovery-phase
                                          master-recurse-phase
                                          slave-fetch-phase
                                          slave-recurse-phase
@@ -128,15 +130,15 @@
         (finally (return line))))
 
 (defgeneric execute-test-phase (buildmaster-run test-phase result-marker &key verbose)
-  (:method :around ((m-r buildmaster-run) (p master-recurse-phase) current-result &key verbose)
-    (declare (ignore verbose))
+  (:documentation
+   "Execute a buildmaster test phase.")
+  (:method :around ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (when (unsaved-definition-changes-p)
       (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS before ~A." (type-of p))))
     (multiple-value-prog1  (call-next-method)
       (when (unsaved-definition-changes-p)
         (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS after ~A." (type-of p))))))
-  (:method :around ((m-r buildmaster-run) (p local-test-phase) result-marker &key verbose)
-    (declare (ignore verbose))
+  (:method :around ((m-r buildmaster-run) (p local-test-phase) result-marker &key &allow-other-keys)
     (with-active-phase (p)
       (iter (with r = result-marker)
             (repeat (master-run-n-phase-results m-r))
@@ -146,16 +148,15 @@
                 (append-result-output r output t)
                 (setf r (advance-result m-r t return-value condition backtrace))))
             (finally (return r)))))
-  (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result &key verbose)
-    (declare (ignore verbose))
+  (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result &key &allow-other-keys)
     (run-module-test :master-reachability-phase (result-module current-result) nil t))
-  (:method ((m-r buildmaster-run) (p master-update-phase) current-result &key verbose)
-    (declare (ignore verbose))
+  (:method ((m-r buildmaster-run) (p master-update-phase) current-result &key &allow-other-keys)
     ;; XXX: need to ensure that the working directory is up to date (the default) -- that we drive masters, etc.
     (prog1 (run-module-test :master-update-phase (result-module current-result) nil t)
       (setf (result-commit current-result) (desr::git-commit-log '("tracker") (result-path current-result)))))
-  (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key verbose)
-    (declare (ignore verbose))
+  (:method ((m-r buildmaster-run) (p master-discovery-phase) current-result &key &allow-other-keys)
+    (run-module-test :master-discovery-phase (result-module current-result) nil t))
+  (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (run-module-test :master-recurse-phase (name (result-module current-result)) nil t))
   (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker &key verbose)
     (with-active-phase (p)
@@ -247,8 +248,8 @@
                (buildmaster-error "~@<Early termination from slave: remote end-of-output marker missing.~:@>")))))
     (with-pipe-stream (pipe :element-type 'character :buffering :none)
       (setup-slave-connection pipe hostname username slave-setup-commands)
-      (funcall fn pipe)
-      (finalise-slave-connection pipe))))
+      (multiple-value-prog1 (funcall fn pipe)
+        (finalise-slave-connection pipe)))))
 
 (defmacro with-slave-connection ((pipe hostname username setup-commands &optional verbose) &body body)
   `(invoke-with-slave-connection ,hostname ,username ,setup-commands ,verbose (lambda (,pipe) ,@body)))
@@ -288,9 +289,10 @@
          hostname username :verbose-slave-communication (getf keys :verbose-slave-communication call-buildslave)
          (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication)))
 
-(defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
+(defun one* (&optional (reachability t) (upstream t) (discover t) (recurse t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
+                       (when discover '(master-discovery-phase))
                        (when recurse '(master-recurse-phase))
                        (when slave-fetch '(slave-fetch-phase))
                        (when slave-recurse '(slave-recurse-phase))

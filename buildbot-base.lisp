@@ -276,6 +276,8 @@
   (:default-initargs :action-description "test upstream repository reachability"))
 (defclass master-update-phase (local-test-phase) ()
   (:default-initargs :action-description "fetch upstream modules and convert them"))
+(defclass master-discovery-phase (local-test-phase) ()
+  (:default-initargs :action-description "discover module systems and their direct dependencies"))
 (defclass master-recurse-phase (local-test-phase) ()
   (:default-initargs :action-description "unwind module dependencies"))
 (defclass slave-fetch-phase (remote-test-phase) ()
