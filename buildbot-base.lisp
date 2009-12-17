@@ -148,9 +148,12 @@
         termination-done-p)
     (unwind-protect
          (handler-bind ((serious-condition (lambda (c)
-                                             (terminate-action action :condition c :backtrace (with-output-to-string (s)
-                                                                                                (backtrace most-positive-fixnum s)))
+                                             (terminate-action action
+                                                               :condition c
+                                                               :backtrace (with-output-to-string (s)
+                                                                            (backtrace most-positive-fixnum s)))
                                              (setf termination-done-p t)
+                                             ;; let the condition roll further upwards
                                              nil)))
            (multiple-value-prog1 (funcall fn)
              (setf normally-executed-p t)))

@@ -200,6 +200,7 @@
                             (unless (and (= 1 (length final-line))
                                          (char= #\) (schar final-line 0)))
                               (buildmaster-error "~@<Corrupt final line while reading module ~A.~:@>" (name m))))
+                          ;; Advance the result.
                           (destructuring-bind (&key status condition backtrace) final-args
                             (setf r (advance-result m-r t status condition backtrace)))))
                       (buildmaster-error "~@<Corrupt initial line while reading module ~A.~:@>" (name m)))))
@@ -319,13 +320,15 @@
               (while (typep phase 'local-test-phase))
               (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication)
                     rest-phases phases))
-        (handler-case
-            (with-slave-evaluation `(buildslave ',(mapcar #'make-keyword module-names) ',(mapcar (compose #'make-keyword #'type-of) rest-phases) ,verbose)
-                (slave-pipe hostname username :purge purge :branch branch :metastore-branch metastore-branch :debug debug :disable-debugger disable-debugger
-                            :verbose verbose :verbose-slave-communication verbose-slave-communication)
-              (iter (for (phase . phases) on rest-phases)
-                    (setf (remote-phase-slave-stream phase) slave-pipe
-                          result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication))))
-          (buildslave-error (c)
-            (terminate-action result-marker :condition c)
-            (error c)))))))
+        (when rest-phases
+          (handler-case
+              (with-slave-evaluation `(buildslave ',(mapcar #'make-keyword module-names) ',(mapcar (compose #'make-keyword #'type-of) rest-phases) ,verbose)
+                  (slave-pipe hostname username :purge purge :branch branch :metastore-branch metastore-branch :debug debug :disable-debugger disable-debugger
+                              :verbose verbose :verbose-slave-communication verbose-slave-communication)
+                (iter (for (phase . phases) on rest-phases)
+                      (setf (remote-phase-slave-stream phase) slave-pipe
+                            result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication))))
+            (buildslave-error (c)
+              (terminate-action result-marker :condition c)
+              (error c))))))
+    (end-period m-r)))
