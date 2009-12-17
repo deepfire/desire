@@ -536,3 +536,12 @@ and commit message of the corresponding commit as multiple values."
             (let ((message (string-right-trim '(#\Newline)
                                               (subseq output (+ 5 posn)))))
               (make-commit (parse-commit-id commit-id) date author message))))))))
+
+(defun git-repository-last-version-from-tag (&optional repository-dir)
+  (maybe-within-directory repository-dir
+    (multiple-value-bind (successp output)
+        (with-explanation ("determining version last recorded in ~S" *default-pathname-defaults*)
+          (git "log" "-1" "--tags" "--decorate=short"))
+      (declare (ignore successp))
+      (when-let ((version (first (extract-delimited-substrings output "tag: upstream/" #\,))))
+        (mapcar #'parse-integer (split-sequence #\. version))))))
