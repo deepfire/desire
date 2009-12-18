@@ -185,9 +185,9 @@ locally present modules will be marked as converted."
         (dolist (mname old-gate-modules)
           (when-let ((m (module mname :if-does-not-exist :continue)))
             (setf (oldmodule-scapolos mname) (module-scan-positive-localities m))))
-        (dolist (m fixed-gate-modules)
-          (setf (module-scan-positive-localities m) (when (oldmodule-scapolos (name m))
-                                                      (list fixed-gate))))))))
+        (dolist (mname fixed-gate-modules)
+          (setf (module-scan-positive-localities (module mname)) (when (oldmodule-scapolos mname)
+                                                                   (list fixed-gate))))))))
 
 (defun reload-definitions (&key reset-metastore)
   "Lose all unsaved definitions by replacing them with those from the metastore,
