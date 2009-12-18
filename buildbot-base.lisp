@@ -143,7 +143,7 @@
   (:method ((o incomplete-action) &rest initargs)
     (complete-action o (specific-action-subclass o 'success) initargs)))
 
-(defun invoke-with-tracked-termination (action fn)
+(defun invoke-with-tracked-termination (action handlep fn)
   (let (normally-executed-p
         termination-done-p)
     (unwind-protect
@@ -153,15 +153,17 @@
                                                                :backtrace (with-output-to-string (s)
                                                                             (backtrace most-positive-fixnum s)))
                                              (setf termination-done-p t)
-                                             ;; let the condition roll further upwards
-                                             nil)))
+                                             (when handlep
+                                               (return-from invoke-with-tracked-termination nil)))))
            (multiple-value-prog1 (funcall fn)
              (setf normally-executed-p t)))
       (unless (or normally-executed-p termination-done-p)
-        (terminate-action action)))))
+        (terminate-action action
+                          :backtrace (with-output-to-string (s)
+                                       (backtrace most-positive-fixnum s)))))))
 
-(defmacro with-tracked-termination ((action) &body body)
-  `(invoke-with-tracked-termination ,action (lambda () ,@body)))
+(defmacro with-tracked-termination ((action &optional handlep) &body body)
+  `(invoke-with-tracked-termination ,action ,handlep (lambda () ,@body)))
 
 ;;;;
 ;;;; Webbable
@@ -322,11 +324,6 @@
              slave-load-phase)))
 
 (defclass interrupted-buildmaster-run (unhandled-failure buildmaster-run) ())
-
-(defmethod terminate-action :after ((o buildmaster-run) &key condition &allow-other-keys)
-  (declare (ignore condition))
-  (let ((result-vector (master-run-results o)))
-    (setf (fill-pointer result-vector) (array-dimension result-vector 0))))
 
 (defvar *buildmaster-runs* nil)
 

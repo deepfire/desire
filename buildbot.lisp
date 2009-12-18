@@ -71,6 +71,12 @@
                (end-period o)
                nil))))))
 
+(defmethod terminate-action :after ((o buildmaster-run) &key condition &allow-other-keys)
+  (declare (ignore condition))
+  (let ((result-vector (master-run-results o)))
+    (setf (fill-pointer result-vector) (array-dimension result-vector 0))
+    (bordeaux-threads:condition-notify (master-run-condvar o))))
+
 (defgeneric grab-result (master i)
   (:method ((o buildmaster-run) (i integer))
     (with-master-run-lock (o)
@@ -224,7 +230,7 @@
            (close (two-way-stream-output-stream pipe))
            (iter (for line = (read-line pipe nil nil))
                  (unless line
-                   (buildmaster-error "~@<Early termination from slave: no output marker found.~:@>"))
+                   (error 'buildslave-error :output "#<EARLY-TERMINATION-FROM-SLAVE: beginning-of-output marker missing>"))
                  (when verbose
                    (report-line i line))
                  (when (or (starts-with-subseq *implementation-debugger-signature* line)
@@ -245,7 +251,7 @@
            (let ((final-line (read-mandatory-line pipe "the final line")))
              (report-line -1 final-line)
              (unless (line-marker-p final-line *buildslave-remote-end-of-output-marker*)
-               (buildmaster-error "~@<Early termination from slave: remote end-of-output marker missing.~:@>")))))
+               (error 'buildslave-error :output "#<EARLY-TERMINATION-FROM-SLAVE: end-of-output marker missing>")))))
     (with-pipe-stream (pipe :element-type 'character :buffering :none)
       (setup-slave-connection pipe hostname username slave-setup-commands)
       (multiple-value-prog1 (funcall fn pipe)
@@ -261,17 +267,14 @@
      (sb-ext:quit)))
 
 (defun invoke-with-slave-evaluation (slave-form local-fn hostname username &rest keys &key print-slave-connection-conditions verbose-slave-communication &allow-other-keys)
-  (handler-case
-      (with-maybe-just-printing-conditions (t buildslave-error) print-slave-connection-conditions
-        (let ((slave-form (make-buildslave-evaluation-form slave-form)))
-          (when verbose-slave-communication
-            (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
-          (with-slave-connection (slave-pipe hostname username (apply #'cook-buildslave-command slave-form
-                                                                      (remove-from-plist keys :print-slave-connection-conditions :verbose-slave-communication))
-                                             verbose-slave-communication)
-            (funcall local-fn slave-pipe))))
-    (buildslave-error (c)
-      (return-from invoke-with-slave-evaluation (values nil c)))))
+  (with-maybe-just-printing-conditions (t buildslave-error) print-slave-connection-conditions
+    (let ((slave-form (make-buildslave-evaluation-form slave-form)))
+      (when verbose-slave-communication
+        (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
+      (with-slave-connection (slave-pipe hostname username (apply #'cook-buildslave-command slave-form
+                                                                  (remove-from-plist keys :print-slave-connection-conditions :verbose-slave-communication))
+                                         verbose-slave-communication)
+        (funcall local-fn slave-pipe)))))
 
 (defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key &allow-other-keys) &body body)
   `(invoke-with-slave-evaluation ,slave-form (lambda (,slave-pipe) ,@body) ,hostname ,username ,@keys))
@@ -280,14 +283,17 @@
 ;;;; Buildmaster entry points
 ;;;;
 (defun ping-slave (&rest keys &key call-buildslave (hostname *default-buildslave-host*) (username *default-buildslave-username*) &allow-other-keys)
-  (apply #'invoke-with-slave-evaluation (cond
-                                          (call-buildslave
-                                           `(buildslave nil `(:slave-fetch-phase) t)))
-         (lambda (pipe)
-           (declare (ignore pipe))
-           t)
-         hostname username :verbose-slave-communication (getf keys :verbose-slave-communication call-buildslave)
-         (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication)))
+  (handler-case
+      (apply #'invoke-with-slave-evaluation (cond
+                                              (call-buildslave
+                                               `(buildslave nil `(:slave-fetch-phase) t)))
+             (lambda (pipe)
+               (declare (ignore pipe))
+               t)
+             hostname username :verbose-slave-communication (getf keys :verbose-slave-communication call-buildslave)
+             (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication))
+    (buildslave-error (c)
+      (return-from ping-slave (values nil c)))))
 
 (defun one* (&optional (reachability t) (upstream t) (discover t) (recurse t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
@@ -314,7 +320,7 @@
                                  #'string<)))
          (modules (mapcar #'module module-names))
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
-    (with-tracked-termination (m-r)
+    (with-tracked-termination (m-r t)
       (let ((rest-phases (master-run-phases m-r))
             (result-marker (advance-result m-r)))
         (push m-r *buildmaster-runs*)
@@ -332,7 +338,6 @@
                             result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication))))
             (buildslave-error (c)
               (terminate-action result-marker :condition c)
-              (terminate-action m-r :condition c)
               (error c))))))
     (cond ((processingp m-r)        ; the normal, non-interrupted case
            (end-period m-r)
