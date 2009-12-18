@@ -133,27 +133,28 @@
          (let ((present-before-update-p (module-locally-present-p module locality)))
            (unless (or (and skip-present present-before-update-p)
                        (and skip-missing (not present-before-update-p)))
-             (update module locality)
-             ;; Discover and register system definitions.
-             ;; Don't try to use the full-information dependency resolver, as it will likely fail.
-             (notice-module-repository module nil locality)))
-         (cond
-           ((module-locally-present-p module locality)
-            (multiple-value-bind (module-deps new-system-dictionary) (discover-module-dependencies module system-type complete system-dictionary verbose)
-              (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
-                     (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
-                (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
-                (multiple-value-prog1
-                    (if new-deps-from-this-module
-                        (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
-                                         :complete complete :skip-present skip-present :verbose verbose)
-                        (values new-module-dictionary new-system-dictionary))))))
-           (skip-missing
-            (format t "~@<;;; ~@;Module ~A is missing, but SKIP-MISSING was specified, moving on with fingers crossed.~:@>~%" name)
-            (setf (cdr cell) :done)
-            (values module-dictionary system-dictionary))
-           (t
-            (module-error (module name) "~@<Couldn't obtain module ~A.~:@>" name)))))))
+             (update module locality))
+           (cond
+             ((module-locally-present-p module locality)
+              ;; Discover and register system definitions.
+              ;; Don't try to use the full-information dependency resolver, as it will likely fail.
+              (unless present-before-update-p
+                (notice-module-repository module nil locality))
+              (multiple-value-bind (module-deps new-system-dictionary) (discover-module-dependencies module system-type complete system-dictionary verbose)
+                (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
+                       (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
+                  (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
+                  (multiple-value-prog1
+                      (if new-deps-from-this-module
+                          (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
+                                           :complete complete :skip-present skip-present :verbose verbose)
+                          (values new-module-dictionary new-system-dictionary))))))
+             (skip-missing
+              (format t "~@<;;; ~@;Module ~A is missing, but SKIP-MISSING was specified, moving on with fingers crossed.~:@>~%" name)
+              (setf (cdr cell) :done)
+              (values module-dictionary system-dictionary))
+             (t
+              (module-error (module name) "~@<Couldn't obtain module ~A.~:@>" name))))))))
   (:method :around (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
     (declare (ignore complete skip-present skip-missing verbose))
     (multiple-value-bind (new-module-dictionary new-system-dictionary) (call-next-method)
