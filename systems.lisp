@@ -140,41 +140,57 @@ definition path within its module within LOCALITY.")
     (recompute-direct-system-dependencies-one s)))
 
 (defun recompute-full-system-dependencies-set (systems &optional verbose)
-  (let ((present-systems (do-present-systems (s)
-                           (unless (system-host-p s)
-                             (collect s))))
-        (removed-links (make-hash-table :test 'eq)))
+  (let ((removed-links (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
       (labels ((do-calc-sysdeps (depstack s)
                  ;; XXX: ensure-slot-value special form ?
-                 (cond ((slot-boundp s 'dependencies)
-                        (slot-value s 'dependencies))
-                       ((member s depstack) ; dependency loop?
-                        (push (name s) (removed-links (first depstack)))
-                        (deletef (slot-value (first depstack) 'direct-dependency-names) (name s))
-                        ;; not re-adding dependencies
-                        nil)
-                       (t
-                        (setf (slot-value s 'dependencies)
-                              (apply #'append
-                                     (mapcar (curry #'do-calc-sysdeps (cons s depstack))
-                                             (iter (for depname in (system-direct-dependency-names s))
-                                                   (collect (or (system depname :if-does-not-exist :continue)
-                                                                (make-instance 'unknown-system :name depname))))))))))
+                 (with-slots (name direct-dependency-names dependencies definition-complete-p) s
+                   (cond ((member s depstack)       ; dependency loop?
+                          (push name (removed-links (first depstack)))
+                          (deletef (slot-value (first depstack) 'direct-dependency-names) name)
+                          ;; not re-adding dependencies
+                          ;; NOTE: what about incompleteness propagation?
+                          nil)
+                         ((slot-boundp s 'dependencies)      ; cached?
+                          (values dependencies
+                                  definition-complete-p))
+                         ((system-locally-present-p s)    ; available?
+                          (setf dependencies
+                                (delete-duplicates
+                                 (iter outer
+                                       (for depname in direct-dependency-names)
+                                       (for depsys = (system depname :if-does-not-exist :continue))
+                                       (cond
+                                         ((not (and depsys (system-known-p depsys)))
+                                          ;; There are three reasons for system's definitions to be incomplete.
+                                          ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
+                                          (setf definition-complete-p nil)
+                                          (unless depsys
+                                            (make-instance 'unknown-system :name depname)))
+                                         (t
+                                          (multiple-value-bind (deps complete-p) (do-calc-sysdeps (cons s depstack) depsys)
+                                            ;; Incomplete dependencies being contagious are the second reason.
+                                            (setf definition-complete-p complete-p)
+                                            (nconcing (copy-list deps))))))))
+                          (unless direct-dependency-names ; no deps, no problems
+                            (setf definition-complete-p t))
+                          (values dependencies
+                                  definition-complete-p))
+                         (t
+                          ;; System not being locally present is the third reason.
+                          (values nil
+                                  (setf definition-complete-p nil))))))
                (sysdeps (s)
                  (unwind-protect (do-calc-sysdeps nil s)
                    (do-removed-links (from to-names)
                      (nconcf (slot-value from 'direct-dependency-names) to-names))
                    (clrhash removed-links))))
         (dolist (s (if (eq systems t)
-                       present-systems
+                       (do-present-systems (s)
+                         (unless (system-host-p s)
+                           (collect s)))
                        systems))
-          (when verbose
-            (syncformat t ";;; Processing system fulldeps ~A~%" (name s)))
-          (sysdeps s))
-        (dolist (s present-systems)
-          (let ((deps (mapcar (rcurry #'system :if-does-not-exist :continue) (system-dependencies s))))
-            (setf (slot-value s 'definition-complete-p) (not (find 'unknown-systems deps :key #'type-of)))))))))
+          (sysdeps s))))))
 
 (defun recompute-full-system-dependencies (&key verbose)
   (recompute-full-system-dependencies-set t verbose))
