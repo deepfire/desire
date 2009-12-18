@@ -154,22 +154,19 @@ system TYPE within LOCALITY."
                               (module (coerce-to-module module))
                               (systems (module-systems module)))
   "Answer the question -- what does it mean to load this particular module?"
-  (cond ((null systems)
-         (module-error module "~@<Module ~A has no systems, and hence no central system.~:@>" (name module)))
-        ((endp (rest systems))
-         (first systems))
-        ((find (name module) systems :key #'name))
-        ((let ((non-test-systems (remove-if (curry #'search "TEST") systems :key (compose #'symbol-name #'name))))
-           (cond ((endp (rest non-test-systems))
-                  (first non-test-systems))
-                 ((let ((fair-guesses (remove-if-not (curry #'search (symbol-name (name module))) non-test-systems :key (compose #'symbol-name #'name))))
-                    (when (endp (rest fair-guesses))
-                      (first fair-guesses)))))))
-        (t
-         (case if-does-not-exist
-           (:continue)
-           (:error (module-error module "~@<Unresolved ambiguity: failed to guess the system central in module ~A, among ~A.~:@>"
-                                 (name module) (mapcar #'name systems)))))))
+  (or (cond ((endp (rest systems)) ; this takes care of the systemless case as well
+             (first systems))
+            ((find (name module) systems :key #'name))
+            ((let ((non-test-systems (remove-if (curry #'search "TEST") systems :key (compose #'symbol-name #'name))))
+               (cond ((endp (rest non-test-systems))
+                      (first non-test-systems))
+                     ((let ((fair-guesses (remove-if-not (curry #'search (symbol-name (name module))) non-test-systems :key (compose #'symbol-name #'name))))
+                        (when (endp (rest fair-guesses))
+                          (first fair-guesses))))))))
+      (ecase if-does-not-exist
+        (:continue)
+        (:error (module-error module "~@<Unresolved ambiguity: failed to guess the system central in module ~A, among ~A.~:@>"
+                              (name module) (mapcar #'name systems))))))
 
 ;;;;
 ;;;; Dependencies

@@ -314,7 +314,7 @@
 (defun default-buildmaster-module-set ()
   (let* ((gate (gate *self*))
          (testable (append (gate-converted-module-names gate) (copy-list (location-module-names gate)))))
-    (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :if-does-not-exist :continue) testable)
+    (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :continue) testable)
       (values (sort test-worthy #'string<)
               (sort central-system-less #'string<)))))
 
