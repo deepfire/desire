@@ -28,9 +28,11 @@
 (defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
 (defparameter *purge-command* "rm -rf desr")
 (defparameter *purge-metastore-command* "rm -rf desr/git/.meta")
-(defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh" *bootstrap-script-location*))
+(defparameter *update-bootstrapper-command* (format nil "wget ~A -O climb.sh"
+                                                    *bootstrap-script-location*))
 
-(defun cook-buildslave-command (expr &key purge purge-metastore (branch "master") metastore-branch (debug t) disable-debugger verbose)
+(defun cook-buildslave-command (expr &key purge purge-metastore (branch "master") metastore-branch
+                                (debug t) disable-debugger verbose)
   (remove nil (list
                (when purge
                  *purge-command*)
@@ -131,7 +133,8 @@
 (defun read-mandatory-line (stream description &optional (slurp-empty-lines t))
   (iter (for line = (read-line stream nil nil))
         (unless line
-          (buildmaster-error "~@<Early termination from slave: premature end while processing ~A.~:@>" description))
+          (buildmaster-error "~@<Early termination from slave: premature end while processing ~A.~:@>"
+                             description))
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
 
@@ -140,26 +143,31 @@
    "Execute a buildmaster test phase.")
   (:method :around ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (when (unsaved-definition-changes-p)
-      (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS before ~A." (type-of p))))
+      (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS before ~A."
+                                                        (type-of p))))
     (multiple-value-prog1  (call-next-method)
       (when (unsaved-definition-changes-p)
-        (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS after ~A." (type-of p))))))
+        (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS after ~A."
+                                                          (type-of p))))))
   (:method :around ((m-r buildmaster-run) (p local-test-phase) result-marker &key &allow-other-keys)
     (with-active-phase (p)
       (iter (with r = result-marker)
             (repeat (master-run-n-phase-results m-r))
             (for m = (result-module r))
             (with-tracked-termination (r)
-              (destructuring-bind (&key return-value output condition backtrace) (call-next-method m-r p r)
+              (destructuring-bind (&key return-value output condition backtrace)
+                  (call-next-method m-r p r)
                 (append-result-output r output t)
                 (setf r (advance-result m-r t return-value condition backtrace))))
             (finally (return r)))))
   (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result &key &allow-other-keys)
     (run-module-test :master-reachability-phase (result-module current-result) nil t))
   (:method ((m-r buildmaster-run) (p master-update-phase) current-result &key &allow-other-keys)
-    ;; XXX: need to ensure that the working directory is up to date (the default) -- that we drive masters, etc.
+    ;; XXX: need to ensure that the working directory is up to date (the default) -- 
+    ;; that we drive masters, etc.
     (prog1 (run-module-test :master-update-phase (result-module current-result) nil t)
-      (setf (result-commit current-result) (desr::git-commit-log '("tracker") (result-path current-result)))))
+      (setf (result-commit current-result) (desr::git-commit-log '("tracker")
+                                                                 (result-path current-result)))))
   (:method ((m-r buildmaster-run) (p master-discovery-phase) current-result &key &allow-other-keys)
     (run-module-test :master-discovery-phase (result-module current-result) nil t))
   (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
@@ -179,13 +187,18 @@
                         (when verbose
                           (report-line 0 initial-line))
                         (unless (eq name (name m))
-                          (buildmaster-error "~@<Wrong module info from slave, next in turn was ~S, module returned ~S.~:@>" (name m) name))
+                          (buildmaster-error "~@<Wrong module info from slave, next in turn was ~S, ~
+                                                 module returned ~S.~:@>"
+                                             (name m) name))
                         (unless (eq mode (make-keyword (symbol-name (type-of p))))
-                          (buildmaster-error "~@<Wrong phase for module ~A from slave: current phase ~S, client sent ~S~:@>" (name m) :fetch mode))
+                          (buildmaster-error "~@<Wrong phase for module ~A from slave: ~
+                                                 current phase ~S, client sent ~S~:@>"
+                                             (name m) :fetch mode))
                         (format t "==( processing module ~A, phase ~A~%" name mode)
                         (let ((marker-line (read-mandatory-line pipe (name m))))
                           (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
-                            (buildmaster-error "~@<Missing test output marker for module ~A.~:@>" (name m)))
+                            (buildmaster-error "~@<Missing test output marker for module ~A.~:@>"
+                                               (name m)))
                           (when verbose
                             (report-line 1 marker-line)))
                         (iter (for line = (read-mandatory-line pipe (name m) nil))
@@ -200,17 +213,21 @@
                                (final-args (iter (repeat 6)
                                                  (collect (read pipe nil eof)))))
                           (when (member eof final-args)
-                            (buildmaster-error "~@<Early termination from slave while reading module ~A.~:@>" (name m)))
+                            (buildmaster-error "~@<Early termination from slave while reading ~
+                                                   module ~A.~:@>"
+                                               (name m)))
                           (let ((final-line (read-mandatory-line pipe (name m))))
                             (when verbose
                               (report-line -1 final-line))
                             (unless (and (= 1 (length final-line))
                                          (char= #\) (schar final-line 0)))
-                              (buildmaster-error "~@<Corrupt final line while reading module ~A.~:@>" (name m))))
+                              (buildmaster-error "~@<Corrupt final line while reading module ~A.~:@>"
+                                                 (name m))))
                           ;; Advance the result.
                           (destructuring-bind (&key status condition backtrace) final-args
                             (setf r (advance-result m-r t status condition backtrace)))))
-                      (buildmaster-error "~@<Corrupt initial line while reading module ~A.~:@>" (name m)))))
+                      (buildmaster-error "~@<Corrupt initial line while reading module ~A.~:@>"
+                                         (name m)))))
               (finally (return r)))))))
 
 ;;;;
@@ -266,23 +283,31 @@
        ,@body)
      (sb-ext:quit)))
 
-(defun invoke-with-slave-evaluation (slave-form local-fn hostname username &rest keys &key print-slave-connection-conditions verbose-slave-communication &allow-other-keys)
+(defun invoke-with-slave-evaluation (slave-form local-fn hostname username &rest keys
+                                     &key print-slave-connection-conditions verbose-slave-communication
+                                     &allow-other-keys)
   (with-maybe-just-printing-conditions (t buildslave-error) print-slave-connection-conditions
     (let ((slave-form (make-buildslave-evaluation-form slave-form)))
       (when verbose-slave-communication
         (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
-      (with-slave-connection (slave-pipe hostname username (apply #'cook-buildslave-command slave-form
-                                                                  (remove-from-plist keys :print-slave-connection-conditions :verbose-slave-communication))
+      (with-slave-connection (slave-pipe hostname username
+                                         (apply #'cook-buildslave-command slave-form
+                                                (remove-from-plist keys
+                                                                   :print-slave-connection-conditions
+                                                                   :verbose-slave-communication))
                                          verbose-slave-communication)
         (funcall local-fn slave-pipe)))))
 
-(defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key &allow-other-keys) &body body)
+(defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key
+                                                        &allow-other-keys)
+                                 &body body)
   `(invoke-with-slave-evaluation ,slave-form (lambda (,slave-pipe) ,@body) ,hostname ,username ,@keys))
 
 ;;;;
 ;;;; Buildmaster entry points
 ;;;;
-(defun ping-slave (&rest keys &key call-buildslave (hostname *default-buildslave-host*) (username *default-buildslave-username*) &allow-other-keys)
+(defun ping-slave (&rest keys &key call-buildslave (hostname *default-buildslave-host*)
+                   (username *default-buildslave-username*) &allow-other-keys)
   (handler-case
       (apply #'invoke-with-slave-evaluation (cond
                                               (call-buildslave
@@ -290,12 +315,15 @@
              (lambda (pipe)
                (declare (ignore pipe))
                t)
-             hostname username :verbose-slave-communication (getf keys :verbose-slave-communication call-buildslave)
+             hostname username :verbose-slave-communication
+             (getf keys :verbose-slave-communication call-buildslave)
              (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication))
     (buildslave-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (discover t) (recurse t) (slave-fetch t) (slave-recurse t) (slave-load t) (slave-test nil) &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
+(defun one* (&optional (reachability t) (upstream t) (discover t) (recurse t) (slave-fetch t)
+             (slave-recurse t) (slave-load t) (slave-test nil)
+             &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when discover '(master-discovery-phase))
@@ -313,18 +341,25 @@
 
 (defun default-buildmaster-module-set ()
   (let* ((gate (gate *self*))
-         (testable (append (gate-converted-module-names gate) (copy-list (location-module-names gate)))))
-    (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :continue) testable)
+         (testable (append (gate-converted-module-names gate)
+                           (copy-list (location-module-names gate)))))
+    (multiple-value-bind (test-worthy central-system-less)
+        (unzip (rcurry #'module-central-system :continue) testable)
       (values (sort test-worthy #'string<)
               (sort central-system-less #'string<)))))
 
-(defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*) modules
-            purge branch metastore-branch debug disable-debugger (verbose t) verbose-slave-communication)
+(defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
+            (phases *buildmaster-run-phases*) modules
+            purge branch metastore-branch debug disable-debugger
+            (verbose t) verbose-slave-communication)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
-         (module-names (or modules (multiple-value-bind (test-worthy central-system-less) (default-buildmaster-module-set)
+         (module-names (or modules (multiple-value-bind (test-worthy central-system-less)
+                                       (default-buildmaster-module-set)
                                      (when central-system-less
-                                       (format t "~@<; ~@;~@<Fo~;llowing modules were excluded from testing, because they don't have a central system:~{ ~A~}~:@>~:@>~%"
+                                       (format t "~@<; ~@;~@<Fo~;llowing modules were excluded from ~
+                                                             testing, because they don't have a ~
+                                                             central system:~{ ~A~}~:@>~:@>~%"
                                                central-system-less))
                                      test-worthy)))
          (modules (mapcar #'module module-names))
@@ -335,16 +370,22 @@
         (push m-r *buildmaster-runs*)
         (iter (for (phase . phases) on rest-phases)
               (while (typep phase 'local-test-phase))
-              (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication)
+              (setf result-marker (execute-test-phase m-r phase result-marker
+                                                      :verbose verbose-slave-communication)
                     rest-phases phases))
         (when rest-phases
           (handler-case
-              (with-slave-evaluation `(buildslave ',(mapcar #'make-keyword module-names) ',(mapcar (compose #'make-keyword #'type-of) rest-phases) ,verbose)
-                  (slave-pipe hostname username :purge purge :branch branch :metastore-branch metastore-branch :debug debug :disable-debugger disable-debugger
+              (with-slave-evaluation `(buildslave ',(mapcar #'make-keyword module-names)
+                                                  ',(mapcar (compose #'make-keyword #'type-of)
+                                                            rest-phases) ,verbose)
+                  (slave-pipe hostname username :purge purge :branch branch
+                              :metastore-branch metastore-branch
+                              :debug debug :disable-debugger disable-debugger
                               :verbose verbose :verbose-slave-communication verbose-slave-communication)
                 (iter (for (phase . phases) on rest-phases)
                       (setf (remote-phase-slave-stream phase) slave-pipe
-                            result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication))))
+                            result-marker (execute-test-phase m-r phase result-marker
+                                                              :verbose verbose-slave-communication))))
             (buildslave-error (c)
               (terminate-action result-marker :condition c)
               (error c))))))
