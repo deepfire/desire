@@ -25,8 +25,19 @@
    ;; buildslave entry point
    #:buildslave
    ;; buildmaster
-   #:buildmaster-error #:simple-buildmaster-error #:simple-build-test-error
-   #:ping-slave #:one #:one*
+   #:buildbot-condition
+   #:buildbot-error
+   #:buildmaster-condition
+   #:buildmaster-error
+   #:buildslave-condition
+   #:buildslave-error
+   #:simple-buildmaster-error
+   #:buildslave-communication-error
+   #:simple-buildslave-communication-error
+   #:buildslave-initialisation-error
+   #:ping-slave
+   #:one
+   #:one*
    ;; buildmaster web interface
    #:start-cl-waterfall))
 
@@ -36,10 +47,18 @@
 ;;;;
 ;;;; Buildbot conditions
 ;;;;
-(define-condition buildmaster-error (desire-error) ())
+(define-condition buildbot-condition (desire-condition) ())
+(define-condition buildbot-error (buildbot-condition desire-error) ())
+(define-condition buildmaster-condition (buildbot-condition) ())
+(define-condition buildmaster-error (buildmaster-condition buildbot-error) ())
+(define-condition buildslave-condition (buildbot-condition) ())
+(define-condition buildslave-error (buildslave-condition buildbot-error) ())
 (define-simple-error buildmaster-error)
 
-(define-reported-condition buildslave-error (buildmaster-error)
+(define-condition buildslave-communication-error (buildslave-error) ())
+(define-simple-error buildslave-communication-error)
+
+(define-reported-condition buildslave-initialisation-error (buildslave-communication-error)
   ((output :reader error-output :initarg :output))
   (:report (output)
            "~@<Error encountered while initialising buildslave:~%~A~%~:@>" output))
@@ -92,14 +111,16 @@
     `(defclass ,name ,superclasses
        (,@slots
         (class-map :allocation :class
-                   :initform (alist-hash-table ',(mapcar (curry #'apply #'cons) (rest subclass-map)) :test 'eq)))
+                   :initform (alist-hash-table ',(mapcar (curry #'apply #'cons) (rest subclass-map))
+                                               :test 'eq)))
        ,@(remove :subclass-to-action-class-map class-options :key #'car))
     (error "~@<No subclass-to-action-class-map class option was specified.~:@>")))
 
 (defgeneric specific-action-subclass (action type)
   (:method ((o action) (type symbol))
     (or (gethash type (action-class-map o))
-        (error "~@<Root action class of class ~A doesn't specify a specific action subclass of type ~A.~:@>"
+        (error "~@<Root action class of class ~A doesn't specify a ~
+                   specific action subclass of type ~A.~:@>"
                (class-name (class-of o)) type))))
 
 (defclass incomplete-action (action) ())
@@ -121,7 +142,8 @@
   (declare (type complete-action complete-action))
   (typep complete-action 'unhandled-failure))
 
-(defmethod update-instance-for-different-class :after ((old action) (new complete-action) &key &allow-other-keys)
+(defmethod update-instance-for-different-class :after ((old action) (new complete-action) &key
+                                                       &allow-other-keys)
   (end-period new))
 
 (defgeneric complete-action (action class initargs)
@@ -147,14 +169,15 @@
   (let (normally-executed-p
         termination-done-p)
     (unwind-protect
-         (handler-bind ((serious-condition (lambda (c)
-                                             (terminate-action action
-                                                               :condition c
-                                                               :backtrace (with-output-to-string (s)
-                                                                            (backtrace most-positive-fixnum s)))
-                                             (setf termination-done-p t)
-                                             (when handlep
-                                               (return-from invoke-with-tracked-termination nil)))))
+         (handler-bind ((serious-condition
+                         (lambda (c)
+                           (terminate-action action
+                                             :condition c
+                                             :backtrace (with-output-to-string (s)
+                                                          (backtrace most-positive-fixnum s)))
+                           (setf termination-done-p t)
+                           (when handlep
+                             (return-from invoke-with-tracked-termination nil)))))
            (multiple-value-prog1 (funcall fn)
              (setf normally-executed-p t)))
       (unless (or normally-executed-p termination-done-p)
@@ -226,7 +249,8 @@
                 (setf (aref results (+ base i))
                       (make-instance 'result-not-yet :phase phase :module m :id (+ base i)
                                      :path pathname
-                                     :output (make-array initial-output-length :element-type 'character :adjustable t)))))
+                                     :output (make-array initial-output-length
+                                                         :element-type 'character :adjustable t)))))
     (setf (fill-pointer results) 0)))
 
 (defgeneric append-result-output (result string &optional finalp)
@@ -243,8 +267,10 @@
                  (required-length (+ used-bytes length 1)) ; we do newlines manually
                  (rvec-length (array-dimension rvec 0)))
             (when (< rvec-length required-length)
-              (let ((fitting-length (ash 1 (+ (integer-length required-length)                     ; Quadruple, while we're going for speed and
-                                              (if (> (integer-length required-length) 20) 0 1))))) ; double when we've got to resort to compactness.
+              (let ((fitting-length (ash 1 (+ (integer-length required-length)
+                                              ;; Quadruple, while we're going for speed and
+                                              ;; double when we've got to resort to compactness.
+                                              (if (> (integer-length required-length) 20) 0 1)))))
                 (setf rvec (adjust-array rvec fitting-length)
                       (result-output o) rvec)))
             (setf (subseq rvec used-bytes (1- required-length)) string
@@ -293,7 +319,8 @@
 
 (defgeneric describe-phase (test-phase)
   (:method ((o test-phase))
-    (format nil "~A on ~:[the wishmaster~;a buildslave~]; ~:[not started~; started ~:*~A~]~:[~;, finished ~:*~A~]"
+    (format nil "~A on ~:[the wishmaster~;a buildslave~]; ~:[not started~; started ~:*~A~]~
+                                                          ~:[~;, finished ~:*~A~]"
             (phase-action-description o) (typep o 'remote-test-phase)
             (when (period-started-p o)
               (multiple-value-call #'print-decoded-time
@@ -345,7 +372,8 @@
                                        (for phase-type in phases)
                                        (collect (make-instance phase-type :nr i)))
           (slot-value o 'n-phases) n-phases
-          (slot-value o 'results) (prepare-result-vector (slot-value o 'phases) n-phase-results modules locality)
+          (slot-value o 'results) (prepare-result-vector (slot-value o 'phases) n-phase-results
+                                                         modules locality)
           (slot-value o 'n-phase-results) n-phase-results)))
 
 (defun master-result (master-run i)

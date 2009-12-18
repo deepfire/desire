@@ -133,8 +133,9 @@
 (defun read-mandatory-line (stream description &optional (slurp-empty-lines t))
   (iter (for line = (read-line stream nil nil))
         (unless line
-          (buildmaster-error "~@<Early termination from slave: premature end while processing ~A.~:@>"
-                             description))
+          (buildslave-communication-error
+           "~@<Early termination from slave: premature end while processing ~A.~:@>"
+           description))
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
 
@@ -182,52 +183,57 @@
               (for m = (result-module r))
               (with-tracked-termination (r)
                 (let ((initial-line (read-mandatory-line pipe (name m))))
-                  (if (char= #\( (schar initial-line 0))
-                      (destructuring-bind (&key name mode) (read-string-list initial-line 1)
-                        (when verbose
-                          (report-line 0 initial-line))
-                        (unless (eq name (name m))
-                          (buildmaster-error "~@<Wrong module info from slave, next in turn was ~S, ~
-                                                 module returned ~S.~:@>"
-                                             (name m) name))
-                        (unless (eq mode (make-keyword (symbol-name (type-of p))))
-                          (buildmaster-error "~@<Wrong phase for module ~A from slave: ~
-                                                 current phase ~S, client sent ~S~:@>"
-                                             (name m) :fetch mode))
-                        (format t "==( processing module ~A, phase ~A~%" name mode)
-                        (let ((marker-line (read-mandatory-line pipe (name m))))
-                          (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
-                            (buildmaster-error "~@<Missing test output marker for module ~A.~:@>"
-                                               (name m)))
+                  (unless (char= #\( (schar initial-line 0))
+                    (buildslave-communication-error
+                     "~@<Corrupt initial line while reading module ~A.~:@>"
+                     (name m)))
+                  (destructuring-bind (&key name mode) (read-string-list initial-line 1)
+                    (when verbose
+                      (report-line 0 initial-line))
+                    (unless (eq name (name m))
+                      (buildslave-communication-error
+                       "~@<Wrong module info from slave, next in turn was ~S, ~
+                               module returned ~S.~:@>"
+                       (name m) name))
+                    (unless (eq mode (make-keyword (symbol-name (type-of p))))
+                      (buildslave-communication-error
+                       "~@<Wrong phase for module ~A from slave: ~
+                               current phase ~S, client sent ~S~:@>"
+                       (name m) :fetch mode))
+                    (format t "==( processing module ~A, phase ~A~%" name mode)
+                    (let ((marker-line (read-mandatory-line pipe (name m))))
+                      (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
+                        (buildslave-communication-error
+                         "~@<Missing test output marker for module ~A.~:@>"
+                         (name m)))
+                      (when verbose
+                        (report-line 1 marker-line)))
+                    (iter (for line = (read-mandatory-line pipe (name m) nil))
+                          (for i from 2)
                           (when verbose
-                            (report-line 1 marker-line)))
-                        (iter (for line = (read-mandatory-line pipe (name m) nil))
-                              (for i from 2)
-                              (when verbose
-                                (report-line i line))
-                              (when (line-marker-p line *buildslave-remote-end-of-test-output-marker*)
-                                (return))
-                              (append-result-output r line))
-                        (let* ((eof 'eof-marker)
-                               (*read-eval* nil)
-                               (final-args (iter (repeat 6)
-                                                 (collect (read pipe nil eof)))))
-                          (when (member eof final-args)
-                            (buildmaster-error "~@<Early termination from slave while reading ~
-                                                   module ~A.~:@>"
-                                               (name m)))
-                          (let ((final-line (read-mandatory-line pipe (name m))))
-                            (when verbose
-                              (report-line -1 final-line))
-                            (unless (and (= 1 (length final-line))
-                                         (char= #\) (schar final-line 0)))
-                              (buildmaster-error "~@<Corrupt final line while reading module ~A.~:@>"
-                                                 (name m))))
-                          ;; Advance the result.
-                          (destructuring-bind (&key status condition backtrace) final-args
-                            (setf r (advance-result m-r t status condition backtrace)))))
-                      (buildmaster-error "~@<Corrupt initial line while reading module ~A.~:@>"
-                                         (name m)))))
+                            (report-line i line))
+                          (when (line-marker-p line *buildslave-remote-end-of-test-output-marker*)
+                            (return))
+                          (append-result-output r line))
+                    (let* ((eof 'eof-marker)
+                           (*read-eval* nil)
+                           (final-args (iter (repeat 6)
+                                             (collect (read pipe nil eof)))))
+                      (when (member eof final-args)
+                        (buildslave-communication-error
+                         "~@<Early termination from slave while reading module ~A.~:@>"
+                         (name m)))
+                      (let ((final-line (read-mandatory-line pipe (name m))))
+                        (when verbose
+                          (report-line -1 final-line))
+                        (unless (and (= 1 (length final-line))
+                                     (char= #\) (schar final-line 0)))
+                          (buildslave-communication-error
+                           "~@<Corrupt final line while reading module ~A.~:@>"
+                           (name m))))
+                      ;; Advance the result.
+                      (destructuring-bind (&key status condition backtrace) final-args
+                        (setf r (advance-result m-r t status condition backtrace)))))))
               (finally (return r)))))))
 
 ;;;;
@@ -247,7 +253,8 @@
            (close (two-way-stream-output-stream pipe))
            (iter (for line = (read-line pipe nil nil))
                  (unless line
-                   (error 'buildslave-error :output "#<EARLY-TERMINATION-FROM-SLAVE: beginning-of-output marker missing>"))
+                   (buildslave-communication-error "~@<Early termination from slave: ~
+                                                       beginning-of-output marker missing~:@>"))
                  (when verbose
                    (report-line i line))
                  (when (or (starts-with-subseq *implementation-debugger-signature* line)
@@ -258,7 +265,7 @@
                                                      (while line)
                                                      (collect line)
                                                      (collect #(#\Newline))))))
-                     (error 'buildslave-error :output error-message)))
+                     (error 'buildslave-initialisation-error :output error-message)))
                  (for i from 0)
                  (when (line-marker-p line *buildslave-remote-output-marker*)
                    (report-line i line)
@@ -268,7 +275,8 @@
            (let ((final-line (read-mandatory-line pipe "the final line")))
              (report-line -1 final-line)
              (unless (line-marker-p final-line *buildslave-remote-end-of-output-marker*)
-               (error 'buildslave-error :output "#<EARLY-TERMINATION-FROM-SLAVE: end-of-output marker missing>")))))
+               (buildslave-communication-error "~@<Early termination from slave: ~
+                                                   end-of-output marker missing~:@>")))))
     (with-pipe-stream (pipe :element-type 'character :buffering :none)
       (setup-slave-connection pipe hostname username slave-setup-commands)
       (multiple-value-prog1 (funcall fn pipe)
@@ -286,7 +294,7 @@
 (defun invoke-with-slave-evaluation (slave-form local-fn hostname username &rest keys
                                      &key print-slave-connection-conditions verbose-slave-communication
                                      &allow-other-keys)
-  (with-maybe-just-printing-conditions (t buildslave-error) print-slave-connection-conditions
+  (with-maybe-just-printing-conditions (t buildbot-error) print-slave-connection-conditions
     (let ((slave-form (make-buildslave-evaluation-form slave-form)))
       (when verbose-slave-communication
         (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
@@ -318,7 +326,7 @@
              hostname username :verbose-slave-communication
              (getf keys :verbose-slave-communication call-buildslave)
              (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication))
-    (buildslave-error (c)
+    (buildbot-error (c)
       (return-from ping-slave (values nil c)))))
 
 (defun one* (&optional (reachability t) (upstream t) (discover t) (recurse t) (slave-fetch t)
@@ -386,7 +394,7 @@
                       (setf (remote-phase-slave-stream phase) slave-pipe
                             result-marker (execute-test-phase m-r phase result-marker
                                                               :verbose verbose-slave-communication))))
-            (buildslave-error (c)
+            (buildbot-error (c)
               (terminate-action result-marker :condition c)
               (error c))))))
     (cond ((processingp m-r)        ; the normal, non-interrupted case
