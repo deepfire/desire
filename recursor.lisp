@@ -138,8 +138,7 @@
              ((module-locally-present-p module locality)
               ;; Discover and register system definitions.
               ;; Don't try to use the full-information dependency resolver, as it will likely fail.
-              (unless present-before-update-p
-                (notice-module-repository module nil locality))
+              (notice-module-repository module nil locality)
               (multiple-value-bind (module-deps new-system-dictionary) (discover-module-dependencies module system-type complete system-dictionary verbose)
                 (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
                        (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))

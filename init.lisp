@@ -131,13 +131,10 @@ locally present modules will be marked as converted."
               (syncformat t ";;; Processing module ~A~%" (name module)))
             (notice-module-repository module nil))
         (when verbose
-          (syncformat t ";;; Ensured branches and performed system discovery in ~D seconds.~%" sec)))
+          (syncformat t ";;; Ensured branches and performed system discovery and query in ~D seconds.~%" sec)))
       ;;
       ;; System dependency calculation, in bulk
       ;;
-      (with-measured-time-lapse (sec) (recompute-direct-system-dependencies)
-        (when verbose
-          (syncformat t ";;; Queried direct system dependencies in ~D seconds.~%" sec)))
       (enumerate-host-systems)
       (with-measured-time-lapse (sec) (recompute-full-system-dependencies)
         (when verbose
