@@ -724,6 +724,10 @@ Find out whether SYSTEM is hidden."
   "Whether SYSTEM is mentioned in DEFINITIONS."
   (not (typep system 'unknown-system)))
 
+(defun system-locally-present-p (system)
+  "Whether SYSTEM is present within local gate."
+  (slot-boundp system 'definition-pathname))
+
 (defclass asdf-system (asdf known-system) ())
 (defclass mudball-system (mudball known-system) ())
 (defclass xcvb-system (xcvb known-system) ())

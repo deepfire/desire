@@ -138,6 +138,7 @@
    #:system-hidden-p
    #:system-host-p
    #:system-known-p
+   #:system-locally-present-p
    #:system-definition-pathname
    #:system-definition-write-date
    #:do-present-systems
