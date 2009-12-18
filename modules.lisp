@@ -201,7 +201,7 @@ Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
   (dolist (s (module-systems module))
     (when *verbose-repository-maintenance*
       (format t "~@<;;; ~@;Ensuring loadability of ~A ~A~:@>~%" (type-of s) (name s)))
-    (ensure-system-loadable s (not (system-hidden-p s)) locality)))
+    (ensure-system-loadable s (system-definition-pathname s) locality)))
 
 ;;;;
 ;;;; Module repository maintenance hook
