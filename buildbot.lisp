@@ -311,13 +311,22 @@
        :verbose verbose
        :verbose-slave-communication verbose-slave-communication))
 
+(defun default-buildmaster-module-set ()
+  (let* ((gate (gate *self*))
+         (testable (append (gate-converted-module-names gate) (copy-list (location-module-names gate)))))
+    (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :if-does-not-exist :continue) testable)
+      (values (sort test-worthy #'string<)
+              (sort central-system-less #'string<)))))
+
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*) (phases *buildmaster-run-phases*) modules
             purge branch metastore-branch debug disable-debugger (verbose t) verbose-slave-communication)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
-         (module-names (or modules
-                           (sort (copy-list (append (location-module-names gate) (gate-converted-module-names gate)))
-                                 #'string<)))
+         (module-names (or modules (multiple-value-bind (test-worthy central-system-less) (default-buildmaster-module-set)
+                                     (when central-system-less
+                                       (format t "~@<; ~@;~@<Fo~;llowing modules were excluded from testing, because they don't have a central system:~{ ~A~}~:@>~:@>~%"
+                                               central-system-less))
+                                     test-worthy)))
          (modules (mapcar #'module module-names))
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
     (with-tracked-termination (m-r t)
