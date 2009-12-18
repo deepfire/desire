@@ -135,11 +135,11 @@ locally present modules will be marked as converted."
       ;;
       ;; System dependency calculation, in bulk
       ;;
-      (with-measured-time-lapse (sec) (recompute-direct-system-dependencies :verbose verbose)
+      (with-measured-time-lapse (sec) (recompute-direct-system-dependencies)
         (when verbose
           (syncformat t ";;; Queried direct system dependencies in ~D seconds.~%" sec)))
       (enumerate-host-systems)
-      (with-measured-time-lapse (sec) (recompute-full-system-dependencies :verbose verbose)
+      (with-measured-time-lapse (sec) (recompute-full-system-dependencies)
         (when verbose
           (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec)))
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 

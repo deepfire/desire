@@ -133,13 +133,11 @@ definition path within its module within LOCALITY.")
         (system-direct-dependency-names o)
         (recompute-direct-system-dependencies-one o))))
 
-(defun recompute-direct-system-dependencies (&key verbose)
+(defun recompute-direct-system-dependencies ()
   (do-present-systems (s)
-    (when verbose
-      (syncformat t ";;; Processing system ~A~%" (name s)))
     (recompute-direct-system-dependencies-one s)))
 
-(defun recompute-full-system-dependencies-set (systems &optional verbose)
+(defun recompute-full-system-dependencies-set (systems)
   (let ((removed-links (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
       (labels ((do-calc-sysdeps (depstack s)
@@ -192,8 +190,8 @@ definition path within its module within LOCALITY.")
                        systems))
           (sysdeps s))))))
 
-(defun recompute-full-system-dependencies (&key verbose)
-  (recompute-full-system-dependencies-set t verbose))
+(defun recompute-full-system-dependencies ()
+  (recompute-full-system-dependencies-set t))
 
 ;;;;
 ;;;; o/~ Below zero, below my need for words o/~
