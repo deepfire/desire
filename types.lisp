@@ -424,6 +424,8 @@ differ in only slight detail -- gate property, for example."
   (ensure-directories-exist (cvs-locality-lock-path o) :verbose t))
 
 (defgeneric update-gate-conversions (locality)
+  (:documentation
+   "Actually, this cannot be used on its own.")
   (:method ((o gate-locality))
     (when *verbose-repository-maintenance*
       (format t "~@<;; ~@;Updating module presence list in gate ~S.~:@>~%" (locality-pathname o)))
@@ -438,9 +440,6 @@ differ in only slight detail -- gate property, for example."
         (setf (gate-converted-module-names o) publishable-names
               (gate-unpublished-module-names o) unpublishable-names
               (gate-hidden-module-names o) hidden-names)))))
-
-(defun update-conversions ()
-  (update-gate-conversions (gate *self*)))
 
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
   (update-gate-conversions o))
@@ -476,39 +475,57 @@ differ in only slight detail -- gate property, for example."
   ;; The locality typed *gate-vcs-type* needs to be constructed differently between make-instance/change-class.
   (mapc (curry #'define-local-distributor-locality o nil) (remove *gate-vcs-type* *supported-vcs-types*)))
 
-(defgeneric update-local-distributor-conversions (distributor)
-  (:method ((o local-distributor))
+(defgeneric update-local-distributor-conversions (distributor converted-set)
+  (:method ((o local-distributor) converted-set)
     (let ((gate (gate o)))
       (let (;; The logic here is that if we're engaging in this whole game,
             ;; we're only releasing via our gate remote.
             (release-set (location-module-names gate))
-            (converted (gate-converted-module-names gate))
+            (present (gate-converted-module-names gate))
             (unpublished (gate-unpublished-module-names gate))
             (hidden (gate-hidden-module-names gate)))
-        (let* ((missing (set-difference release-set converted))
-               (new-unpublished (intersection missing unpublished))
-               (new-hidden (intersection missing hidden))
-               (mia (set-difference missing (append new-unpublished new-hidden))))
+        (let* ((release-missing (set-difference release-set present))
+               (converted-missing (set-difference converted-set present))
+               (new-unpublished (append (intersection release-missing unpublished)
+                                        (intersection converted-missing unpublished)))
+               (new-hidden (append (intersection release-missing hidden)
+                                   (intersection converted-missing hidden)))
+               (new-demoted (append new-unpublished new-hidden))
+               (release-set (set-difference release-set new-demoted))
+               (converted-set (set-difference converted-set new-demoted))
+               (release-mia (set-difference release-missing new-demoted))
+               (converted-mia (set-difference converted-missing new-demoted)))
           (when new-unpublished
             (format t ";; Following modules were demoted to unpublished:~{ ~A~}~%" new-unpublished))
           (when new-hidden
             (format t ";; Following modules were demoted to hidden:~{ ~A~}~%" new-hidden))
-          (when mia
-            (desire-error "~@<Modules ~S, which are required to establish identity with distributor ~A, are missing from ~A.~:@>" mia (name o) (root o)))
-          ;; the new release set is (set-difference release-set (append new-unpublished new-hidden))
-          ;; but nobody seems to care
+          (when release-mia
+            (restart-case (desire-error "~@<Release modules ~A, which are required to establish identity with distributor ~A, are missing from ~A.~:@>"
+                                        release-mia (name o) (root o))
+              (continue ()
+                :report "Mark missing modules as no longer released."
+                (nset-differencef release-set release-mia))))
+          (when converted-mia
+            (restart-case (desire-error "~@<Converted modules ~A, which are required to establish identity with distributor ~A, are missing from ~A.~:@>"
+                                        converted-mia (name o) (root o))
+              (continue ()
+                :report "Mark missing modules as no longer converted."
+                (nset-differencef converted-set converted-mia))))
           (dolist (m-name release-set)
             (let ((m (module m-name)))
               (unless (typep m 'origin-module)
                 (change-class m 'origin-module))))
-          (nset-differencef (gate-converted-module-names gate) release-set))))))
+          (setf (location-module-names gate) release-set
+                (gate-converted-module-names gate) converted-set))))))
 
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
-  (let ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w))))
+  (let* ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w)))
+         (converted (gate-converted-module-names gate)))
     (setf *original-self-gate-class-name* (class-name (class-of gate))
-          (gate w) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root))))
-  (update-local-distributor-conversions w))
+          (gate w) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
+    ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
+    (update-local-distributor-conversions w converted)))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
   (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc) :path nil))
