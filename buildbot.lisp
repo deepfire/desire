@@ -332,5 +332,10 @@
                             result-marker (execute-test-phase m-r phase result-marker :verbose verbose-slave-communication))))
             (buildslave-error (c)
               (terminate-action result-marker :condition c)
+              (terminate-action m-r :condition c)
               (error c))))))
-    (end-period m-r)))
+    (cond ((processingp m-r)        ; the normal, non-interrupted case
+           (end-period m-r)
+           t)
+          (t
+           (action-condition m-r)))))
