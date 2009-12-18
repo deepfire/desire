@@ -69,6 +69,8 @@ Defaults to NIL.")
     (with-valid-exit-codes ((23 nil)) (rsync "--list-only" (url o name))))
   (:method ((o cvs-native-remote) name)
     (with-valid-exit-codes ((1 nil)) (cvs "-d" (url o name) "history")))
+  (:method ((o tarball-http-remote) name)
+    (not (null (determine-available-module-tarball-version-starting-after (url o name) (initial-tarball-version o)))))
   (:method ((o svn-http-remote) name)
     (touch-www-file (url o name))))
 
