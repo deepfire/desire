@@ -104,6 +104,7 @@ locally present modules will be marked as converted."
                                           :omit-registration t)))
                      (when verbose
                        (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
+      (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
       (read-local-definitions :metastore localmeta-path)
       (reestablish-metastore-subscriptions meta-path)
       (when merge-remote-wishmasters
