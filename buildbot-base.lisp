@@ -281,8 +281,11 @@
 ;;; Test phase
 ;;;
 (defclass test-phase (action) 
-  ((action-description :reader phase-action-description :initarg :action-description)
-   (nr :reader phase-nr :initarg :nr)))
+  ((run :reader phase-run :initarg :run)
+   (action-description :reader phase-action-description :initarg :action-description)
+   (nr :reader phase-nr :initarg :nr)
+   (base :reader phase-base :initarg :base)
+   (n-results :reader phase-n-results :initarg :n-results)))
 
 (defclass interrupted-test-phase (unhandled-failure test-phase) ())
 
@@ -369,8 +372,9 @@
   (let ((n-phase-results (length modules))
         (n-phases (length phases)))
     (setf (slot-value o 'phases) (iter (for i from 0)
+                                       (for base from 0 by n-phase-results)
                                        (for phase-type in phases)
-                                       (collect (make-instance phase-type :nr i)))
+                                       (collect (make-instance phase-type :run o :nr i :base base :n-results n-phase-results)))
           (slot-value o 'n-phases) n-phases
           (slot-value o 'results) (prepare-result-vector (slot-value o 'phases) n-phase-results
                                                          modules locality)
