@@ -107,7 +107,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                           ~;)~:@>"
             (symbol-name
              (or (when (eq (remote-distributor o) *self*)
-                   *original-self-gate-class-name*)
+                   'gate-native-remote)
                  (type-of o)))
             (unless (equal default-remote-name (name o))
               (string (name o)))

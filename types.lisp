@@ -60,8 +60,6 @@ SAVE-DEFINITIONS was called.")
     (setf (symbol-value var) (make-hash-table :test #'equal)))
   (values))
 
-(defvar *original-self-gate-class-name* nil)
-
 ;;;;
 ;;;; Base
 ;;;;
@@ -313,7 +311,7 @@ a special module called '.meta'."
 ;; Handle remote localisation, for printing purposes.
 (defun remote-canonical-class-name (remote)
   (or (when (eq (remote-distributor remote) *self*)
-        *original-self-gate-class-name*)
+        'gate-native-remote)
       (type-of remote)))
 
 (defun remote-type-promote-to-gate (type)
@@ -522,8 +520,7 @@ differ in only slight detail -- gate property, for example."
   "Called once, during INIT, if we're pretending to be someone well-known."
   (let* ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w)))
          (converted (gate-converted-module-names gate)))
-    (setf *original-self-gate-class-name* (class-name (class-of gate))
-          (gate w) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
+    (setf (gate w) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
     ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
     (update-local-distributor-conversions w converted)))
 
