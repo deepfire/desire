@@ -80,6 +80,9 @@
                                                undefined))
                          (setf extended-system-dictionary (mark-system-wanted newdep extended-system-dictionary)))
                        ;; NOTE: on module boundaries we lose precise system dependency names
+                       (when-let ((module-less (remove-if #'system-module truly-external)))
+                         (system-error system "~@<While calculating dependencies of system ~A: systems with NIL module slot: ~S.  Types: ~S.~@:>"
+                                       (name system) module-less (mapcar #'type-of module-less)))
                        (values (append (mapcar (compose #'name #'system-module) truly-external)
                                        modules)
                                extended-system-dictionary)))))))
