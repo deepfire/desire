@@ -68,7 +68,11 @@
     t)
   (:method ((o (eql :slave-fetch-phase)) mn &optional verbose-internals record-output)
     (declare (ignore verbose-internals record-output))
-    (let ((*fetch-errors-serious* t))
+    (let ((*fetch-errors-serious* t)
+          (remote (module-best-remote (module mn))))
+      (unless (typep remote 'gate) ; Should it check for exact wishmaster identity?
+        (module-error (module mn) "~@<Attempted to fetch module ~A from a non-gate remote ~A in slave mode.~:@>"
+                      mn (name remote)))
       (update mn)
       t))
   (:method ((o (eql :slave-recurse-phase)) mn &optional verbose-internals record-output)
