@@ -516,16 +516,22 @@ differ in only slight detail -- gate property, for example."
           (setf (location-module-names gate) release-set
                 (gate-converted-module-names gate) converted-set))))))
 
+(defgeneric initialise-wishmaster-gate (distributor &optional well-known-p root)
+  (:method ((o local-distributor) &optional well-known-p root)
+    (if well-known-p
+        (let* ((gate (find-if (of-type 'git) (distributor-remotes o)))
+               (converted (gate-converted-module-names gate)))
+          (setf (gate o) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
+          ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
+          (update-local-distributor-conversions o converted))
+        (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc) :path nil))))
+
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
-  (let* ((gate (find-if (of-type *gate-vcs-type*) (distributor-remotes w)))
-         (converted (gate-converted-module-names gate)))
-    (setf (gate w) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
-    ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
-    (update-local-distributor-conversions w converted)))
+  (initialise-wishmaster-gate w t root))
 
 (defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
-  (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc) :path nil))
+  (initialise-wishmaster-gate o))
 
 ;;;
 ;;; Remote methods
