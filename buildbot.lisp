@@ -393,7 +393,7 @@
             (buildbot-error (c)
               (terminate-action result-marker :condition c)
               (error c))))))
-    (cond ((processingp m-r)        ; the normal, non-interrupted case
+    (cond ((not (period-ended-p m-r)) ; the normal, non-interrupted case
            (end-period m-r)
            t)
           (t
