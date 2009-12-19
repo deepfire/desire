@@ -197,14 +197,6 @@
                                 (format nil "~A~%" condition)
                                 (when-let ((backtrace (action-backtrace m-r)))
                                   (format nil "~%the backtrace was:~%~A~%" backtrace)))))
-                (:globalcond
-                 (setf (content-type*) "text/plain")
-                 (destructuring-bind (&optional condition backtrace) *global-condition*
-                   (when condition
-                     (concatenate 'string
-                                  (format nil "~A~%" condition)
-                                  (when backtrace
-                                    (format nil "~%the backtrace was:~%~A~%" backtrace))))))
                 (:failsummary
                  (let* ((binary-stream (send-headers))
                         (stream (flexi-streams:make-flexi-stream binary-stream)))
@@ -251,7 +243,7 @@
                                            "Local time is " (str (multiple-value-call #'print-decoded-time
                                                                    (get-decoded-time))) ".")
                                      (when *global-condition*
-                                       (fmt "<br/>There was a <a href='/desire-waterfall?mode=globalcond'>global condition</a>.<br/>"))
+                                       (fmt "<br/>There was a global condition.<br/>"))
                                      (cond (first-run
                                             (print-legend stream)
                                             (if (period-ended-p first-run)
