@@ -49,13 +49,15 @@
                                                (str "&nbsp; ")))))))))))))
 
 (defgeneric invoke-with-phase-emission (stream phase fn)
-  (:method ((stream stream) (o test-phase) (fn function))
+  (:method ((stream stream) (o test-phase) (fn function) &aux
+            (results (master-run-results (phase-run o))))
     (with-html-output (stream)
       (:div :class "phase"
             (:div :class "phase-header" "Phase #" (str (princ-to-string (phase-nr o))) ": " (str (describe-phase o)) ". "
                   "Total of "
-                  (str (princ-to-string (count-if (of-type 'failure) (master-run-results (phase-run o))
-                                                  :start (phase-base o) :end (+ (phase-base o) (phase-n-results o))))) " failures.")
+                  (str (princ-to-string (count-if (of-type 'failure) results
+                                                  :start (phase-base o) :end (min (length results)
+                                                                                  (+ (phase-base o) (phase-n-results o)))))) " failures.")
             (:div :class "result-row cfont"
                   (str (funcall fn)))))))
 
