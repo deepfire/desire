@@ -175,22 +175,41 @@
                           (format nil "~A~%" condition)
                           (when-let ((backtrace (action-backtrace m-r)))
                             (format nil "~%the backtrace was:~%~A~%" backtrace)))))
+          (:first
+           (let* ((binary-stream (send-headers))
+                  (stream (flexi-streams:make-flexi-stream binary-stream)))
+             (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
+               (declare (ignore rest-runs))
+               (when first-run
+                 (with-html-output (stream nil :prologue t)
+                   (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
+                          (:head (:title "desire buildbot waterfall on " (str hostname))
+                                 (:style :type "text/css" (str *style*)))
+                          (:body :class "body"
+                                 (:div :class "header"
+                                       "Hello, this is buildmaster on " (str hostname) " speaking." (:br)
+                                       "Local time is " (str (multiple-value-call #'print-decoded-time
+                                                               (get-decoded-time))) ".")
+                                 (print-legend stream)
+                                 (emit-master-run stream first-run t 0 t))))))))
           (:overview
            (let* ((binary-stream (send-headers))
                   (stream (flexi-streams:make-flexi-stream binary-stream)))
-             (with-html-output (stream nil :prologue t)
-               (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
-                      (:head (:title "desire buildbot waterfall on " (str hostname))
-                             (:style :type "text/css" (str *style*)))
-                      (:body :class "body"
-                             (:div :class "header"
-                                   "Hello, this is buildmaster on " (str hostname) " speaking." (:br)
-                                   "Local time is " (str (multiple-value-call #'print-decoded-time
-                                                           (get-decoded-time))) ".")
-                             (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
+             (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
+               (with-html-output (stream nil :prologue t)
+                 (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
+                        (:head (:title "desire buildbot waterfall on " (str hostname))
+                               (:style :type "text/css" (str *style*)))
+                        (:body :class "body"
+                               (:div :class "header"
+                                     "Hello, this is buildmaster on " (str hostname) " speaking." (:br)
+                                     "Local time is " (str (multiple-value-call #'print-decoded-time
+                                                             (get-decoded-time))) ".")
                                (cond (first-run
                                       (print-legend stream)
-                                      (emit-master-run stream first-run t 0 t)
+                                      (if (processingp first-run)
+                                          (fmt "<br/>There is a buildmaster run <a href='/desire-waterfall?mode=first'>in progress</a>.<br/>")
+                                          (emit-master-run stream first-run t 0 t))
                                       (iter (for run in rest-runs)
                                             (for nr from 1)
                                             (emit-master-run stream run t nr)))
