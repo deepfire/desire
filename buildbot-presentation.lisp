@@ -129,21 +129,18 @@
             (:div (fmt "Total ~D <a href='/desire-waterfall?mode=failsummary&nr=~D'>failures</a>."
                        (count-if (of-type 'failure) (master-run-results o)) nr))
             (:div :class "run-status"
-                  "Status: " (str (cond ((processingp o)
+                  "Status: " (str (cond ((not (period-ended-p o))
                                          (format nil "still going, with ~D tests complete"
                                                  (master-run-n-complete-results o)))
-                                        ((terminatedp o)
+                                        ((action-condition o)
                                          (format nil "terminated at ~A~:[, with no known reason~;, due to a <a href='/desire-waterfall?mode=runcond'>condition</a>~]"
                                                  (multiple-value-call #'print-decoded-time
                                                    (decode-universal-time (period-end-time o)))
                                                  (action-condition o)))
-                                        ((period-ended-p o)
+                                        (t
                                          (format nil "completed successfully at ~A"
                                                  (multiple-value-call #'print-decoded-time
-                                                   (decode-universal-time (period-end-time o)))))
-                                        (t
-                                         (format nil "failed, with uncaught exception, with ~D tests complete"
-                                                 (master-run-n-complete-results o))))) ".")
+                                                   (decode-universal-time (period-end-time o))))))) ".")
             (let ((*master-run-nr* nr))
               (call-next-method)))))
   (:method (stream (o buildmaster-run) (mode (eql :full)) nr &optional header-p)
