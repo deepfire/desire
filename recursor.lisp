@@ -34,7 +34,9 @@
 (defun make-notprocessing-undone (name) (cons name (cons nil nil)))
 (defun make-processing-undone (name) (cons name (cons :processing nil)))
 
-(defun discover-module-dependencies (module &optional (system-type *default-system-type*) complete system-dictionary verbose)
+(defun discover-module-dependencies (module &optional (system-type *default-system-type*)
+                                     complete system-dictionary verbose &aux
+                                     (module (coerce-to-module module)))
   (labels ((subj (c) (car c))
            (cell (c) (cdr c))
            ((setf cellar) (v c) (setf (cadr c) v))
