@@ -68,12 +68,12 @@
              ;; - not locally present :: represented in DEFINITIONS and in the runtime,
              ;;                          has a module associated, but the module is not locally present
              ;; - locally present :: as above, but module is present and DEFINITION-PATHNAME is bound
-             (multiple-value-bind (maybe-known undefined) (unzip (rcurry #'system :if-does-not-exist :continue)
+             (multiple-value-bind (defined undefined) (unzip (rcurry #'system :if-does-not-exist :continue)
                                                                  (direct-system-dependencies system))
                (multiple-value-bind (known unknown) (unzip #'system-known-p
-                                                           maybe-known)
+                                                           (mapcar #'system defined))
                  (multiple-value-bind (known-local known-external) (unzip (compose (feq module) #'system-module)
-                                                                          (mapcar #'system known))
+                                                                          known)
                    (multiple-value-bind (host-provided-external truly-external) (unzip #'system-host-p
                                                                                        known-external)
                      (declare (ignore host-provided-external))
@@ -82,9 +82,6 @@
                                                undefined))
                          (setf extended-system-dictionary (mark-system-wanted newdep extended-system-dictionary)))
                        ;; NOTE: on module boundaries we lose precise system dependency names
-                       (when-let ((module-less (remove-if #'system-module truly-external)))
-                         (system-error system "~@<While calculating dependencies of system ~A: systems with NIL module slot: ~S.  Types: ~S.~@:>"
-                                       (name system) module-less (mapcar #'type-of module-less)))
                        (values (append (mapcar (compose #'name #'system-module) truly-external)
                                        modules)
                                extended-system-dictionary)))))))
@@ -97,7 +94,8 @@
                  (when verbose
                    (format t ";;;; processing known system ~A~%" name))
                  (unless (typep system system-type)
-                   (recursor-error "~@<While operating in ~A mode, encountered an ~A at ~S.~:@>" system-type (type-of system) (system-definition-pathname system)))
+                   (recursor-error "~@<While operating in ~A mode, encountered an ~A~:[~; at ~S~].~:@>"
+                                   system-type (type-of system) (system-locally-present-p system) (system-definition-pathname system)))
                  (unless (typep system system-type)
                    (recursor-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
                  (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
