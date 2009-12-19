@@ -160,8 +160,8 @@
   (let* ((hostname (string-downcase (string (name *self*))))
          (parameters (iter (for (param . value) in (get-parameters*))
                            (appending (list (make-keyword (string-upcase param)) value)))))
-    (destructuring-bind (&key condition backtrace &allow-other-keys)
-        (with-recorded-status (:record-backtrace t :backtrace-as-list t)
+    (destructuring-bind (&key return-value condition backtrace &allow-other-keys)
+        (with-recorded-status (:record-backtrace t)
           (flet ((get-int-param (key)
                    (when-let ((value (getf parameters key)))
                      (ignore-errors (parse-integer value))))
@@ -266,7 +266,8 @@
                                                        "There have been no buildmaster runs to speak of."))))))))
                    (finish-output stream)))))))
       (when condition
-        (setf *global-condition* (list condition backtrace))))))
+        (setf *global-condition* (list condition backtrace)))
+      return-value)))
 
 (defun start-cl-waterfall (&optional (prefix "/desire-waterfall"))
   (push (create-regex-dispatcher prefix 'cl-waterfall) *dispatch-table*))
