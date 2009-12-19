@@ -384,6 +384,19 @@
   (declare (type buildmaster-run master-run))
   (aref (master-run-results master-run) i))
 
+(defun result (result phase &optional (master-run (first *buildmaster-runs*)))
+  (aref (master-run-results master-run)
+        (let ((base (etypecase phase
+                      (integer (* phase (master-run-n-phase-results master-run)))
+                      (symbol (phase-base (find (string phase) (master-run-phases master-run)
+                                                :key #'type-of :test #'string=))))))
+          (etypecase result
+            ((or symbol string)
+             (position result (master-run-results master-run)
+                       :start base :key (compose #'name #'result-module) :test #'string=))
+            (integer
+             (+ base (mod result (master-run-n-phase-results master-run))))))))
+
 (defun first-phase-result-p (master-run result)
   (< (result-id result) (master-run-n-phase-results master-run)))
 
