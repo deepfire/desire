@@ -94,10 +94,12 @@
                  (when verbose
                    (format t ";;;; processing known system ~A~%" name))
                  (unless (typep system system-type)
-                   (recursor-error "~@<While operating in ~A mode, encountered an ~A~:[~; at ~S~].~:@>"
-                                   system-type (type-of system) (system-locally-present-p system) (system-definition-pathname system)))
-                 (unless (typep system system-type)
-                   (recursor-error "~@<While operating in ~A mode, encountered an ~A.~:@>" system-type (type-of system)))
+                   (recursor-error "~@<While calculating dependencies of module ~A, in ~A mode, ~
+                                       encountered an ~A ~A~:[~; at ~S~].~:@>"
+                                   (name module) system-type (type-of system) name
+                                   (system-locally-present-p system)
+                                   (when (system-known-p system)
+                                     (system-definition-pathname system))))
                  (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
                  (add-system-dependencies module system modules system-dictionary))
                (values modules system-dictionary))))
