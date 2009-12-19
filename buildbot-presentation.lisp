@@ -59,8 +59,8 @@
 (defmacro with-phase-emission ((stream phase) &body body)
   `(invoke-with-phase-emission ,stream ,phase (lambda () ,@body)))
 
-(defgeneric emit-master-run-results (stream master-run)
-  (:method (stream (o buildmaster-run))
+(defgeneric emit-master-run-results (stream master-run only-failures)
+  (:method (stream (o buildmaster-run) only-failures)
     (with-html-output (stream)
       (:div :class "phases"
             (let ((n-phases-total (master-run-n-phases o))
@@ -73,7 +73,9 @@
                       (for base from 0 by n-phase-results)
                       (with-phase-emission (stream phase)
                         (dotimes (i n-phase-results)
-                          (with-result-emission (stream (master-result o (+ base i)))))))
+                          (let ((r (master-result o (+ base i))))
+                            (unless (and only-failures (not (typep r 'failure)))
+                              (with-result-emission (stream r)))))))
                 (let* ((first-incomplete-phase-nr n-complete-phases)
                        (incomplete-phases (nthcdr first-incomplete-phase-nr (master-run-phases o))))
                   (when-let ((incomplete-phase (and (< n-complete-phases n-phases-total)
@@ -83,13 +85,17 @@
                     (with-phase-emission (stream incomplete-phase)
                       (iter (for i from incomplete-phase-base)
                             (repeat n-incomplete-phase-complete-results)
-                            (with-result-emission (stream (master-result o i))))
+                            (let ((r (master-result o i)))
+                              (unless (and only-failures (not (typep r 'failure)))
+                                (with-result-emission (stream r)))))
                       (finish-output stream)
                       ;; follow the buildmaster for the incomplete part (guaranteed to be at least 1 module, due to FLOOR above)
                       (iter (for i from (+ incomplete-phase-base n-incomplete-phase-complete-results))
                             (repeat (- n-phase-results n-incomplete-phase-complete-results))
-                            (with-result-emission (stream (master-result o i)) ;; pre-output is safe
-                              (grab-result o i))
+                            (let ((r (master-result o i)))
+                              (unless (and only-failures (not (typep r 'failure)))
+                                (with-result-emission (stream r) ;; pre-output is safe
+                                  (grab-result o i))))
                             (finish-output stream)))
                     ;; follow the buildmaster for the rest of phases
                     (iter (for phase-no from (1+ first-incomplete-phase-nr) below n-phases-total)
@@ -98,26 +104,33 @@
                           (with-phase-emission (stream phase)
                             (iter (for i from base)
                                   (repeat n-phase-results)
-                                  (with-result-emission (stream (master-result o i))
-                                    (grab-result o i))
+                                  (let ((r (master-result o i)))
+                                    (unless (and only-failures (not (typep r 'failure)))
+                                      (with-result-emission (stream r)
+                                        (grab-result o i))))
                                   (finish-output stream))))))))))))
 
-(defgeneric emit-master-run (stream master-run complete-p nr &optional header-p)
-  (:method (stream (o buildmaster-run) complete-p nr &optional header-p)
+(defgeneric emit-master-run (stream master-run mode nr &optional header-p)
+  (:method :around (stream (o buildmaster-run) mode nr &optional header-p)
+    (declare (ignore header-p))
     (with-html-output (stream)
       (:div :class "run"
             (:div (str (multiple-value-call #'print-decoded-time
                          (decode-universal-time (period-start-time o))))
-                  (str (format nil ". Run of ~D modules and ~D phases ~(~A~)."
-                               (master-run-n-phase-results o)
-                               (master-run-n-phases o)
-                               (mapcar #'type-of (master-run-phases o)))))
+                  (fmt ". Run of ~D modules and ~D phases ~(~A~)."
+                       (master-run-n-phase-results o)
+                       (master-run-n-phases o)
+                       (mapcar #'type-of (master-run-phases o))))
+            (:div (fmt "Total ~D <a href='/desire-waterfall?mode=failsummary&nr=~D'>failures</a>."
+                       (count-if (of-type 'failure) (master-run-results o)) nr))
             (:div :class "run-status"
                   "Status: " (str (cond ((processingp o)
                                          (format nil "still going, with ~D tests complete"
                                                  (master-run-n-complete-results o)))
                                         ((terminatedp o)
-                                         (format nil "terminated~:[, with no known reason~;, due to a <a href='/desire-waterfall?mode=runcond'>condition</a>~]"
+                                         (format nil "terminated at ~A~:[, with no known reason~;, due to a <a href='/desire-waterfall?mode=runcond'>condition</a>~]"
+                                                 (multiple-value-call #'print-decoded-time
+                                                   (decode-universal-time (period-end-time o)))
                                                  (action-condition o)))
                                         ((period-ended-p o)
                                          (format nil "completed successfully at ~A"
@@ -126,12 +139,16 @@
                                         (t
                                          (format nil "failed, with uncaught exception, with ~D tests complete"
                                                  (master-run-n-complete-results o))))) ".")
-            (when complete-p
-              (let ((*master-run-nr* nr))
-                (when header-p
-                  (emit-master-run-header stream o))
-                (finish-output stream)
-                (emit-master-run-results stream o)))))))
+            (let ((*master-run-nr* nr))
+              (call-next-method)))))
+  (:method (stream (o buildmaster-run) (mode (eql :full)) nr &optional header-p)
+    (when header-p
+      (emit-master-run-header stream o))
+    (finish-output stream)
+    (emit-master-run-results stream o nil))
+  (:method (stream (o buildmaster-run) (mode (eql :errors)) nr &optional header-p)
+    (declare (ignore header-p))
+    (emit-master-run-results stream o t)))
 
 (defvar *style*)
 
@@ -175,7 +192,22 @@
                           (format nil "~A~%" condition)
                           (when-let ((backtrace (action-backtrace m-r)))
                             (format nil "~%the backtrace was:~%~A~%" backtrace)))))
-          (:first
+          (:failsummary
+           (let* ((binary-stream (send-headers))
+                  (stream (flexi-streams:make-flexi-stream binary-stream)))
+             (when m-r
+               (with-html-output (stream nil :prologue t)
+                 (:html :class "root" :xmlns "http://www.w3.org/1999/xhtml" :|XML:LANG| "en" :lang "en"
+                        (:head (:title "desire buildbot waterfall on " (str hostname))
+                               (:style :type "text/css" (str *style*)))
+                        (:body :class "body"
+                               (:div :class "header"
+                                     "Hello, this is buildmaster on " (str hostname) " speaking." (:br)
+                                     "Local time is " (str (multiple-value-call #'print-decoded-time
+                                                             (get-decoded-time))) ".")
+                               (fmt "<br/>Failure summary:<br/>")
+                               (emit-master-run stream m-r :errors 0 t)))))))
+          (:inprogress
            (let* ((binary-stream (send-headers))
                   (stream (flexi-streams:make-flexi-stream binary-stream)))
              (destructuring-bind (&optional first-run &rest rest-runs) *buildmaster-runs*
@@ -191,7 +223,7 @@
                                        "Local time is " (str (multiple-value-call #'print-decoded-time
                                                                (get-decoded-time))) ".")
                                  (print-legend stream)
-                                 (emit-master-run stream first-run t 0 t))))))))
+                                 (emit-master-run stream first-run :full 0 t))))))))
           (:overview
            (let* ((binary-stream (send-headers))
                   (stream (flexi-streams:make-flexi-stream binary-stream)))
@@ -207,12 +239,12 @@
                                                              (get-decoded-time))) ".")
                                (cond (first-run
                                       (print-legend stream)
-                                      (if (processingp first-run)
-                                          (fmt "<br/>There is a buildmaster run <a href='/desire-waterfall?mode=first'>in progress</a>.<br/>")
-                                          (emit-master-run stream first-run t 0 t))
+                                      (if (period-ended-p first-run)
+                                          (emit-master-run stream first-run :full 0 t)
+                                          (fmt "<br/>There is a buildmaster run <a href='/desire-waterfall?mode=inprogress'>in progress</a>.<br/>"))
                                       (iter (for run in rest-runs)
                                             (for nr from 1)
-                                            (emit-master-run stream run t nr)))
+                                            (emit-master-run stream run :full nr)))
                                      (t
                                       (htm :br
                                            (:div :class "no-runs"
