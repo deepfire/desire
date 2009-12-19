@@ -721,18 +721,22 @@ when needed."))
 named differently from system's name. We have to store the name of
 the definition file for such systems.
 Find out whether SYSTEM is hidden."
+  (declare (type system system))
   (not (null (system-definition-pathname-name system))))
 
 (defun system-host-p (system)
   "Whether SYSTEM is provided by the host implementation."
+  (declare (type system system))
   (typep system 'host-system))
 
 (defun system-known-p (system)
   "Whether SYSTEM is mentioned in DEFINITIONS."
+  (declare (type system system))
   (not (typep system 'unknown-system)))
 
 (defun system-locally-present-p (system)
   "Whether SYSTEM is present within local gate."
+  (declare (type system system))
   (slot-boundp system 'definition-pathname))
 
 (defclass asdf-system (asdf known-system) ())
