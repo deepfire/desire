@@ -737,7 +737,8 @@ Find out whether SYSTEM is hidden."
 (defun system-locally-present-p (system)
   "Whether SYSTEM is present within local gate."
   (declare (type system system))
-  (slot-boundp system 'definition-pathname))
+  (and (system-known-p system)
+       (slot-boundp system 'definition-pathname)))
 
 (defclass asdf-system (asdf known-system) ())
 (defclass mudball-system (mudball known-system) ())
