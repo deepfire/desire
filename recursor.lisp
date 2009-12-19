@@ -59,20 +59,30 @@
              "Given a MODULE's SYSTEM, detect its dependencies and, accordingly, extend the sets
               of known REQUIRED systems, MODULES and MISSING unknown systems, returning them
               as multiple values."
-             (multiple-value-bind (maybe-known unknown) (unzip (rcurry #'system :if-does-not-exist :continue) (direct-system-dependencies system))
-               (multiple-value-bind (known known-unknown) (unzip #'system-known-p maybe-known)
-                 (multiple-value-bind (local-newdeps othermodule-newdeps) (unzip (compose (feq module) #'system-module)
-                                                                                 (mapcar #'system known))
-                   (let ((extended-system-dictionary system-dictionary))
-                     (dolist (newdep (append (mapcar (compose #'string #'name) (append local-newdeps
-                                                                                       known-unknown))
-                                             unknown))
-                       (setf extended-system-dictionary (mark-system-wanted newdep extended-system-dictionary)))
-                     ;; NOTE: on module boundaries we lose precise system dependency names
-                     (values (append (mapcar (compose #'name #'system-module)
-                                             (remove-if #'system-host-p othermodule-newdeps)) ; drop host-provided systems
-                                     modules)
-                             extended-system-dictionary))))))
+             ;; System ontology:
+             ;; - undefined :: missing from both DEFINITIONS and the runtime
+             ;; - unknown :: represented in the runtime, has no module associated;
+             ;;              it's not decided yet whether such systems are worth of a DEFINITIONS entry
+             ;; - not locally present :: represented in DEFINITIONS and in the runtime,
+             ;;                          has a module associated, but the module is not locally present
+             ;; - locally present :: as above, but module is present and DEFINITION-PATHNAME is bound
+             (multiple-value-bind (maybe-known undefined) (unzip (rcurry #'system :if-does-not-exist :continue)
+                                                                 (direct-system-dependencies system))
+               (multiple-value-bind (known unknown) (unzip #'system-known-p
+                                                           maybe-known)
+                 (multiple-value-bind (known-local known-external) (unzip (compose (feq module) #'system-module)
+                                                                          (mapcar #'system known))
+                   (multiple-value-bind (host-provided-external truly-external) (unzip #'system-host-p
+                                                                                       known-external)
+                     (declare (ignore host-provided-external))
+                     (let ((extended-system-dictionary system-dictionary))
+                       (dolist (newdep (append (mapcar (compose #'string #'name) (append known-local truly-external unknown))
+                                               undefined))
+                         (setf extended-system-dictionary (mark-system-wanted newdep extended-system-dictionary)))
+                       ;; NOTE: on module boundaries we lose precise system dependency names
+                       (values (append (mapcar (compose #'name #'system-module) truly-external)
+                                       modules)
+                               extended-system-dictionary)))))))
            (satisfy-next-system (module system-type &optional modules system-dictionary)
              "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
               the fallout. Return the modified sets of known REQUIRED systems, MODULES and
