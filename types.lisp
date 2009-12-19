@@ -521,6 +521,10 @@ differ in only slight detail -- gate property, for example."
     (if well-known-p
         (let* ((gate (find-if (of-type 'git) (distributor-remotes o)))
                (converted (gate-converted-module-names gate)))
+          (when-let ((intersection (intersection converted (location-module-names gate))))
+            (definition-error "~@<Bad local definitions: intersection between exported ~
+                                  and converted modules: ~S.~:@>"
+                intersection))
           (setf (gate o) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
           ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
           (update-local-distributor-conversions o converted))
