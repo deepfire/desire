@@ -93,7 +93,6 @@
 ;;;;
 (defparameter *buildmaster-run-phases* '(master-reachability-phase
                                          master-update-phase
-                                         master-discovery-phase
                                          master-recurse-phase
                                          slave-fetch-phase
                                          slave-recurse-phase
@@ -169,8 +168,6 @@
     (prog1 (run-module-test :master-update-phase (result-module current-result) nil t)
       (setf (result-commit current-result) (desr::git-commit-log '("tracker")
                                                                  (result-path current-result)))))
-  (:method ((m-r buildmaster-run) (p master-discovery-phase) current-result &key &allow-other-keys)
-    (run-module-test :master-discovery-phase (result-module current-result) nil t))
   (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (run-module-test :master-recurse-phase (name (result-module current-result)) nil t))
   (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker &key verbose)
@@ -329,12 +326,11 @@
     (buildbot-error (c)
       (return-from ping-slave (values nil c)))))
 
-(defun one* (&optional (reachability t) (upstream t) (discover t) (recurse t) (slave-fetch t)
+(defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t)
              (slave-recurse t) (slave-load t) (slave-test nil)
              &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
-                       (when discover '(master-discovery-phase))
                        (when recurse '(master-recurse-phase))
                        (when slave-fetch '(slave-fetch-phase))
                        (when slave-recurse '(slave-recurse-phase))
