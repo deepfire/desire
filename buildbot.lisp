@@ -182,8 +182,8 @@
                 (let ((initial-line (read-mandatory-line pipe (name m))))
                   (unless (char= #\( (schar initial-line 0))
                     (buildslave-communication-error
-                     "~@<Corrupt initial line while reading module ~A.~:@>"
-                     (name m)))
+                     "~@<Corrupt initial line while reading module ~A:~%~S~:@>"
+                     (name m) initial-line))
                   (destructuring-bind (&key name mode) (read-string-list initial-line 1)
                     (when verbose
                       (report-line 0 initial-line))
@@ -201,8 +201,8 @@
                     (let ((marker-line (read-mandatory-line pipe (name m))))
                       (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
                         (buildslave-communication-error
-                         "~@<Missing test output marker for module ~A.~:@>"
-                         (name m)))
+                         "~@<Missing test output marker for module ~A, got instead:~%~S~:@>"
+                         (name m) marker-line))
                       (when verbose
                         (report-line 1 marker-line)))
                     (iter (for line = (read-mandatory-line pipe (name m) nil))
@@ -226,8 +226,8 @@
                         (unless (and (= 1 (length final-line))
                                      (char= #\) (schar final-line 0)))
                           (buildslave-communication-error
-                           "~@<Corrupt final line while reading module ~A.~:@>"
-                           (name m))))
+                           "~@<Corrupt final line while reading module ~A:~%~S~:@>"
+                           (name m) final-line)))
                       ;; Advance the result.
                       (destructuring-bind (&key status condition backtrace) final-args
                         (setf r (advance-result m-r t status condition backtrace)))))))
