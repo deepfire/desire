@@ -105,7 +105,10 @@ system TYPE within LOCALITY."
              (ensure-system (name path)
                (lret ((system (or (lret ((present-system (system name :if-does-not-exist :continue)))
                                     (when present-system
-                                      (check-present-system-sanity present-system)))
+                                      (if (system-known-p present-system)
+                                          (check-present-system-sanity present-system)
+                                          ;; Upgrading system to a known one!
+                                          (remove-system present-system))))
                                   (register-new-system (canonicalise-name name) path))))
                  (setf (slot-value system 'definition-pathname) path
                        (slot-value system 'definition-write-date) (file-write-date path))

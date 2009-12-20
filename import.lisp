@@ -44,7 +44,7 @@ Defaults to NIL.")
 
 (progn
   (define-executable darcs)
-  (define-executable darcs-to-git)
+  (define-executable darcs-fast-export)
   (define-executable hg)
   (define-executable python)        ; this is for hg-to-git.py
   (define-executable rsync)
@@ -204,24 +204,20 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
     (with-explanation ("on behalf of module ~A, converting from ~A to ~A: ~S => ~S" name (vcs-type o) *gate-vcs-type* from-repo-dir *default-pathname-defaults*)
       (call-next-method)))
   (:method ((o darcs-locality) name from-repo-dir)
-    (when (git-repository-present-p)
-      (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
-        (when untracked
-          (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
-                  from-repo-dir *default-pathname-defaults* untracked)
-          (mapc #'delete-file untracked))
-        (when (or staged-mod staged-del staged-new unstaged-mod unstaged-del)
-          (ensure-clean-repository :error))))
-    (with-condition-recourses dirt-files-in-repository
-        (multiple-value-bind (successp output) (with-shell-predicate (darcs-to-git from-repo-dir))
-          (unless successp
-            (error 'dirt-files-in-repository :locality (gate *self*) :module name
-                   :dirt-files (extract-delimited-substrings output "Only in .: " #\Newline))))
-      (remove-dirt-files (c)
-                         (format t "~@<;;; ~@;dirt files ~S prevent darcs-to-git from proceeding. Removing them and retrying...~:@>~%" (condition-dirt-files c))
-                         (mapc #'delete-file (condition-dirt-files c))))
-    (when (git-repository-bare-p)
-      (setf (git-repository-bare-p) nil)))
+    (if (git-repository-present-p)
+        (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
+          (when untracked
+            (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
+                    from-repo-dir *default-pathname-defaults* untracked)
+            (mapc #'delete-file untracked))
+          (when (or staged-mod staged-del staged-new unstaged-mod unstaged-del)
+            (ensure-clean-repository :error)))
+        (git "init"))
+    ;; We ignore exit status, as, sadly, it's not informative.
+    ;; Thankfully, git-fast-import is pretty reliable.
+    (let ((*output* nil))
+      (pipe (darcs-fast-export from-repo-dir)
+            (git "fast-import"))))
   (:method ((o cvs-locality) name from-repo-dir)
     (multiple-value-bind (url cvs-module-name) (url *source-remote* name)
       (declare (ignore url))
