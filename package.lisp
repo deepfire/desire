@@ -139,6 +139,7 @@
    #:system-host-p
    #:system-known-p
    #:system-locally-present-p
+   #:system-makunpresent
    #:system-definition-pathname
    #:system-definition-write-date
    #:do-present-systems

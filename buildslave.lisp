@@ -77,6 +77,9 @@
       t))
   (:method ((o (eql :slave-recurse-phase)) mn &optional verbose-internals record-output)
     (declare (ignore record-output))
+    (do-modules (m)
+      (when (directory-exists-p (module-pathname m))
+        (stash-module m)))
     (desire (list mn) :skip-present t :seal nil :verbose verbose-internals)
     t)
   (:method ((o (eql :slave-load-phase)) mn &optional verbose-internals record-output)
@@ -87,6 +90,25 @@
     (declare (ignore verbose-internals record-output))
     (not-implemented :slave-test-phase)))
 
+(defgeneric run-buildslave-phase (phase-name module-names verbose)
+  (:method :around ((phase-name (eql :slave-recurse-phase)) module-names verbose)
+    (unwind-protect (call-next-method)
+      (do-modules (m)
+        (when (module-stashed-repo-present-p m)
+          (unstash-module m))))
+    (recompute-full-system-dependencies))
+  (:method (phase-name module-names verbose)
+    (iter (for mn in module-names)
+          (syncformat t "(:name ~S :mode ~(~S~)~%~S~%" mn phase-name *buildslave-remote-test-output-marker*)
+          (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
+            (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
+                        condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) backtrace)))))
+
+(defun buildslave (module-names phase-names &optional verbose &aux
+                   (module-names (mapcar #'canonicalise-name module-names)))
+  (dolist (phase-name (mapcar (compose #'make-keyword #'string-upcase #'string) phase-names))
+    (run-buildslave-phase phase-name module-names verbose)))
+
 (defun invoke-with-slave-output-markers (stream fn)
   (syncformat stream "~%~S~%" *buildslave-remote-output-marker*)
   (funcall fn)
@@ -94,13 +116,3 @@
 
 (defmacro with-slave-output-markers (() &body body)
   `(invoke-with-slave-output-markers t (lambda () ,@body)))
-
-(defun buildslave (modules phases &optional verbose-internals)
-  (let ((module-names (mapcar #'canonicalise-name modules))
-        (phases (mapcar (compose #'make-keyword #'string-upcase #'string) phases)))
-    (iter (for p in phases)
-          (iter (for mn in module-names)
-                (syncformat t "(:name ~S :mode ~(~S~)~%~S~%" mn p *buildslave-remote-test-output-marker*)
-                (destructuring-bind (&key return-value condition backtrace) (run-module-test p mn verbose-internals)
-                  (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                              condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) backtrace))))))

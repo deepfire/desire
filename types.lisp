@@ -740,6 +740,12 @@ Find out whether SYSTEM is hidden."
   (and (system-known-p system)
        (slot-boundp system 'definition-pathname)))
 
+(defun system-makunpresent (system)
+  "Change SYSTEM so that SYSTEM-LOCALLY-PRESENT-P will return NIL on it."
+  (declare (type system system))
+  (slot-makunbound system 'definition-pathname)
+  (slot-makunbound system 'definition-write-date))
+
 (defclass asdf-system (asdf known-system) ())
 (defclass mudball-system (mudball known-system) ())
 (defclass xcvb-system (xcvb known-system) ())
