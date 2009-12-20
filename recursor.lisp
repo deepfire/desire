@@ -34,9 +34,9 @@
 (defun make-notprocessing-undone (name) (cons name (cons nil nil)))
 (defun make-processing-undone (name) (cons name (cons :processing nil)))
 
-(defun discover-module-dependencies (module &optional (system-type *default-system-type*)
-                                     complete system-dictionary verbose &aux
-                                     (module (coerce-to-module module)))
+(defun discover-direct-module-dependencies (module &optional (system-type *default-system-type*)
+                                            complete system-dictionary verbose &aux
+                                            (module (coerce-to-module module)))
   (labels ((subj (c) (car c))
            (cell (c) (cdr c))
            ((setf cellar) (v c) (setf (cadr c) v))
@@ -69,7 +69,7 @@
              ;;                          has a module associated, but the module is not locally present
              ;; - locally present :: as above, but module is present and DEFINITION-PATHNAME is bound
              (multiple-value-bind (defined undefined) (unzip (rcurry #'system :if-does-not-exist :continue)
-                                                                 (direct-system-dependencies system))
+                                                             (direct-system-dependencies system))
                (multiple-value-bind (known unknown) (unzip #'system-known-p
                                                            (mapcar #'system defined))
                  (multiple-value-bind (known-local known-external) (unzip (compose (feq module) #'system-module)
@@ -155,7 +155,8 @@
               ;; Discover and register system definitions.
               ;; Don't try to use the full-information dependency resolver, as it will likely fail.
               (notice-module-repository module nil locality)
-              (multiple-value-bind (module-deps new-system-dictionary) (discover-module-dependencies module system-type complete system-dictionary verbose)
+              (multiple-value-bind (module-deps new-system-dictionary)
+                  (discover-direct-module-dependencies module system-type complete system-dictionary verbose)
                 (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
                        (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
                   (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
@@ -179,21 +180,26 @@
         (setf (cdr cell) :done)
         (values new-module-dictionary new-system-dictionary)))))
 
-(defun satisfy-modules (module-names locality system-type module-dictionary system-dictionary toplevelp &key complete skip-present skip-missing verbose)
+(defun satisfy-modules (module-names locality system-type module-dictionary system-dictionary toplevelp
+                        &key complete skip-present skip-missing verbose)
   (iter (for module-name in module-names)
-        (for (values updated-module-dictionary updated-system-dictionary) = (satisfy-module module-name locality system-type module-dictionary system-dictionary
-                                                                                            :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose))
+        (for (values updated-module-dictionary updated-system-dictionary) =
+             (satisfy-module module-name locality system-type module-dictionary system-dictionary
+                             :complete complete
+                             :skip-present skip-present :skip-missing skip-missing
+                             :verbose verbose))
         (setf (values module-dictionary system-dictionary) (values updated-module-dictionary updated-system-dictionary))
         (finally
          (when-let ((undone (and toplevelp (mapcar #'car (remove-if #'cddr module-dictionary)))))
            (format t "WARNING: after all gyrations following modules were left unsatisfied:~{ ~S~}~%" undone))
-         ;; satisfy the constraint of all loadable systems having dependencies slot bound
-         (when verbose
-           (format t "~@<;;; ~@;Recomputing system dependencies...~:@>~%"))
-         (recompute-full-system-dependencies-set
-          (iter (for (name nil . satisfied) in updated-system-dictionary)
-                (unless (member name *implementation-provided-system-names* :test #'string=)
-                  (collect (system name)))))
+         ;; satisfy the constraint of all loadable systems having dependencies slot boundp
+         (when toplevelp
+           (when verbose
+             (format t "~@<;;; ~@;Recomputing system dependencies...~:@>~%"))
+           (recompute-full-system-dependencies-set
+            (iter (for (name wanted . present) in updated-system-dictionary)
+                  (unless (member name *implementation-provided-system-names* :test #'string=)
+                    (collect (system name))))))
          (return (values module-dictionary system-dictionary)))))
 
 (defun desire (desires &key complete skip-present skip-missing (seal t) verbose)
