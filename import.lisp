@@ -280,6 +280,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                      (module (coerce-to-module module)))
   (when (module-stashed-p module)
     (module-error module "~@<Module ~A is already stashed.~:@>" (name module)))
+  (format t "~@<;; ~@;Stashing module ~A.~:@>~%" (name module))
   (rename-file (module-pathname module locality) (module-stashed-pathname module locality))
   (setf (module-scan-positive-localities module) nil)
   (dolist (s (module-systems module) t)
@@ -289,6 +290,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                        (module (coerce-to-module module)))
   (unless (module-stashed-p module)
     (module-error module "~@<Module ~A is not stashed.~:@>" (name module)))
+  (format t "~@<;; ~@;Unstashing module ~A.~:@>~%" (name module))
   (rename-file (module-stashed-pathname module locality) (module-pathname module locality))
   (module-locally-present-p module) ; restore locality presence cache
   (notice-module-repository module)
