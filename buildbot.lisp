@@ -95,7 +95,6 @@
                                          master-update-phase
                                          master-recurse-phase
                                          slave-fetch-phase
-                                         slave-recurse-phase
                                          slave-load-phase
                                          ;; slave-test-phase
                                          ))
@@ -348,13 +347,12 @@
       (return-from ping-slave (values nil c)))))
 
 (defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t)
-             (slave-recurse t) (slave-load t) (slave-test nil)
+             (slave-load t) (slave-test nil)
              &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when recurse '(master-recurse-phase))
                        (when slave-fetch '(slave-fetch-phase))
-                       (when slave-recurse '(slave-recurse-phase))
                        (when slave-load '(slave-load-phase))
                        (when slave-test '(slave-test-phase)))
        :modules modules

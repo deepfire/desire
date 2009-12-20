@@ -313,8 +313,6 @@
   (:default-initargs :action-description "unwind module dependencies"))
 (defclass slave-fetch-phase (remote-test-phase) ()
   (:default-initargs :action-description "fetch modules from wishmaster"))
-(defclass slave-recurse-phase (remote-test-phase) ()
-  (:default-initargs :action-description "unwind module dependencies"))
 (defclass slave-load-phase (remote-test-phase) ()
   (:default-initargs :action-description "load modules"))
 (defclass slave-test-phase (remote-test-phase) ()

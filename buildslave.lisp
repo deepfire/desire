@@ -75,16 +75,14 @@
                       mn (name remote)))
       (update mn)
       t))
-  (:method ((o (eql :slave-recurse-phase)) mn &optional verbose-internals record-output)
+  (:method ((o (eql :slave-load-phase)) mn &optional verbose-internals record-output)
     (declare (ignore record-output))
     (do-modules (m)
       (when (directory-exists-p (module-pathname m))
         (stash-module m)))
+    (drop-system-backend-definition-cache *default-system-type*)
     (desire (list mn) :skip-present t :seal nil :verbose verbose-internals)
-    t)
-  (:method ((o (eql :slave-load-phase)) mn &optional verbose-internals record-output)
-    (declare (ignore verbose-internals record-output))
-    (asdf:oos 'asdf:load-op mn)
+    (asdf:oos 'asdf:load-op (name (module-central-system mn)))
     t)
   (:method ((o (eql :slave-test-phase)) mn &optional verbose-internals record-output)
     (declare (ignore verbose-internals record-output))
@@ -101,10 +99,6 @@
                          ~S~%" 
                       mn phase-name
                       *buildslave-remote-test-output-marker*)
-          (do-modules (m)
-            (when (directory-exists-p (module-pathname m))
-              (stash-module m)))
-          (drop-system-backend-definition-cache *default-system-type*)
           (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
             (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~%~]~
                            ~S~%~
