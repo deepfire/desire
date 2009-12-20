@@ -137,7 +137,7 @@
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
 
-(defgeneric execute-test-phase (buildmaster-run test-phase result-marker &key verbose)
+(defgeneric execute-test-phase (buildmaster-run test-phase result-marker &key &allow-other-keys)
   (:documentation
    "Execute a buildmaster test phase.")
   (:method :around ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
@@ -169,7 +169,8 @@
                                                                  (result-path current-result)))))
   (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (run-module-test :master-recurse-phase (name (result-module current-result)) nil t))
-  (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker &key verbose)
+  (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker
+            &key verbose verbose-starting-module)
     (with-active-phase (p)
       (let ((*read-eval* nil)
             (*package* (find-package :desire))
@@ -190,6 +191,9 @@
             (iter (with r = result-marker)
                   (repeat (master-run-n-phase-results m-r))
                   (for m = (result-module r))
+                  (when (string= verbose-starting-module (name m))
+                    (format t "==( enabling verbosity, starting from module ~A~%" (name m))
+                    (setf verbose t))
                   (with-tracked-termination (r)
                     (let ((initial-line (read-mandatory-line pipe (name m))))
                       (when verbose
@@ -260,7 +264,7 @@
   #+sbcl "debugger invoked on a")
 (defvar *implementation-unhandled-condition-signature*
   #+sbcl "unhandled")
-(defun invoke-with-slave-connection (hostname username slave-setup-commands verbose fn)
+(defun invoke-with-slave-connection (hostname username slave-setup-commands verbose-comm fn)
   (flet ((setup-slave-connection (pipe hostname username commands)
            (with-asynchronous-execution
              (with-input-from-string (stream (compile-shell-command commands))
@@ -272,7 +276,7 @@
                  (unless line
                    (buildslave-communication-error "~@<Early termination from slave: ~
                                                        beginning-of-output marker missing~:@>"))
-                 (when verbose
+                 (when verbose-comm
                    (report-line i line))
                  (when (or (starts-with-subseq *implementation-debugger-signature* line)
                            (starts-with-subseq *implementation-unhandled-condition-signature* line))
@@ -299,8 +303,10 @@
       (multiple-value-prog1 (funcall fn pipe)
         (finalise-slave-connection pipe)))))
 
-(defmacro with-slave-connection ((pipe hostname username setup-commands &optional verbose) &body body)
-  `(invoke-with-slave-connection ,hostname ,username ,setup-commands ,verbose (lambda (,pipe) ,@body)))
+(defmacro with-slave-connection ((pipe hostname username setup-commands &key verbose) &body body)
+  `(invoke-with-slave-connection ,hostname ,username ,setup-commands ,verbose
+                                 (lambda (,pipe)
+                                   ,@body)))
 
 (defun make-buildslave-evaluation-form (&rest body)
   `(progn
@@ -309,18 +315,17 @@
      (sb-ext:quit)))
 
 (defun invoke-with-slave-evaluation (slave-form local-fn hostname username &rest keys
-                                     &key print-slave-connection-conditions verbose-slave-communication
-                                     &allow-other-keys)
+                                     &key print-slave-connection-conditions verbose &allow-other-keys)
   (with-maybe-just-printing-conditions (t buildbot-error) print-slave-connection-conditions
     (let ((slave-form (make-buildslave-evaluation-form slave-form)))
-      (when verbose-slave-communication
+      (when verbose
         (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
       (with-slave-connection (slave-pipe hostname username
                                          (apply #'cook-buildslave-command slave-form
                                                 (remove-from-plist keys
                                                                    :print-slave-connection-conditions
-                                                                   :verbose-slave-communication))
-                                         verbose-slave-communication)
+                                                                   :verbose))
+                                         :verbose verbose)
         (funcall local-fn slave-pipe)))))
 
 (defmacro with-slave-evaluation (slave-form (slave-pipe hostname username &rest keys &key
@@ -334,21 +339,23 @@
 (defun ping-slave (&rest keys &key call-buildslave (hostname *default-buildslave-host*)
                    (username *default-buildslave-username*) &allow-other-keys)
   (handler-case
-      (apply #'invoke-with-slave-evaluation (cond
-                                              (call-buildslave
-                                               `(buildslave nil `(:slave-fetch-phase) t)))
+      (apply #'invoke-with-slave-evaluation
+             (cond
+               (call-buildslave
+                `(buildslave nil `(:slave-fetch-phase) :verbose t)))
              (lambda (pipe)
                (declare (ignore pipe))
                t)
-             hostname username :verbose-slave-communication
-             (getf keys :verbose-slave-communication call-buildslave)
-             (remove-from-plist keys :call-buildslave :hostname :username :verbose-slave-communication))
+             hostname username
+             :verbose (getf keys :verbose call-buildslave)
+             (remove-from-plist keys :call-buildslave :hostname :username :verbose))
     (buildbot-error (c)
       (return-from ping-slave (values nil c)))))
 
 (defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t)
              (slave-load t) (slave-test nil)
-             &key modules purge (debug t) disable-debugger (verbose t) verbose-slave-communication)
+             &key modules purge (debug t) disable-debugger (verbose t)
+             verbose-comm verbose-comm-starting-phase verbose-comm-starting-module)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
                        (when recurse '(master-recurse-phase))
@@ -360,7 +367,9 @@
        :debug debug
        :disable-debugger disable-debugger
        :verbose verbose
-       :verbose-slave-communication verbose-slave-communication))
+       :verbose-comm verbose-comm
+       :verbose-comm-starting-phase verbose-comm-starting-phase
+       :verbose-comm-starting-module verbose-comm-starting-module))
 
 (defun default-buildmaster-module-set ()
   (let* ((gate (gate *self*))
@@ -374,7 +383,10 @@
 (defun one (&key (hostname *default-buildslave-host*) (username *default-buildslave-username*)
             (phases *buildmaster-run-phases*) modules
             purge branch metastore-branch debug disable-debugger
-            (verbose t) verbose-slave-communication)
+            (verbose t)
+            verbose-comm
+            verbose-comm-starting-phase
+            verbose-comm-starting-module)
   (find-executable 'ssh)
   (let* ((gate (gate *self*))
          (module-names (or modules (multiple-value-bind (test-worthy central-system-less)
@@ -393,22 +405,30 @@
         (push m-r *buildmaster-runs*)
         (iter (for (phase . phases) on rest-phases)
               (while (typep phase 'local-test-phase))
-              (setf result-marker (execute-test-phase m-r phase result-marker
-                                                      :verbose verbose-slave-communication)
+              (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-comm)
                     rest-phases phases))
         (when rest-phases
           (handler-case
               (with-slave-evaluation `(buildslave ',(mapcar #'make-keyword module-names)
                                                   ',(mapcar (compose #'make-keyword #'type-of)
-                                                            rest-phases) ,verbose)
-                  (slave-pipe hostname username :purge purge :branch branch
-                              :metastore-branch metastore-branch
+                                                            rest-phases)
+                                                  :verbose ,verbose)
+                  (slave-pipe hostname username :purge purge
+                              :branch branch :metastore-branch metastore-branch
                               :debug debug :disable-debugger disable-debugger
-                              :verbose verbose :verbose-slave-communication verbose-slave-communication)
+                              :verbose (or verbose-comm
+                                           verbose-comm-starting-phase
+                                           verbose-comm-starting-module))
                 (iter (for (phase . phases) on rest-phases)
                       (setf (remote-phase-slave-stream phase) slave-pipe
                             result-marker (execute-test-phase m-r phase result-marker
-                                                              :verbose verbose-slave-communication))))
+                                                              :verbose verbose-comm
+                                                              :verbose-starting-module
+                                                              (and (if verbose-comm-starting-phase
+                                                                       (string= verbose-comm-starting-phase
+                                                                                (type-of phase))
+                                                                       t)
+                                                                   verbose-comm-starting-module)))))
             (buildbot-error (c)
               (terminate-action result-marker :condition c)
               (error c))))))

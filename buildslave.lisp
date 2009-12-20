@@ -107,7 +107,7 @@
                         *buildslave-remote-end-of-test-output-marker* 
                         return-value (format nil "~A" condition) backtrace)))))
 
-(defun buildslave (module-names phase-names &optional verbose &aux
+(defun buildslave (module-names phase-names &key verbose &aux
                    (module-names (mapcar #'canonicalise-name module-names)))
   (dolist (phase-name (mapcar (compose #'make-keyword #'string-upcase #'string) phase-names))
     (run-buildslave-phase phase-name module-names verbose)))
