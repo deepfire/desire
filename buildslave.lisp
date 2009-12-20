@@ -101,6 +101,7 @@
               (unstash-module m)))
           (recompute-full-system-dependencies)))))
   (:method (phase-name module-names verbose)
+    (syncformat t "(:phase ~S :module-count ~D)~%" phase-name (length module-names))
     (iter (for mn in module-names)
           (syncformat t "(:name ~S :mode ~(~S~)~%~
                          ~S~%" 
@@ -112,7 +113,8 @@
                            :status ~S :condition ~S :backtrace ~S)~%"
                         condition (type-of condition)
                         *buildslave-remote-end-of-test-output-marker* 
-                        return-value (format nil "~A" condition) backtrace)))))
+                        return-value (format nil "~A" condition) backtrace)))
+    (syncformat t "(:phase-end ~S)~%" phase-name)))
 
 (defun buildslave (module-names phase-names &optional verbose &aux
                    (module-names (mapcar #'canonicalise-name module-names)))

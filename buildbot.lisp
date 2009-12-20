@@ -175,63 +175,84 @@
       (let ((*read-eval* nil)
             (*package* (find-package :desire))
             (pipe (remote-phase-slave-stream p)))
-        (iter (with r = result-marker)
-              (repeat (master-run-n-phase-results m-r))
-              (for m = (result-module r))
-              (with-tracked-termination (r)
-                (let ((initial-line (read-mandatory-line pipe (name m))))
-                  (when verbose
-                    (report-line 0 initial-line))
-                  (unless (char= #\( (schar initial-line 0))
-                    (buildslave-communication-error
-                     "~@<Corrupt initial line while reading module ~A:~%~S~:@>"
-                     (name m) initial-line))
-                  (destructuring-bind (&key name mode) (read-string-list initial-line 1)
-                    (unless (eq name (name m))
-                      (buildslave-communication-error
-                       "~@<Wrong module info from slave, next in turn was ~S, ~
-                               module returned ~S.~:@>"
-                       (name m) name))
-                    (unless (eq mode (make-keyword (symbol-name (type-of p))))
-                      (buildslave-communication-error
-                       "~@<Wrong phase for module ~A from slave: ~
-                               current phase ~S, client sent ~S~:@>"
-                       (name m) :fetch mode))
-                    (format t "==( processing module ~A, phase ~A~%" name mode)
-                    (let ((marker-line (read-mandatory-line pipe (name m))))
+        (let ((phase-header (read-mandatory-line pipe "phase header")))
+          (when verbose
+            (report-line 0 phase-header))
+          (destructuring-bind (&key phase module-count) (let ((*read-eval* nil))
+                                                          (read-from-string phase-header))
+            (unless (string= phase (type-of p))
+              (buildslave-communication-error
+               "~@<Slave reports wrong phase ~A, while expected ~A.~:@>" phase (type-of p)))
+            (unless (= (phase-n-results p) module-count)
+              (buildslave-communication-error
+               "~@<Slave reports wrong module count for phase ~A: got ~D, expected ~D.~:@>"
+               phase module-count (phase-n-results p)))))
+        (prog1
+            (iter (with r = result-marker)
+                  (repeat (master-run-n-phase-results m-r))
+                  (for m = (result-module r))
+                  (with-tracked-termination (r)
+                    (let ((initial-line (read-mandatory-line pipe (name m))))
                       (when verbose
-                        (report-line 1 marker-line))
-                      (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
+                        (report-line 0 initial-line))
+                      (unless (char= #\( (schar initial-line 0))
                         (buildslave-communication-error
-                         "~@<Missing test output marker for module ~A, got instead:~%~S~:@>"
-                         (name m) marker-line)))
-                    (iter (for line = (read-mandatory-line pipe (name m) nil))
-                          (for i from 2)
-                          (when verbose
-                            (report-line i line))
-                          (when (line-marker-p line *buildslave-remote-end-of-test-output-marker*)
-                            (return))
-                          (append-result-output r line))
-                    (let* ((eof 'eof-marker)
-                           (*read-eval* nil)
-                           (final-args (iter (repeat 6)
-                                             (collect (read pipe nil eof)))))
-                      (when (member eof final-args)
-                        (buildslave-communication-error
-                         "~@<Early termination from slave while reading module ~A.~:@>"
-                         (name m)))
-                      (let ((final-line (read-mandatory-line pipe (name m))))
-                        (when verbose
-                          (report-line -1 final-line))
-                        (unless (and (= 1 (length final-line))
-                                     (char= #\) (schar final-line 0)))
+                         "~@<Corrupt initial line while reading module ~A:~%~S~:@>"
+                         (name m) initial-line))
+                      (destructuring-bind (&key name mode) (read-string-list initial-line 1)
+                        (unless (eq name (name m))
                           (buildslave-communication-error
-                           "~@<Corrupt final line while reading module ~A:~%~S~:@>"
-                           (name m) final-line)))
-                      ;; Advance the result.
-                      (destructuring-bind (&key status condition backtrace) final-args
-                        (setf r (advance-result m-r t status condition backtrace)))))))
-              (finally (return r)))))))
+                           "~@<Wrong module info from slave, next in turn was ~S, ~
+                               module returned ~S.~:@>"
+                           (name m) name))
+                        (unless (eq mode (make-keyword (symbol-name (type-of p))))
+                          (buildslave-communication-error
+                           "~@<Wrong phase for module ~A from slave: ~
+                               current phase ~S, client sent ~S~:@>"
+                           (name m) :fetch mode))
+                        (format t "==( processing module ~A, phase ~A~%" name mode)
+                        (let ((marker-line (read-mandatory-line pipe (name m))))
+                          (when verbose
+                            (report-line 1 marker-line))
+                          (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
+                            (buildslave-communication-error
+                             "~@<Missing test output marker for module ~A, got instead:~%~S~:@>"
+                             (name m) marker-line)))
+                        (iter (for line = (read-mandatory-line pipe (name m) nil))
+                              (for i from 2)
+                              (when verbose
+                                (report-line i line))
+                              (when (line-marker-p line *buildslave-remote-end-of-test-output-marker*)
+                                (return))
+                              (append-result-output r line))
+                        (let* ((eof 'eof-marker)
+                               (*read-eval* nil)
+                               (final-args (iter (repeat 6)
+                                                 (collect (read pipe nil eof)))))
+                          (when (member eof final-args)
+                            (buildslave-communication-error
+                             "~@<Early termination from slave while reading module ~A.~:@>"
+                             (name m)))
+                          (let ((final-line (read-mandatory-line pipe (name m))))
+                            (when verbose
+                              (report-line -1 final-line))
+                            (unless (and (= 1 (length final-line))
+                                         (char= #\) (schar final-line 0)))
+                              (buildslave-communication-error
+                               "~@<Corrupt final line while reading module ~A:~%~S~:@>"
+                               (name m) final-line)))
+                          ;; Advance the result.
+                          (destructuring-bind (&key status condition backtrace) final-args
+                            (setf r (advance-result m-r t status condition backtrace)))))))
+                  (finally (return r)))
+          (let ((phase-tail (read-mandatory-line pipe "phase tail")))
+            (when verbose
+              (report-line -1 phase-tail))
+            (destructuring-bind (&key phase-end) (let ((*read-eval* nil))
+                                                   (read-from-string phase-tail))
+              (unless (string= phase-end (type-of p))
+                (buildslave-communication-error
+                 "~@<Slave reports end of wrong phase ~A, while expected ~A.~:@>" phase-end (type-of p))))))))))
 
 ;;;;
 ;;;; Slave connection
