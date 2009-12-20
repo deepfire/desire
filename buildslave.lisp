@@ -91,17 +91,20 @@
     (not-implemented :slave-test-phase)))
 
 (defgeneric run-buildslave-phase (phase-name module-names verbose)
-  (:method :around ((phase-name (eql :slave-recurse-phase)) module-names verbose)
-    (unwind-protect (call-next-method)
-      (ignore-errors
-        (let ((*standard-output* (make-broadcast-stream))
-              (*error-output* (make-broadcast-stream)))
-          (do-modules (m)
-            (when (module-stashed-repo-present-p m)
-              (unstash-module m)))
-          (recompute-full-system-dependencies)))))
-  (:method (phase-name module-names verbose)
+  (:method :around (phase-name module-names verbose)
     (syncformat t "(:phase ~S :module-count ~D)~%" phase-name (length module-names))
+    (call-next-method)
+    (syncformat t "(:phase-end ~S)~%" phase-name))
+  (:method :before ((phase-name (eql :slave-load-phase)) module-names verbose)
+    (let ((*standard-output* (make-broadcast-stream))
+          (*error-output* (make-broadcast-stream)))
+      (ignore-errors
+        (dolist (mname module-names)
+          (let ((m (module mname)))
+            (when (module-stashed-repo-present-p m)
+              (unstash-module m))))
+        (recompute-full-system-dependencies))))
+  (:method (phase-name module-names verbose)
     (iter (for mn in module-names)
           (syncformat t "(:name ~S :mode ~(~S~)~%~
                          ~S~%" 
@@ -113,8 +116,7 @@
                            :status ~S :condition ~S :backtrace ~S)~%"
                         condition (type-of condition)
                         *buildslave-remote-end-of-test-output-marker* 
-                        return-value (format nil "~A" condition) backtrace)))
-    (syncformat t "(:phase-end ~S)~%" phase-name)))
+                        return-value (format nil "~A" condition) backtrace)))))
 
 (defun buildslave (module-names phase-names &optional verbose &aux
                    (module-names (mapcar #'canonicalise-name module-names)))
