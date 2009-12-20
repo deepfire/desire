@@ -47,7 +47,8 @@
 (defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
 
 (defparameter *implementation-provided-system-names*
-  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-COVER" "SB-GROVEL" "SB-MD5" "SB-POSIX" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS")
+  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-CLTL2" "SB-COVER" "SB-EXECUTABLE" "SB-GROVEL"
+           "SB-INTROSPECT" "SB-MD5" "SB-POSIX" "SB-QUEUE" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS" "SB-SPROF")
   #-sbcl nil)
 
 (defvar *unsaved-definition-changes-p* nil
