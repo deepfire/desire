@@ -99,10 +99,17 @@
     (recompute-full-system-dependencies))
   (:method (phase-name module-names verbose)
     (iter (for mn in module-names)
-          (syncformat t "(:name ~S :mode ~(~S~)~%~S~%" mn phase-name *buildslave-remote-test-output-marker*)
+          (syncformat t "(:name ~S :mode ~(~S~)~%~
+                         ~S~%" 
+                      mn phase-name
+                      *buildslave-remote-test-output-marker*)
           (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
-            (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~]~%~S~%:status ~S :condition ~S :backtrace ~S)~%"
-                        condition (type-of condition) *buildslave-remote-end-of-test-output-marker* return-value (format nil "~A" condition) backtrace)))))
+            (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~%~]~
+                           ~S~%~
+                           :status ~S :condition ~S :backtrace ~S)~%"
+                        condition (type-of condition)
+                        *buildslave-remote-end-of-test-output-marker* 
+                        return-value (format nil "~A" condition) backtrace)))))
 
 (defun buildslave (module-names phase-names &optional verbose &aux
                    (module-names (mapcar #'canonicalise-name module-names)))
