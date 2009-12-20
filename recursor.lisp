@@ -78,12 +78,13 @@
                                                                                        known-external)
                      (declare (ignore host-provided-external))
                      (let ((extended-system-dictionary system-dictionary))
-                       (dolist (newdep (append (mapcar (compose #'string #'name) (append known-local truly-external unknown))
+                       (dolist (newdep (append (mapcar (compose #'string #'name) (append known-local unknown))
                                                undefined))
                          (setf extended-system-dictionary (mark-system-wanted newdep extended-system-dictionary)))
                        ;; NOTE: on module boundaries we lose precise system dependency names
-                       (values (append (mapcar (compose #'name #'system-module) truly-external)
-                                       modules)
+                       (values (remove-duplicates
+                                (append (mapcar (compose #'name #'system-module) truly-external)
+                                        modules))
                                extended-system-dictionary)))))))
            (satisfy-next-system (module system-type &optional modules system-dictionary)
              "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
