@@ -850,7 +850,8 @@ This notably excludes converted modules."
 (defun remove-system (system-designator &aux
                       (s (coerce-to-system system-designator)))
   (do-remove-system s)
-  (removef (module-systems (system-module s)) s))
+  (when (system-known-p s)
+    (removef (module-systems (system-module s)) s)))
 
 (defun remove-app (app-designator &aux
                    (a (coerce-to-application app-designator)))
