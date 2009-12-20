@@ -61,6 +61,10 @@ Only used in COMPUTE-SYSTEM-DEFINITION-PATHNAME.")
   (:method ((o asdf-system))
     (downstring (name o))))
 
+(defgeneric drop-system-backend-definition-cache (type)
+  (:method ((o (eql 'asdf-system)))
+    (clrhash asdf::*defined-systems*)))
+
 ;; This is /just/ for two functions below.
 ;; Use SYSTEM-DEFINITION-REGISTRY-SYMLINK-PATH for your needs.
 (defun locality-asdf-registry-path (locality)

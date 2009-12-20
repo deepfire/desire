@@ -95,21 +95,16 @@
     (syncformat t "(:phase ~S :module-count ~D)~%" phase-name (length module-names))
     (call-next-method)
     (syncformat t "(:phase-end ~S)~%" phase-name))
-  (:method :before ((phase-name (eql :slave-load-phase)) module-names verbose)
-    (let ((*standard-output* (make-broadcast-stream))
-          (*error-output* (make-broadcast-stream)))
-      (ignore-errors
-        (dolist (mname module-names)
-          (let ((m (module mname)))
-            (when (module-stashed-repo-present-p m)
-              (unstash-module m))))
-        (recompute-full-system-dependencies))))
   (:method (phase-name module-names verbose)
     (iter (for mn in module-names)
           (syncformat t "(:name ~S :mode ~(~S~)~%~
                          ~S~%" 
                       mn phase-name
                       *buildslave-remote-test-output-marker*)
+          (do-modules (m)
+            (when (directory-exists-p (module-pathname m))
+              (stash-module m)))
+          (drop-system-backend-definition-cache *default-system-type*)
           (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
             (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~%~]~
                            ~S~%~
