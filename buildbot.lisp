@@ -128,12 +128,28 @@
        (char= #\: (schar line 0))
        (string= line (symbol-name marker) :start1 1)))
 
+(defvar *implementation-debugger-signature*
+  #+sbcl "debugger invoked on a")
+(defvar *implementation-unhandled-condition-signature*
+  #+sbcl "unhandled")
+(defun snoop-buildslave-errors (line nr stream error-type)
+  (when (or (starts-with-subseq *implementation-debugger-signature* line)
+            (starts-with-subseq *implementation-unhandled-condition-signature* line))
+    (format t "==( found remote error signature on line ~D~%" nr)
+    (let ((error-message (apply #'concatenate 'string line #(#\Newline)
+                                (iter (for line = (read-line stream nil nil))
+                                      (while line)
+                                      (collect line)
+                                      (collect #(#\Newline))))))
+      (error error-type :output error-message))))
+
 (defun read-mandatory-line (stream description &optional (slurp-empty-lines t))
   (iter (for line = (read-line stream nil nil))
         (unless line
           (buildslave-communication-error
            "~@<Early termination from slave: premature end while processing ~A.~:@>"
            description))
+        (snoop-buildslave-errors line 0 stream 'buildslave-communication-error)
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
 
@@ -260,10 +276,6 @@
 ;;;;
 ;;;; Slave connection
 ;;;;
-(defvar *implementation-debugger-signature*
-  #+sbcl "debugger invoked on a")
-(defvar *implementation-unhandled-condition-signature*
-  #+sbcl "unhandled")
 (defun invoke-with-slave-connection (hostname username slave-setup-commands verbose-comm fn)
   (flet ((setup-slave-connection (pipe hostname username commands)
            (with-asynchronous-execution
@@ -278,15 +290,7 @@
                                                        beginning-of-output marker missing~:@>"))
                  (when verbose-comm
                    (report-line i line))
-                 (when (or (starts-with-subseq *implementation-debugger-signature* line)
-                           (starts-with-subseq *implementation-unhandled-condition-signature* line))
-                   (format t "==( found remote error signature on line ~D~%" i)
-                   (let ((error-message (apply #'concatenate 'string line #(#\Newline)
-                                               (iter (for line = (read-line pipe nil nil))
-                                                     (while line)
-                                                     (collect line)
-                                                     (collect #(#\Newline))))))
-                     (error 'buildslave-initialisation-error :output error-message)))
+                 (snoop-buildslave-errors line i pipe 'buildslave-initialisation-error)
                  (for i from 0)
                  (when (line-marker-p line *buildslave-remote-output-marker*)
                    (when verbose-comm
