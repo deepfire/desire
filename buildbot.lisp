@@ -289,15 +289,18 @@
                      (error 'buildslave-initialisation-error :output error-message)))
                  (for i from 0)
                  (when (line-marker-p line *buildslave-remote-output-marker*)
-                   (report-line i line)
+                   (when verbose-comm
+                     (report-line i line))
                    (format t "==( found remote output beginning marker on line ~D~%" i)
                    (return))))
          (finalise-slave-connection (pipe)
            (let ((final-line (read-mandatory-line pipe "the final line")))
-             (report-line -1 final-line)
+             (when verbose-comm
+               (report-line -1 final-line))
              (unless (line-marker-p final-line *buildslave-remote-end-of-output-marker*)
                (buildslave-communication-error "~@<Early termination from slave: ~
-                                                   end-of-output marker missing~:@>")))))
+                                                   end-of-output marker missing~:@>"))
+             (format t "==( found end of remote output marker~%"))))
     (with-pipe-stream (pipe :element-type 'character :buffering :none)
       (setup-slave-connection pipe hostname username slave-setup-commands)
       (multiple-value-prog1 (funcall fn pipe)
