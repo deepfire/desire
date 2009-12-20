@@ -226,6 +226,11 @@ update_dependencies() {
     for desire_dep in ${desire_deps} desire
     do
         test "${VERBOSE}" && echo -n "      $desire_dep: "
+        # Handle stashed modules.
+        if test -d "${root}/git/${desire_dep}_"
+        then
+            mv "${root}/git/${desire_dep}_" "${root}/git/${desire_dep}"
+        fi
         if test -d "${root}/git/${desire_dep}"
         then
             update_module "${root}" "${desire_dep}"
