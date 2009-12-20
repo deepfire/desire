@@ -100,7 +100,7 @@
                       mn phase-name
                       *buildslave-remote-test-output-marker*)
           (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
-            (syncformat t "~:[~*~;~%>>> A condition of type ~A was encountered during execution.~%~]~
+            (syncformat t "~%~:[~*~;~%>>> A condition of type ~A was encountered during execution.~%~]~
                            ~S~%~
                            :status ~S :condition ~S :backtrace ~S)~%"
                         condition (type-of condition)
