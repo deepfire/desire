@@ -129,10 +129,8 @@
        (char= #\: (schar line 0))
        (string= line (symbol-name marker) :start1 1)))
 
-(defun read-mandatory-line (stream description verbose &optional (slurp-empty-lines t))
+(defun read-mandatory-line (stream description &optional (slurp-empty-lines t))
   (iter (for line = (read-line stream nil nil))
-        (when verbose
-          (report-line :rml line))
         (unless line
           (buildslave-communication-error
            "~@<Early termination from slave: premature end while processing ~A.~:@>"
@@ -181,7 +179,7 @@
               (repeat (master-run-n-phase-results m-r))
               (for m = (result-module r))
               (with-tracked-termination (r)
-                (let ((initial-line (read-mandatory-line pipe (name m) verbose)))
+                (let ((initial-line (read-mandatory-line pipe (name m))))
                   (when verbose
                     (report-line 0 initial-line))
                   (unless (char= #\( (schar initial-line 0))
@@ -200,14 +198,14 @@
                                current phase ~S, client sent ~S~:@>"
                        (name m) :fetch mode))
                     (format t "==( processing module ~A, phase ~A~%" name mode)
-                    (let ((marker-line (read-mandatory-line pipe (name m) verbose)))
+                    (let ((marker-line (read-mandatory-line pipe (name m))))
                       (when verbose
                         (report-line 1 marker-line))
                       (unless (line-marker-p marker-line *buildslave-remote-test-output-marker*)
                         (buildslave-communication-error
                          "~@<Missing test output marker for module ~A, got instead:~%~S~:@>"
                          (name m) marker-line)))
-                    (iter (for line = (read-mandatory-line pipe (name m) verbose nil))
+                    (iter (for line = (read-mandatory-line pipe (name m) nil))
                           (for i from 2)
                           (when verbose
                             (report-line i line))
@@ -222,7 +220,7 @@
                         (buildslave-communication-error
                          "~@<Early termination from slave while reading module ~A.~:@>"
                          (name m)))
-                      (let ((final-line (read-mandatory-line pipe (name m) verbose)))
+                      (let ((final-line (read-mandatory-line pipe (name m))))
                         (when verbose
                           (report-line -1 final-line))
                         (unless (and (= 1 (length final-line))
