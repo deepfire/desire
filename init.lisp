@@ -54,6 +54,7 @@
   (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
     (do-remotes (r)
       (setf (remote-disabled-p r) (not (member (vcs-type r) present))))
+    (find-executable 'wget)
     (find-executable 'make)
     (find-executable 'cp)))
 
