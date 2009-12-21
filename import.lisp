@@ -276,15 +276,16 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
       (module-error module "~@<Module ~A is not present, when checking for stashed-ness.~:@>" (name module)))
     stashed-present-p))
 
-(defun stash-module (module &optional (locality (gate *self*)) &aux
+(defun stash-module (module &optional (drop-system-caches t) (locality (gate *self*)) &aux
                      (module (coerce-to-module module)))
   (when (module-stashed-p module)
     (module-error module "~@<Module ~A is already stashed.~:@>" (name module)))
   (format t "~@<;; ~@;Stashing module ~A.~:@>~%" (name module))
   (rename-file (module-pathname module locality) (module-stashed-pathname module locality))
   (setf (module-scan-positive-localities module) nil)
-  (dolist (s (module-systems module) t)
-    (system-makunpresent s)))
+  (when drop-system-caches
+    (dolist (s (module-systems module) t)
+      (system-makunpresent s))))
 
 (defun unstash-module (module &optional (locality (gate *self*)) &aux
                        (module (coerce-to-module module)))

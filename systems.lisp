@@ -127,6 +127,15 @@ definition path within its module within LOCALITY.")
 ;;;;
 ;;;; Dependencies
 ;;;;
+(defgeneric drop-system-caches (system-type)
+  (:documentation
+   "Clear system presence and dependency caches, as well as that of
+the system definition backend for SYSTEM-TYPE.")
+  (:method (type)
+    (do-systems (s)
+      (system-makunpresent s)
+      (drop-system-backend-definition-cache type))))
+
 (defgeneric recompute-direct-system-dependencies-one (system)
   (:method ((o system))
     (setf (slot-value o 'direct-dependency-names) (compute-direct-system-dependencies o))))

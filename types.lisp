@@ -744,6 +744,8 @@ Find out whether SYSTEM is hidden."
 (defun system-makunpresent (system)
   "Change SYSTEM so that SYSTEM-LOCALLY-PRESENT-P will return NIL on it."
   (declare (type system system))
+  (slot-makunbound system 'dependencies)
+  (slot-makunbound system 'direct-dependency-names)
   (slot-makunbound system 'definition-pathname)
   (slot-makunbound system 'definition-write-date))
 
