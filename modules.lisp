@@ -195,7 +195,9 @@ meets desire's operational requirements.")
                                        (remove-if #'system-dependencies-up-to-date-p (module-systems o)))))
         (update-system-set-dependencies changed-systems)))))
 
-(defun enumerate-present-modules-and-systems (&key verbose)
+(defun enumerate-present-modules-and-systems (&key drop-system-caches verbose)
+  (when drop-system-caches
+    (drop-system-caches *default-system-type*))
   (with-measured-time-lapse (sec)
       (do-present-modules (module)
         (when verbose
@@ -206,4 +208,5 @@ meets desire's operational requirements.")
   (mapc #'ensure-host-system *implementation-provided-system-names*)
   (with-measured-time-lapse (sec) (update-system-set-dependencies t)
     (when verbose
-      (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec))))
+      (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec)))
+  (values))
