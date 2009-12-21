@@ -78,12 +78,17 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
   (:method ((type (eql 'asdf-system)) locality)
     (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
 
-(defgeneric ensure-system-loadable (system &optional path locality)
+(defgeneric ensure-system-loadable (system &optional locality path)
   (:documentation
    "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
 definition path within its module within LOCALITY.")
-  (:method ((o asdf-system) &optional path (locality (gate *self*)))
-    (when-let ((definition-pathname (or path (system-definition-pathname o))))
+  (:method :before ((o system) &optional locality path)
+    (declare (ignore path locality))
+    (unless (system-locally-present-p o)
+      (system-error o "~@<Cannot ensure loadability of a non-locally-present system ~A.~:@>"
+                    (name o))))
+  (:method ((o asdf-system) &optional (locality (gate *self*)) path)
+    (let ((definition-pathname (or path (system-definition-pathname o))))
       (ensure-symlink (system-definition-registry-symlink-path o locality)
                       definition-pathname))))
 
@@ -111,10 +116,9 @@ definition path within its module within LOCALITY.")
   (:documentation
    "Determine whether SYSTEM is loadable within LOCALITY.")
   (:method :around ((s system) &optional (locality (gate *self*)))
-    (handler-case (let ((*break-on-signals* nil))
-                    (call-next-method s locality))
-      (error (c)
-        (format t "~@<; ~@;WARNING: error while querying backend of system ~S about its loadability: ~A~:@>~%" (name s) c))))
+     (or (system-host-p s)
+         (and (system-locally-present-p s)
+              (call-next-method s locality))))
   (:method ((o symbol) &optional (locality (gate *self*)))
     (system-loadable-p (system o) locality))
   (:method ((o host-system) &optional locality)
@@ -136,19 +140,28 @@ the system definition backend for SYSTEM-TYPE."
       (system-makunpresent s)))
   (drop-system-backend-definition-cache system-type))
 
-(defgeneric recompute-direct-system-dependencies-one (system)
-  (:method ((o system))
-    (setf (slot-value o 'direct-dependency-names) (compute-direct-system-dependencies o))))
+(defgeneric notice-system-definition (system pathname)
+  (:method ((o known-system) (p pathname))
+    (setf (slot-value o 'definition-pathname) p
+          (slot-value o 'definition-write-date) (file-write-date p))))
 
 (defgeneric system-dependencies-up-to-date-p (system)
-  (:method ((o system))
+  (:method ((o host-system)) t)
+  (:method ((o known-system))
+    (unless (system-locally-present-p o)
+      (system-error o "~@<Asked to determine up-to-date-ness of a non-locally-present system ~A.~:@>"
+                    (name o)))
     (= (file-write-date (system-definition-pathname o)) (system-definition-write-date o))))
 
 (defgeneric direct-system-dependencies (system)
-  (:method ((o system))
+  (:method ((o known-system))
     (if (system-dependencies-up-to-date-p o)
         (system-direct-dependency-names o)
         (recompute-direct-system-dependencies-one o))))
+
+(defgeneric recompute-direct-system-dependencies-one (system)
+  (:method ((o known-system))
+    (setf (slot-value o 'direct-dependency-names) (compute-direct-system-dependencies o))))
 
 (defun recompute-direct-system-dependencies ()
   (do-present-systems (s)
@@ -221,7 +234,7 @@ the system definition backend for SYSTEM-TYPE."
                        systems))
           (sysdeps s))))))
 
-(defun compute-system-full-dependencies (system &aux
+(defun compute-full-system-dependencies (system &aux
                                          (system (coerce-to-system system)))
   (recompute-full-system-dependencies-set (list system))
   (values (when (system-definition-complete-p system)

@@ -99,7 +99,7 @@
                                        encountered an ~A ~A~:[~; at ~S~].~:@>"
                                    (name module) system-type (type-of system) name
                                    (system-locally-present-p system)
-                                   (when (system-known-p system)
+                                   (when (system-locally-present-p system)
                                      (system-definition-pathname system))))
                  (setf (system-satisfiedp system-dictionary name) :present) ; made loadable, hiddens uncovered, deps about to be added
                  (add-system-dependencies module system modules system-dictionary))

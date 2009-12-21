@@ -709,7 +709,6 @@ instead."
   ((definition-pathname :reader system-definition-pathname :initarg :definition-pathname :documentation "Cache.")
    (definition-write-date :reader system-definition-write-date :initarg :definition-write-date :documentation "Cache."))
   (:default-initargs
-   :pathname nil
    :definition-write-date nil
    :definition-complete-p nil)
   (:documentation
@@ -740,6 +739,7 @@ Find out whether SYSTEM is hidden."
   "Whether SYSTEM is present within local gate."
   (declare (type system system))
   (and (system-known-p system)
+       (not (system-host-p system))
        (slot-boundp system 'definition-pathname)))
 
 (defun system-makunpresent (system)

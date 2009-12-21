@@ -293,8 +293,8 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
     (module-error module "~@<Module ~A is not stashed.~:@>" (name module)))
   (format t "~@<;; ~@;Unstashing module ~A.~:@>~%" (name module))
   (rename-file (module-stashed-pathname module locality) (module-pathname module locality))
-  (module-locally-present-p module) ; restore locality presence cache
-  (notice-module-repository module)
+  (module-locally-present-p module locality) ; restore locality presence cache
+  (notice-module-repository module nil locality)
   t)
 
 (defun update (module &optional locality &key pass-output &aux

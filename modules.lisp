@@ -110,9 +110,8 @@ system TYPE within LOCALITY."
                                           ;; Upgrading system to a known one!
                                           (remove-system present-system))))
                                   (register-new-system (canonicalise-name name) path))))
-                 (setf (slot-value system 'definition-pathname) path
-                       (slot-value system 'definition-write-date) (file-write-date path))
-                 (ensure-system-loadable system path locality))))
+                 (notice-system-definition system path)
+                 (ensure-system-loadable system locality path))))
       (let ((systems
              (iter (for path in sysfiles)
                    (for name in sysnames)
@@ -206,13 +205,13 @@ Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
   (dolist (s (module-systems module))
     (when *verbose-repository-maintenance*
       (format t "~@<;;; ~@;Ensuring loadability of ~A ~A~:@>~%" (type-of s) (name s)))
-    (ensure-system-loadable s (system-definition-pathname s) locality)))
+    (ensure-system-loadable s locality)))
 
 ;;;;
 ;;;; Module repository maintenance hook
 ;;;;
 ;;; Branching model management.
-;;; System discovery, loadability and dependencies.
+;;; System discovery, presence, loadability and dependencies.
 (defgeneric notice-module-repository (module &optional compute-system-dependencies locality)
   (:documentation
    "Ensure that the repository corresponding to MODULE within LOCALITY
