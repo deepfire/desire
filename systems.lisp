@@ -203,7 +203,7 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                                           (unless depsys
                                             (make-instance 'unknown-system :name depname)))
                                          (t
-                                          (multiple-value-bind (deps complete-p) (do-calc-sysdeps (cons s depstack) depsys)
+                                          (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
                                             ;; Incomplete dependencies being contagious are the second reason.
                                             (setf definition-complete-p complete-p)
                                             (nconcing (copy-list deps))))))))
