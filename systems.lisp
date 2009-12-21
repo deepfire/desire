@@ -154,22 +154,30 @@ the system definition backend for SYSTEM-TYPE."
   (do-present-systems (s)
     (recompute-direct-system-dependencies-one s)))
 
-(defun recompute-full-system-dependencies-set (systems)
+(defun recompute-full-system-dependencies-set (systems &key verbose)
   (let ((removed-links (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
       (labels ((do-calc-sysdeps (depstack s)
                  ;; XXX: ensure-slot-value special form ?
                  (with-slots (name direct-dependency-names dependencies definition-complete-p) s
-                   (cond ((member s depstack)       ; dependency loop?
+                   (when verbose
+                     (format t "computing dependencies of ~A~%" (name s)))
+                   (cond ((member s depstack) ; dependency loop?
+                          (when verbose
+                            (format t "...dependency loop: ~A~%" (mapcar #'name depstack)))
                           (push name (removed-links (first depstack)))
                           (deletef (slot-value (first depstack) 'direct-dependency-names) name)
                           ;; not re-adding dependencies
                           ;; NOTE: what about incompleteness propagation?
                           nil)
-                         ((slot-boundp s 'dependencies)      ; cached?
+                         ((slot-boundp s 'dependencies) ; cached?
+                          (when verbose
+                            (format t "...already computed, returning ~A~%" (mapcar #'name dependencies)))
                           (values dependencies
                                   definition-complete-p))
-                         ((system-locally-present-p s)    ; available?
+                         ((system-locally-present-p s) ; available?
+                          (when verbose
+                            (format t "...computing~%"))
                           (setf dependencies
                                 (delete-duplicates
                                  (iter outer
@@ -189,14 +197,20 @@ the system definition backend for SYSTEM-TYPE."
                                             (nconcing (copy-list deps))))))))
                           (unless direct-dependency-names ; no deps, no problems
                             (setf definition-complete-p t))
+                          (when verbose
+                            (format t "computed dependencies of ~A: ~:[in~;~]complete, ~A~%"
+                                    (name s) definition-complete-p (mapcar #'name dependencies)))
                           (values dependencies
                                   definition-complete-p))
                          (t
+                          (when verbose
+                            (format t "...not locally present, skipping~%"))
                           ;; System not being locally present is the third reason.
                           (values nil
                                   (setf definition-complete-p nil))))))
                (sysdeps (s)
                  (unwind-protect (do-calc-sysdeps nil s)
+                   ;; reinstate loops..
                    (do-removed-links (from to-names)
                      (nconcf (slot-value from 'direct-dependency-names) to-names))
                    (clrhash removed-links))))
@@ -206,6 +220,13 @@ the system definition backend for SYSTEM-TYPE."
                            (collect s)))
                        systems))
           (sysdeps s))))))
+
+(defun compute-system-full-dependencies (system &aux
+                                         (system (coerce-to-system system)))
+  (recompute-full-system-dependencies-set (list system))
+  (values (when (system-definition-complete-p system)
+            (system-dependencies system))
+          (system-definition-complete-p system)))
 
 (defun recompute-full-system-dependencies ()
   (recompute-full-system-dependencies-set t))
