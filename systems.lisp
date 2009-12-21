@@ -182,9 +182,12 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                           ;; NOTE: what about incompleteness propagation?
                           (values t nil))
                          ((and (slot-boundp s 'dependencies) ; cached?
-                               (not force-recompute))
+                               definition-complete-p
+                               (or (system-host-p s) ; it's constant
+                                   (not force-recompute)))
                           (when verbose
-                            (format t "...already computed, returning ~A~%" (mapcar #'name dependencies)))
+                            (format t "...already computed, returning ~:[in~;~]complete, ~A~%"
+                                    definition-complete-p (mapcar #'name dependencies)))
                           (values definition-complete-p
                                   dependencies))
                          ((system-locally-present-p s) ; available?
@@ -192,8 +195,7 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                             (format t "...computing~%"))
                           (setf dependencies
                                 (delete-duplicates
-                                 (iter outer
-                                       (for depname in direct-dependency-names)
+                                 (iter (for depname in direct-dependency-names)
                                        (for depsys = (system depname :if-does-not-exist :continue))
                                        (cond
                                          ((not (and depsys (system-known-p depsys)))
@@ -201,12 +203,13 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                                           ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
                                           (setf definition-complete-p nil)
                                           (unless depsys
-                                            (make-instance 'unknown-system :name depname)))
+                                            (make-instance 'unknown-system :name depname))
+                                          (nconcing (list depsys)))
                                          (t
                                           (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
                                             ;; Incomplete dependencies being contagious are the second reason.
                                             (setf definition-complete-p complete-p)
-                                            (nconcing (copy-list deps))))))))
+                                            (nconcing (cons depsys (copy-list deps)))))))))
                           (unless direct-dependency-names ; no deps, no problems
                             (setf definition-complete-p t))
                           (when verbose
@@ -235,9 +238,11 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
           (dolist (s set)
             (andf complete-p (sysdeps s))))))))
 
-(defun compute-full-system-dependencies (system &aux
+(defun compute-full-system-dependencies (system &key force-recompute verbose &aux
                                          (system (coerce-to-system system)))
-  (let ((complete-p (update-system-set-dependencies (list system))))
+  (let ((complete-p (update-system-set-dependencies (list system)
+                                                    :force-recompute force-recompute
+                                                    :verbose verbose)))
     (values (when complete-p
               (system-dependencies system))
             complete-p)))
