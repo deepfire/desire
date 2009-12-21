@@ -200,6 +200,8 @@
    #:read-local-definitions
    #:unsaved-definition-changes-p
    ;; systems.lisp
+   #:undeclared-system-dependency
+   #:condition-guilty-set
    #:system-loadable-p
    #:ensure-system-loadable
    #:module-systems-unloadable-error

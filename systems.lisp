@@ -39,6 +39,12 @@
   (:report (system path)
            "~@<Couldn't find the definition for ~S in ~S~:@>" system path))
 
+(define-reported-condition undeclared-system-dependency (system-error)
+  ((guilty-set :reader condition-guilty-set :initarg :guilty-set))
+  (:report (system guilty-set)
+           "~@<Undeclared dependency for system ~A somewhere among systems ~A.~:@>"
+           (name system) (mapcar #'name guilty-set)))
+
 ;;;;
 ;;;; Backends
 ;;;;
@@ -124,6 +130,10 @@ definition path within its module within LOCALITY.")
 ;;;;
 ;;;; Dependencies
 ;;;;
+(defun ensure-system (name)
+  (or (system name :if-does-not-exist :continue)
+      (make-instance 'unknown-system :name name)))
+
 (defun drop-system-caches (&optional (system-type *default-system-type*))
   "Clear system presence and dependency caches, as well as that of
 the system definition backend for SYSTEM-TYPE."
@@ -200,20 +210,18 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                             (setf dependencies
                                   (delete-duplicates
                                    (iter (for depname in direct-dependency-names)
-                                         (for depsys = (system depname :if-does-not-exist :continue))
+                                         (for depsys = (ensure-system depname))
                                          (when verbose
                                            (format t ";;;;;; processing direct ~A, ~
                                                              ~:[missing~;present, ~:[un~;~]known~]~%"
                                                    depname depsys (and depsys (system-known-p depsys))))
                                          (nconcing
                                           (cond
-                                            ((not (and depsys (system-known-p depsys)))
+                                            ((not (system-known-p depsys))
                                              ;; There are three reasons for system's definitions to be incomplete.
                                              ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
                                              (setf definition-complete-p nil)
-                                             (let ((depsys (or depsys
-                                                               (make-instance 'unknown-system :name depname))))
-                                               (list depsys)))
+                                             (list depsys))
                                             (t
                                              (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
                                                ;; Incomplete dependencies being contagious are the second reason.
