@@ -131,7 +131,9 @@ definition path within its module within LOCALITY.")
   "Clear system presence and dependency caches, as well as that of
 the system definition backend for SYSTEM-TYPE."
   (do-systems (s)
-    (system-makunpresent s))
+    (when (and (system-known-p s)
+               (not (system-host-p s)))
+      (system-makunpresent s)))
   (drop-system-backend-definition-cache system-type))
 
 (defgeneric recompute-direct-system-dependencies-one (system)
