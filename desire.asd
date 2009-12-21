@@ -1,13 +1,6 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
-
-(defpackage :desire.system
-  (:use :cl :asdf))
-
-(in-package :desire.system)
-
-(defsystem :desire
-  :depends-on (:alexandria :iterate :cl-fad
-               :pergamum :executor)
+(asdf:defsystem :desire
+  :depends-on (:alexandria :iterate :cl-fad :pergamum :executor)
   :components ((:file "dependencies")
                ;; Tier #
                (:file "package" :depends-on ("dependencies"))
