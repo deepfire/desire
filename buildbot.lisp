@@ -32,7 +32,7 @@
                                                     *bootstrap-script-location*))
 
 (defun cook-buildslave-command (expr &key purge purge-metastore (branch "master") metastore-branch
-                                (debug t) disable-debugger verbose)
+                                (debug t) (disable-debugger t) verbose)
   (remove nil (list
                (when purge
                  *purge-command*)
@@ -329,9 +329,7 @@
         (format t "~@<;;; ~@;Evaluating on buildslave: ~S~:@>~%" slave-form))
       (with-slave-connection (slave-pipe hostname username
                                          (apply #'cook-buildslave-command slave-form
-                                                (remove-from-plist keys
-                                                                   :print-slave-connection-conditions
-                                                                   :verbose))
+                                                (remove-from-plist keys :print-slave-connection-conditions))
                                          :verbose verbose)
         (funcall local-fn slave-pipe)))))
 
@@ -361,7 +359,7 @@
 
 (defun one* (&optional (reachability t) (upstream t) (recurse t) (slave-fetch t)
              (slave-load t) (slave-test nil)
-             &key modules purge (debug t) disable-debugger (verbose t)
+             &key modules purge (debug t) (disable-debugger t) (verbose t)
              verbose-comm verbose-comm-starting-phase verbose-comm-starting-module)
   (one :phases (append (when reachability '(master-reachability-phase))
                        (when upstream '(master-update-phase))
