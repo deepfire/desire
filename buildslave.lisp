@@ -82,7 +82,11 @@
         (stash-module m nil)))
     (drop-system-caches *default-system-type*)
     (desire (list mn) :skip-present t :seal nil :verbose verbose-internals)
-    (module-dependencies (module mn))
+    (multiple-value-bind (module-deps system-deps) (module-dependencies (module mn))
+      (format t "~@<;;; ~@; Mo~@<dule dependencies: ~A~:@>~:@>~%" (mapcar #'name module-deps))
+      (format t "~@<;;; ~@; Sy~@<stem dependencies: ~A~:@>~:@>~%" (mapcar #'name system-deps))
+      (format t "~@<;;; ~@; The dependencies are ~:[IN~;~]complete~:@>~%"
+              (every #'system-definition-complete-p system-deps)))
     (asdf:oos 'asdf:load-op (name (module-central-system mn)))
     t)
   (:method ((o (eql :slave-test-phase)) mn &optional verbose-internals record-output)
