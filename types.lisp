@@ -745,6 +745,9 @@ Find out whether SYSTEM is hidden."
 (defun system-makunpresent (system)
   "Change SYSTEM so that SYSTEM-LOCALLY-PRESENT-P will return NIL on it."
   (declare (type system system))
+  (when (system-host-p system)
+    (system-error system "~@<SYSTEM-MAKUNPRESENT: asked to make a host system ~A unpresent.~:@>"
+                  (name system)))
   (setf (slot-value system 'definition-complete-p) nil)
   (slot-makunbound system 'dependencies)
   (slot-makunbound system 'direct-dependency-names)
