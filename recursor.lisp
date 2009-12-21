@@ -196,7 +196,7 @@
          (when toplevelp
            (when verbose
              (format t "~@<;;; ~@;Recomputing system dependencies...~:@>~%"))
-           (recompute-full-system-dependencies-set
+           (update-system-set-dependencies
             (lret ((involved-systems (mapcar (compose #'system #'first) updated-system-dictionary)))
               (format t "~@<;;; ~@;Finally, recalculating fulldeps of following systems: ~A~:@>~%"
                       (mapcar #'name (remove-if #'system-host-p involved-systems))))))

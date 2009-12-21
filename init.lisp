@@ -21,12 +21,6 @@
 (in-package :desire)
 
 
-(defun make-host-system (name)
-  (make-instance 'host-system :name (canonicalise-name name)))
-
-(defun enumerate-host-systems ()
-  (mapc #'make-host-system *implementation-provided-system-names*))
-
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
     (desire-error "~@<The specified root at ~S does not exist.~:@>" directory))
@@ -136,25 +130,11 @@ locally present modules will be marked as converted."
       ;;
       ;; Per-repository branch model maintenance, system discovery and loadability
       ;;
-      (syncformat t ";;; Massaging present modules~%")
-      (with-measured-time-lapse (sec)
-          (do-present-modules (module)
-            (when verbose
-              (syncformat t ";;; Processing module ~A~%" (name module)))
-            (notice-module-repository module nil))
-        (when verbose
-          (syncformat t ";;; Ensured branches and performed system discovery and query in ~D seconds.~%" sec)))
-      ;;
-      ;; System dependency calculation, in bulk
-      ;;
-      (enumerate-host-systems)
-      (with-measured-time-lapse (sec) (recompute-full-system-dependencies)
-        (when verbose
-          (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec)))
+      (syncformat t ";;; Enumerating present modules and systems~%")
+      (enumerate-present-modules-and-systems :verbose verbose)
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
-              (sort (do-modules (m)
-                      (when (module-scan-positive-localities m)
-                        (collect (string (name m)))))
+              (sort (do-present-modules (m)
+                      (collect (name m)))
                     #'string<))
       ;;
       ;; Quirks

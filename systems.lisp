@@ -54,13 +54,6 @@ For case-insensitive systems the name is in upper case.")
   (:method ((type (eql 'asdf-system)) pathname)
     (string-upcase (pathname-name pathname))))
 
-(defgeneric system-canonical-definition-pathname-name (system)
-  (:documentation
-   "Return the canonical definition patname name for SYSTEM.
-Only used in COMPUTE-SYSTEM-DEFINITION-PATHNAME.")
-  (:method ((o asdf-system))
-    (downstring (name o))))
-
 (defgeneric drop-system-backend-definition-cache (type)
   (:method ((o (eql 'asdf-system)))
     (clrhash asdf::*defined-systems*)))
@@ -74,7 +67,7 @@ Only used in COMPUTE-SYSTEM-DEFINITION-PATHNAME.")
   (:documentation
    "Do the module-agnostic part of the rituals needed for making systems
 within LOCALITY loadable using BACKEND-TYPE.  The other, module-specific
-part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
+part is done by ENSURE-SYSTEM-LOADABLE.")
   (:method ((type (eql 'asdf-system)) locality)
     (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
 
@@ -140,6 +133,13 @@ the system definition backend for SYSTEM-TYPE."
       (system-makunpresent s)))
   (drop-system-backend-definition-cache system-type))
 
+(defun ensure-host-system (name)
+  (if-let ((present (system name :if-does-not-exist :continue)))
+    (unless (system-host-p present)
+      (system-error present "~@<Asked to facilitate ~A as a host system, while it's already an ~A.~:@>"
+                    name (type-of present)))
+    (make-instance 'host-system :name (canonicalise-name name))))
+
 (defgeneric notice-system-definition (system pathname)
   (:method ((o known-system) (p pathname))
     (setf (slot-value o 'definition-pathname) p
@@ -153,21 +153,19 @@ the system definition backend for SYSTEM-TYPE."
                     (name o)))
     (= (file-write-date (system-definition-pathname o)) (system-definition-write-date o))))
 
-(defgeneric direct-system-dependencies (system)
-  (:method ((o known-system))
-    (if (system-dependencies-up-to-date-p o)
+(defgeneric direct-system-dependencies (system &key force-recompute)
+  (:method ((o known-system) &key force-recompute)
+    (if (and (slot-boundp o 'direct-dependency-names)
+             (not force-recompute)
+             (system-dependencies-up-to-date-p o))
         (system-direct-dependency-names o)
-        (recompute-direct-system-dependencies-one o))))
+        (setf (slot-value o 'direct-dependency-names) (compute-direct-system-dependencies o)))))
 
-(defgeneric recompute-direct-system-dependencies-one (system)
-  (:method ((o known-system))
-    (setf (slot-value o 'direct-dependency-names) (compute-direct-system-dependencies o))))
-
-(defun recompute-direct-system-dependencies ()
-  (do-present-systems (s)
-    (recompute-direct-system-dependencies-one s)))
-
-(defun recompute-full-system-dependencies-set (systems &key verbose)
+(defun update-system-set-dependencies (systems &key force-recompute verbose)
+  "Complete full system dependency caches for every system in SYSTEMS.
+The value returned is a boolean, which is true if all systems' dependencies
+are complete.
+When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
   (let ((removed-links (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
       (labels ((do-calc-sysdeps (depstack s)
@@ -182,12 +180,13 @@ the system definition backend for SYSTEM-TYPE."
                           (deletef (slot-value (first depstack) 'direct-dependency-names) name)
                           ;; not re-adding dependencies
                           ;; NOTE: what about incompleteness propagation?
-                          nil)
-                         ((slot-boundp s 'dependencies) ; cached?
+                          (values t nil))
+                         ((and (slot-boundp s 'dependencies) ; cached?
+                               (not force-recompute))
                           (when verbose
                             (format t "...already computed, returning ~A~%" (mapcar #'name dependencies)))
-                          (values dependencies
-                                  definition-complete-p))
+                          (values definition-complete-p
+                                  dependencies))
                          ((system-locally-present-p s) ; available?
                           (when verbose
                             (format t "...computing~%"))
@@ -213,36 +212,35 @@ the system definition backend for SYSTEM-TYPE."
                           (when verbose
                             (format t "computed dependencies of ~A: ~:[in~;~]complete, ~A~%"
                                     (name s) definition-complete-p (mapcar #'name dependencies)))
-                          (values dependencies
-                                  definition-complete-p))
+                          (values definition-complete-p
+                                  dependencies))
                          (t
                           (when verbose
                             (format t "...not locally present, skipping~%"))
                           ;; System not being locally present is the third reason.
-                          (values nil
-                                  (setf definition-complete-p nil))))))
+                          (values (setf definition-complete-p nil)
+                                  nil)))))
                (sysdeps (s)
                  (unwind-protect (do-calc-sysdeps nil s)
                    ;; reinstate loops..
                    (do-removed-links (from to-names)
                      (nconcf (slot-value from 'direct-dependency-names) to-names))
                    (clrhash removed-links))))
-        (dolist (s (if (eq systems t)
-                       (do-present-systems (s)
-                         (unless (system-host-p s)
-                           (collect s)))
-                       systems))
-          (sysdeps s))))))
+        (lret ((set (if (eq systems t)
+                        (do-present-systems (s)
+                          (unless (system-host-p s)
+                            (collect s)))
+                        systems))
+               (complete-p t)) ; the empty set has complete definitions :-)
+          (dolist (s set)
+            (andf complete-p (sysdeps s))))))))
 
 (defun compute-full-system-dependencies (system &aux
                                          (system (coerce-to-system system)))
-  (recompute-full-system-dependencies-set (list system))
-  (values (when (system-definition-complete-p system)
-            (system-dependencies system))
-          (system-definition-complete-p system)))
-
-(defun recompute-full-system-dependencies ()
-  (recompute-full-system-dependencies-set t))
+  (let ((complete-p (update-system-set-dependencies (list system))))
+    (values (when complete-p
+              (system-dependencies system))
+            complete-p)))
 
 ;;;;
 ;;;; o/~ Below zero, below my need for words o/~

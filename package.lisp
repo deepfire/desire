@@ -202,7 +202,6 @@
    ;; systems.lisp
    #:system-loadable-p
    #:ensure-system-loadable
-   #:ensure-module-systems-loadable
    #:module-systems-unloadable-error
    ;; modules.lisp
    #:system-name-conflict

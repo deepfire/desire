@@ -32,4 +32,4 @@
 (defmethod satisfy-module :after ((module-name (eql 'cl-launch)) locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
   (declare (ignore complete skip-present skip-missing verbose))
   (make-cl-launch-system (locality-pathname locality))
-  (ensure-module-systems-loadable (module 'cl-launch) locality))
+  (notice-module-repository (module 'cl-launch)))

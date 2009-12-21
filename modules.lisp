@@ -69,22 +69,6 @@ system TYPE within LOCALITY."
     (unless (blacklisted-p path)
       (collect path))))
 
-(defun compute-system-definition-pathname (system repository &key (if-does-not-exist :error))
-  "Return the pathname of a SYSTEM's definition within REPOSITORY."
-  (let ((name (or (system-definition-pathname-name system) (system-canonical-definition-pathname-name system)))
-        (type (system-pathname-type system)))
-    (when (system-host-p system)
-      (system-error system "~@<Asked to compute pathname of a host-provided system ~A.~:@>" name))
-    (when (not (system-known-p system))
-      (system-error system "~@<Asked to compute pathname of unknown system ~A.~:@>" name))
-    (or (file-exists-p (subfile repository (list name) :type type)) ;; Try the fast path first.
-        (do-module-system-definitions (path (system-module system) repository type)
-          (finding path such-that (and (string= name (pathname-name path))
-                                       (not (blacklisted-p path)))))
-        (ecase if-does-not-exist
-          (:error (error 'system-definition-missing-error :system system :path repository))
-          (:continue nil)))))
-
 (defun discover-and-register-module-systems (module &optional verbose (system-type *default-system-type*) (locality (gate *self*)) &aux
                                              (module (coerce-to-module module)))
   (let* ((sysfiles (find-module-system-definitions module system-type locality))
@@ -141,11 +125,6 @@ system TYPE within LOCALITY."
           (do-remove-system s))
         (setf (module-systems module) systems)))))
 
-(defun discover-and-register-systems (&optional verbose (system-type *default-system-type*) (locality (gate *self*)))
-  "Scan repositories of modules present within LOCALITY for system definitions."
-  (do-present-modules (m locality)
-    (discover-and-register-module-systems m verbose system-type locality)))
-
 ;;;;
 ;;;; Module <-> system mapping heuristic
 ;;;;
@@ -196,18 +175,6 @@ and return them as multiple values."
               sysdeps))))
 
 ;;;;
-;;;; System loadability
-;;;;
-(defun ensure-module-systems-loadable (module &optional (locality (gate *self*)) &aux
-                                       (module (coerce-to-module module)))
-  "Try making MODULE's systems loadable, defaulting to LOCALITY.
-Raise an error of type MODULE-SYSTEMS-UNLOADABLE-ERROR upon failure."
-  (dolist (s (module-systems module))
-    (when *verbose-repository-maintenance*
-      (format t "~@<;;; ~@;Ensuring loadability of ~A ~A~:@>~%" (type-of s) (name s)))
-    (ensure-system-loadable s locality)))
-
-;;;;
 ;;;; Module repository maintenance hook
 ;;;;
 ;;; Branching model management.
@@ -223,7 +190,20 @@ meets desire's operational requirements.")
       (ensure-tracker-branch repo-dir (ref-value "master" repo-dir))
       (discover-and-register-module-systems o *verbose-repository-maintenance* *default-system-type* locality)
       (dolist (s (module-systems o))
-        (recompute-direct-system-dependencies-one s))
-      (when compute-system-dependencies
-        (when-let ((changed-systems (remove-if #'system-dependencies-up-to-date-p (module-systems o))))
-          (recompute-full-system-dependencies-set changed-systems))))))
+        (direct-system-dependencies s))
+      (when-let ((changed-systems (and compute-system-dependencies
+                                       (remove-if #'system-dependencies-up-to-date-p (module-systems o)))))
+        (update-system-set-dependencies changed-systems)))))
+
+(defun enumerate-present-modules-and-systems (&key verbose)
+  (with-measured-time-lapse (sec)
+      (do-present-modules (module)
+        (when verbose
+          (syncformat t ";;; Processing module ~A~%" (name module)))
+        (notice-module-repository module nil))
+    (when verbose
+      (syncformat t ";;; Ensured branches and performed system discovery and query in ~D seconds.~%" sec)))
+  (mapc #'ensure-host-system *implementation-provided-system-names*)
+  (with-measured-time-lapse (sec) (update-system-set-dependencies t)
+    (when verbose
+      (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec))))
