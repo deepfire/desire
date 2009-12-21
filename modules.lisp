@@ -176,6 +176,8 @@ system TYPE within LOCALITY."
 ;;;;
 (defun module-dependencies (module &optional complete verbose &aux
                             (module (coerce-to-module module)))
+  "Compute the lists of modules and systems MODULE depends upon,
+and return them as multiple values."
   (let* ((all-systems (module-systems module))
          (main-system (module-central-system module))
          (other-systems (remove main-system all-systems))
@@ -188,8 +190,11 @@ system TYPE within LOCALITY."
       (when-let ((unknown-sysdeps (remove-if #'system-known-p sysdeps)))
         (module-error module "~@<Module ~A depends on unknown systems: ~A~:@>" (name module) (mapcar #'name unknown-sysdeps)))
       (when-let ((incomplete-sysdeps (remove-if #'system-definition-complete-p sysdeps)))
-        (module-error module "~@<While calculating system dependencies of module ~A: incomplete sysdeps ~A with no unknown sysdeps.~:@>" (name module) (mapcar #'name incomplete-sysdeps)))
-      (remove-duplicates (mapcar #'system-module sysdeps) :test #'eq))))
+        (module-error module "~@<While calculating system dependencies of module ~A: ~
+                                 incomplete sysdeps ~A with no unknown sysdeps.~:@>"
+                      (name module) (mapcar #'name incomplete-sysdeps)))
+      (values (remove-duplicates (mapcar #'system-module sysdeps) :test #'eq)
+              sysdeps))))
 
 ;;;;
 ;;;; System loadability
