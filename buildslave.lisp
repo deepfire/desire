@@ -82,6 +82,7 @@
         (stash-module m nil)))
     (drop-system-caches *default-system-type*)
     (desire (list mn) :skip-present t :seal nil :verbose verbose-internals)
+    (module-dependencies (module mn))
     (asdf:oos 'asdf:load-op (name (module-central-system mn)))
     t)
   (:method ((o (eql :slave-test-phase)) mn &optional verbose-internals record-output)
