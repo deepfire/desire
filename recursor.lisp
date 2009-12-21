@@ -117,8 +117,8 @@
                                                  system-dictionary)))
         (when verbose
           (format t "~@<;;;; ~@;Determining dependencies of module ~A.  Main system file: ~A.  ~
-                       Other system files: ~A.  Required system files: ~A.  System ~
-                       dictionary: ~A.~:@>~%"
+                              Other system files: ~A.  Required system files: ~A.  ~
+                              System dictionary: ~A.~:@>~%"
                   (name module) (name main-system) (mapcar #'name other-systems) required-names extended-system-dictionary))
         (iter (with modules)
               (when (not (iter (for (name wanted . satisfied) in extended-system-dictionary)
@@ -197,9 +197,9 @@
            (when verbose
              (format t "~@<;;; ~@;Recomputing system dependencies...~:@>~%"))
            (recompute-full-system-dependencies-set
-            (iter (for (name wanted . present) in updated-system-dictionary)
-                  (unless (member name *implementation-provided-system-names* :test #'string=)
-                    (collect (system name))))))
+            (lret ((involved-systems (mapcar (compose #'system #'first) updated-system-dictionary)))
+              (format t "~@<;;; ~@;Finally, recalculating fulldeps of following systems: ~A~:@>~%"
+                      (mapcar #'name (remove-if #'system-host-p involved-systems))))))
          (return (values module-dictionary system-dictionary)))))
 
 (defun desire (desires &key complete skip-present skip-missing (seal t) verbose)
