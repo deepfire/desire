@@ -21,6 +21,8 @@
 (in-package :desire)
 
 
+(defparameter *vcs-appendage-types* '(darcs))
+
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
     (desire-error "~@<The specified root at ~S does not exist.~:@>" directory))
@@ -83,7 +85,7 @@ locally present modules will be marked as converted."
       ;;
       ;; NOTE: there's some profound crap there 
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
-        (setf git '(git) hg '(hg python)  darcs '(darcs darcs-to-git wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
+        (setf git '(git) hg '(hg python)  darcs '(darcs darcs-fast-export wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
       (with-class-slot (git hg darcs cvs svn tarball) enabled-p
         (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
       (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
@@ -121,6 +123,8 @@ locally present modules will be marked as converted."
       ;; Set up tools for import
       ;;
       (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
+      (dolist (type *vcs-appendage-types*)
+        (try-ensure-importer-executable type))
       (determine-tools-and-update-remote-accessibility)
       ;;
       ;; Generic part of system loadability
