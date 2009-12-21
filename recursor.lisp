@@ -199,7 +199,8 @@
            (update-system-set-dependencies
             (lret ((involved-systems (mapcar (compose #'system #'first) updated-system-dictionary)))
               (format t "~@<;;; ~@;Finally, recalculating fulldeps of following systems: ~A~:@>~%"
-                      (mapcar #'name (remove-if #'system-host-p involved-systems))))))
+                      (mapcar #'name (remove-if #'system-host-p involved-systems))))
+            :verbose verbose))
          (return (values module-dictionary system-dictionary)))))
 
 (defun desire (desires &key complete skip-present skip-missing (seal t) verbose)
