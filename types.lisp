@@ -759,7 +759,7 @@ Find out whether SYSTEM is hidden."
 (defclass xcvb-system (xcvb known-system) ())
 
 (defmethod initialize-instance :after ((o known-system) &key module &allow-other-keys)
-  (when module ; take host-provided systems into account
+  (unless (system-host-p o)
     (appendf (module-systems module) (list o))))
 
 ;;;;

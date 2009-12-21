@@ -166,19 +166,18 @@ the system definition backend for SYSTEM-TYPE."
 The value returned is a boolean, which is true if all systems' dependencies
 are complete.
 When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
-  (declare (optimize debug))
   (let ((removed-links (make-hash-table :test 'eq))
-        (recomputeds (make-hash-table :test 'eq)))
+        (recomputedp (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
-      (with-container recomputed (recomputeds :type boolean :if-does-not-exist :continue)
+      (with-container recomputedp (recomputedp :type boolean :if-does-not-exist :continue)
         (labels ((do-calc-sysdeps (depstack s)
                    ;; XXX: ensure-slot-value special form ?
                    (with-slots (name direct-dependency-names dependencies definition-complete-p) s
                      (when verbose
-                       (format t "computing dependencies of ~A~%" name))
+                       (format t ";;;; computing deps of ~A for~{ ~A~}~%" name (mapcar #'name depstack)))
                      (cond ((member s depstack) ; dependency loop?
                             (when verbose
-                              (format t "...dependency loop: ~A~%" (mapcar #'name depstack)))
+                              (format t "~@<;;;; ~@;...dependency loop: ~A~:@>~%" (mapcar #'name depstack)))
                             (push name (removed-links (first depstack)))
                             (deletef (slot-value (first depstack) 'direct-dependency-names) name)
                             ;; not re-adding dependencies
@@ -188,43 +187,52 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                                  definition-complete-p
                                  (or (system-host-p s) ; it's constant
                                      (not force-recompute)
-                                     (recomputed s)))
+                                     (recomputedp s)))
                             (when verbose
-                              (format t "...already computed, returning ~:[in~;~]complete,~%~10T~A~%"
+                              (format t "~@<;;;;;; ~@;...already computed, returning ~:[in~;~]complete,~
+                                                      ~:[ leaf~;~%~10T~:*~A~]~:@>~%"
                                       definition-complete-p (mapcar #'name dependencies)))
                             (values definition-complete-p
                                     dependencies))
                            ((system-locally-present-p s) ; available?
                             (when verbose
-                              (format t "...computing~%"))
+                              (format t ";;;; ...computing, directs: ~A~%" direct-dependency-names))
                             (setf dependencies
                                   (delete-duplicates
                                    (iter (for depname in direct-dependency-names)
                                          (for depsys = (system depname :if-does-not-exist :continue))
-                                         (cond
-                                           ((not (and depsys (system-known-p depsys)))
-                                            ;; There are three reasons for system's definitions to be incomplete.
-                                            ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
-                                            (setf definition-complete-p nil)
-                                            (unless depsys
-                                              (make-instance 'unknown-system :name depname))
-                                            (nconcing (list depsys)))
-                                           (t
-                                            (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
-                                              ;; Incomplete dependencies being contagious are the second reason.
-                                              (setf definition-complete-p complete-p)
-                                              (nconcing (cons depsys (copy-list deps))))))))
-                                  (recomputed s) t)
+                                         (when verbose
+                                           (format t ";;;;;; processing direct ~A, ~
+                                                             ~:[missing~;present, ~:[un~;~]known~]~%"
+                                                   depname depsys (and depsys (system-known-p depsys))))
+                                         (nconcing
+                                          (cond
+                                            ((not (and depsys (system-known-p depsys)))
+                                             ;; There are three reasons for system's definitions to be incomplete.
+                                             ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
+                                             (setf definition-complete-p nil)
+                                             (let ((depsys (or depsys
+                                                               (make-instance 'unknown-system :name depname))))
+                                               (list depsys)))
+                                            (t
+                                             (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
+                                               ;; Incomplete dependencies being contagious are the second reason.
+                                               (setf definition-complete-p complete-p)
+                                               (cons depsys (copy-list deps))))))))
+                                  (recomputedp s) t)
                             (unless direct-dependency-names ; no deps, no problems
                               (setf definition-complete-p t))
                             (when verbose
-                              (format t "computed dependencies of ~A: ~:[in~;~]complete,~%~10T~A~%"
+                              (format t "~@<;;;; ~@;...computed: ~A~:@>~%"
+                                      (mapcar (curry #'xform-if #'identity #'name) dependencies))
+                              (format t "~@<;;;;;; ~@;computed dependencies of ~A: ~:[in~;~]complete,~
+                                                      ~:[ leaf~;~%~10T~:*~A~]~:@>~%"
                                       name definition-complete-p (mapcar #'name dependencies)))
                             (values definition-complete-p
                                     dependencies))
                            (t
                             (when verbose
-                              (format t "...not locally present, skipping~%"))
+                              (format t ";;;; ...not locally present, skipping~%"))
                             ;; System not being locally present is the third reason.
                             (values (setf definition-complete-p nil)
                                     nil)))))
@@ -240,8 +248,15 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                               (collect s)))
                           systems))
                  (complete-p t)) ; the empty set has complete definitions :-)
+            (when verbose
+              (format t "~@<;;; ~@;computing dependencies of ~A~:@>~%"
+                      (mapcar #'name set)))
             (dolist (s set)
-              (setf complete-p (and (sysdeps s) complete-p)))))))))
+              (when verbose
+                (format t "~@<;;; ~@;processing ~A~:@>~%" (name s)))
+              (setf complete-p (and (sysdeps s) complete-p))
+              (when verbose
+                (format t "~@<;;; ~@;done with ~A~:@>~%" (name s))))))))))
 
 (defun compute-full-system-dependencies (system &key force-recompute verbose &aux
                                          (system (coerce-to-system system)))
