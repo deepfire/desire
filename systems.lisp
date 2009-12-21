@@ -236,7 +236,7 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                         systems))
                (complete-p t)) ; the empty set has complete definitions :-)
           (dolist (s set)
-            (andf complete-p (sysdeps s))))))))
+            (setf complete-p (and (sysdeps s) complete-p))))))))
 
 (defun compute-full-system-dependencies (system &key force-recompute verbose &aux
                                          (system (coerce-to-system system)))
