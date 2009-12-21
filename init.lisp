@@ -21,9 +21,11 @@
 (in-package :desire)
 
 
+(defun make-host-system (name)
+  (make-instance 'host-system :name (canonicalise-name name)))
+
 (defun enumerate-host-systems ()
-  (dolist (sname *implementation-provided-system-names*)
-    (make-instance 'host-system :name (canonicalise-name sname))))
+  (mapc #'make-host-system *implementation-provided-system-names*))
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
