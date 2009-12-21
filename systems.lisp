@@ -166,13 +166,14 @@ the system definition backend for SYSTEM-TYPE."
 The value returned is a boolean, which is true if all systems' dependencies
 are complete.
 When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
+  (declare (optimize debug))
   (let ((removed-links (make-hash-table :test 'eq)))
     (with-container removed-links (removed-links :type list :iterator do-removed-links :iterator-bind-key t)
       (labels ((do-calc-sysdeps (depstack s)
                  ;; XXX: ensure-slot-value special form ?
                  (with-slots (name direct-dependency-names dependencies definition-complete-p) s
                    (when verbose
-                     (format t "computing dependencies of ~A~%" (name s)))
+                     (format t "computing dependencies of ~A~%" name))
                    (cond ((member s depstack) ; dependency loop?
                           (when verbose
                             (format t "...dependency loop: ~A~%" (mapcar #'name depstack)))
@@ -214,7 +215,7 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                             (setf definition-complete-p t))
                           (when verbose
                             (format t "computed dependencies of ~A: ~:[in~;~]complete, ~A~%"
-                                    (name s) definition-complete-p (mapcar #'name dependencies)))
+                                    name definition-complete-p (mapcar #'name dependencies)))
                           (values definition-complete-p
                                   dependencies))
                          (t
