@@ -710,7 +710,8 @@ instead."
    (definition-write-date :reader system-definition-write-date :initarg :definition-write-date :documentation "Cache."))
   (:default-initargs
    :pathname nil
-   :definition-write-date nil)
+   :definition-write-date nil
+   :definition-complete-p nil)
   (:documentation
    "Note that we don't remember how to find systems within the module's
 directory hierarchy, as we rely on the recursor to properly register the
@@ -744,6 +745,7 @@ Find out whether SYSTEM is hidden."
 (defun system-makunpresent (system)
   "Change SYSTEM so that SYSTEM-LOCALLY-PRESENT-P will return NIL on it."
   (declare (type system system))
+  (setf (slot-value system 'definition-complete-p) nil)
   (slot-makunbound system 'dependencies)
   (slot-makunbound system 'direct-dependency-names)
   (slot-makunbound system 'definition-pathname)
