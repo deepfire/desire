@@ -583,11 +583,26 @@ instead."
 (defmethod initialize-instance :before ((o remote) &key distributor vcs-type transport name &allow-other-keys)
   (setf (name o) (init-time-select-remote-name distributor vcs-type transport name)))
 
+(defun compute-path-form (path)
+  `(lambda ()
+     (declare (special *module* *umbrella*))
+     (list ,@(iter (for elt in path)
+                   (collect
+                       (etypecase elt
+                         ((or string (eql :no/))
+                          elt)
+                         ((member *module* *umbrella*)
+                          `(symbol-value (find-symbol ,(symbol-name elt) :desire)))
+                         (t
+                          (definition-error
+                              "~@<Malformed remote pathname specifier ~S: ~
+                              only strings and one of :NO/, DESR:*MODULE* and ~
+                              DESR:*UMBRELLA* are allowed.~:@>"
+                              elt))))))))
+
 (defmethod initialize-instance :after ((o remote) &key distributor path &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o))
-  (setf (remote-path-fn o) (compile nil `(lambda ()
-                                           (declare (special *module* *umbrella*))
-                                           (list ,@path)))))
+  (setf (remote-path-fn o) (compile nil (compute-path-form path))))
 
 ;;;;
 ;;;; Modules
