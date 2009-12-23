@@ -45,30 +45,11 @@
 
 
 ;;;;
-;;;; Buildbot conditions
+;;;; More or less generic-ish basis
 ;;;;
-(define-condition buildbot-condition (desire-condition) ())
-(define-condition buildbot-error (buildbot-condition desire-error) ())
-(define-condition buildmaster-condition (buildbot-condition) ())
-(define-condition buildmaster-error (buildmaster-condition buildbot-error) ())
-(define-condition buildslave-condition (buildbot-condition) ())
-(define-condition buildslave-error (buildslave-condition buildbot-error) ())
-(define-simple-error buildmaster-error)
-
-(define-condition buildslave-communication-error (buildslave-error) ())
-(define-simple-error buildslave-communication-error)
-
-(define-reported-condition buildslave-initialisation-error (buildslave-communication-error)
-  ((output :reader error-output :initarg :output))
-  (:report (output)
-           "~@<Error encountered while initialising buildslave:~%~A~%~:@>" output))
-
-(define-condition build-test-error (desire-error) ())
-(define-simple-error build-test-error)
-
-;;;;
-;;;; Period
-;;;;
+;;;
+;;; Period
+;;;
 (defclass period ()
   ((start-time :accessor period-start-time :type (integer 0) :initarg :start-time)
    (end-time :accessor period-end-time :type (integer 0) :initarg :end-time)))
@@ -93,11 +74,11 @@
   (:method ((o period))
     (if (slot-boundp o 'end-time)
         (- (period-end-time o) (period-start-time o))
-        (buildmaster-error "~@<Period not finalised.~:@>"))))
+        (error "~@<Period not finalised.~:@>"))))
 
-;;;;
-;;;; Action
-;;;;
+;;;
+;;; Action
+;;;
 (define-protocol-class action (period)
   ((condition :reader action-condition :initarg :condition)
    (backtrace :reader action-backtrace :initarg :backtrace)
@@ -188,9 +169,9 @@
 (defmacro with-tracked-termination ((action &optional handlep) &body body)
   `(invoke-with-tracked-termination ,action ,handlep (lambda () ,@body)))
 
-;;;;
-;;;; Webbable
-;;;;
+;;;
+;;; Webbable
+;;;
 (defclass webbable ()
   ((description :reader web-description :initarg :description)
    (class :reader web-class :initarg :class)
@@ -207,9 +188,32 @@
          ,@(remove :web-initargs class-options :key #'car)))
     (error "~@<No web-initargs class option was specified.~:@>")))
 
+
 ;;;;
-;;;; Result
+;;;; Buildbot
 ;;;;
+(define-condition buildbot-condition (desire-condition) ())
+(define-condition buildbot-error (buildbot-condition desire-error) ())
+(define-condition buildmaster-condition (buildbot-condition) ())
+(define-condition buildmaster-error (buildmaster-condition buildbot-error) ())
+(define-condition buildslave-condition (buildbot-condition) ())
+(define-condition buildslave-error (buildslave-condition buildbot-error) ())
+(define-simple-error buildmaster-error)
+
+(define-condition buildslave-communication-error (buildslave-error) ())
+(define-simple-error buildslave-communication-error)
+
+(define-reported-condition buildslave-initialisation-error (buildslave-communication-error)
+  ((output :reader error-output :initarg :output))
+  (:report (output)
+           "~@<Error encountered while initialising buildslave:~%~A~%~:@>" output))
+
+(define-condition build-test-error (desire-error) ())
+(define-simple-error build-test-error)
+
+;;;
+;;; Result
+;;;
 (define-action-root-class result (action webbable)
   ((module :accessor result-module :initarg :module)
    (phase :accessor result-phase :initarg :phase)
@@ -228,9 +232,9 @@
    (failure result-failure)
    (unhandled-failure result-unhandled-failure)))
 
-;;;;
-;;;; Result output vector management
-;;;;
+;;;
+;;; Result output vector management
+;;;
 (defconstant header-leeway 32)
 (defconstant page-size (virtual-memory-page-size))
 (defconstant initial-output-length (- page-size header-leeway))
@@ -353,6 +357,10 @@
 
 (defclass interrupted-buildmaster-run (unhandled-failure buildmaster-run) ())
 
+
+;;;
+;;; Accessing results
+;;;
 (defvar *buildmaster-runs* nil)
 
 (defun master-run-n-complete-results (master-run)
@@ -403,3 +411,89 @@
 
 (defun previous-phase-result-success-p (master-run result)
   (typep (previous-phase-result master-run result) 'success))
+
+
+;;;;
+;;;; Emission-related globals
+;;;;
+(defvar *style*)
+(defparameter *uri-base* '("desire-waterfall"))
+(defparameter *global-condition* nil)
+(defparameter *verbose-static-emission* t)
+(defvar *emitting-static* nil)
+(defvar *current-base* nil)
+(defvar *completed-static-emissions* (make-hash-table :test #'equal))
+(defvar *static-output-base-pathname* nil)
+(defvar *master-run-nr*)
+
+(define-root-container *completed-static-emissions* completed-static-emission :key-type list :type boolean :if-does-not-exist :continue)
+
+;;;
+;;; Automagic staticity machinery: in static mode %URI calls RENDER-CL-WATERFALL,
+;;; which implies: watch out for graph loops!
+;;;
+(defun invoke-maybe-static/content-type (base-pathname path-fn content-type fn)
+  (if *emitting-static*
+      (let* ((subpath (funcall path-fn))
+             (subdirectory (butlast subpath))
+             (filename (lastcar subpath))
+             (filetype (ecase content-type
+                         (:text/plain "txt")
+                         ((nil) "html")))
+             (output-pathname (subfile base-pathname subpath :type filetype)))
+        (when *verbose-static-emission*
+          (format t "~@<; ~@;Static: base ~S, sub ~S, name ~A.~A   Output: ~S.~:@>~%"
+                  base-pathname subdirectory filename filetype
+                  output-pathname))
+        (ensure-directories-exist output-pathname)
+        (with-output-to-file (s output-pathname)
+          (funcall fn s)))
+      (progn
+        (when content-type
+          (setf (content-type*) (ecase content-type
+                                  (:text/plain "text/plain"))))
+        (funcall fn (flexi-streams:make-flexi-stream (send-headers))))))
+
+(defmacro with-maybe-static/content-type ((stream content-type base-pathname path-fn) &body body)
+  `(invoke-maybe-static/content-type ,base-pathname ,path-fn ,content-type
+                                     (lambda (,stream)
+                                       ,@body)))
+
+(defun %uri (path extension text base)
+  (flet ((process-path-element (x)
+           (etypecase x
+             (integer (write-to-string x))
+             (string x)
+             (symbol (downstring x))))
+         (rebase-path (new-base x)
+           (let* ((old-base (butlast x))
+                  (name (lastcar x))
+                  (mismatch-posn (mismatch new-base old-base))
+                  (newbaselen (length new-base)))
+             (multiple-value-bind (unwind rewind) (cond
+                                                    ((null mismatch-posn))
+                                                    ((= mismatch-posn newbaselen)
+                                                     (values nil (subseq old-base newbaselen)))
+                                                    (t
+                                                     (values (make-list (- newbaselen mismatch-posn)
+                                                                        :initial-element "..")
+                                                             (subseq old-base mismatch-posn))))
+               (append unwind rewind (list name))))))
+    (let ((processed-path (mapcar #'process-path-element path)))
+      (lret ((uri (format nil "<a href='~A~:[~;.~:*~A~]'>~A</a>"
+                          (flatten-path-list (if *emitting-static*
+                                                 (rebase-path *current-base* processed-path)
+                                                 (append base processed-path))
+                                             (not *emitting-static*))
+                          extension text)))
+        (when (and *emitting-static*
+                   (not (completed-static-emission path)))
+          (when *verbose-static-emission*
+            (format t "~@<; ~@;Recurring with ~S~:@>~%" path))
+          (render-cl-waterfall path))))))
+
+(defun plain-uri (path text &optional (extensionp *emitting-static*) (base *uri-base*))
+  (%uri path (when extensionp "txt") text base))
+
+(defun uri (path text &optional (extensionp *emitting-static*) (base *uri-base*))
+  (%uri path (when extensionp "html") text base))
