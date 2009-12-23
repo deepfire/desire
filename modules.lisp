@@ -197,8 +197,9 @@ meets desire's operational requirements.")
 
 (defun sync-module (module &optional locality &aux
                     (locality (or locality (gate *self*))))
-  (git-repository-update-for-dumb-servers
-   (module-pathname (coerce-to-module module) locality)))
+  (with-avoided-executable-output ()
+    (git-repository-update-for-dumb-servers
+     (module-pathname (coerce-to-module module) locality))))
 
 (defun enumerate-present-modules-and-systems (&key drop-system-caches verbose)
   (when drop-system-caches
