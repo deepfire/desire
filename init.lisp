@@ -56,7 +56,9 @@
       (setf (remote-disabled-p r) (not (member (vcs-type r) present))))
     (find-executable 'wget)
     (find-executable 'make)
-    (find-executable 'cp)))
+    (find-executable 'cp)
+    (find-executable 'gzip)
+    (find-executable 'gpg)))
 
 (defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
   "Make Desire fully functional, with PATH chosen as storage location.
