@@ -23,7 +23,8 @@
 ;;;
 ;;; Knobs
 ;;;
-(defvar *bootstrap-wishmaster-url*                "git://git.feelingofgreen.ru")
+(defvar *bootstrap-wishmaster-url*                "git://git.feelingofgreen.ru/")
+(defvar *bootstrap-wishmaster-http-url*           "http://git.feelingofgreen.ru/shared/git/")
 (defvar *desires*                                  nil "List of import descriptions.")
 (defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
 (defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")
@@ -187,6 +188,10 @@ its 'best remote'."
 (defclass http (transport-mixin) () (:default-initargs :transport 'http :schema 'http))
 (defclass rsync (transport-mixin) () (:default-initargs :transport 'rsync :schema 'rsync))
 
+(defclass combined (native http)
+  ((http-path :accessor remote-http-path :initarg :http-path :documentation "Specified.")
+   (http-path-fn :accessor remote-http-path-fn :initarg :http-path-fn :documentation "Generated from above.")))
+
 ;;; exhaustive partition of FETCH-INDIRECTION-MIXIN
 (defclass separate-clone (clone-separation-mixin) ())
 (defclass clone-is-fetch (clone-separation-mixin) ())
@@ -197,19 +202,25 @@ its 'best remote'."
 
 ;;; exhaustive partition of type product of VCS-TYPE, TRANSPORT-MIXIN, CLONE-SEPARATION-MIXIN, and
 ;;;   FETCH-INDIRECTION-MIXIN
-(defclass git-native   (git        native direct-fetch   clone-is-fetch) () (:default-initargs :schema 'git))
-(defclass git-http     (git        http   direct-fetch   clone-is-fetch) ())
-(defclass hg-http      (hg         http   indirect-fetch separate-clone) ())
-(defclass darcs-http   (darcs      http   indirect-fetch separate-clone) ())
-(defclass cvs-rsync    (cvs        rsync  indirect-fetch clone-is-fetch) ())
-(defclass cvs-native   (cvs        native direct-fetch   clone-is-fetch) () (:default-initargs :schema '|:PSERVER|))
-(defclass tarball-http (tarball    http   direct-fetch   clone-is-fetch) ((initial-version :accessor initial-tarball-version :initarg :initial-version)))
-(defclass svn-rsync    (svn        rsync  indirect-fetch clone-is-fetch) ())
+(defclass git-native   (git        native   direct-fetch   clone-is-fetch) () (:default-initargs :schema 'git))
+(defclass git-http     (git        http     direct-fetch   clone-is-fetch) ())
 ;;; ...... 8< ......
-(defclass svn-direct   (svn               direct-fetch) ())
+(defclass git-combined (git-native git-http combined) ())
 ;;; ...... >8 ......
-(defclass svn-http     (svn-direct http   #| direct |#   clone-is-fetch) ())
-(defclass svn-native   (svn-direct native #| direct |#   clone-is-fetch) () (:default-initargs :schema 'svn))
+(defclass hg-http      (hg         http     indirect-fetch separate-clone) ())
+(defclass darcs-http   (darcs      http     indirect-fetch separate-clone) ())
+(defclass cvs-rsync    (cvs        rsync    indirect-fetch clone-is-fetch) ())
+(defclass cvs-native   (cvs        native   direct-fetch   clone-is-fetch) () (:default-initargs :schema '|:PSERVER|))
+(defclass tarball-http (tarball    http     direct-fetch   clone-is-fetch) ((initial-version :accessor initial-tarball-version :initarg :initial-version)))
+(defclass svn-rsync    (svn        rsync    indirect-fetch clone-is-fetch) ())
+;;; ...... 8< ......
+(defclass svn-direct   (svn                 direct-fetch) ())
+;;; ...... >8 ......
+(defclass svn-http     (svn-direct http     #| direct |#   clone-is-fetch) ())
+(defclass svn-native   (svn-direct native   #| direct |#   clone-is-fetch) () (:default-initargs :schema 'svn))
+
+(defmethod schema ((o git-combined))
+  (if *combined-remotes-prefer-native-over-http* 'git 'http))
 
 ;;;;
 ;;;; Location
@@ -294,7 +305,7 @@ a special module called '.meta'."
 ;;; almost most specific (due to GATE mixin), exhaustive partition of REMOTE
 (defclass git-native-remote (git-remote git-native) ())
 (defclass git-http-remote (git-remote git-http) ())
-(defclass git-combined-remote (git-remote git-native git-http) ())
+(defclass git-combined-remote (git-remote git-combined) ())
 (defclass hg-http-remote (hg-remote hg-http) ())
 (defclass darcs-http-remote (darcs-remote darcs-http) ())
 (defclass cvs-rsync-remote (cvs-remote cvs-rsync) ())
@@ -308,6 +319,7 @@ a special module called '.meta'."
 ;;; troublesome, as it violates simplicity.
 (defclass gate-native-remote (gate-remote git-native-remote) ())
 (defclass gate-http-remote (gate-remote git-http-remote) ())
+(defclass gate-combined-remote (gate-remote git-combined-remote) ())
 
 ;; Handle remote localisation, for printing purposes.
 (defun remote-canonical-class-name (remote)
@@ -356,7 +368,7 @@ differ in only slight detail -- gate property, for example."
 (defclass svn-locality (svn locality) ())
 (defclass tarball-locality (tarball locality) ())
 
-(defclass git-gate-locality (gate-native-remote git-locality gate-locality) ())
+(defclass git-gate-locality (gate-combined-remote git-locality gate-locality) ())
 
 ;;;;
 ;;;; Here are the constraints on the remote class precedence lists, as imposed by
@@ -372,6 +384,7 @@ differ in only slight detail -- gate property, for example."
 ;;;
 (defmethod vcs-type ((o (eql 'gate-native-remote))) *gate-vcs-type*)
 (defmethod vcs-type ((o (eql 'gate-http-remote))) *gate-vcs-type*)
+(defmethod vcs-type ((o (eql 'gate-combined-remote))) *gate-vcs-type*)
 (defmethod vcs-type ((o (eql 'git-native-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-http-remote))) 'git)
 (defmethod vcs-type ((o (eql 'git-combined-remote))) 'git)
@@ -386,6 +399,7 @@ differ in only slight detail -- gate property, for example."
 
 (defmethod transport ((o (eql 'gate-native-remote))) 'native)
 (defmethod transport ((o (eql 'gate-http-remote))) 'http)
+(defmethod transport ((o (eql 'gate-combined-remote))) (if *combined-remotes-prefer-native-over-http* 'native 'http))
 (defmethod transport ((o (eql 'git-native-remote))) 'native)
 (defmethod transport ((o (eql 'git-http-remote))) 'http)
 (defmethod transport ((o (eql 'git-combined-remote))) (if *combined-remotes-prefer-native-over-http* 'native 'http))
@@ -603,6 +617,9 @@ instead."
 (defmethod initialize-instance :after ((o remote) &key distributor path &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o))
   (setf (remote-path-fn o) (compile nil (compute-path-form path))))
+
+(defmethod initialize-instance :after ((o combined) &key http-path &allow-other-keys)
+  (setf (remote-http-path-fn o) (compile nil (compute-path-form http-path))))
 
 ;;;;
 ;;;; Modules
@@ -956,13 +973,47 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 ;;; NOTE: this is the reason why remotes have names
 ;;;
 ;;; Why it's here?  The metastore functions below need it.
+(defun invoke-maybe-handling-executable-failures (maybe fn handler)
+  (if maybe
+      (handler-case (funcall fn)
+        (executable-failure (c)
+          (funcall handler c)))
+      (funcall fn)))
+
+(defmacro with-maybe-handled-executable-failures (maybe form &body ((handler (&optional condition) &body handler-body)))
+  (unless (eq handler :handler)
+    (error "~@<Wrong clause ~A.~:@>" handler))
+  (let ((condition-sym (or condition (gensym))))
+    `(invoke-maybe-handling-executable-failures
+      ,maybe (lambda () ,form)
+      (lambda (,condition-sym)
+        ,@(unless condition `((declare (ignore ,condition-sym))))
+        ,@handler-body))))
+
+(defvar *git-fetch-recovery-attempt* nil)
+
 (defun git-fetch-remote (remote module-name &optional directory)
-  "Fetch from REMOTE, with working directory optionally changed
-to DIRECTORY."
+  "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (maybe-within-directory directory
-    (let ((module-url (url remote module-name)))
-      (ensure-gitremote (name remote) module-url))
-    (fetch-gitremote (name remote))))
+    (with-maybe-handled-executable-failures (not *git-fetch-recovery-attempt*)
+        (let ((module-url (url remote module-name)))
+          (ensure-gitremote (name remote) module-url)
+          (git "fetch" (down-case-name remote)))
+      (:handler (c)
+        ;; Already using a dumb, proxy-enabled transport?  Nothing we can do here, then..
+        (unless *combined-remotes-prefer-native-over-http*
+          (error c))
+        (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
+                          Retrying in dumb HTTP mode.~:@>~%"
+                (name remote) (url remote module-name))
+        (let ((*combined-remotes-prefer-native-over-http* nil)
+              (*git-fetch-recovery-attempt* t))
+          (git-fetch-remote remote module-name))
+        (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
+                          Are we in a HTTP-only environment?  ~
+                          Any further accesses to combined remotes will go through HTTP.~:@>~%")
+        (setf *combined-remotes-prefer-native-over-http* nil)
+        t))))
 
 ;;;;
 ;;;; Modules, in context of knowledge base
@@ -970,18 +1021,26 @@ to DIRECTORY."
 (defvar *module*)
 (defvar *umbrella*)
 
-(defun compile-remote-module-path-strings (remote module module-name)
-  (let ((*module* (when module-name (downstring module-name)))
-        (*umbrella* (when module (downstring (module-umbrella module)))))
-    (declare (special *module* *umbrella*))
-    (iter (for insn-spec in (funcall (remote-path-fn remote)))
-          (cond ((eq insn-spec :no/)
-                 (pop accumulated-path))
-                (t
-                 (when insn-spec
-                   (collect insn-spec into accumulated-path at beginning)
-                   (collect "/" into accumulated-path at beginning))))
-          (finally (return (nreverse accumulated-path))))))
+(defgeneric compile-remote-module-path-strings (remote module module-name)
+  (:method :around ((r remote) module module-name)
+    (let ((*module* (when module-name (downstring module-name)))
+          (*umbrella* (when module (downstring (module-umbrella module)))))
+      (declare (special *module* *umbrella*))
+      (iter (for insn-spec in (call-next-method))
+            (cond ((eq insn-spec :no/)
+                   (pop accumulated-path))
+                  (t
+                   (when insn-spec
+                     (collect insn-spec into accumulated-path at beginning)
+                     (collect "/" into accumulated-path at beginning))))
+            (finally (return (nreverse accumulated-path))))))
+  (:method ((r remote) module module-name)
+    (funcall (remote-path-fn r)))
+  ;; XXX: Ugh.
+  (:method ((r git-combined-remote) module module-name)
+    (if *combined-remotes-prefer-native-over-http*
+        (funcall (remote-path-fn r))
+        (funcall (remote-http-path-fn r)))))
 
 (defgeneric url-using-module (remote module)
   (:method :around ((r remote) module)
@@ -1213,21 +1272,37 @@ with SYSTEM specifying the driven variable binding."
   "Drop unsaved changes recorded in METASTORE-PATHNAME."
   (git-set-branch-index-tree nil metastore-pathname))
 
-(defun clone-metastore (url locality-pathname branch)
+(defun clone-metastore (url http-url metastore-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out."
-  (within-directory (locality-pathname)
+  (within-directory (metastore-pathname :if-does-not-exist :create :if-exists :error)
     (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
       (declare (ignore type cred port path))
-      (let ((remote-name (string-downcase host))
-            (meta-dir (subdirectory* locality-pathname ".meta")))
+      (let ((remote-name (canonicalise-name host)))
         (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
-          (git "clone" "-o" remote-name (concatenate 'string url "/.meta")))
-        (within-directory (meta-dir)
-          (unless (git-branch-present-p :master)
-            (git-set-branch :master))
-          (git-set-head-index-tree :master)
-          (git-set-branch-index-tree (make-remote-ref remote-name branch)))))))
+          (git "init-db")
+          (ensure-gitremote remote-name (concatenate 'string url ".meta"))
+          ;; This should go through fetch-git-remote, which is currently impossible
+          ;; due to how URL works.
+          (with-maybe-handled-executable-failures t
+              (git "fetch" (down-case-name remote-name))
+            (:handler ()
+              (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
+                                  Retrying in dumb HTTP mode.~:@>~%"
+                      remote-name url)
+              (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
+              (git "fetch" (down-case-name remote-name))
+              (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
+                                  Are we in a HTTP-only environment?  ~
+                                  Any further accesses to combined remotes will go through HTTP.~:@>~%")
+              (setf *combined-remotes-prefer-native-over-http* nil)
+              t)))
+        ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
+        (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") nil))
+              (head-in-clouds-p (head-in-clouds-p)))
+          (git-set-branch :master nil remote-master-val (not head-in-clouds-p)))
+        (git-set-head-index-tree :master)
+        (git-set-branch-index-tree (make-remote-ref remote-name branch))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)

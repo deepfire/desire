@@ -29,6 +29,7 @@ version="9.11.2"
 argv0="$(basename $0)"
 
 default_wishmaster="git.feelingofgreen.ru"
+default_http_wishmaster="git.feelingofgreen.ru/shared/git"
 default_desire_branch="master"
 
 print_version_and_die() {
@@ -201,6 +202,8 @@ clone_module() {
     local root="$1"
     local module="$2"
     git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/git/${module}" >/dev/null || \
+        (echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport" && \
+         git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/git/${module}" >/dev/null) || \
         fail "failed to retrieve ${module}"
 }
 

@@ -195,6 +195,11 @@ meets desire's operational requirements.")
                                        (remove-if #'system-dependencies-up-to-date-p (module-systems o)))))
         (update-system-set-dependencies changed-systems)))))
 
+(defun sync-module (module &optional locality &aux
+                    (locality (or locality (gate *self*))))
+  (git-repository-update-for-dumb-servers
+   (module-pathname (coerce-to-module module) locality)))
+
 (defun enumerate-present-modules-and-systems (&key drop-system-caches verbose)
   (when drop-system-caches
     (drop-system-caches *default-system-type*))

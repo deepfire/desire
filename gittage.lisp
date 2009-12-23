@@ -189,6 +189,10 @@ The lists of pathnames returned have following semantics:
                        (error "~@<Unrecognised header ~S while reading from 'git status'.~:@>" line))))
                   (finally (return-from outer (values staged-modified staged-deleted staged-new unstaged-modified unstaged-deleted untracked))))))))))
 
+(defun git-repository-update-for-dumb-servers (&optional directory)
+  (maybe-within-directory directory
+    (git "update-server-info")))
+
 ;;;
 ;;; Config variables
 ;;;
@@ -216,13 +220,28 @@ The lists of pathnames returned have following semantics:
   (maybe-within-directory directory
     (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
       (multiple-value-bind (status output) (with-captured-executable-output ()
-                                             (git "remote"))
+                                             (git "remote" "-v"))
         (declare (ignore status))
-        (let ((remote-names (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))
-          (mapcar #'canonicalise-name remote-names))))))
+        (iter (for line in (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))
+              (while (plusp (length line)))
+              (destructuring-bind (name url &optional fetch-or-push)
+                  (iter (for str in (split-sequence #\Space line :remove-empty-subseqs t))
+                        (nconcing
+                         (split-sequence #\Tab str :remove-empty-subseqs t)))
+                (when (or (not fetch-or-push)
+                          (string= "(fetch)" fetch-or-push))
+                  (collect (canonicalise-name name) into names)
+                  (collect url into urls)))
+              (finally (return (values names urls))))))))
 
-(defun git-remote-present-p (name &optional directory)
-  (member name (gitremotes directory) :test #'string=))
+(defun git-remote-present-p (name &optional url directory)
+  (multiple-value-bind (remote-names urls) (gitremotes directory)
+    (iter (for remote-name in remote-names)
+          (for remote-url in urls)
+          (finding remote-name
+                   such-that (and (eq name remote-name)
+                                  (or (not url)
+                                      (string= url remote-url)))))))
 
 (defun git-add-remote (name url &optional directory)
   (maybe-within-directory directory
@@ -230,8 +249,11 @@ The lists of pathnames returned have following semantics:
       (git "remote" "add" (downstring name) url))))
 
 (defun ensure-gitremote (name url &optional directory)
-  (unless (git-remote-present-p name directory)
-    (git-add-remote name url directory)))
+  (let ((present-p (git-remote-present-p name url directory)))
+    (unless present-p
+      (when (git-remote-present-p name nil directory) ; exists, but with a different name?
+        (git "remote" "rm" (downstring name)))        ; must clean..
+      (git-add-remote (downstring name) url directory))))
 
 (defun fetch-gitremote (remote-name &optional directory)
   (maybe-within-directory directory

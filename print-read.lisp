@@ -102,16 +102,17 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
 (defmethod print-object ((o remote) stream &aux (default-remote-name (with-standard-io-syntax (default-remote-name (name (remote-distributor o)) (vcs-type o) (transport o)))))
   (let ((*print-case* :downcase))
     (format stream "~@<#R(~;~A~:[~; ~:*~(~A~)~] ~S~
+                            ~:[~; ~:*~<~S ~S~:@>~]~
                             ~{ ~<~S ~A~:@>~}~
                             ~:[~; ~:*~<~S ~S~:@>~]~
                           ~;)~:@>"
-            (symbol-name
-             (or (when (eq (remote-distributor o) *self*)
-                   'gate-native-remote)
-                 (type-of o)))
+            (symbol-name (type-of o))
             (unless (equal default-remote-name (name o))
               (string (name o)))
             (slot-or-abort-print-object stream o 'path)
+            (when-let ((http-path (and (typep o 'combined)
+                                       (slot-or-abort-print-object stream o 'http-path))))
+              `(:http-path ,http-path))
             (let ((module-names (iter (for m in (sort (mapcar #'module (slot-or-abort-print-object stream o 'module-names)) #'string< :key #'name))
                                       (collect (if (find (name m) (module-systems m) :key #'name)
                                                    (down-case-name m)
@@ -162,7 +163,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
   (:method ((s distributor) (o distributor) (r remote) source-proposed-type)
     source-proposed-type))
 
-(defun read-remote (type name path-components &key distributor-port domain-name-takeover modules converted-module-names credentials wrinkles initial-version)
+(defun read-remote (type name path-components &key http-path distributor-port domain-name-takeover modules converted-module-names credentials wrinkles initial-version)
   (let* ((source *read-time-merge-source-distributor*)
          (owner *read-time-enclosing-distributor*)
          ;; compute name, the object and type
@@ -175,14 +176,16 @@ The value returned is the merged type for SUBJECT-REMOTE.")
          (merged-module-names (merge-slot-value source owner subject 'module-names (append modules selfless-modules)))
          (modules-for-disconnection (when subject (set-difference merged-module-names (location-module-names subject))))
          (merged-converted-modules (merge-slot-value source owner subject 'converted-module-names converted-module-names)))
-    (lret ((*read-time-enclosing-remote* (or (when subject (change-class subject merged-type))
-                                             (apply #'make-instance merged-type :distributor owner :distributor-port distributor-port :domain-name-takeover domain-name-takeover
-                                                    :path path-components :module-names merged-module-names
-                                                    :last-sync-time *read-universal-time* :synchronised-p t
-                                                    (append (when name `(:name ,name))
-                                                            (when credentials `(:credentials ,credentials))
-                                                            (when wrinkles `(:wrinkles ,wrinkles))
-                                                            (when initial-version `(:initial-version ,initial-version)))))))
+    (lret ((*read-time-enclosing-remote*
+            (or (when subject (change-class subject merged-type))
+                (apply #'make-instance merged-type :distributor owner :distributor-port distributor-port :domain-name-takeover domain-name-takeover
+                       :path path-components :module-names merged-module-names
+                       :last-sync-time *read-universal-time* :synchronised-p t
+                       (append (when name `(:name ,name))
+                               (when http-path `(:http-path ,http-path))
+                               (when credentials `(:credentials ,credentials))
+                               (when wrinkles `(:wrinkles ,wrinkles))
+                               (when initial-version `(:initial-version ,initial-version)))))))
       (setf (slot-value *read-time-enclosing-remote* 'module-names) merged-module-names)
       (when (typep *read-time-enclosing-remote* 'gate)
         (setf (slot-value *read-time-enclosing-remote* 'converted-module-names) merged-converted-modules))
@@ -420,6 +423,7 @@ When SEAL-P is non-NIL, the changes are committed."
       (with-output-to-new-metafile (definitions 'definitions localmeta :commit-p seal :commit-message commit-message)
         (serialise-local-definitions definitions)
         (terpri definitions))
+      (git-repository-update-for-dumb-servers meta)
       (setf *unsaved-definition-changes-p* nil)
       (values))))
 

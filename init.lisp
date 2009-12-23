@@ -97,7 +97,7 @@ locally present modules will be marked as converted."
       ;;
       (unless (metastore-present-p meta-path '(definitions))
         (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S~:@>~%" meta-path *bootstrap-wishmaster-url*)
-        (clone-metastore *bootstrap-wishmaster-url* gate-path wishmaster-branch))
+        (clone-metastore *bootstrap-wishmaster-url* *bootstrap-wishmaster-http-url* meta-path wishmaster-branch))
       (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
       (read-definitions :force-source t :metastore meta-path)
       ;;

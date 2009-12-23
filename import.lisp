@@ -325,5 +325,6 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                        (when *default-publishable*
                          (declare-module-converted name locality)))))
                  (syncformat t ";; Done fetching module ~A~%" name))))
-        (notice-module-repository module nil locality)))
+        (notice-module-repository module nil locality)
+        (sync-module module locality)))
   (values))
