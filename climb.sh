@@ -61,6 +61,7 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -s SYSTEM    Install or update the module relevant to SYSTEM, then load it.
   -a APP       Load system containing APP, as per -s, then launch it.
   -x EXPR      Evaluate an expression, in the end of it all.
+  -k PACKAGE   Set current PACKAGE, before evaluation of EXPR.
   -p PHASE(s)  Apply buildslave PHASEs to MODULEs specified through -m.
   -d           Enable debug optimisation of Lisp code.
   -g           Disable debugger, causing desire dump stack and abort on errors,
@@ -107,7 +108,8 @@ and application launching.  Any of these can be omitted, as the required
 information is easily deduced.  Note that the more granular objects
 determine the objects of lower granularity.
 
-After all these steps, EXPR is executed, if it was provided.
+After all these steps, EXPR is executed, if it was provided, with
+PACKAGE optionally set as current.
 
 Report ${argv0} bugs to _deepfire on feelingofgreen <dot> ru
 Desire launchpad team: <https://launchpad.net/~desire>
@@ -116,7 +118,7 @@ EOF
     exit $1
 }
 
-while getopts :un:b:t:m:s:a:x:p:dgevVh opt
+while getopts :un:b:t:m:s:a:x:k:p:dgevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
@@ -127,6 +129,7 @@ do
         s)  SYSTEM="${OPTARG}";;
         a)  APP="${OPTARG}";;
         x)  EXPR="${OPTARG}";;
+        k)  PACKAGE="${OPTARG}";;
         p)  PHASES="${OPTARG}";;
         d)  DEBUG="3";;
         g)  DISABLE_DEBUGGER="--disable-debugger";;
@@ -165,6 +168,8 @@ APP=${APP:-nil}
 
 test "${VERBOSE}" -a "${EXPR}" && echo "NOTE: will execute ${EXPR}, in the end of it all"
 EXPR=${EXPR:-nil}
+test "${VERBOSE}" -a "${PACKAGE}" && echo "NOTE: will set ${PACKAGE} as current package, before executing the above expression"
+PACKAGE=${PACKAGE:-nil}
 test "${VERBOSE}" -a "${PHASES}" && echo "NOTE: will execute buildbot ${PHASES} on ${MODULES}, in the end of it all"
 PHASES=${PHASES:-nil}
 
@@ -352,6 +357,9 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
       (require (down-case-name system)))
     (when app
       (run app))))" \
+     --eval "
+(when ${PACKAGE}
+  (in-package ${PACKAGE}))" \
      --eval "
 (when (quote ${EXPR})
   ${EXPR})"
