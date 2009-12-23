@@ -47,6 +47,21 @@
 ;;;;
 ;;;; More or less generic-ish basis
 ;;;;
+(defun relativise-path (new-base path &optional (ascent-marker ".."))
+  (let* ((old-base (butlast path))
+         (name (lastcar path))
+         (mismatch-posn (mismatch new-base old-base))
+         (newbaselen (length new-base)))
+    (multiple-value-bind (unwind rewind) (cond
+                                           ((null mismatch-posn))
+                                           ((= mismatch-posn newbaselen)
+                                            (values nil (subseq old-base newbaselen)))
+                                           (t
+                                            (values (make-list (- newbaselen mismatch-posn)
+                                                               :initial-element ascent-marker)
+                                                    (subseq old-base mismatch-posn))))
+      (append unwind rewind (list name)))))
+
 ;;;
 ;;; Period
 ;;;
@@ -419,7 +434,7 @@
 (defvar *style*)
 (defparameter *uri-base* '("desire-waterfall"))
 (defparameter *global-condition* nil)
-(defparameter *verbose-static-emission* t)
+(defparameter *verbose-static-emission* nil)
 (defvar *emitting-static* nil)
 (defvar *current-base* nil)
 (defvar *completed-static-emissions* (make-hash-table :test #'equal))
@@ -460,29 +475,15 @@
                                        ,@body)))
 
 (defun %uri (path extension text base)
-  (flet ((process-path-element (x)
+  (flet ((interpret-path-element (x)
            (etypecase x
              (integer (write-to-string x))
              (string x)
-             (symbol (downstring x))))
-         (rebase-path (new-base x)
-           (let* ((old-base (butlast x))
-                  (name (lastcar x))
-                  (mismatch-posn (mismatch new-base old-base))
-                  (newbaselen (length new-base)))
-             (multiple-value-bind (unwind rewind) (cond
-                                                    ((null mismatch-posn))
-                                                    ((= mismatch-posn newbaselen)
-                                                     (values nil (subseq old-base newbaselen)))
-                                                    (t
-                                                     (values (make-list (- newbaselen mismatch-posn)
-                                                                        :initial-element "..")
-                                                             (subseq old-base mismatch-posn))))
-               (append unwind rewind (list name))))))
-    (let ((processed-path (mapcar #'process-path-element path)))
+             (symbol (downstring x)))))
+    (let ((processed-path (mapcar #'interpret-path-element path)))
       (lret ((uri (format nil "<a href='~A~:[~;.~:*~A~]'>~A</a>"
                           (flatten-path-list (if *emitting-static*
-                                                 (rebase-path *current-base* processed-path)
+                                                 (relativise-path *current-base* processed-path)
                                                  (append base processed-path))
                                              (not *emitting-static*))
                           extension text)))
