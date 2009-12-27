@@ -154,7 +154,7 @@
          (values module-dictionary system-dictionary))
         (t
          (setf (car cell) :processing)
-         (let ((present-before-update-p (module-locally-present-p module locality)))
+         (let ((present-before-update-p (module-locally-present-p module locality t)))
            (unless (or (and skip-present present-before-update-p)
                        (and skip-missing (not present-before-update-p)))
              (update module locality))
