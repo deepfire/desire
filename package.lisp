@@ -98,10 +98,15 @@
    #:parse-remote-namestring
    #:remote-disabled-p
    #:credentials
+   #:host-access
    #:cred-name
+   #:cred-hostname
    #:cred-username
    #:cred-password
    #:cred
+   #:coerce-to-credentials
+   #:defcred
+   #:defhostaccess
    ;;   types.lisp :: metastore
    #:reset-metastore
    ;;   types.lisp :: global UI

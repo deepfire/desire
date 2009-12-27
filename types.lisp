@@ -265,6 +265,9 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
   (username (definition-error "~@<Won't create a credential without a username.~:@>") :type string)
   (password (definition-error "~@<Won't create a credential without a password.~:@>") :type (or null string)))
 
+(defstruct (host-access (:include credentials) (:conc-name cred-) (:constructor make-host-access (name &key hostname username password)))
+  (hostname (definition-error "~@<Won't create a host-access credential without a hostname.~:@>") :type string))
+
 (defvar *credentials* (alist-hash-table `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous :username "anonymous" :password "anonymous"))
                                           (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil)))
                                         :test #'equal)
@@ -819,7 +822,7 @@ Find out whether SYSTEM is hidden."
 (define-root-container *apps*           app           :name-transform-fn coerce-to-namestring :remover %remove-app :coercer t :mapper map-apps :type application)
 (define-root-container *remotes*        remote        :name-transform-fn coerce-to-namestring :remover %remove-remote :coercer t :mapper map-remotes :type remote :if-exists :error :iterator do-remotes)
 (define-root-container *localities*     loc           :type locality :mapper map-localities :if-exists :error)
-(define-root-container *credentials*    cred          :type credentials :iterator do-credentials :if-exists :error)
+(define-root-container *credentials*    cred          :type credentials :iterator do-credentials :coercer t)
 (define-root-container *localities-by-path* locality-by-path :type locality :if-exists :error)
 
 ;;;;
@@ -951,6 +954,12 @@ This notably excludes converted modules."
 ;;;;
 ;;;; Remotes, in context of knowledge base
 ;;;;
+(defun defcred (name &key username password)
+  (setf (cred name) (make-cred name :username username :password password)))
+
+(defun defhostaccess (name &key hostname username password)
+  (setf (cred name) (make-host-access name :hostname hostname :username username :password password)))
+
 (defun match-credentials (username password)
   "Find a named credentials entry with matching USERNAME and PASSWORD."
   (do-credentials (c)
