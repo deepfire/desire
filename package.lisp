@@ -241,12 +241,13 @@
    #:purge-module-binaries
    ;; desire.lisp :: tests
    #:run-module-test
-   #:with-slave-output-markers
-   #:buildslave
-   #:*buildslave-remote-output-marker*
-   #:*buildslave-remote-end-of-output-marker*
-   #:*buildslave-remote-test-output-marker*
-   #:*buildslave-remote-end-of-test-output-marker*
+   #:run-test-phase-with-markers
+   #:run-test-phases-with-markers
+   #:with-output-markers
+   #:*beginning-of-output-marker*
+   #:*end-of-output-marker*
+   #:*beginning-of-result-marker*
+   #:*end-of-result-marker*
    ;; add-module.lisp
    #:*auto-lust*
    #:add-distributor

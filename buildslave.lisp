@@ -21,10 +21,10 @@
 (in-package :desire)
 
 
-(defparameter *buildslave-remote-output-marker* :beginning-of-test-results-marker)
-(defparameter *buildslave-remote-end-of-output-marker* :end-of-test-results-marker)
-(defparameter *buildslave-remote-test-output-marker* :beginning-of-test-result-marker)
-(defparameter *buildslave-remote-end-of-test-output-marker* :end-of-test-result-marker)
+(defparameter *beginning-of-output-marker* :beginning-of-output-marker)
+(defparameter *end-of-output-marker* :end-of-output-marker)
+(defparameter *beginning-of-result-marker* :beginning-of-result-marker)
+(defparameter *end-of-result-marker* :end-of-result-marker)
 
 (defgeneric run-module-test (type module-name &optional verbose-internals record-output)
   (:method :around (type module-name &optional verbose-internals record-output)
@@ -66,16 +66,16 @@
     (declare (ignore record-output))
     (desire (list mn) :skip-present t :skip-missing t :seal nil :verbose verbose-internals)
     t)
-  (:method ((o (eql :slave-fetch-phase)) mn &optional verbose-internals record-output)
+  (:method ((o (eql :remote-lisp-fetch-phase)) mn &optional verbose-internals record-output)
     (declare (ignore verbose-internals record-output))
     (let ((*fetch-errors-serious* t)
           (remote (module-best-remote (module mn))))
       (unless (typep remote 'gate) ; Should it check for exact wishmaster identity?
-        (module-error (module mn) "~@<Attempted to fetch module ~A from a non-gate remote ~A in slave mode.~:@>"
+        (module-error (module mn) "~@<Attempted to fetch module ~A from a non-gate remote ~A in remote lisp mode.~:@>"
                       mn (name remote)))
       (update mn)
       t))
-  (:method ((o (eql :slave-load-phase)) mn &optional verbose-internals record-output)
+  (:method ((o (eql :remote-lisp-load-phase)) mn &optional verbose-internals record-output)
     (declare (ignore record-output))
     (do-modules (m)
       (when (directory-exists-p (module-pathname m))
@@ -97,11 +97,11 @@
                                   (name system))
                     (error 'undeclared-system-dependency :system system :guilty-set system-deps))))))))
     t)
-  (:method ((o (eql :slave-test-phase)) mn &optional verbose-internals record-output)
+  (:method ((o (eql :remote-lisp-test-phase)) mn &optional verbose-internals record-output)
     (declare (ignore verbose-internals record-output))
-    (not-implemented :slave-test-phase)))
+    (not-implemented :remote-lisp-test-phase)))
 
-(defgeneric run-buildslave-phase (phase-name module-names verbose)
+(defgeneric run-test-phase-with-markers (phase-name module-names verbose)
   (:method :around (phase-name module-names verbose)
     (syncformat t "(:phase ~S :module-count ~D)~%" phase-name (length module-names))
     (call-next-method)
@@ -111,24 +111,24 @@
           (syncformat t "(:name ~S :mode ~(~S~)~%~
                          ~S~%" 
                       mn phase-name
-                      *buildslave-remote-test-output-marker*)
+                      *beginning-of-result-marker*)
           (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
             (syncformat t "~%~:[~*~;~%>>> A condition of type ~A was encountered during execution.~%~]~
                            ~S~%~
                            :status ~S :condition ~S :backtrace ~S)~%"
                         condition (type-of condition)
-                        *buildslave-remote-end-of-test-output-marker* 
+                        *end-of-result-marker* 
                         return-value (format nil "~A" condition) backtrace)))))
 
-(defun buildslave (module-names phase-names &key verbose &aux
-                   (module-names (mapcar #'canonicalise-name module-names)))
+(defun run-test-phases-with-markers (phase-names module-names &key verbose &aux
+                                     (module-names (mapcar #'canonicalise-name module-names)))
   (dolist (phase-name (mapcar (compose #'make-keyword #'string-upcase #'string) phase-names))
-    (run-buildslave-phase phase-name module-names verbose)))
+    (run-test-phase-with-markers phase-name module-names verbose)))
 
-(defun invoke-with-slave-output-markers (stream fn)
-  (syncformat stream "~%~S~%" *buildslave-remote-output-marker*)
-  (funcall fn)
-  (syncformat stream "~%~S~%" *buildslave-remote-end-of-output-marker*))
+(defun invoke-with-output-markers (stream fn)
+  (syncformat stream "~%~S~%" *beginning-of-output-marker*)
+  (unwind-protect (funcall fn)
+    (syncformat stream "~%~S~%" *end-of-output-marker*)))
 
-(defmacro with-slave-output-markers (() &body body)
-  `(invoke-with-slave-output-markers t (lambda () ,@body)))
+(defmacro with-output-markers (() &body body)
+  `(invoke-with-output-markers t (lambda () ,@body)))

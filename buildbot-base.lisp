@@ -22,22 +22,22 @@
   (:nicknames :desree)
   (:use :common-lisp :iterate :alexandria :pergamum :executor :portable-spawn :desire :hunchentoot :cl-who :elsewhere.0)
   (:export
-   ;; buildslave entry point
-   #:buildslave
    ;; buildmaster
    #:buildbot-condition
    #:buildbot-error
    #:buildmaster-condition
    #:buildmaster-error
-   #:buildslave-condition
-   #:buildslave-error
+   #:remote-lisp-condition
+   #:remote-lisp-error
    #:simple-buildmaster-error
-   #:buildslave-communication-error
-   #:simple-buildslave-communication-error
-   #:buildslave-initialisation-error
-   #:ping-slave
+   #:remote-lisp-communication-error
+   #:simple-remote-lisp-communication-error
+   #:remote-lisp-initialisation-error
+   #:condition-ctx
+   #:ping-remote
    #:one
    #:one*
+   #:metaone
    ;; buildmaster web interface
    #:start-cl-waterfall))
 
@@ -161,12 +161,18 @@
   (:method ((o incomplete-action) &rest initargs)
     (complete-action o (specific-action-subclass o 'success) initargs)))
 
+(defvar *verbose-termination* nil)
+(define-execute-with-bound-variable *verbose-termination*
+  (:binding verbose-termination t :define-with-maybe-macro t))
+
 (defun invoke-with-tracked-termination (action handlep fn)
   (let (normally-executed-p
         termination-done-p)
     (unwind-protect
          (handler-bind ((serious-condition
                          (lambda (c)
+                           (when *verbose-termination*
+                             (format t "~&~@<;; ~@;Te~@<rminating ~A due to ~A:~%~A~:@>~:@>~%" action (type-of c) c))
                            (terminate-action action
                                              :condition c
                                              :backtrace (with-output-to-string (s)
@@ -183,6 +189,19 @@
 
 (defmacro with-tracked-termination ((action &optional handlep) &body body)
   `(invoke-with-tracked-termination ,action ,handlep (lambda () ,@body)))
+
+(defgeneric invoke-with-active-period (period handlep fn)
+  (:method ((o period) handlep (fn function))
+    (start-period o)
+    (multiple-value-prog1 (with-tracked-termination (o handlep)
+                            (funcall fn))
+      (end-period o))))
+
+(defmacro with-active-period ((period &optional handlep period-form) &body body)
+  (if period-form
+      `(let ((,period ,period-form))
+         (invoke-with-active-period ,period ,handlep (lambda () ,@body)))
+      `(invoke-with-active-period ,period ,handlep (lambda () ,@body))))
 
 ;;;
 ;;; Webbable
@@ -211,17 +230,18 @@
 (define-condition buildbot-error (buildbot-condition desire-error) ())
 (define-condition buildmaster-condition (buildbot-condition) ())
 (define-condition buildmaster-error (buildmaster-condition buildbot-error) ())
-(define-condition buildslave-condition (buildbot-condition) ())
-(define-condition buildslave-error (buildslave-condition buildbot-error) ())
+(define-condition remote-lisp-condition (buildbot-condition) 
+  ((ctx :reader condition-ctx :initarg :ctx)))
+(define-condition remote-lisp-error (remote-lisp-condition buildbot-error) ())
 (define-simple-error buildmaster-error)
 
-(define-condition buildslave-communication-error (buildslave-error) ())
-(define-simple-error buildslave-communication-error)
+(define-condition remote-lisp-communication-error (remote-lisp-error) ())
+(define-simple-error remote-lisp-communication-error :object-initarg :ctx)
 
-(define-reported-condition buildslave-initialisation-error (buildslave-communication-error)
+(define-reported-condition remote-lisp-initialisation-error (remote-lisp-communication-error)
   ((output :reader error-output :initarg :output))
   (:report (output)
-           "~@<Error encountered while initialising buildslave:~%~A~%~:@>" output))
+           "~@<Error encountered while initialising remote-lisp:~%~A~%~:@>" output))
 
 (define-condition build-test-error (desire-error) ())
 (define-simple-error build-test-error)
@@ -313,9 +333,7 @@
   (:subclass-to-action-class-map
    (unhandled-failure interrupted-local-test-phase)))
 (define-action-root-class remote-test-phase (test-phase)
-  ((hostname :reader remote-phase-hostname :initarg :hostname)
-   (username :reader remote-phase-username :initarg :username)
-   (slave-stream :accessor remote-phase-slave-stream))
+  ((ctx :accessor remote-phase-ctx))
   (:subclass-to-action-class-map
    (unhandled-failure interrupted-remote-test-phase)))
 
@@ -330,16 +348,16 @@
   (:default-initargs :action-description "discover module systems and their direct dependencies"))
 (defclass master-recurse-phase (local-test-phase) ()
   (:default-initargs :action-description "unwind module dependencies"))
-(defclass slave-fetch-phase (remote-test-phase) ()
+(defclass remote-lisp-fetch-phase (remote-test-phase) ()
   (:default-initargs :action-description "fetch modules from wishmaster"))
-(defclass slave-load-phase (remote-test-phase) ()
+(defclass remote-lisp-load-phase (remote-test-phase) ()
   (:default-initargs :action-description "load modules"))
-(defclass slave-test-phase (remote-test-phase) ()
+(defclass remote-lisp-test-phase (remote-test-phase) ()
   (:default-initargs :action-description "test modules"))
 
 (defgeneric describe-phase (test-phase)
   (:method ((o test-phase))
-    (format nil "~A on ~:[the wishmaster~;a buildslave~]; ~:[not started~; started ~:*~A~]~
+    (format nil "~A on ~:[the wishmaster~;a remote-lisp~]; ~:[not started~; started ~:*~A~]~
                                                           ~:[~;, finished ~:*~A~]"
             (phase-action-description o) (typep o 'remote-test-phase)
             (when (period-started-p o)
@@ -364,11 +382,7 @@
    (unhandled-failure interrupted-buildmaster-run))
   (:default-initargs
    :lock (bordeaux-threads:make-lock)
-   :condvar (bordeaux-threads:make-condition-variable)
-   :start-time (get-universal-time)
-   :phases '(master-update-phase
-             slave-fetch-phase
-             slave-load-phase)))
+   :condvar (bordeaux-threads:make-condition-variable)))
 
 (defclass interrupted-buildmaster-run (unhandled-failure buildmaster-run) ())
 
