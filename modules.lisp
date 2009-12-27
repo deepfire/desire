@@ -201,6 +201,9 @@ meets desire's operational requirements.")
     (git-repository-update-for-dumb-servers
      (module-pathname (coerce-to-module module) locality))))
 
+(defgeneric module-post-install (name module locality pathname)
+  (:method ((name symbol) (module module) (locality locality) pathname)))
+
 (defun enumerate-present-modules-and-systems (&key drop-system-caches verbose)
   (when drop-system-caches
     (drop-system-caches *default-system-type*))

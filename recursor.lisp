@@ -171,6 +171,9 @@
               (values module-dictionary system-dictionary))
              (t
               (module-error (module name) "~@<Couldn't obtain module ~A.~:@>" name))))))))
+  (:method :after ((name symbol) locality system-type module-dictionary system-dictionary &key &allow-other-keys)
+    (let ((module (module name)))
+      (module-post-install name module locality (module-pathname module locality))))
   (:method :around (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
     (declare (ignore complete skip-present skip-missing verbose))
     (multiple-value-bind (new-module-dictionary new-system-dictionary) (call-next-method)

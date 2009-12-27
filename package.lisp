@@ -208,6 +208,7 @@
    ;; modules.lisp
    #:system-name-conflict
    #:module-central-system
+   #:module-post-install
    ;; gittage.lisp
    #:repo-var
    #:module-git-branches
