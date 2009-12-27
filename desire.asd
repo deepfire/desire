@@ -27,7 +27,7 @@
                (:file "apropos" :depends-on ("types"))
                (:file "application" :depends-on ("systems"))
                ;; It's probably too bad that the buildslave doesn't exercise the recursor..
-               (:file "buildslave" :depends-on ("import"))
+               (:file "buildslave" :depends-on ("import" "recursor"))
                (:file "clbuild" :depends-on ("add-module"))
                (:file "libcl" :depends-on ("add-module"))
                (:file "xcvb" :depends-on ("systems"))
