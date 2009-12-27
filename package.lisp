@@ -70,6 +70,7 @@
    #:map-apps
    #:do-distributors
    #:do-remotes
+   #:do-modules
    #:do-distributor-modules
    #:coerce-to-distributor
    #:coerce-to-remote
