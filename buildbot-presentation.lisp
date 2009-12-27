@@ -260,7 +260,7 @@
 (defun cl-waterfall ()
   (render-cl-waterfall))
 
-(defun start-cl-waterfall (&optional (prefix (flatten-path-list *uri-base* :absolute t)))
+(defun start-cl-waterfall (&optional (prefix (string-right-trim '(#\/) (flatten-path-list *uri-base* :absolute t))))
   (push (create-regex-dispatcher prefix 'render-cl-waterfall) *dispatch-table*))
 
 (setf *style*
