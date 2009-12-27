@@ -131,7 +131,7 @@
 (defvar *implementation-unhandled-condition-signature*
   #+sbcl "unhandled")
 
-(defun snoop-remote-errors (line nr stream error-type)
+(defun snoop-remote-errors (line nr stream error-type &rest error-initargs)
   (when-let ((type (cond ((or (starts-with-subseq *implementation-debugger-signature* line)
                               (starts-with-subseq *implementation-unhandled-condition-signature* line))
                           :lisp)
@@ -145,7 +145,7 @@
                                       (while line)
                                       (collect line)
                                       (collect #(#\Newline))))))
-      (error error-type :output error-message))))
+      (apply #'error error-type :output error-message error-initargs))))
 
 (defun read-mandatory-line (ctx description &optional (slurp-empty-lines t))
   (iter (for line = (read-line (ctx-pipe ctx) nil nil))
@@ -153,7 +153,7 @@
           (remote-lisp-communication-error ctx
            "~@<Early termination from remote lisp: premature end while processing ~A.~:@>"
            description))
-        (snoop-remote-errors line 0 (ctx-pipe ctx) 'remote-lisp-communication-error)
+        (snoop-remote-errors line 0 (ctx-pipe ctx) 'remote-lisp-communication-error :ctx ctx)
         (while (and (zerop (length line)) slurp-empty-lines))
         (finally (return line))))
 
@@ -345,7 +345,7 @@
           (for i from 0)
           (when verbose-comm
             (report-line i line))
-          (snoop-remote-errors line i pipe 'remote-lisp-initialisation-error)
+          (snoop-remote-errors line i pipe 'remote-lisp-initialisation-error :ctx ctx)
           (until (line-marker-p line *beginning-of-output-marker*))
           (finally
            (format t "==( found remote output beginning marker on line ~D~%" i)))))
@@ -544,5 +544,5 @@
             (for i from 0)
             (while line)
             (report-line i line)
-            (snoop-remote-errors line i pipe 'remote-lisp-initialisation-error))
+            (snoop-remote-errors line i pipe 'remote-lisp-initialisation-error :ctx ctx))
       t)))
