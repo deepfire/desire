@@ -34,9 +34,12 @@
 (defun make-notprocessing-undone (name) (cons name (cons nil nil)))
 (defun make-processing-undone (name) (cons name (cons :processing nil)))
 
-(defun discover-direct-module-dependencies (module &optional (system-type *default-system-type*)
-                                            complete system-dictionary verbose &aux
-                                            (module (coerce-to-module module)))
+(defun discover-direct-module-dependencies (module &optional
+                                            (required-systems (list (module-central-system module)))
+                                            (system-type *default-system-type*)
+                                            system-dictionary verbose &aux
+                                            (module (coerce-to-module module))
+                                            (required-systems (mapcar #'coerce-to-system required-systems)))
   (labels ((subj (c) (car c))
            (cell (c) (cdr c))
            ((setf cellar) (v c) (setf (cadr c) v))
@@ -57,6 +60,10 @@
                (setf (cellar entry) :wanted
                      dictionary dictionary)
                (cons (make-wanted-missing name) dictionary)))
+           (mark-system-unwanted (name dictionary)
+             (if (entry dictionary name #'string=)
+                 dictionary
+                 (cons (make-unwanted-missing name) dictionary)))
            (add-system-dependencies (module system modules system-dictionary)
              "Given a MODULE's SYSTEM, detect its dependencies and, accordingly, extend the sets
               of known REQUIRED systems, MODULES and MISSING unknown systems, returning them
@@ -70,6 +77,9 @@
              ;; - locally present :: as above, but module is present and DEFINITION-PATHNAME is bound
              (multiple-value-bind (defined undefined) (unzip (rcurry #'system :if-does-not-exist :continue)
                                                              (direct-system-dependencies system))
+               (when verbose
+                 (format t "~@<;;; ~@;Di~@<rect defined sysdeps of ~A:~{ ~A~}~:@>~:@>~%" (name system) defined)
+                 (format t "~@<;;; ~@;Un~@<defined sysdeps of ~A:~{ ~A~}~:@>~:@>~%" (name system) undefined))
                (multiple-value-bind (known unknown) (unzip #'system-known-p
                                                            (mapcar #'system defined))
                  (multiple-value-bind (known-local known-external) (unzip (compose (feq module) #'system-module)
@@ -90,8 +100,8 @@
              "Given a MODULE and a list of its REQUIRED systems, pick one and try to handle
               the fallout. Return the modified sets of known REQUIRED systems, MODULES and
               MISSING unknown systems, returning them as multiple values."
-             (if-let ((name (next-unsatisfied-system system-dictionary)))
-               (let ((system (system name)))
+             (if-let* ((name (next-unsatisfied-system system-dictionary)))
+               (let ((system (ensure-system name)))
                  (when verbose
                    (format t ";;;; processing known system ~A~%" name))
                  (unless (typep system system-type)
@@ -105,34 +115,32 @@
                  (add-system-dependencies module system modules system-dictionary))
                (values modules system-dictionary))))
     (let* ((all-systems (module-systems module))
-           (main-system (module-central-system module))
-           (other-systems (remove main-system all-systems)))
+           (other-systems (set-difference all-systems required-systems))
+           (required-names (mapcar #'name required-systems))
+           (other-names (mapcar #'name other-systems)))
       ;; This doesn't deal with other modules providing same systems. Will silently break.
-      (let* ((required-systems (xform main-system (curry #'cons main-system) (when complete other-systems)))
-             (also-systems (unless complete other-systems))
-             (required-names (mapcar #'name required-systems))
-             (also-names (mapcar #'name also-systems))
-             (extended-system-dictionary (append (mapcar #'make-wanted-missing required-names)
-                                                 (mapcar #'make-unwanted-missing also-names)
-                                                 system-dictionary)))
-        (when verbose
-          (format t "~@<;;;; ~@;Determining dependencies of module ~A.  Main system file: ~A.  ~
-                              Other system files: ~A.  Required system files: ~A.  ~
+      (dolist (name required-names)
+        (setf system-dictionary (mark-system-wanted (string name) system-dictionary)))
+      (dolist (name other-names)
+        (setf system-dictionary (mark-system-unwanted (string name) system-dictionary)))
+      (when verbose
+        (format t "~@<;;;; ~@;Determining dependencies of module ~A.  ~
+                              Required system files: ~A.  Other system files: ~A.  ~
                               System dictionary: ~A.~:@>~%"
-                  (name module) (name main-system) (mapcar #'name other-systems) required-names extended-system-dictionary))
-        (iter (with modules)
-              (when (not (iter (for (name wanted . satisfied) in extended-system-dictionary)
-                               (finding name such-that (and wanted (not satisfied)))))
-                (return (values (remove-duplicates modules) extended-system-dictionary)))
-              ;; Progress is made .. why?
-              (for previous-system-dictionary = (copy-tree extended-system-dictionary))
-              (for (values modules-new new-extended-system-dictionary) = (satisfy-next-system module system-type modules extended-system-dictionary))
-              (when (equal previous-system-dictionary new-extended-system-dictionary)
-                (error 'recursor-progress-halted :system-dictionary new-extended-system-dictionary))
-              (setf (values modules extended-system-dictionary) (values modules-new new-extended-system-dictionary)))))))
+                (name module) required-names other-names system-dictionary))
+      (iter (with modules)
+            (when (not (iter (for (name wanted . satisfied) in system-dictionary)
+                             (finding name such-that (and wanted (not satisfied)))))
+              (return (values (remove-duplicates modules) system-dictionary)))
+            ;; Progress is made .. why?
+            (for previous-system-dictionary = (copy-tree system-dictionary))
+            (for (values modules-new new-system-dictionary) = (satisfy-next-system module system-type modules system-dictionary))
+            (when (equal previous-system-dictionary new-system-dictionary)
+              (error 'recursor-progress-halted :system-dictionary new-system-dictionary))
+            (setf (values modules system-dictionary) (values modules-new new-system-dictionary))))))
 
-(defgeneric satisfy-module (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
-  (:method ((name symbol) locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
+(defgeneric satisfy-module (name locality system-type module-dictionary system-dictionary &key systems complete skip-present skip-missing verbose)
+  (:method ((name symbol) locality system-type module-dictionary system-dictionary &key (systems nil systems-specified-p) complete skip-present skip-missing verbose)
     (when verbose
       (format t "~@<;;; ~@;modules: ~A~:@>~%" module-dictionary)
       (format t "~@<;;; ~@;systems: ~A~:@>~%" system-dictionary))
@@ -155,16 +163,25 @@
               ;; Discover and register system definitions.
               ;; Don't try to use the full-information dependency resolver, as it will likely fail.
               (notice-module-repository module nil locality)
-              (multiple-value-bind (module-deps new-system-dictionary)
-                  (discover-direct-module-dependencies module system-type complete system-dictionary verbose)
-                (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
-                       (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
-                  (syncformat t "~&~@<;; ~@;~S,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
-                  (multiple-value-prog1
-                      (if new-deps-from-this-module
-                          (satisfy-modules new-deps-from-this-module locality system-type new-module-dictionary new-system-dictionary nil
-                                           :complete complete :skip-present skip-present :verbose verbose)
-                          (values new-module-dictionary new-system-dictionary))))))
+              (let ((required-systems (cond (complete
+                                             (module-systems module))
+                                            (systems-specified-p
+                                             (mapcar #'coerce-to-system systems))
+                                            (t
+                                             (list (module-central-system module))))))
+                (when verbose
+                  (syncformat t "~@<;; ~@;~A: ~@<required systems:~{ ~A~}~:@>~:@>~%" name (mapcar #'name required-systems)))
+                (multiple-value-bind (module-deps new-system-dictionary)
+                    (discover-direct-module-dependencies module required-systems system-type system-dictionary verbose)
+                  (let* ((new-deps-from-this-module (remove-if (rcurry #'assoc module-dictionary) module-deps))
+                         (new-module-dictionary (append module-dictionary (mapcar #'make-notprocessing-undone new-deps-from-this-module))))
+                    (syncformat t "~&~@<;; ~@;~A,~:[ no further dependencies~; added ~:*~A,~]~:@>~%" name new-deps-from-this-module)
+                    (multiple-value-prog1
+                        (if new-deps-from-this-module
+                            (satisfy-modules (mapcar #'list new-deps-from-this-module) ; create default specs
+                                             locality system-type new-module-dictionary new-system-dictionary nil
+                                             :complete complete :skip-present skip-present :verbose verbose)
+                            (values new-module-dictionary new-system-dictionary)))))))
              (skip-missing
               (format t "~@<;;; ~@;Module ~A is missing, but SKIP-MISSING was specified, moving on with fingers crossed.~:@>~%" name)
               (setf (cdr cell) :done)
@@ -174,8 +191,7 @@
   (:method :after ((name symbol) locality system-type module-dictionary system-dictionary &key &allow-other-keys)
     (let ((module (module name)))
       (module-post-install name module locality (module-pathname module locality))))
-  (:method :around (name locality system-type module-dictionary system-dictionary &key complete skip-present skip-missing verbose)
-    (declare (ignore complete skip-present skip-missing verbose))
+  (:method :around (name locality system-type module-dictionary system-dictionary &key &allow-other-keys)
     (multiple-value-bind (new-module-dictionary new-system-dictionary) (call-next-method)
       (let ((cell (cdr (assoc name new-module-dictionary))))
         (assert cell)
@@ -183,14 +199,16 @@
         (setf (cdr cell) :done)
         (values new-module-dictionary new-system-dictionary)))))
 
-(defun satisfy-modules (module-names locality system-type module-dictionary system-dictionary toplevelp
+(defun satisfy-modules (module-specs locality system-type module-dictionary system-dictionary toplevelp
                         &key complete skip-present skip-missing verbose)
-  (iter (for module-name in module-names)
+  (iter (for (name . required-system-names) in module-specs)
         (for (values updated-module-dictionary updated-system-dictionary) =
-             (satisfy-module module-name locality system-type module-dictionary system-dictionary
-                             :complete complete
-                             :skip-present skip-present :skip-missing skip-missing
-                             :verbose verbose))
+             (apply #'satisfy-module name locality system-type module-dictionary system-dictionary
+                    :complete complete
+                    :skip-present skip-present :skip-missing skip-missing
+                    :verbose verbose
+                    (when required-system-names
+                      (list :systems required-system-names))))
         (setf (values module-dictionary system-dictionary) (values updated-module-dictionary updated-system-dictionary))
         (finally
          (when-let ((undone (and toplevelp (mapcar #'car (remove-if #'cddr module-dictionary)))))
@@ -214,36 +232,37 @@ Desire satisfaction means:
    - for specified present modules, update, unless SKIP-PRESENT is
      non-nil,
 
-In all cases, systems present in the set union of specified and
-depended upon modules are ensured to be loadable. See also the
-documentation of the COMPLETE keyword.
+COMPLETE designates the breadth of system satisfaction -- when COMPLETE
+is non-NIL, it means that every system present in every module is a source
+of potential dependencies, which need to be satisfied.  When COMPLETE is NIL,
+only the system chosen (heuristically) by MODULE-CENTRAL-SYSTEM is considered
+as a source of dependencies. 
 
 When individual desires are symbols, they are interpreted as module names.
-When they are lists, their first element is interpreted as the source
-distributor, from which the rest of the list is supposed to be fetched.
-These two forms can be mixed in the list of desires.
-The distributor specification is currently ignored, though.
+When they are lists, their first element is interpreted as a module name,
+and the rest as names of systems which need to be satisfied, which presents
+a more controlled alternative to the more blunt COMPLETE required system
+specification method.
 
 Defined keywords:
    - SKIP-PRESENT - whether to skip updating specified modules which are 
-     already present, defaults to nil,
-   - SEAL - whether to commit any definition changes, and,
+     already present, defaults to NIL;
+   - SEAL - whether to commit any definition changes, default is T;
    - COMPLETE - whether to obtain all modules' systems, even those not
-     part of main module systems' complete dependency graphs."
-  (let* ((interpreted-desires (mapcar (curry #'xform-if-not #'consp (lambda (m) (list nil m))) desires)))
-    (when-let ((desired-module-names (mapcar #'canonicalise-name (mapcan #'rest interpreted-desires))))
-      (let ((module-dictionary nil)
-            (system-dictionary (mapcar #'make-unwanted-present *implementation-provided-system-names*)))
-        (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length desired-module-names))
-        (satisfy-modules desired-module-names (gate *self*) *default-system-type* module-dictionary system-dictionary :sure-as-hell
-                         :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose)
+     part of main module systems' complete dependency graphs, default is NIL."
+  (when-let ((module-system-specs (mapcar (curry #'xform-if-not #'consp #'list) (map-list-tree #'canonicalise-name desires))))
+    (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length module-system-specs))
+    (satisfy-modules module-system-specs (gate *self*) *default-system-type* nil (mapcar #'make-unwanted-present
+                                                                                         *implementation-provided-system-names*)
+                     :sure-as-hell
+                     :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose)
       
-        (when *unsaved-definition-changes-p*
-          (syncformat t "; Definitions modified, writing~:[~; and committing~] changes.~%" seal)
-          (save-definitions :seal seal :commit-message (format nil "Added~{ ~A~} and ~:[their~;its~] dependencies."
-                                                               desired-module-names (endp (rest desired-module-names)))))
-        (syncformat t "; All done.~%")
-        (values)))))
+    (when *unsaved-definition-changes-p*
+      (syncformat t "; Definitions modified, writing~:[~; and committing~] changes.~%" seal)
+      (save-definitions :seal seal :commit-message (format nil "Added~{ ~A~} and ~:[their~;its~] dependencies."
+                                                           (mapcar #'car module-system-specs) (endp (rest module-system-specs)))))
+    (syncformat t "; All done.~%")
+    (values)))
 
 (defun lust (&rest desires)
   "A spread interface function for DESIRE.

@@ -343,8 +343,8 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
          (module-spec (quote ${MODULES}))
          (phases (ensure-list (quote ${PHASES})))
          (modules (if system
-                      (list (system-module system))
-                      (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue)) (ensure-list module-spec)))))
+                      (list (list (name (system-module system)) (name system)))
+                      (remove nil (mapcar (lambda (x) (name (module x :if-does-not-exist :continue))) (ensure-list module-spec)))))
          (desire (or module-spec (quote ${SYSTEM}) (quote ${APP}))))
     (when (and desire (not modules))
       (error \"~@<~S was/were desired, but no such entity (application, system or module) is known.~:@>\"
@@ -352,7 +352,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
     (when modules
       (if phases
           (buildslave modules phases ${VERBOSE})
-          (desire (mapcar (function coerce-to-name) modules) :skip-present t)))
+          (desire modules :verbose ${VERBOSE} :skip-present t)))
     (when system
       (require (down-case-name system)))
     (when app
