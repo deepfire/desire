@@ -215,6 +215,7 @@
    #:system-name-conflict
    #:module-central-system
    #:module-post-install
+   #:sync-module
    ;; gittage.lisp
    #:repo-var
    #:module-git-branches
