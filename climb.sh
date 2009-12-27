@@ -173,7 +173,7 @@ PACKAGE=${PACKAGE:-nil}
 test "${VERBOSE}" -a "${PHASES}" && echo "NOTE: will execute buildbot ${PHASES} on ${MODULES}, in the end of it all"
 PHASES=${PHASES:-nil}
 
-test "${VERBOSE}" -a "${DEBUG}" && echo echo "NOTE: optimising for debug"
+test "${VERBOSE}" -a "${DEBUG}" && echo "NOTE: optimising for debug"
 DEBUG=${DEBUG:-1}
 test "${VERBOSE}" -a "${DISABLE_DEBUGGER}" && echo "NOTE: disabling debugger"
 
