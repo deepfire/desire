@@ -460,9 +460,10 @@
             verbose-comm
             verbose-comm-starting-phase
             verbose-comm-starting-module)
-  (declare (ignore credentials purge-store purge-metastore desire-branch metastore-branch optimize-debug disable-debugger))
+  (declare (ignore purge-store purge-metastore desire-branch metastore-branch optimize-debug disable-debugger))
   (find-executable 'ssh :if-does-not-exist :error)
   (let* ((gate (gate *self*))
+         (credentials (or credentials :buildslave))
          (module-names (or modules
                            (multiple-value-bind (test-worthy central-system-less)
                                (compute-buildmaster-module-set module-sets)
@@ -487,10 +488,11 @@
             (when rest-phases
               (handler-case
                   (with-remote-lisp-context (ctx (apply #'make-remote-lisp-context
+                                                        :credentials credentials
                                                         :verbose (or verbose-comm
                                                                      verbose-comm-starting-phase
                                                                      verbose-comm-starting-module)
-                                                        (remove-from-plist options
+                                                        (remove-from-plist options :credentials
                                                                            :phases :modules :module-sets
                                                                            :verbose
                                                                            :verbose-comm-starting-phase
