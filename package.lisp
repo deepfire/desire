@@ -231,14 +231,11 @@
    #:*dirty-repository-behaviour*
    ;; import.lisp
    #:update
-   ;; desire.lisp
+   ;; recursor.lisp
    #:*fetch-errors-serious*
    #:desire
    #:lust
-   #:define-application 
-   #:fetch
-   #:desire
-   #:purge-module-binaries
+   #:loadsys
    ;; desire.lisp :: tests
    #:run-module-test
    #:run-test-phase-with-markers

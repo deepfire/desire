@@ -89,13 +89,8 @@
           (format t "~@<;;; ~@; Sy~@<stem dependencies: ~A~:@>~:@>~%" (mapcar #'name system-deps))
           (format t "~@<;;; ~@; The dependencies are ~:[IN~;~]complete~:@>~%"
                   (every #'system-definition-complete-p system-deps))
-          (handler-case (asdf:oos 'asdf:load-op (name (module-central-system mn)))
-            (asdf:missing-definition (c)
-              (let ((system (ensure-system (asdf:error-name c))))
-                (if (member system system-deps)
-                    (system-error system "~@<Internal error: failed to make system ~A loadable.~:@>"
-                                  (name system))
-                    (error 'undeclared-system-dependency :system system :guilty-set system-deps))))))))
+          (loadsys (module-central-system mn) :verbose verbose-internals)
+          #+(or) (error 'undeclared-system-dependency :system system :guilty-set system-deps))))
     t)
   (:method ((o (eql :remote-lisp-test-phase)) mn &optional verbose-internals record-output)
     (declare (ignore verbose-internals record-output))

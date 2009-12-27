@@ -127,6 +127,27 @@ definition path within its module within LOCALITY.")
     (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
            (system-definition-pathname o))))
 
+(defgeneric load-system (system &optional missing-dependency-handler)
+  (:method ((o asdf-system) &optional missing-dependency-handler)
+    (let (last-missing-system)
+      (tagbody :retry
+         (flet ((try-recover-system (name &aux
+                                          (name (canonicalise-name name)))
+                  (let ((missing-system (ensure-system name)))
+                    (format t "~@<;; ~@;Attempting to recover an unloadable system ~A.~:@>~%" name)
+                    (unless (system-known-p missing-system)
+                      (system-error missing-system "~@<Failed to recover system ~A: not known.~:@>" name))
+                    (when (eq missing-system last-missing-system)
+                      (system-error missing-system "~@<Failed to recover system ~A: missing dependency handler failed to improve situation.~:@>" name))
+                    (setf last-missing-system missing-system)
+                    (funcall missing-dependency-handler missing-system)
+                    (go :retry))))
+           (handler-case (asdf:operate 'asdf:load-op (name o))
+             (asdf:missing-definition (c)
+               (try-recover-system (asdf:error-name c)))
+             (asdf:missing-dependency (c)
+               (try-recover-system (asdf::missing-requires c)))))))))
+
 ;;;;
 ;;;; Dependencies
 ;;;;

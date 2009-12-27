@@ -343,7 +343,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
          (module-spec (quote ${MODULES}))
          (phases (ensure-list (quote ${PHASES})))
          (modules (if system
-                      (list (list (name (system-module system)) (name system)))
+                      (list (list (name (system-module system))))
                       (remove nil (mapcar (lambda (x) (name (module x :if-does-not-exist :continue))) (ensure-list module-spec)))))
          (desire (or module-spec (quote ${SYSTEM}) (quote ${APP}))))
     (when (and desire (not modules))
@@ -354,7 +354,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
           (buildslave modules phases ${VERBOSE})
           (desire modules :verbose ${VERBOSE} :skip-present t)))
     (when system
-      (require (down-case-name system)))
+      (loadsys system :verbose ${VERBOSE}))
     (when app
       (run app))))" \
      --eval "
