@@ -86,6 +86,10 @@
   (:method ((o period))
     (setf (period-end-time o) (get-universal-time))))
 
+(defgeneric period-unstart (period)
+  (:method ((o period))
+    (slot-makunbound o 'start-time)))
+
 (defgeneric period-length (period)
   (:method ((o period))
     (if (slot-boundp o 'end-time)
@@ -345,8 +349,6 @@
   (:default-initargs :action-description "test upstream repository reachability"))
 (defclass master-update-phase (local-test-phase) ()
   (:default-initargs :action-description "fetch upstream modules and convert them"))
-(defclass master-discovery-phase (local-test-phase) ()
-  (:default-initargs :action-description "discover module systems and their direct dependencies"))
 (defclass master-recurse-phase (local-test-phase) ()
   (:default-initargs :action-description "unwind module dependencies"))
 (defclass remote-lisp-fetch-phase (remote-test-phase) ()
@@ -367,6 +369,26 @@
             (when (period-ended-p o)
               (multiple-value-call #'print-decoded-time
                 (decode-universal-time (period-end-time o)))))))
+
+(defgeneric phase-type-dependency (phase)
+  (:method ((o (eql 'master-reachability-phase))) nil)
+  (:method ((o (eql 'master-update-phase))) 'master-reachability-phase)
+  (:method ((o (eql 'master-recurse-phase))) 'master-update-phase)
+  (:method ((o (eql 'remote-lisp-fetch-phase))) 'master-recurse-phase)
+  (:method ((o (eql 'remote-lisp-load-phase))) 'remote-lisp-fetch-phase)
+  (:method ((o (eql 'remote-lisp-test-phase))) 'remote-lisp-load-phase)
+  (:method ((o master-reachability-phase)) nil)
+  (:method ((o master-update-phase)) 'master-reachability-phase)
+  (:method ((o master-recurse-phase)) 'master-update-phase)
+  (:method ((o remote-lisp-fetch-phase)) 'master-recurse-phase)
+  (:method ((o remote-lisp-load-phase)) 'remote-lisp-fetch-phase)
+  (:method ((o remote-lisp-test-phase)) 'remote-lisp-load-phase))
+
+(defun result-dependency (result)
+  (let ((phase (result-phase result)))
+    (when-let* ((dependency-type (phase-type-dependency phase))
+                (dependency (find-if (of-type dependency-type) (master-run-phases (phase-run phase)))))
+      (result (result-id result) (type-of dependency) (phase-run phase)))))
 
 ;;;
 ;;; Buildmaster run
@@ -419,6 +441,9 @@
 (defun master-result (master-run i)
   (declare (type buildmaster-run master-run))
   (aref (master-run-results master-run) i))
+
+(defun result-nr (result)
+  (- (result-id result) (phase-base (result-phase result))))
 
 (defun result (result phase &optional (master-run (first *buildmaster-runs*)))
   (aref (master-run-results master-run)

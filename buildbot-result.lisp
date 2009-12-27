@@ -67,11 +67,12 @@
   (:method ((o test-phase) (r result))
     "")
   (:method ((o master-update-phase) (r result))
-    (let ((commit (result-commit r)))
+    (if-let ((commit (slot-value* r 'commit nil)))
       (concatenate 'string
                    "<pre>Commit-ID: " (desr::cook-refval (desr::commit-id commit)) "</pre><br>"
                    "<pre>Author:    " (desr::commit-author commit) "</pre><br>"
-                   "<pre>Date:      " (desr::commit-date commit) "</pre><br>"))))
+                   "<pre>Date:      " (desr::commit-date commit) "</pre><br>")
+      "")))
 
 (defun invalidate-result-hint-cache (&optional (buildmaster-run (first *buildmaster-runs*)))
   (iter (for r in-vector (master-run-results buildmaster-run))

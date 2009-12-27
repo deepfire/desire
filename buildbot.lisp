@@ -38,10 +38,11 @@
       (with-master-run-lock (o)
         (when-let ((completed-r (when (plusp i)
                                   (aref result-vector (1- i)))))
-          (when ranp
-            (if successp
-                (succeed-action completed-r)
-                (fail-action completed-r :condition condition :backtrace backtrace))))
+          (if ranp
+              (if successp
+                  (succeed-action completed-r)
+                  (fail-action completed-r :condition condition :backtrace backtrace))
+              (period-unstart completed-r)))
         (bordeaux-threads:condition-notify (master-run-condvar o))
         (cond ((< i (* (master-run-n-phase-results o)
                        (master-run-n-phases o)))
@@ -49,7 +50,8 @@
                (lret ((new-r (aref result-vector i)))
                  (start-period new-r)))
               (t
-               (end-period o)
+               (when ranp
+                 (end-period o))
                nil))))))
 
 (defmethod terminate-action :after ((o buildmaster-run) &key condition &allow-other-keys)
@@ -172,11 +174,16 @@
     (iter (with r = result-marker)
           (repeat (master-run-n-phase-results m-r))
           (for m = (result-module r))
-          (with-tracked-termination (r)
-            (destructuring-bind (&key return-value output condition backtrace)
-                (call-next-method m-r p r)
-              (append-result-output r output t)
-              (setf r (advance-result m-r t return-value condition backtrace))))
+          (for rdep = (result-dependency r))
+          (if (or (not rdep)
+                  (and (period-ended-p rdep)
+                       (successp rdep)))
+              (with-tracked-termination (r)
+                (destructuring-bind (&key return-value output condition backtrace)
+                    (call-next-method m-r p r)
+                  (append-result-output r output t)
+                  (setf r (advance-result m-r t return-value condition backtrace))))
+              (setf r (advance-result m-r nil)))
           (finally (return r))))
   (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result &key &allow-other-keys)
     (run-module-test :master-reachability-phase (result-module current-result) nil t))
@@ -437,20 +444,16 @@
                                                  ))
 (defparameter *default-buildmaster-module-sets* '(:release :converted))
 
-;;; At some point we'll need to add stored module sets.
-(defun compute-buildmaster-module-set (&optional (component-sets *default-buildmaster-module-sets*))
-  (let* ((gate (gate *self*))
-         (testable (copy-list (iter (for set in (or component-sets))
-                                    (appending (ecase set
-                                                 (:defined (do-modules (m) (collect (name m))))
-                                                 (:desirable (do-modules (m) (when (typep (module-best-remote m :if-does-not-exist :continue) 'gate)
-                                                                               (collect (name m)))))
-                                                 (:converted (gate-converted-module-names gate))
-                                                 (:release (location-module-names gate))))))))
-    (multiple-value-bind (test-worthy central-system-less)
-        (unzip (rcurry #'module-central-system :continue) testable)
-      (values (sort test-worthy #'string<)
-              (sort central-system-less #'string<)))))
+;; At some point we'll need to add stored sets.
+(defun compute-module-set (&optional (component-sets *default-buildmaster-module-sets*))
+  (let ((gate (gate *self*)))
+    (iter (for set in (or component-sets))
+          (appending (ecase set
+                       (:defined (do-modules (m) (collect (name m))))
+                       (:desirable (do-modules (m) (when (typep (module-best-remote m :if-does-not-exist :continue :allow-self t) 'gate)
+                                                     (collect (name m)))))
+                       (:converted (gate-converted-module-names gate))
+                       (:release (location-module-names gate)))))))
 
 (defun one (&rest options &key credentials
             (phases *default-buildmaster-run-phases*)
@@ -464,15 +467,15 @@
   (find-executable 'ssh :if-does-not-exist :error)
   (let* ((gate (gate *self*))
          (credentials (or credentials :buildslave))
-         (module-names (or modules
-                           (multiple-value-bind (test-worthy central-system-less)
-                               (compute-buildmaster-module-set module-sets)
+         (module-names (or (sort (copy-list modules) #'string<)
+                           (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :continue)
+                                                                                         (compute-module-set module-sets))
                              (when central-system-less
                                (format t "~@<; ~@;~@<Fo~;llowing modules were excluded from ~
                                                              testing, because they don't have a ~
                                                              central system:~{ ~A~}~:@>~:@>~%"
                                        central-system-less))
-                             test-worthy)))
+                             (sort test-worthy #'string<))))
          (modules (mapcar #'coerce-to-module module-names))
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
     (with-captured-buildbot-errors ()
@@ -483,7 +486,8 @@
             (push m-r *buildmaster-runs*)
             (iter (for (phase . phases) on rest-phases)
                   (while (typep phase 'local-test-phase))
-                  (setf result-marker (execute-test-phase m-r phase result-marker :verbose verbose-comm)
+                  (setf result-marker (with-active-period (phase)
+                                        (execute-test-phase m-r phase result-marker :verbose verbose-comm))
                         rest-phases phases))
             (when rest-phases
               (handler-case
