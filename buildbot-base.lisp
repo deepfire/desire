@@ -39,7 +39,8 @@
    #:one*
    #:metaone
    ;; buildmaster web interface
-   #:start-cl-waterfall))
+   #:start-cl-waterfall
+   #:render-cl-waterfall-static))
 
 (in-package :desire-buildbot)
 
