@@ -31,6 +31,8 @@
    ;; WWW: executor
    #:wget
    #:get-url-contents-as-string #:list-www-directory #:invoke-with-file-from-www #:with-file-from-www #:touch-www-file
+   ;; NAMED-READTABLES
+   #:readtable=
    ))
 
 (cl:in-package :elsewhere.0)
@@ -323,3 +325,169 @@ in order of strictly decreasing likelihood."
 
 (defun touch-www-file (url)
   (with-valid-exit-codes ((1 nil) (2 nil) (3 nil) (4 nil) (5 nil) (6 nil) (7 nil) (8 nil)) (wget "--spider" url)))
+
+;;;;
+;;;; NAMED-READTABLES innards
+;;;;
+(defmacro with-readtable-iterator ((name readtable) &body body)
+  (let ((it (gensym)))
+    `(let ((,it (%make-readtable-iterator ,readtable)))
+       (macrolet ((,name () `(funcall ,',it)))
+         ,@body))))
+
+#+sbcl
+(defun %make-readtable-iterator (readtable)
+  (let ((char-macro-array (sb-impl::character-macro-array readtable))
+        (char-macro-ht    (sb-impl::character-macro-hash-table readtable))
+        (dispatch-tables  (sb-impl::dispatch-tables readtable))
+        (char-code 0))
+    (with-hash-table-iterator (ht-iterator char-macro-ht)
+      (labels ((grovel-base-chars ()
+                 (declare (optimize sb-c::merge-tail-calls))
+                 (if (>= char-code sb-int:base-char-code-limit)
+                     (grovel-unicode-chars)
+                     (let ((reader-fn (svref char-macro-array char-code))
+                           (char      (code-char (shiftf char-code (1+ char-code)))))
+                       (if reader-fn
+                           (yield char reader-fn)
+                           (grovel-base-chars)))))
+               (grovel-unicode-chars ()
+                 (multiple-value-bind (more? char reader-fn) (ht-iterator)
+                   (if (not more?)
+                       (values nil nil nil nil nil)
+                       (yield char reader-fn))))
+               (yield (char reader-fn)
+                 (let ((disp-ht))
+                   (cond
+                     ((setq disp-ht (cdr (assoc char dispatch-tables)))
+                      (let* ((disp-fn (get-macro-character char readtable))
+                             (sub-char-alist))
+                        (maphash (lambda (k v)
+                                   (push (cons k v) sub-char-alist))
+                                 disp-ht)
+                        (values t char disp-fn t sub-char-alist)))
+                     (t
+                      (values t char reader-fn nil nil))))))
+        #'grovel-base-chars))))
+
+#+clozure
+(defun %make-readtable-iterator (readtable)
+  (let ((char-macro-alist (ccl::rdtab.alist readtable)))
+    (lambda ()
+      (if char-macro-alist
+          (destructuring-bind (char . defn) (pop char-macro-alist)
+            (if (consp defn)
+                (values t char (car defn) t (cdr defn))
+                (values t char defn nil nil)))
+          (values nil nil nil nil nil)))))
+
+;;; Written on ACL 8.0.
+#+allegro
+(defun %make-readtable-iterator (readtable)
+  (declare (optimize speed))            ; for TCO
+  (check-type readtable readtable)
+  (let* ((macro-table     (first (excl::readtable-macro-table readtable)))
+         (dispatch-tables (excl::readtable-dispatch-tables readtable))
+         (table-length    (length macro-table))
+         (idx 0))
+    (labels ((grovel-macro-chars ()
+               (if (>= idx table-length)
+                   (grovel-dispatch-chars)
+                   (let ((read-fn (svref macro-table idx))
+			 (oidx idx))
+                     (incf idx)
+                     (if (or (eq read-fn #'excl::read-token)
+                             (eq read-fn #'excl::read-dispatch-char)
+                             (eq read-fn #'excl::undefined-macro-char))
+                         (grovel-macro-chars)
+                         (values t (code-char oidx) read-fn nil nil)))))
+             (grovel-dispatch-chars ()
+               (if (null dispatch-tables)
+                   (values nil nil nil nil nil)
+                   (destructuring-bind (disp-char sub-char-table)
+                       (first dispatch-tables)
+                     (setf dispatch-tables (rest dispatch-tables))
+                     ;;; Kludge. We can't fully clear dispatch tables
+                     ;;; in %CLEAR-READTABLE.
+                     (when (eq (svref macro-table (char-code disp-char))
+                               #'excl::read-dispatch-char)
+                       (values t
+                               disp-char
+                               (svref macro-table (char-code disp-char))
+                               t
+                               (loop for subch-fn   across sub-char-table
+                                     for subch-code from 0
+                                     when subch-fn
+                                       collect (cons (code-char subch-code)
+                                                     subch-fn))))))))
+      #'grovel-macro-chars)))
+
+
+#-(or sbcl clozure allegro)
+(eval-when (:compile-toplevel)
+  (let ((*print-pretty* t))
+    (simple-style-warn
+     "~&~@<  ~@;~A has not been ported to ~A. ~
+       We fall back to a portable implementation of readtable iterators. ~
+       This implementation has to grovel through all available characters. ~
+       On Unicode-aware implementations this may come with some costs.~@:>" 
+     (package-name '#.*package*) (lisp-implementation-type))))
+
+#-(or sbcl clozure allegro)
+(defun %make-readtable-iterator (readtable)
+  (check-type readtable readtable)
+  (let ((char-code 0))
+    #'(lambda ()
+        (prog ()
+           :GROVEL
+           (when (< char-code char-code-limit)
+             (let* ((char (code-char char-code))
+                    (fn   (get-macro-character char readtable)))
+               (incf char-code)
+               (when (not fn) (go :GROVEL))
+               (multiple-value-bind (disp? alist)
+                   (handler-case ; grovel dispatch macro characters.
+                       (values t
+                               ;; Only grovel upper case characters to
+                               ;; avoid duplicates.
+                               (loop for code from 0 below char-code-limit
+                                     for subchar = (let ((ch (code-char code)))
+                                                     (when (or (not (alpha-char-p ch))
+                                                               (upper-case-p ch))
+                                                       ch))
+                                     for disp-fn = (and subchar
+                                                        (get-dispatch-macro-character
+                                                            char subchar readtable))
+                                     when disp-fn
+                                       collect (cons subchar disp-fn)))
+                     (error () nil))
+                 (return (values t char fn disp? alist)))))))))
+
+(defun function= (fn1 fn2)
+  "Are reader-macro function-designators FN1 and FN2 the same?"
+  #+ :clisp
+  (let* ((fn1 (ensure-function fn1))
+         (fn2 (ensure-function fn2))
+         (n1 (system::function-name fn1))
+         (n2 (system::function-name fn2)))
+    (if (and (eq n1 :lambda) (eq n2 :lambda))
+        (eq fn1 fn2)
+        (equal n1 n2)))
+  #+ :common-lisp
+  (eq (ensure-function fn1) (ensure-function fn2)))
+
+(defun readtable= (readtable1 readtable2)
+  "Doesn't check for character terminatingness."
+  (with-readtable-iterator (iter1 readtable1)
+    (with-readtable-iterator (iter2 readtable2)
+      (loop
+         (multiple-value-bind (more1 char1 reader-fn-1 disp1? table1) (iter1)
+           (multiple-value-bind (more2 char2 reader-fn-2 disp2? table2) (iter2)
+             (when (and (not more1) (not more2))
+               (return t))
+             (unless (and more1 more2
+                          (char= char1 char2)
+                          (function= reader-fn-1 reader-fn-2)
+                          (eq disp1? disp2?)
+                          (equal table1 table2))
+               (return nil))))))))
