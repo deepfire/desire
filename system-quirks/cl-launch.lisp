@@ -30,5 +30,5 @@
       (make "install_source" `("INSTALL_SOURCE=" ,(subfile* locality-directory "cl-launch"))))))
 
 (defmethod module-post-install ((module-name (eql 'cl-launch)) module locality pathname)
-  (make-cl-launch-system pathname)
+  (make-cl-launch-system (locality-pathname locality))
   (notice-module-repository module))
