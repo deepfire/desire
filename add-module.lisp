@@ -59,6 +59,8 @@ The secondary value, if non-NIL, designates the subdomain of the matched
 distributor, if the match was non-strict due to the module's domain name
 being a function of its name, as depicted above."
   (or (distributor domain-name :if-does-not-exist :continue)
+      (when-let ((de-www-ified-domain-name (prefixp "www." domain-name)))
+        (distributor de-www-ified-domain-name :if-does-not-exist :continue))
       (do-distributors (d)
         (when-let ((subdomain (subdomain-p (down-case-name d) downcase-domain-name)))
           (return (values d subdomain))))))
