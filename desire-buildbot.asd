@@ -1,4 +1,4 @@
-;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+;;; -*- Mode: Lisp; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 
 (defpackage :desire-buildbot.system
   (:use :cl :asdf))

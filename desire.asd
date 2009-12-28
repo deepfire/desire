@@ -1,4 +1,4 @@
-;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+;;; -*- Mode: Lisp; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 (asdf:defsystem :desire
   :depends-on (:alexandria :iterate :cl-fad :pergamum :executor)
   :components ((:file "dependencies")

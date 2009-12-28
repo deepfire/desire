@@ -1,4 +1,4 @@
-;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE-BUILDBOT; Base: 10; indent-tabs-mode: nil -*-
+;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE-BUILDBOT; Base: 10; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 ;;;
 ;;;  (c) copyright 2009 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
