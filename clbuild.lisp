@@ -27,15 +27,32 @@
                                                   (get_lichteblau_com . www.lichteblau.com)
                                                   (get_b9_com         . b9.com)
                                                   (get_clbuild_mirror . common-lisp.net-clbuild-mirror)
-                                                  (get_xach_com       . git.xach.com)))
+                                                  (get_xach_com       . git.xach.com)
+                                                  (get_cvs_sfnet      . sourceforge-cvs-native)
+                                                  (get_lispbuilder    . googlecode.com-svn-http)))
 
 (defun recognise-clbuild-remote (remote-nickname)
-  (when-let ((remote-name (cdr (assoc remote-nickname *known-clbuild-remote-dictionary*))))
-    (remote remote-name)))
+  (if-let ((remote-name (cdr (assoc remote-nickname *known-clbuild-remote-dictionary*))))
+    (remote remote-name)
+    (let ((specifier (string remote-nickname)))
+      (if (< (length specifier) 5)
+          (error "~@<Malformed remote specifier ~S.~:@>" specifier)
+          (let ((type (find-symbol (string-upcase (subseq specifier 4)) :desire)))
+            (cond ((subtypep type 'vcs-type-mixin)
+                   (values nil type))
+                  ((string= "GET_CVS_FULL" specifier)
+                   (values nil 'cvs))
+                  (t
+                   (error "~@<Malformed remote specifier ~S.~:@>" specifier))))))))
 
-(defun steal-clbuild-projects-file (filename)
+(defun clbuild-file-pathname (name)
+  (subfile* (module-pathname :clbuild) name))
+
+(defun steal-clbuild-projects-file (&optional filename verbose &aux
+                                    (filename (or filename (clbuild-file-pathname "projects"))))
   (let ((*package* #.*package*)
         (*read-eval* nil)
+        (*verbose-internalisation* verbose)
         (new-remotes (make-hash-table)))
     (with-container new-remotes (new-remotes :type list :iterator do-new-remotes :iterator-bind-key t :if-does-not-exist :continue :if-exists :continue)
       (with-open-file (s filename)
@@ -47,11 +64,13 @@
               (for (values module-name offset0) = (read-from-string string nil nil :start 0))
               (unless module-name
                 (next-iteration))
+              (format t ";; Module ~A, ~A~%" module-name (subseq string offset0))
               (for module = (module module-name :if-does-not-exist :continue))
               (for (values remote-name offset1) = (read-from-string string nil nil :start offset0))
-              (for known-remote = (recognise-clbuild-remote remote-name))
               (unless remote-name
                 (definition-error "~@<Malformed directive: no remote specifier for module ~A~:@>" module-name))
+              ;; We get either the full information or just the VCS type.
+              (for (values known-remote vcs-type) = (recognise-clbuild-remote remote-name))
               (let* ((spacepos (position #\Space string :start offset1))
                      (url (subseq string offset1 spacepos))
                      (posturl (let ((*readtable* (copy-readtable)))
@@ -59,10 +78,7 @@
                                 (when spacepos (when-let ((posturl (read-from-string string nil nil :start spacepos)))
                                                  (princ-to-string posturl))))))
                 (multiple-value-bind (remote cred i maybe-umbrella-name created-p)
-                    (or known-remote (ensure-url-remote url module-name :vcs-type-hint (case remote-name
-                                                                                         (get_git 'git)
-                                                                                         (get_darcs 'darcs)
-                                                                                         (get_svn 'svn))))
+                    (or known-remote (ensure-url-remote url module-name :vcs-type-hint vcs-type))
                   (declare (ignore i))
                   (unless remote
                     (next-iteration))
