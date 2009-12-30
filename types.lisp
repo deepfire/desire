@@ -250,8 +250,8 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    (domain-name-takeover :accessor remote-domain-name-takeover :initarg :domain-name-takeover :documentation "Specified.")
    (distributor-port :accessor remote-distributor-port :type (or null (integer 0 65536)) :initarg :distributor-port :documentation "Specified, rarely.")
    (module-credentials :accessor remote-module-credentials :type list :initarg :credentials :documentation "Specified, rarely.")
-   (path :accessor remote-path :initarg :path :documentation "Specified.")
-   (path-fn :accessor remote-path-fn :initarg :path-fn :documentation "Generated from above.")
+   (path :reader remote-path :initarg :path :documentation "Specified.")
+   (path-fn :reader remote-path-fn :initarg :path-fn :documentation "Generated from above.")
    (disabled-p :accessor remote-disabled-p :type boolean :initarg :disabled-p :documentation "Image-only property: not serialised."))
   (:default-initargs
    :registrator #'(setf remote)
@@ -259,6 +259,16 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :distributor-port nil
    :domain-name-takeover nil
    :credentials nil))
+
+(defun %set-remote-path (remote path slot-name)
+  (setf (slot-value remote slot-name) path
+        (slot-value remote (format-symbol (symbol-package slot-name) "~A-FN" slot-name))
+        (compile nil (compute-path-form path))))
+
+(defun set-remote-path (remote path)
+  (%set-remote-path remote path 'path))
+
+(defsetf remote-path set-remote-path)
 
 (defstruct (credentials (:conc-name cred-) (:constructor make-cred (name &key username password)))
   (name (definition-error "~@<Won't create an unnamed credential.~:@>") :type symbol)
@@ -606,26 +616,36 @@ instead."
 (defun compute-path-form (path)
   `(lambda ()
      (declare (special *module* *umbrella*))
-     (list ,@(iter (for elt in path)
+     (list ,@(iter (for (elt . rest) on path)
                    (collect
                        (etypecase elt
-                         ((or string (eql :no/))
+                         ((or string (eql :no/) (eql :/))
                           elt)
                          ((member *module* *umbrella*)
                           `(symbol-value (find-symbol ,(symbol-name elt) :desire)))
                          (t
                           (definition-error
-                              "~@<Malformed remote pathname specifier ~S: ~
-                              only strings and one of :NO/, DESR:*MODULE* and ~
-                              DESR:*UMBRELLA* are allowed.~:@>"
+                              "~@<Malformed remote pathname specifier element ~S: ~
+                              only strings and one of :/, :NO/, DESR:*MODULE* and ~
+                              DESR:*UMBRELLA* are allowed in remote pathname specifiers.~:@>"
                               elt))))))))
+
+(defun path-wild-dir-p (path)
+  "See whether PATH is agnostic with regard to the trailing slash."
+  (not (member (lastcar path) '(:/ :no/))))
+
+(defun path-match-p (specifier path)
+  "See whether PATH matches the SPECIFIER."
+  (if (path-wild-dir-p specifier)
+      (equalp (butlast path) specifier)
+      (equalp path specifier)))
 
 (defmethod initialize-instance :after ((o remote) &key distributor path &allow-other-keys)
   (appendf (distributor-remotes distributor) (list o))
-  (setf (remote-path-fn o) (compile nil (compute-path-form path))))
+  (set-remote-path o path))
 
 (defmethod initialize-instance :after ((o combined) &key http-path &allow-other-keys)
-  (setf (remote-http-path-fn o) (compile nil (compute-path-form http-path))))
+  (%set-remote-path o http-path 'http-path))
 
 ;;;;
 ;;;; Modules
@@ -1039,7 +1059,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
           (*umbrella* (when module (downstring (module-umbrella module)))))
       (declare (special *module* *umbrella*))
       (iter (for insn-spec in (call-next-method))
-            (cond ((eq insn-spec :no/)
+            (cond ((eq insn-spec :/)) ; we have "/" by default, so no-op
+                  ((eq insn-spec :no/)  ; rubout the default "/"
                    (pop accumulated-path))
                   (t
                    (when insn-spec

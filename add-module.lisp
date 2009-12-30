@@ -106,8 +106,10 @@ pathname component list variants, with MODNAME occurences substituted."
               (setf variants
                     (iter (for v in variants)
                           (collect (append v pathname-component))))))
-    (unless dirp
-      (setf variants (mapcar (rcurry #'append '(:no/)) variants)))))
+    (setf variants (mapcar (rcurry #'append (list (if dirp
+                                                      :/
+                                                      :no/)))
+                           variants))))
 
 (defun guess-module-name (distributor-name pathname-component-list)
   "Interpret DISTRIBUTOR-NAME and PATHNAME-COMPONENT-LIST as components
@@ -144,15 +146,15 @@ and the RAW-MODULE-NAME, try to find a matching remote among REMOTES."
           (iter outer
                 (with umbrellisable-remote) (with umbrellisable-variant)
                 (for remote-path-variant in variants)
-                (let ((full-remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
+                (let* ((full-remote-path-variant (append (when domain-name-takeover dist) remote-path-variant)))
                   (dolist (r remotes)
                     (when (eql port (remote-distributor-port r))
-                      (cond ((equalp full-remote-path-variant (remote-path r)) ; the match is either against pristine remote path
+                      (cond ((path-match-p (remote-path r) full-remote-path-variant)
                              (return-from outer r))
                             (domain-name-takeover
                              (let ((umbrellised-remote-path (compute-umbrellised-remote-path (remote-path r))))
                                ;; or we might need to update a remote...
-                               (when (equalp full-remote-path-variant umbrellised-remote-path)
+                               (when (path-match-p umbrellised-remote-path full-remote-path-variant)
                                  (setf umbrellisable-remote r
                                        umbrellisable-variant umbrellised-remote-path))))))))
                 (finally (when umbrellisable-remote
@@ -268,7 +270,8 @@ The values returned are:
     (when credentials
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
-(defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*))
+(defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*) &aux
+                   (module-name (when module-name (canonicalise-name module-name))))
   (multiple-value-bind (remote credentials module-name maybe-umbrella-name) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
     (if remote
         (lret ((module (ensure-remote-module remote module-name (or maybe-umbrella-name module-name) :credentials credentials :path-whitelist path-whitelist :path-blacklist path-blacklist)))
