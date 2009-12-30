@@ -269,7 +269,8 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
   (hostname (definition-error "~@<Won't create a host-access credential without a hostname.~:@>") :type string))
 
 (defvar *credentials* (alist-hash-table `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous :username "anonymous" :password "anonymous"))
-                                          (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil)))
+                                          (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil))
+                                          (cvspublic-cvspublic . ,(make-cred 'cvspublic-cvspublic :username "cvspublic" :password "cvspublic")))
                                         :test #'equal)
   "Credentials, by name. Not intended to be secure.")
 
