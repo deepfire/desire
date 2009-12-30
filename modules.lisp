@@ -78,7 +78,8 @@ system TYPE within LOCALITY."
                  (system-error system "~@<During system discovery in module ~A: asked for a system ~S of type ~S, got one of type ~S~:@>"
                                system-type (name system) (type-of system)))
                (unless (eq module (system-module system))
-                 (error 'system-name-conflict :system system :module module)))
+                 (error 'system-name-conflict :system system :module module))
+               system)
              (register-new-system (name path)
                (format t "~@<;; ~@;Registering a previously unknown system ~A at ~S~:@>~%" name path)
                (setf *unsaved-definition-changes-p* t)
@@ -87,12 +88,13 @@ system TYPE within LOCALITY."
                                                                     (hidden-p (not (equal pathname-name (downstring name)))))
                                                           pathname-name)))
              (ensure-system (name path)
-               (lret ((system (or (lret ((present-system (system name :if-does-not-exist :continue)))
-                                    (when present-system
-                                      (if (system-known-p present-system)
-                                          (check-present-system-sanity present-system)
-                                          ;; Upgrading system to a known one!
-                                          (remove-system present-system))))
+               (lret ((system (or (when-let ((present-system (system name :if-does-not-exist :continue)))
+                                    (if (system-known-p present-system)
+                                        (check-present-system-sanity present-system)
+                                        (progn
+                                          (format t "~@<;; ~@;Making system ~A known.~:@>~%" name)
+                                          (remove-system present-system)
+                                          nil)))
                                   (register-new-system (canonicalise-name name) path))))
                  (notice-system-definition system path)
                  (ensure-system-loadable system locality path))))
