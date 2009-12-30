@@ -547,6 +547,13 @@ differ in only slight detail -- gate property, for example."
           (setf (location-module-names gate) release-set
                 (gate-converted-module-names gate) converted-set))))))
 
+(defgeneric update-gate (&optional distributor)
+  (:method (&optional (distributor *self*))
+    (let* ((gate (gate distributor))
+           (converted (gate-converted-module-names gate)))
+      (update-gate-conversions gate)
+      (update-local-distributor-conversions distributor converted))))
+
 (defgeneric initialise-wishmaster-gate (distributor &optional well-known-p root)
   (:method ((o local-distributor) &optional well-known-p root)
     (if well-known-p
