@@ -163,7 +163,8 @@ locally present modules will be marked as converted."
     (setf (distributor (name self)) self
           (gate self) incumbent-gate
           (remote-distributor incumbent-gate) self
-          (distributor-remotes self) (list incumbent-gate))))
+          (distributor-remotes self) (list incumbent-gate))
+    (update-local-distributor-conversions self (gate-converted-module-names old-gate))))
 
 (defun carry-over-module-locality-presence-cache-from-old-gate (old-gate self)
   (let ((fixed-gate (gate self)))
