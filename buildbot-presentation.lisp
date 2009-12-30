@@ -267,7 +267,7 @@
   margin-bottom: 15em;
 }
 .run {
-  min-width: 7000px;
+  min-width: 10000px;
   clear: both;
   margin-top: 2em;
   background: #f0f0ff;
