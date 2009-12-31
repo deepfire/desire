@@ -313,7 +313,8 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
      --eval "
 (progn
   ;; disable compiler verbosity
-  (setf (values *compile-verbose* *compile-print* *load-verbose*) (values nil nil nil))
+  (let ((verbose (and ${DEBUG} ${VERBOSE})))
+    (setf (values *compile-verbose* *compile-print* *load-verbose*) (values verbose verbose verbose)))
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
