@@ -21,12 +21,13 @@
 (in-package :desire-buildbot)
 
 
-(defvar *default-master* :git.feelingofgreen.ru)
-(defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
-
 (defhostaccess :buildslave        :hostname "betelheise" :username "empty" :password nil)
 (defhostaccess :buildslave-empty  :hostname "betelheise" :username "emptier" :password nil)
 (defhostaccess :buildmaster       :hostname "localhost" :username "buildmaster" :password nil)
+
+(defvar *default-master* :git.feelingofgreen.ru)
+(defparameter *default-remote-lisp-credentials* :buildslave)
+(defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
 
 ;;;;
 ;;;; Generator/presentation communication and concurrence management.
@@ -202,7 +203,7 @@
   (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (run-module-test :master-recurse-phase (name (result-module current-result)) nil t))
   (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker
-            &key verbose verbose-starting-module)
+            &key verbose verbose-starting-module verbose-progress)
     (let ((*read-eval* nil)
           (*package* (find-package :desire))
           (ctx (remote-phase-ctx p)))
@@ -257,7 +258,8 @@
                                                                "~@<Wrong phase for module ~A from remote: ~
                                                                  current phase ~S, client sent ~S~:@>"
                                                                (name m) :fetch mode))
-                            (format t "==( processing module ~A, phase ~A~%" name mode)
+                            (when verbose-progress
+                              (format t "==( processing module ~A, phase ~A~%" name mode))
                             (let ((marker-line (read-mandatory-line ctx (name m))))
                               (when verbose
                                 (report-line 1 marker-line))
@@ -421,7 +423,7 @@
 ;;;;
 (defun ping-remote (&optional call-remote-phase-processor credentials
                     &rest context-keys &key &allow-other-keys &aux
-                    (credentials (or credentials :buildslave)))
+                    (credentials (or credentials *default-remote-lisp-credentials*)))
   "Perform a bare-minimum remote lisp bootstrap attempt."
   (with-captured-buildbot-errors ()
     (with-remote-lisp-context (nil (apply #'make-remote-lisp-context
@@ -431,21 +433,6 @@
         (cond (call-remote-phase-processor
                `(run-test-phases-with-markers `(:remote-lisp-fetch-phase) nil :verbose t)))
       t)))
-
-(defun one* (&optional (reachability t) (upstream t) (recurse t) (remote-fetch t)
-             (remote-load t) (remote-test nil) &rest keys
-             &key credentials modules module-sets purge-store purge-metastore (optimize-debug t) (disable-debugger t) (verbose t)
-             verbose-comm verbose-comm-starting-phase verbose-comm-starting-module)
-  "A spread-phase shortcut for ONE."
-  (declare (ignore credentials modules module-sets purge-store purge-metastore optimize-debug disable-debugger
-                   verbose verbose-comm verbose-comm-starting-phase verbose-comm-starting-module))
-  (apply #'one :phases (append (when reachability '(master-reachability-phase))
-                               (when upstream '(master-update-phase))
-                               (when recurse '(master-recurse-phase))
-                               (when remote-fetch '(remote-lisp-fetch-phase))
-                               (when remote-load '(remote-lisp-load-phase))
-                               (when remote-test '(remote-lisp-test-phase)))
-         keys))
 
 (defparameter *default-buildmaster-run-phases* '(master-reachability-phase
                                                  master-update-phase
@@ -467,7 +454,19 @@
                        (:converted (gate-converted-module-names gate))
                        (:release (location-module-names gate)))))))
 
-(defun one (&rest options &key credentials
+(defun compute-run-module-set (&key modules (module-sets *default-buildmaster-module-sets*))
+  (sort (or (copy-list modules)
+            (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :continue)
+                                                                          (compute-module-set module-sets))
+              (when central-system-less
+                (format t "~@<; ~@;~@<Fo~;llowing modules were excluded from ~
+                                                             testing, because they don't have a ~
+                                                             central system:~{ ~A~}~:@>~:@>~%"
+                        central-system-less))
+              test-worthy))
+        #'string<))
+
+(defun one (&rest options &key (register t) (credentials *default-remote-lisp-credentials*)
             (phases *default-buildmaster-run-phases*)
             modules (module-sets *default-buildmaster-module-sets*)
             purge-store purge-metastore desire-branch metastore-branch optimize-debug disable-debugger
@@ -478,16 +477,7 @@
   (declare (ignore purge-store purge-metastore desire-branch metastore-branch optimize-debug disable-debugger))
   (find-executable 'ssh :if-does-not-exist :error)
   (let* ((gate (gate *self*))
-         (credentials (or credentials :buildslave))
-         (module-names (or (sort (copy-list modules) #'string<)
-                           (multiple-value-bind (test-worthy central-system-less) (unzip (rcurry #'module-central-system :continue)
-                                                                                         (compute-module-set module-sets))
-                             (when central-system-less
-                               (format t "~@<; ~@;~@<Fo~;llowing modules were excluded from ~
-                                                             testing, because they don't have a ~
-                                                             central system:~{ ~A~}~:@>~:@>~%"
-                                       central-system-less))
-                             (sort test-worthy #'string<))))
+         (module-names (compute-run-module-set :modules modules :module-sets module-sets))
          (modules (mapcar #'coerce-to-module module-names))
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
     (with-captured-buildbot-errors ()
@@ -495,7 +485,8 @@
         (with-active-period (m-r)
           (let ((rest-phases (master-run-phases m-r))
                 (result-marker (advance-result m-r)))
-            (push m-r *buildmaster-runs*)
+            (when register
+              (push m-r *buildmaster-runs*))
             (iter (for (phase . phases) on rest-phases)
                   (while (typep phase 'local-test-phase))
                   (setf result-marker (with-active-period (phase)
@@ -508,7 +499,7 @@
                                                         :verbose (or verbose-comm
                                                                      verbose-comm-starting-phase
                                                                      verbose-comm-starting-module)
-                                                        (remove-from-plist options :credentials
+                                                        (remove-from-plist options :register :credentials
                                                                            :phases :modules :module-sets
                                                                            :verbose
                                                                            :verbose-comm-starting-phase
@@ -532,7 +523,53 @@
                   (if (period-started-p (first rest-phases))
                       (terminate-action (current-phase-result (current-master-run-phase m-r)) :condition c)
                       (period-unstart result-marker))
-                  (error c))))))))))
+                  (error c)))))
+          m-r)))))
+
+(defun one* (&optional (reachability t) (upstream t) (recurse t) (remote-fetch t)
+             (remote-load t) (remote-test nil) &rest keys
+             &key (register t) credentials modules module-sets purge-store purge-metastore (optimize-debug t) (disable-debugger t) (verbose t)
+             verbose-comm verbose-comm-starting-phase verbose-comm-starting-module)
+  "A spread-phase shortcut for ONE."
+  (declare (ignore register credentials modules module-sets purge-store purge-metastore optimize-debug disable-debugger
+                   verbose verbose-comm verbose-comm-starting-phase verbose-comm-starting-module))
+  (apply #'one :phases (append (when reachability '(master-reachability-phase))
+                               (when upstream '(master-update-phase))
+                               (when recurse '(master-recurse-phase))
+                               (when remote-fetch '(remote-lisp-fetch-phase))
+                               (when remote-load '(remote-lisp-load-phase))
+                               (when remote-test '(remote-lisp-test-phase)))
+         keys))
+
+(defun bisect-load (test affected-module affector-modules &key purge-store (credentials *default-remote-lisp-credentials*) verbose)
+  (labels ((test-set (set)
+             (when verbose
+               (format t "~@<;; ~@;Te~@<sting set ~A~:@>~:@>~%" set))
+             (lret* ((run (one* nil nil nil nil t nil
+                                :register nil
+                                :credentials credentials
+                                :modules set
+                                :purge-store purge-store))
+                     (result (funcall test (result affected-module 0 run))))
+               (when verbose
+                 (format t "~@<;; ...~:[FAIL~;OK~]~:@>~%" result))))
+           (more-affectors (set chain)
+             (if (test-set chain)
+                 chain
+                 (let* ((n (bisect (lambda (x)
+                                     (test-set (append (subseq set 0 x) chain)))
+                                   (length set)))
+                        (extended-chain (cons (nth n set) chain)))
+                   (when verbose
+                     (format t "~@<;; ~@;Ch~@<ain is now ~A~:@>~:@>~%" extended-chain))
+                   (more-affectors (subseq set 0 n) extended-chain)))))
+    (more-affectors affector-modules
+                    (list affected-module))))
+
+(defun bisect-load* (test module &key modules (module-sets *default-buildmaster-module-sets*) purge-store (credentials *default-remote-lisp-credentials*) verbose)
+  (let* ((full-set (compute-run-module-set :modules modules :module-sets module-sets))
+         (affector-set (subseq full-set 0 (position module full-set))))
+    (bisect-load test module affector-set :purge-store purge-store :credentials credentials :verbose verbose)))
 
 (defun metaone (&optional phases verbose no-purge module-sets credentials
                 &rest one-keys &key &allow-other-keys &aux
