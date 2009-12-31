@@ -326,10 +326,13 @@
 ;;;
 (defclass test-phase (action) 
   ((run :reader phase-run :initarg :run)
+   (current :accessor current-phase-result :initarg :current)
    (action-description :reader phase-action-description :initarg :action-description)
    (nr :reader phase-nr :initarg :nr)
    (base :reader phase-base :initarg :base)
-   (n-results :reader phase-n-results :initarg :n-results)))
+   (n-results :reader phase-n-results :initarg :n-results))
+  (:default-initargs
+   :current nil))
 
 (defclass interrupted-test-phase (unhandled-failure test-phase) ())
 
@@ -398,6 +401,7 @@
    (condvar :reader master-run-condvar :initarg :condvar)
    (modules :reader master-run-modules :initarg :modules)
    (phases :reader master-run-phases :initarg :phases)
+   (current :accessor current-master-run-phase :initarg :current)
    (n-phases :reader master-run-n-phases :initarg :n-phases)
    (n-phase-results :reader master-run-n-phase-results :initarg :n-phase-results)
    (results :reader master-run-results :initarg :results))
@@ -405,7 +409,8 @@
    (unhandled-failure interrupted-buildmaster-run))
   (:default-initargs
    :lock (bordeaux-threads:make-lock)
-   :condvar (bordeaux-threads:make-condition-variable)))
+   :condvar (bordeaux-threads:make-condition-variable)
+   :current nil))
 
 (defclass interrupted-buildmaster-run (unhandled-failure buildmaster-run) ())
 

@@ -162,6 +162,10 @@
 (defgeneric execute-test-phase (buildmaster-run test-phase result-marker &key &allow-other-keys)
   (:documentation
    "Execute a buildmaster test phase.")
+  (:method :before ((m-r buildmaster-run) (p test-phase) current-result &key &allow-other-keys)
+    (setf (current-master-run-phase m-r) p))
+  (:method :after ((m-r buildmaster-run) (p test-phase) current-result &key &allow-other-keys)
+    (setf (current-master-run-phase m-r) nil))
   (:method :around ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (when (unsaved-definition-changes-p)
       (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS before ~A."
@@ -171,20 +175,22 @@
         (save-definitions :seal t :commit-message (format nil "Saved changes in DEFINITIONS after ~A."
                                                           (type-of p))))))
   (:method :around ((m-r buildmaster-run) (p local-test-phase) result-marker &key &allow-other-keys)
-    (iter (with r = result-marker)
-          (repeat (master-run-n-phase-results m-r))
-          (for m = (result-module r))
-          (for rdep = (result-dependency r))
-          (if (or (not rdep)
-                  (and (period-ended-p rdep)
-                       (successp rdep)))
-              (with-tracked-termination (r)
-                (destructuring-bind (&key return-value output condition backtrace)
-                    (call-next-method m-r p r)
-                  (append-result-output r output t)
-                  (setf r (advance-result m-r t return-value condition backtrace))))
-              (setf r (advance-result m-r nil)))
-          (finally (return r))))
+    (with-slots ((r current)) p
+      (setf r result-marker)
+      (iter (repeat (master-run-n-phase-results m-r))
+            (for m = (result-module r))
+            (for rdep = (result-dependency r))
+            (if (or (not rdep)
+                    (and (period-ended-p rdep)
+                         (successp rdep)))
+                (with-tracked-termination (r)
+                  (destructuring-bind (&key return-value output condition backtrace)
+                      (call-next-method m-r p r)
+                    (append-result-output r output t)
+                    (setf r (advance-result m-r t return-value condition backtrace))))
+                (setf r (advance-result m-r nil)))
+            (finally (return (prog1 r
+                               (setf r nil)))))))
   (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result &key &allow-other-keys)
     (run-module-test :master-reachability-phase (result-module current-result) nil t))
   (:method ((m-r buildmaster-run) (p master-update-phase) current-result &key &allow-other-keys)
@@ -201,87 +207,93 @@
           (*package* (find-package :desire))
           (ctx (remote-phase-ctx p)))
       (with-slots (pipe) ctx
-        (let ((phase-header (read-mandatory-line ctx "phase header")))
-          (when verbose
-            (report-line 0 phase-header))
-          (destructuring-bind (&key phase module-count) (let ((*read-eval* nil))
-                                                          (read-from-string phase-header))
-            (unless (string= phase (type-of p))
-              (remote-lisp-communication-error ctx
-               "~@<Remote reports wrong phase ~A, while expected ~A.~:@>" phase (type-of p)))
-            (unless (= (phase-n-results p) module-count)
-              (remote-lisp-communication-error ctx
-               "~@<Remote reports wrong module count for phase ~A: got ~D, expected ~D.~:@>"
-               phase module-count (phase-n-results p)))))
-        (prog1
-            (iter (with r = result-marker)
-                  (repeat (master-run-n-phase-results m-r))
-                  (for m = (result-module r))
-                  (when (string= verbose-starting-module (name m))
-                    (format t "==( enabling verbosity, starting from module ~A~%" (name m))
-                    (setf verbose t))
-                  (with-tracked-termination (r)
-                    (let ((initial-line (read-mandatory-line ctx (name m))))
-                      (when verbose
-                        (report-line 0 initial-line))
-                      (unless (char= #\( (schar initial-line 0))
-                        (remote-lisp-communication-error ctx
-                         "~@<Corrupt initial line while reading module ~A:~%~S~:@>"
-                         (name m) initial-line))
-                      (destructuring-bind (&key name mode) (read-string-list initial-line 1)
-                        (unless (eq name (name m))
-                          (remote-lisp-communication-error ctx
-                           "~@<Wrong module info from remote, next in turn was ~S, ~
-                               module returned ~S.~:@>"
-                           (name m) name))
-                        (unless (eq mode (make-keyword (symbol-name (type-of p))))
-                          (remote-lisp-communication-error ctx
-                           "~@<Wrong phase for module ~A from remote: ~
-                               current phase ~S, client sent ~S~:@>"
-                           (name m) :fetch mode))
-                        (format t "==( processing module ~A, phase ~A~%" name mode)
-                        (let ((marker-line (read-mandatory-line ctx (name m))))
+        (flet ((read-phase-header (ctx)
+                 (let ((phase-header (read-mandatory-line ctx "phase header")))
+                   (when verbose
+                     (report-line 0 phase-header))
+                   (destructuring-bind (&key phase module-count) (let ((*read-eval* nil))
+                                                                   (read-from-string phase-header))
+                     (unless (string= phase (type-of p))
+                       (remote-lisp-communication-error ctx
+                                                        "~@<Remote reports wrong phase ~A, while expected ~A.~:@>" phase (type-of p)))
+                     (unless (= (phase-n-results p) module-count)
+                       (remote-lisp-communication-error ctx
+                                                        "~@<Remote reports wrong module count for phase ~A: got ~D, expected ~D.~:@>"
+                                                        phase module-count (phase-n-results p))))))
+               (read-phase-tail (ctx)
+                 (let ((phase-tail (read-mandatory-line ctx "phase tail")))
+                   (when verbose
+                     (report-line -1 phase-tail))
+                   (destructuring-bind (&key phase-end) (let ((*read-eval* nil))
+                                                          (read-from-string phase-tail))
+                     (unless (string= phase-end (type-of p))
+                       (remote-lisp-communication-error ctx
+                                                        "~@<Remote reports end of wrong phase ~A, while expected ~A.~:@>" phase-end (type-of p)))))))
+          (prog2
+              (read-phase-header ctx)
+              (with-slots ((r current)) p
+                (setf r result-marker)
+                (iter (repeat (master-run-n-phase-results m-r))
+                      (for m = (result-module r))
+                      (when (string= verbose-starting-module (name m))
+                        (format t "==( enabling verbosity, starting from module ~A~%" (name m))
+                        (setf verbose t))
+                      (with-tracked-termination (r)
+                        (let ((initial-line (read-mandatory-line ctx (name m))))
                           (when verbose
-                            (report-line 1 marker-line))
-                          (unless (line-marker-p marker-line *beginning-of-result-marker*)
+                            (report-line 0 initial-line))
+                          (unless (char= #\( (schar initial-line 0))
                             (remote-lisp-communication-error ctx
-                             "~@<Missing test output marker for module ~A, got instead:~%~S~:@>"
-                             (name m) marker-line)))
-                        (iter (for line = (read-mandatory-line ctx (name m) nil))
-                              (for i from 2)
-                              (when verbose
-                                (report-line i line))
-                              (when (line-marker-p line *end-of-result-marker*)
-                                (return))
-                              (append-result-output r line))
-                        (let* ((eof 'eof-marker)
-                               (*read-eval* nil)
-                               (final-args (iter (repeat 6)
-                                                 (collect (read pipe nil eof)))))
-                          (when (member eof final-args)
-                            (remote-lisp-communication-error ctx
-                             "~@<Early termination from remote while reading module ~A.~:@>"
-                             (name m)))
-                          (let ((final-line (read-mandatory-line ctx (name m))))
-                            (when verbose
-                              (report-line -1 final-line))
-                            (unless (and (= 1 (length final-line))
-                                         (char= #\) (schar final-line 0)))
+                                                             "~@<Corrupt initial line while reading module ~A:~%~S~:@>"
+                                                             (name m) initial-line))
+                          (destructuring-bind (&key name mode) (read-string-list initial-line 1)
+                            (unless (eq name (name m))
                               (remote-lisp-communication-error ctx
-                               "~@<Corrupt final line while reading module ~A:~%~S~:@>"
-                               (name m) final-line)))
-                          ;; Advance the result.
-                          (destructuring-bind (&key status condition backtrace) final-args
-                            (setf r (advance-result m-r t status condition backtrace)))))))
-                  (finally (return r)))
-          (let ((phase-tail (read-mandatory-line ctx "phase tail")))
-            (when verbose
-              (report-line -1 phase-tail))
-            (destructuring-bind (&key phase-end) (let ((*read-eval* nil))
-                                                   (read-from-string phase-tail))
-              (unless (string= phase-end (type-of p))
-                (remote-lisp-communication-error ctx
-                 "~@<Remote reports end of wrong phase ~A, while expected ~A.~:@>" phase-end (type-of p))))))))))
+                                                               "~@<Wrong module info from remote, next in turn was ~S, ~
+                                                                 module returned ~S.~:@>"
+                                                               (name m) name))
+                            (unless (eq mode (make-keyword (symbol-name (type-of p))))
+                              (remote-lisp-communication-error ctx
+                                                               "~@<Wrong phase for module ~A from remote: ~
+                                                                 current phase ~S, client sent ~S~:@>"
+                                                               (name m) :fetch mode))
+                            (format t "==( processing module ~A, phase ~A~%" name mode)
+                            (let ((marker-line (read-mandatory-line ctx (name m))))
+                              (when verbose
+                                (report-line 1 marker-line))
+                              (unless (line-marker-p marker-line *beginning-of-result-marker*)
+                                (remote-lisp-communication-error ctx
+                                                                 "~@<Missing test output marker for module ~A, got instead:~%~S~:@>"
+                                                                 (name m) marker-line)))
+                            (iter (for line = (read-mandatory-line ctx (name m) nil))
+                                  (for i from 2)
+                                  (when verbose
+                                    (report-line i line))
+                                  (when (line-marker-p line *end-of-result-marker*)
+                                    (return))
+                                  (append-result-output r line))
+                            (let* ((eof 'eof-marker)
+                                   (*read-eval* nil)
+                                   (final-args (iter (repeat 6)
+                                                     (collect (read pipe nil eof)))))
+                              (when (member eof final-args)
+                                (remote-lisp-communication-error ctx
+                                                                 "~@<Early termination from remote while reading module ~A.~:@>"
+                                                                 (name m)))
+                              (let ((final-line (read-mandatory-line ctx (name m))))
+                                (when verbose
+                                  (report-line -1 final-line))
+                                (unless (and (= 1 (length final-line))
+                                             (char= #\) (schar final-line 0)))
+                                  (remote-lisp-communication-error ctx
+                                                                   "~@<Corrupt final line while reading module ~A:~%~S~:@>"
+                                                                   (name m) final-line)))
+                              ;; Advance the result.
+                              (destructuring-bind (&key status condition backtrace) final-args
+                                (setf r (advance-result m-r t status condition backtrace)))))))
+                      (finally (return (prog1 r
+                                         (setf r nil))))))
+            (read-phase-tail ctx)))))))
 
 ;;;;
 ;;;; Remote lisp communication
@@ -517,7 +529,9 @@
                                                                              t)
                                                                          verbose-comm-starting-module))))))
                 (error (c)
-                  (terminate-action result-marker :condition c)
+                  (if (period-started-p (first rest-phases))
+                      (terminate-action (current-phase-result (current-master-run-phase m-r)) :condition c)
+                      (period-unstart result-marker))
                   (error c))))))))))
 
 (defun metaone (&optional phases verbose no-purge module-sets credentials
