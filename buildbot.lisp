@@ -480,51 +480,54 @@
          (module-names (compute-run-module-set :modules modules :module-sets module-sets))
          (modules (mapcar #'coerce-to-module module-names))
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
-    (with-captured-buildbot-errors ()
-      (with-maybe-verbose-termination (verbose-comm)
-        (with-active-period (m-r)
-          (let ((rest-phases (master-run-phases m-r))
-                (result-marker (advance-result m-r)))
-            (when register
-              (push m-r *buildmaster-runs*))
-            (iter (for (phase . phases) on rest-phases)
-                  (while (typep phase 'local-test-phase))
-                  (setf result-marker (with-active-period (phase)
-                                        (execute-test-phase m-r phase result-marker :verbose verbose-comm))
-                        rest-phases phases))
-            (when rest-phases
-              (handler-case
-                  (with-remote-lisp-context (ctx (apply #'make-remote-lisp-context
-                                                        :credentials credentials
-                                                        :verbose (or verbose-comm
-                                                                     verbose-comm-starting-phase
-                                                                     verbose-comm-starting-module)
-                                                        (remove-from-plist options :register :credentials
-                                                                           :phases :modules :module-sets
-                                                                           :verbose
-                                                                           :verbose-comm-starting-phase
-                                                                           :verbose-comm-starting-module)))
-                      `(run-test-phases-with-markers ',(mapcar (compose #'make-keyword #'type-of) rest-phases)
-                                                     ',(mapcar #'make-keyword module-names)
-                                                     :verbose ,verbose)
-                    (dolist (p rest-phases)
-                      (setf (remote-phase-ctx p) ctx))
-                    (iter (for (phase . phases) on rest-phases)
-                          (setf result-marker (with-active-period (phase)
-                                                (execute-test-phase m-r phase result-marker
-                                                                    :verbose verbose-comm
-                                                                    :verbose-starting-module
-                                                                    (and (if verbose-comm-starting-phase
-                                                                             (string= verbose-comm-starting-phase
-                                                                                      (type-of phase))
-                                                                             t)
-                                                                         verbose-comm-starting-module))))))
-                (error (c)
-                  (if (period-started-p (first rest-phases))
-                      (terminate-action (current-phase-result (current-master-run-phase m-r)) :condition c)
-                      (period-unstart result-marker))
-                  (error c)))))
-          m-r)))))
+    (multiple-value-bind (status condition context)
+        (with-captured-buildbot-errors ()
+          (with-maybe-verbose-termination (verbose-comm)
+            (with-active-period (m-r)
+              (let ((rest-phases (master-run-phases m-r))
+                    (result-marker (advance-result m-r)))
+                (when register
+                  (push m-r *buildmaster-runs*))
+                (iter (for (phase . phases) on rest-phases)
+                      (while (typep phase 'local-test-phase))
+                      (setf result-marker (with-active-period (phase)
+                                            (execute-test-phase m-r phase result-marker :verbose verbose-comm))
+                            rest-phases phases))
+                (when rest-phases
+                  (handler-case
+                      (with-remote-lisp-context (ctx (apply #'make-remote-lisp-context
+                                                            :credentials credentials
+                                                            :verbose (or verbose-comm
+                                                                         verbose-comm-starting-phase
+                                                                         verbose-comm-starting-module)
+                                                            (remove-from-plist options :register :credentials
+                                                                               :phases :modules :module-sets
+                                                                               :verbose
+                                                                               :verbose-comm-starting-phase
+                                                                               :verbose-comm-starting-module)))
+                          `(run-test-phases-with-markers ',(mapcar (compose #'make-keyword #'type-of) rest-phases)
+                                                         ',(mapcar #'make-keyword module-names)
+                                                         :verbose ,verbose)
+                        (dolist (p rest-phases)
+                          (setf (remote-phase-ctx p) ctx))
+                        (iter (for (phase . phases) on rest-phases)
+                              (setf result-marker (with-active-period (phase)
+                                                    (execute-test-phase m-r phase result-marker
+                                                                        :verbose verbose-comm
+                                                                        :verbose-starting-module
+                                                                        (and (if verbose-comm-starting-phase
+                                                                                 (string= verbose-comm-starting-phase
+                                                                                          (type-of phase))
+                                                                                 t)
+                                                                             verbose-comm-starting-module))))))
+                    (error (c)
+                      (if (period-started-p (first rest-phases))
+                          (terminate-action (current-phase-result (current-master-run-phase m-r)) :condition c)
+                          (period-unstart result-marker))
+                      (error c))))))))
+      (if condition
+          (values status m-r condition context)
+          (values status m-r)))))
 
 (defun one* (&optional (reachability t) (upstream t) (recurse t) (remote-fetch t)
              (remote-load t) (remote-test nil) &rest keys
@@ -545,24 +548,26 @@
   (labels ((test-set (set)
              (when verbose
                (format t "~@<;; ~@;Te~@<sting set ~A~:@>~:@>~%" set))
-             (lret* ((run (one* nil nil nil nil t nil
-                                :register nil
-                                :credentials credentials
-                                :modules set
-                                :purge-store purge-store))
-                     (result (funcall test (result affected-module 0 run))))
+             (let* ((run (nth-value 1 (one* nil nil nil nil t nil
+                                             :register nil
+                                             :credentials credentials
+                                             :modules set
+                                             :purge-store purge-store)))
+                    (result (funcall test (result affected-module 0 run))))
                (when verbose
-                 (format t "~@<;; ...~:[FAIL~;OK~]~:@>~%" result))))
+                 (format t "~@<;; ...~A~:@>~%" result))
+               (values result run)))
            (more-affectors (set chain)
-             (if (test-set chain)
-                 chain
-                 (let* ((n (bisect (lambda (x)
-                                     (test-set (append (subseq set 0 x) chain)))
-                                   (length set)))
-                        (extended-chain (cons (nth n set) chain)))
-                   (when verbose
-                     (format t "~@<;; ~@;Ch~@<ain is now ~A~:@>~:@>~%" extended-chain))
-                   (more-affectors (subseq set 0 n) extended-chain)))))
+             (multiple-value-bind (result run) (test-set chain)
+               (if result
+                   (values chain (result affected-module 0 run))
+                   (let* ((n (bisect (lambda (x)
+                                       (not (test-set (append (subseq set 0 x) chain))))
+                                     (length set)))
+                          (extended-chain (cons (nth n set) chain)))
+                     (when verbose
+                       (format t "~@<;; ~@;Ch~@<ain is now ~A~:@>~:@>~%" extended-chain))
+                     (more-affectors (subseq set 0 n) extended-chain))))))
     (more-affectors affector-modules
                     (list affected-module))))
 
@@ -570,6 +575,21 @@
   (let* ((full-set (compute-run-module-set :modules modules :module-sets module-sets))
          (affector-set (subseq full-set 0 (position module full-set))))
     (bisect-load test module affector-set :purge-store purge-store :credentials credentials :verbose verbose)))
+
+(defun cleanup (dir)
+  (let* ((dir (subdirectory* dir "src" "syscalls"))
+         (abl-subdir (subdirectory* dir "sbcl-1.0.31.32-linux-x86-64")))
+    (when (fad:directory-exists-p abl-subdir)
+      (fad:delete-directory-and-files abl-subdir))
+    (mapc #'delete-file
+          (mapcan #'directory
+                  (list
+                   (subfile dir '(:wild) :type "c")
+                   (subfile dir '(:wild) :type "so")
+                   (subfile dir '(:wild) :type "fasl")
+                   (subfile dir '("ffi-types-unix"))
+                   (subfile dir '("ffi-types-unix.grovel-tmp") :type :wild)
+                   (subfile dir '("ffi-wrappers-unix.grovel-tmp") :type :wild))))))
 
 (defun metaone (&optional phases verbose no-purge module-sets credentials
                 &rest one-keys &key &allow-other-keys &aux
