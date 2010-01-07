@@ -21,7 +21,7 @@
 (in-package :desire)
 
 
-(defparameter *vcs-appendage-types* '(darcs))
+(defparameter *vcs-appendage-types* '(darcs hg))
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
@@ -39,15 +39,20 @@
       (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
       (setf (gitvar 'user.name nil t) username))))
 
+(defun module-wildfile (module name &key type &aux
+                        (module (coerce-to-module module)))
+  (and (or (module-locally-present-p module (gate *self*) t)
+           (update module)
+           t)
+       (first (directory (subfile (module-pathname module) (list :wild-inferiors name) :type type)))))
+
 (defgeneric try-ensure-importer-executable (type)
   (:method ((o (eql 'darcs)))
-    (when-let ((executable
-                (and (or (module-locally-present-p :bzr-fastimport (gate *self*) t)
-                         (update :bzr-fastimport)
-                         t)
-                     (first (directory (subfile* (module-pathname :bzr-fastimport)
-                                                 :wild-inferiors "darcs-fast-export"))))))
-      (setf (executable 'darcs-fast-export) executable))))
+    (when-let ((executable (module-wildfile :bzr-fastimport "darcs-fast-export")))
+      (setf (executable 'darcs-fast-export) executable)))
+  (:method ((o (eql 'hg)))
+    (when-let ((executable (module-wildfile :bzr-fastimport "hg-fast-export" :type "py")))
+      (setf (executable 'hg-fast-export) executable))))
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."

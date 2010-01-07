@@ -46,6 +46,7 @@ Defaults to NIL.")
   (define-executable darcs)
   (define-executable darcs-fast-export)
   (define-executable hg)
+  (define-executable hg-fast-export)
   (define-executable python)        ; this is for hg-to-git.py
   (define-executable rsync)
   (define-executable cvs)
@@ -107,27 +108,26 @@ Note that the provided directory is the final directory in the gate locality.")
       (with-error-resignaling (missing-executable
                                ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
         (within-directory (repo-dir :if-does-not-exist :create)
-          (handler-case (progn
-                          (unless (directory-created-p)
-                            (unless (git-repository-has-objects-p nil)
-                              (error 'empty-repository :pathname repo-dir))
-                            (when *follow-upstream*
-                              (ensure-clean-repository *dirty-repository-behaviour*)))
-                          (let ((*new-repository-p* (directory-created-p))
-                                (*source-remote* o))
-                            ;; at this point several facts apply:
-                            ;; - the directory of the module's repository within the gate exists, maybe without .git, and we're in that directory
-                            ;; - above variables are bound
-                            (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
-                              (call-next-method)))
-                          (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
-                                                                 (t :continue)))
-                          (setf (git-repository-world-readable-p) *default-world-readable*))
-            (error (c)
-              (when (and (directory-created-p)
-                         (not (git-repository-has-objects-p repo-dir)))
-                (fad:delete-directory-and-files repo-dir))
-              (error c)))))))
+          (handler-bind ((error (lambda (c)
+                                  (declare (ignore c))
+                                  (when (and (directory-created-p)
+                                             (not (git-repository-has-objects-p repo-dir)))
+                                    (fad:delete-directory-and-files repo-dir)))))
+            (unless (directory-created-p)
+              (unless (git-repository-has-objects-p nil)
+                (error 'empty-repository :pathname repo-dir))
+              (when *follow-upstream*
+                (ensure-clean-repository *dirty-repository-behaviour*)))
+            (let ((*new-repository-p* (directory-created-p))
+                  (*source-remote* o))
+              ;; at this point several facts apply:
+              ;; - the directory of the module's repository within the gate exists, maybe without .git, and we're in that directory
+              ;; - above variables are bound
+              (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
+                (call-next-method)))
+            (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
+                                                   (t :continue)))
+            (setf (git-repository-world-readable-p) *default-world-readable*))))))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
@@ -217,6 +217,13 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
     ;; Thankfully, git-fast-import is pretty reliable.
     (let ((*output* nil))
       (pipe (darcs-fast-export from-repo-dir)
+            (git "fast-import"))))
+  (:method ((o hg-locality) name from-repo-dir)
+    (unless (git-repository-present-p)
+      (git "init"))
+    (let ((*output* nil)
+          (*error* nil))
+      (pipe (hg-fast-export "-r" from-repo-dir)
             (git "fast-import"))))
   (:method ((o cvs-locality) name from-repo-dir)
     (multiple-value-bind (url cvs-module-name) (url *source-remote* name)
