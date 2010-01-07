@@ -39,7 +39,7 @@
   (let* ((totally-black (eq t (module-system-path-blacklist module)))
          (path (truename repo-dir))
          (subdirs (unless totally-black
-                    (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=)) 
+                    (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=))
                                (directory (subdirectory path '(:wild))))))
          (pass1 (unless totally-black
                   (append (directory (subfile path '(:wild) :type system-pathname-type))

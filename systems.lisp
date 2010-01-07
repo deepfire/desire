@@ -79,7 +79,7 @@ part is done by ENSURE-SYSTEM-LOADABLE.")
 
 (defgeneric ensure-system-loadable (system &optional locality path)
   (:documentation
-   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's 
+   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's
 definition path within its module within LOCALITY.")
   (:method :before ((o system) &optional locality path)
     (declare (ignore path locality))

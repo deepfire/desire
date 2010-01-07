@@ -91,7 +91,7 @@ locally present modules will be marked as converted."
       ;;
       ;; Set up tools
       ;;
-      ;; NOTE: there's some profound crap there 
+      ;; NOTE: there's some profound crap there
       (with-class-slot (git hg darcs cvs svn tarball) required-executables
         (setf git '(git) hg '(hg python)  darcs '(darcs darcs-fast-export wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
       (with-class-slot (git hg darcs cvs svn tarball) enabled-p
@@ -144,7 +144,7 @@ locally present modules will be marked as converted."
       ;;
       (syncformat t ";;; Enumerating present modules and systems~%")
       (enumerate-present-modules-and-systems :verbose verbose)
-      (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%" 
+      (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
               (sort (do-present-modules (m)
                       (collect (name m)))
                     #'string<))

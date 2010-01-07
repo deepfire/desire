@@ -1425,6 +1425,6 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
 ;;;; Localities.  Utilities not used anywhere at this moment.
 ;;;;
 (defun define-locality (name vcs-type &rest keys &key &allow-other-keys)
-  "Define locality of VCS-TYPE at PATH, if one doesn't exist already, 
+  "Define locality of VCS-TYPE at PATH, if one doesn't exist already,
    in which case an error is signalled."
   (apply #'make-instance (format-symbol (symbol-package vcs-type) "~A-LOCALITY" vcs-type) :name name (remove-from-plist keys :name)))

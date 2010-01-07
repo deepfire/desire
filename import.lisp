@@ -321,7 +321,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                       (repo-dir (module-pathname name locality)))
                  (syncformat t ";; Fetching module ~A from ~A remote ~A, ~A~%" name (vcs-type best-remote) (name best-remote) url)
                  (with-maybe-just-printing-conditions (t fetch-failure) (not *fetch-errors-serious*)
-                   (restart-bind ((retry (lambda () 
+                   (restart-bind ((retry (lambda ()
                                            (maybe-within-directory repo-dir
                                              (git "gui"))
                                            (invoke-restart (find-restart 'retry)))
