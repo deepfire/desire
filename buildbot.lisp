@@ -27,7 +27,7 @@
 
 (defvar *default-master* :git.feelingofgreen.ru)
 (defparameter *default-remote-lisp-credentials* :buildslave)
-(defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/git/desire/climb.sh")
+(defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/src/desire/climb.sh")
 
 ;;;;
 ;;;; Generator/presentation communication and concurrence management.

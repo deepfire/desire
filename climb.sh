@@ -1,5 +1,5 @@
 #!/bin/bash
-argv0_url="http://www.feelingofgreen.ru/shared/git/desire/climb.sh"            #
+argv0_url="http://www.feelingofgreen.ru/shared/src/desire/climb.sh"            #
 ################################################################################
 fail() {
     echo "ERROR: $*"
@@ -29,7 +29,7 @@ version="9.11.2"
 argv0="$(basename $0)"
 
 default_wishmaster="git.feelingofgreen.ru"
-default_http_wishmaster="git.feelingofgreen.ru/shared/git"
+default_http_wishmaster="git.feelingofgreen.ru/shared/src"
 default_desire_branch="master"
 
 print_version_and_die() {
@@ -76,8 +76,7 @@ from the canonical location at ${argv0_url},
 and then normal processing is continued, using the updated version.
 
 During the first step, a storage root location is either created or validated.
-The storage root must be a writable directory containing a writable 'git'
-subdirectory.
+The storage root must be a writable directory.
 
 When STORAGE-ROOT is not specified, ~/.climb-root is looked up for an
 absolute pathname referring to a valid storage location.  If this condition
@@ -113,7 +112,7 @@ PACKAGE optionally set as current.
 
 Report ${argv0} bugs to _deepfire on feelingofgreen <dot> ru
 Desire launchpad team: <https://launchpad.net/~desire>
-Docs: <http://www.feelingofgreen.ru/shared/git/desire/doc/overview.html>
+Docs: <http://www.feelingofgreen.ru/shared/src/desire/doc/overview.html>
 EOF
     exit $1
 }
@@ -197,25 +196,22 @@ writable_absolute_directory_p() {
 
 valid_storage_location_p() {
     local path="$1"
-    writable_absolute_directory_p "${path}" || return 1
-    test -d "${path}/git" || fail "\"${path}/git\" does not exist"
-    test -w "${path}/git" || fail "\"${path}/git\" is not writable"
-    return 0
+    writable_absolute_directory_p "${path}"
 }
 
 clone_module() {
     local root="$1"
     local module="$2"
-    git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/git/${module}" >/dev/null || \
+    git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/${module}" >/dev/null || \
         (echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport" && \
-         git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/git/${module}" >/dev/null) || \
+         git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >/dev/null) || \
         fail "failed to retrieve ${module}"
 }
 
 update_module() {
     local root="$1"
     local module="$2"
-    (cd "${root}/git/${module}" && git fetch "${WISHMASTER}" >/dev/null 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >/dev/null) || \
+    (cd "${root}/${module}" && git fetch "${WISHMASTER}" >/dev/null 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >/dev/null) || \
         fail "failed to update ${module}"
 }
 
@@ -235,11 +231,11 @@ update_dependencies() {
     do
         test "${VERBOSE}" && echo -n "      $desire_dep: "
         # Handle stashed modules.
-        if test -d "${root}/git/${desire_dep}_"
+        if test -d "${root}/${desire_dep}_"
         then
-            mv "${root}/git/${desire_dep}_" "${root}/git/${desire_dep}"
+            mv "${root}/${desire_dep}_" "${root}/${desire_dep}"
         fi
-        if test -d "${root}/git/${desire_dep}"
+        if test -d "${root}/${desire_dep}"
         then
             update_module "${root}" "${desire_dep}"
         else
@@ -260,7 +256,7 @@ then
     update_dependencies "${ROOT}"
 else
     test "${ROOT}" || \
-        fail "~/.climb-root did not refer to a writable directory, containing a writable 'git' subdirectory, nor was STORAGE-ROOT specified, cannot continue"
+        fail "~/.climb-root did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue"
 
     if test -e "${ROOT}"
     then
@@ -272,7 +268,7 @@ else
             fail "\"${ROOT}\" does not exist, and its parent is not a writable directory"
         test "${VERBOSE}" && echo "NOTE: validated \"${ROOT}\" as new storage location, updating ~/.climb-root"
         echo -n "${ROOT}" > ~/.climb-root
-        mkdir "${ROOT}" "${ROOT}/git" || \
+        mkdir "${ROOT}" || \
             fail "unable to initialise the storage location at \"${ROOT}\", exiting"
         test "${VERBOSE}" && echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
         clone_dependencies "${ROOT}"
@@ -280,7 +276,7 @@ else
 fi
 
 test "${VERBOSE}" && echo "NOTE: checking out '${DESIRE_BRANCH}' branch of desire..."
-( cd ${ROOT}/git/desire && git reset --hard "${WISHMASTER}/${DESIRE_BRANCH}" ) || \
+( cd ${ROOT}/desire && git reset --hard "${WISHMASTER}/${DESIRE_BRANCH}" ) || \
     fail "failed to check out branch '${DESIRE_BRANCH}' of desire"
 
 test "${VERBOSE}" && echo "NOTE: cranking up verbosity"
@@ -298,7 +294,7 @@ CONGRATULATING_MESSAGE="\"
    Congratulations! You have reached a point where you can wish for any package
   desire knows about. Just type (lust 'desiree) and it will happen.
   You can link desire's pool of packages into ASDF by ensuring that
-  #p\\\"${ROOT}/git/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*
+  #p\\\"${ROOT}/.asdf-registry/\\\" is in your ASDF:*CENTRAL-REGISTRY*
 
   To see what's possible, issue:
     (apropos-desr 'clim)
@@ -318,10 +314,10 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
-  (load (compile-file \"${ROOT}/git/asdf/asdf.lisp\")))" \
+  (load (compile-file \"${ROOT}/asdf/asdf.lisp\")))" \
      --eval "
 (progn
-  (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/git/\")))
+  (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/\")))
   (defun basic-root-modules-search (system)
     (let* ((name (asdf::coerce-name system))
            (file (make-pathname :directory (append *asdf-root* (list name)) :name name :type \"asd\" :case :local)))

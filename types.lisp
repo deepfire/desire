@@ -497,7 +497,8 @@ differ in only slight detail -- gate property, for example."
             (apply #'make-instance (find-class locality-type) :distributor o
                    :name (format-symbol #.*package* "~A~:[~;-~:*~A~]"
                                         (default-remote-name (name o) vcs-type 'native) name-qualifier)
-                   :pathname (subdirectory* (root o) (string-downcase (string vcs-type)))
+                   :pathname (subdirectory (root o) (unless (eq vcs-type *gate-vcs-type*)
+                                                      (list (concatenate 'string "." (string-downcase (string vcs-type))))))
                    arguments)))))
 
 (defmethod shared-initialize :after ((o local-distributor) slot-names &key &allow-other-keys)
@@ -563,7 +564,7 @@ differ in only slight detail -- gate property, for example."
             (definition-error "~@<Bad local definitions: intersection between exported ~
                                   and converted modules: ~S.~:@>"
                 intersection))
-          (setf (gate o) (change-class gate 'git-gate-locality :pathname (merge-pathnames #p"git/" root)))
+          (setf (gate o) (change-class gate 'git-gate-locality :pathname root))
           ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
           (update-local-distributor-conversions o converted))
         (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc) :path nil))))
@@ -673,7 +674,7 @@ instead."
    :scan-positive-localities nil
    :remotes nil))
 
-(defclass origin-module (module) 
+(defclass origin-module (module)
   ((status :accessor module-status :initarg :status)
    (public-packages :accessor module-public-packages :initarg :public-packages))
   (:default-initargs
@@ -1270,8 +1271,9 @@ in non-unpublished remotes."
 about their relationship.
 The value returned is the list of found modules."
   (do-modules (module)
-    (when (update-module-presence module locality)
-      (cond ((module-hidden-p module locality)
+    (let ((presentp (update-module-presence module locality)))
+      (cond ((not presentp))
+            ((module-hidden-p module locality)
              (collect module into hidden-modules))
             ((not (module-publishable-p module locality))
              (collect module into unpublishable-modules))

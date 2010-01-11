@@ -25,12 +25,8 @@
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
-    (desire-error "~@<The specified root at ~S does not exist.~:@>" directory))
-  (let ((gitroot (subdirectory* directory "git")))
-    (when (and (probe-file gitroot) (not (directory-exists-p gitroot)))
-      (desire-error "~@<The specified root at ~S contains a file named 'git', which violates the requirement for a sane root.~:@>" directory))
-    (ensure-directories-exist gitroot)
-    (ensure-directories-exist (subdirectory* directory "tmp")))
+    (desire-error "~@<The specified storage area at ~S does not exist.~:@>" directory))
+  (ensure-directories-exist (subdirectory* directory "tmp"))
   directory)
 
 (defun ensure-committer-identity ()
@@ -74,16 +70,15 @@ an identity relationship with that definition will be performed,
 by looking up locally the modules defined for export. The rest of
 locally present modules will be marked as converted."
   (let* ((path (fad:pathname-as-directory path))
-         (absolute-path (if (pathname-absolute-p path)
-                            path
-                            (merge-pathnames path))))
+         (gate-path (if (pathname-absolute-p path)
+                        path
+                        (merge-pathnames path))))
     ;;
     ;; Storage
     ;;
-    (ensure-root-sanity (parse-namestring absolute-path))
-    (let* ((gate-path (merge-pathnames (make-pathname :directory (list :relative (downstring *gate-vcs-type*))) absolute-path))
-           (meta-path (merge-pathnames #p".meta/" gate-path))
-           (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
+    (ensure-root-sanity (parse-namestring gate-path))
+    (let ((meta-path (merge-pathnames #p".meta/" gate-path))
+          (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
       ;;
       ;; Reset
       ;;
@@ -113,10 +108,10 @@ locally present modules will be marked as converted."
       (setf *self* (with-measured-time-lapse (sec)
                        (if-let ((d (and as (distributor as))))
                          (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
-                                (change-class d 'local-distributor :root absolute-path :meta meta-path :localmeta localmeta-path))
+                                (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
                          (let ((local-name (canonicalise-name (machine-instance))))
                            (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
-                           (make-instance 'local-distributor :name local-name :root absolute-path :meta meta-path :localmeta localmeta-path
+                           (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path
                                           :omit-registration t)))
                      (when verbose
                        (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
