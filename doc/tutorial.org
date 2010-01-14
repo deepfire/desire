@@ -6,7 +6,7 @@
 Crash desire tutorial
 #+BEGIN_CENTER
 #+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
-January 14, 2010, 12:20
+January 14, 2010, 12:32
 #+END:
 #+END_CENTER
 
@@ -14,9 +14,9 @@ January 14, 2010, 12:20
 
 This document is intended to provide you with shortest-possible instructions
 for accessing a largest set of desire functionality in minimum of time.
+Note though, that it's in no way complete.
 
-In case you want a more thorough material, you should address to the main
-documentation:
+In case you want a more thorough material, you should address the main documentation:
 
 	http://www.feelingofgreen.ru/shared/src/desire/doc/overview.html
 
@@ -38,7 +38,8 @@ The easiest way to get desire running is to use its bootstrap script, climb.sh.
 You'll also need a Lisp (SBCL[fn:1], currently) and git[fn:2].
 
 Before that, though, you'll need to decide on a storage area for module storage needs.
-Let's assume that you chose /home/user/desr (it must be an absolute pathname):
+Let's assume that you chose /home/user/desr (it must be an absolute pathname, and the
+exact directory must not exist):
 
 	: wget http://www.feelingofgreen.ru/shared/src/desire/climb.sh
 	: sh climb.sh /home/user/desr
@@ -54,6 +55,7 @@ from your regular environment:
 	: (push "/home/user/desr/.asdf-registry/" asdf:*central-registry*)
 	: (require :desire)
 	: (desr:init "/home/user/desr/")
+	: (in-package :desire)
 
 Or, alternatively, as a shell command running SBCL:
 
@@ -141,7 +143,7 @@ afterwards (but preferably after you've used LUST or UPDATE on the new definitio
 Nothing prevents you from recording non-lisp repositories and obtaining/updating them in the
 aforementioned manner.
 
-*** Running a buildbot
+*** Webbly buildbotry
 
 This section assumes that you've already loaded desire on the buildmaster's machine,
 using the account which will run the buildmaster.
@@ -191,6 +193,12 @@ using the account which will run the buildmaster.
 	: (desire-buildbot:render-cl-waterfall-static #p"/path/to/buildbot-output/")
 
    There's an API for examining the results: look in buildbot-base.lisp
+
+***** Pinging the remote lisp
+
+If you want to check buildslave connectivity:
+
+	: (desree:ping-remote)
 
 * Footnotes
 
