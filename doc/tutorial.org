@@ -1,0 +1,203 @@
+### -*- mode: org; -*-
+#+STARTUP: hidestars #+STARTUP: odd #+STARTUP: logdone #+STARTUP: nofninline
+#+STYLE: <link rel="stylesheet" type="text/css" href="style.css" />
+#+OPTIONS: H:7
+
+Crash desire tutorial
+#+BEGIN_CENTER
+#+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
+January 14, 2010, 12:20
+#+END:
+#+END_CENTER
+
+* About this document
+
+This document is intended to provide you with shortest-possible instructions
+for accessing a largest set of desire functionality in minimum of time.
+
+In case you want a more thorough material, you should address to the main
+documentation:
+
+	http://www.feelingofgreen.ru/shared/src/desire/doc/overview.html
+
+*** Canonical location
+
+This document has a canonical location:
+
+	http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.html
+
+or, for the Org-mode source:
+
+	http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.org
+
+* Tutorial
+*** Entry
+
+The easiest way to get desire running is to use its bootstrap script, climb.sh.
+
+You'll also need a Lisp (SBCL[fn:1], currently) and git[fn:2].
+
+Before that, though, you'll need to decide on a storage area for module storage needs.
+Let's assume that you chose /home/user/desr (it must be an absolute pathname):
+
+	: wget http://www.feelingofgreen.ru/shared/src/desire/climb.sh
+	: sh climb.sh /home/user/desr
+
+Once that's complete, you're presented with a REPL, ready for use of desire.
+
+***** Re-entry
+
+The following expressions make desire and the pool of modules managed by it accessible
+from your regular environment:
+
+	: (load (compile-file "/home/user/desr/asdf/asdf.lisp"))
+	: (push "/home/user/desr/.asdf-registry/" asdf:*central-registry*)
+	: (require :desire)
+	: (desr:init "/home/user/desr/")
+
+Or, alternatively, as a shell command running SBCL:
+
+	: sbcl --eval '(load (compile-file "/home/user/desr/asdf/asdf.lisp"))'           \
+        :      --eval '(push "/home/user/desr/.asdf-registry/" asdf:*central-registry*)' \
+        :      --eval '(require :desire)'                                                \
+        :      --eval '(desr:init "/home/user/desr/")'                                   \
+        :      --eval '(in-package :desire)'
+
+*** What's available?
+
+As the instructions at the REPL of the bootstrap script suggests, you might lookup what's
+available:
+
+	: (apropos-desr 'clim)
+
+or:
+	: (list-modules)
+
+*** Getting it
+
+To download (or update) a module, along with its declared dependencies[fn:3],
+and to make them available:
+
+	: (lust 'cxml)
+
+*** Loading it
+    
+In order to load a system within a module, while catching (downloading and installing)
+undeclared dependencies[fn:3]:
+
+	: (loadsys 'cxml)
+
+*** Updating/retrieving a single module
+
+To update or obtain a single module, without touching its dependencies:
+
+	: (update 'cxml)
+
+*** The case of an unknown module
+
+What if you want to use a module which desire doesn't know about?  You will first need to
+extend the definitions:
+
+	: (add-module "darcs+http://some.where/in/the/galaxy")
+
+Note the special syntax for the URI schema -- it's a hint to desire what VCS the remote
+module is in.  The supported schemas are (one entry per a distinct transport type): 
+        - git
+        - git+http, http
+	- darcs+http, darcs
+        - hg+http, hg
+        - cvs+rsync
+        - svn
+        - svn+http
+        - svn+rsync
+        - tarball, tarball+http
+
+The CVS pserver designators (in pristine form) are supported as well.
+
+When the upstream repository is in a non-git format, you may need to install some extra
+programs to facilitate the conversion:
+
+	- cvs :: git-cvs
+	- svn :: git-svn
+	- tarball :: git-import-orig from debian's git-buildpackage
+
+For darcs and hg you don't need anything as desire handles it in an automagic manner. 
+
+If ADD-MODULE succeeds you can proceed as outlined in previous sections.  Note that it
+might fail to internalise the definition, because a non-trivial amount of interpretation
+is performed to normalise the URL into a form suitable for desire.
+
+ADD-MODULE may also ask you for a 'remote name', in case the URI represents a new remote
+within a distributor for which no automatic name could be chosen.  You're free to enter
+a string without spaces.
+
+As you most likely want the changes to persist, you should save the modified definitions
+afterwards (but preferably after you've used LUST or UPDATE on the new definition):
+
+	: (save-definitions)
+
+*** Non-lisp upstreams
+
+Nothing prevents you from recording non-lisp repositories and obtaining/updating them in the
+aforementioned manner.
+
+*** Running a buildbot
+
+This section assumes that you've already loaded desire on the buildmaster's machine,
+using the account which will run the buildmaster.
+
+1. Prepare a clean buildslave account, and make sure you'll be able to log in remotely:
+
+	: ssh <clean-account>@<buildslave-host>
+
+   without any further input, that is, using a ssh key pair.
+
+2. Load the buildbot:
+
+	: (loadsys :desire-buildbot)
+
+3. Make your remote lisp account known:
+
+	: (defhostaccess :buildslave
+	:                :hostname "<buildslave-host>"
+	:                :username "<clean-account>"
+	:                :password "")
+
+4. If you do not intend to run a webserver to present testing results, you do not
+   need to have a running hunchentoot instance and do not have to execute the following:
+
+	: (desire-buildbot:start-cl-waterfall "URI/prefix")
+
+   If you do, as a consequence of above you'll have a dynamic handler for
+
+	: http://your.domain:your-hunchentoot-port/URI/prefix
+
+5. Now, to run the thing:
+
+   #+BEGIN_EXAMPLE   
+	(desire-buildbot:one*
+	 t   ; "touch" upstream repo
+	 t   ; fetch
+	 t   ; unwind dependencies and record definitions
+	 ;; remote lisp phases
+	 t   ; fetch
+	 t   ; load
+	 nil ; there's no test phase yet, but it can be very easily implemented
+	 :credentials :buildslave)
+   #+END_EXAMPLE
+
+6. If you choose to present the results as a static hierarchy of HTML files:
+
+	: (desire-buildbot:render-cl-waterfall-static #p"/path/to/buildbot-output/")
+
+   There's an API for examining the results: look in buildbot-base.lisp
+
+* Footnotes
+
+[fn:1] http://sourceforge.net/project/showfiles.php?group_id=1373
+
+[fn:2] A matter of 'apt-get install git-core' or 'yum install git-core' on most of
+Linux distributions.
+
+[fn:3] The issue of declared dependencies vs. undeclared ones is a controversial one.
+Suffice to say, desire handles it somewhat gracefully.

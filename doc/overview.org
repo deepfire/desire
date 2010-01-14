@@ -6,7 +6,7 @@
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
 #+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
-November 29, 2009, 11:02
+January 12, 2010, 08:21
 #+END:
 #+END_CENTER
 
@@ -14,63 +14,326 @@ November 29, 2009, 11:02
 
 This document has a canonical location:
 
-	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.html
+	http://www.feelingofgreen.ru/shared/src/desire/doc/overview.html
 
 or, for the Org-mode source:
 
-	http://www.feelingofgreen.ru/shared/git/desire/doc/overview.org
+	http://www.feelingofgreen.ru/shared/src/desire/doc/overview.org
 
 * What is desire (supposed to be)?
 
-Desire is a package management substrate.
-  
-The domain of desire includes software distribution points and software
-modules, but carefully avoids module internals, leaving that to system
-definition facilities.  The domain-specific information is represented
-in a both human- and machine-readable form and is shared, by the means
-of a distributed VCS, within a loose aggregation that could be called a network
-of desire nodes.
+Desire is a source code management substrate.  It once was called a
+"package management substrate", but no longer, because, while it
+does some things a package manager like APT or YUM would do, the actual
+packaging part is not represented.
 
-There are three sides of desire:
-     -  a knowledge base about world of software distributors and modules,
-     -  an end-user software retrieval system, and
-     -  (re)distribution.
+Desire probably is best described as a sum of its current components:
+     - a DSL enumerating software module upstreams and facilitating a global
+       namespace for described objects, augmented with rich supporting facilities;
+     - a nascent VCS management layer[fn:11];
+     - a repository format unifier based on the above, facilitating
+       redistribution of upstream source code in a common DVCS format;
+     - a set of inter-module dependency deducers[fn:10] for various
+       situations, but most importantly allowing for automated
+       end-user-oriented module retrieval and installation;
+     - a number of auxiliary tools based on that substrate:
+       - a semi-automated clbuild project definition importer;
+       - a fairly automated packager for ASDF-INSTALL;
+       - an automated patch applicator providing a set of XCVBified projects;
+       - a buildbot with a master/slave architecture and a web interface
+         supporting both static and dynamic page generation.
 
-Desire shares concepts with and provides some features of, at least:
-     -  asdf-install
-     -  mudballs
-     -  clbuild
+If this sounds like running in all directions, it probably is, as the goal
+of desire is to become a substrate supporting all source-code-related
+activities -- module enumeration, (re-)distribution, upstream tracking,
+release management, packaging, testing etc.
 
-Desire uses the Git distributed version control system to pass around
-the domain-specific information, as well as for software redistribution.
+* What can desire do for you /now/?
+*** End user
 
-Higher-order goals of desire revolve around:
+You can use desire in the same manner as ASDF-INSTALL, but in a somewhat more friendly
+manner:
+     - no non-essential packages need to be installed, because desire has a concept of
+       central system of a module[fn:13];
+     - you can ask it about available modules in an apropos-like fashion, because of
+       the availability of an explicitly declared nomenclature;
 
-     - distributed development,
-     - cross-project cooperation, and
-     - coordinated release making.
+Additionally, you can use it to track non-lisp upstreams -- without dependency handling,
+for obvious reasons.
 
-* How to obtain desire?
+*** Upstreams
 
-Desire can be obtained at:
+There are two modes of operation, a participating one and a non-participating one.
 
-        git://git.feelingofgreen.ru/desire
+The latter requires almost no involvement on upstream's part -- not even use of desire,
+whereas the former assumes control over the definition of the corresponding part of the
+global upstream namespace.
 
-but please see the "Streamlined bootstrap" section below.
+In either case you get:
+     - your modules and their dependencies are globally declared and easily available
+       to end-users;
+     - buildbot-style testing on http://feelingofgreen.ru/desire-waterfall [fn:12].
 
-* Status
+***** Non-participating upstreams
 
-Desire still undergoes major changes, and might be a rough ride.
+You don't have to do anything, but perhaps ask the desire maintainers to record definitions
+of modules released by you and of their dependencies, that is, if they are not recorded already.
 
-The streamlined bootstrapper (climb.sh) breaks once in a while.
+***** Participating upstreams a.k.a. wishmasters
 
-A couple of DEFINITIONS format changes are ahead, and their contents is not
-yet either satisfactorily complete or correct.
+You get to maintain your portion of global definitions and a set of publicly accessible
+git repositories.
 
-Automated domain-wide testing is set up, and the process of elimination of determined
-problems is well underway.  See http://www.feelingofgreen.ru/desire-waterfall.
+In return, you get following things:
+     - easy upstream dependency tracking (really, an end-user mode feature);
+     - programmatic API for certain aspects of git repository operation;
+     - semi-automatic ASDF-INSTALL exporter;
+     - possibility to run a local instance of the buildbot.
 
-Desire still works only with ASDF systems, on Linux and using SBCL.
+*** Tinkerer
+
+You know you're in this category when you want to do things like:
+     - programmatically generate/maintain/test changes/branches across a set of modules,
+       like the automated XCVBifier does, perhaps for facilitating coordinated
+       release making;
+     - programmatically populate the definition namespace (perhaps for a
+       web-sphere where people could register and manipulate their projects);
+     - extend the buildbot infrastructure, perhaps adding things like automated
+       package generation phase;
+
+I won't go into details at this point, but I believe that desire provides enough
+foothold to make all that feasible, if not easy-ish.
+
+Like with any underspecified area, desire employs a degree of heuristics here and there --
+and that's where we need specifications to make things predictable and reliable.
+
+* Installation
+
+The ultimate goal of actions described in this section is to provide the user
+with a REPL fully prepared for input of desire commands.
+
+*** Requirements
+
+Absolute requirements at this point are a POSIX shell, git and SBCL.
+
+*** Bootstrap and initialisation
+
+Besides the obvious download and compilation/load steps, desire requires
+an initialisation procedure parametrised with a source code storage area,
+in order to become operational.
+
+All these steps can be carried out:
+     - manually;
+     - in a semi-automated manner, with assist of ASDF-INSTALL;
+     - in a completely automated manner, using the bootstrap script.
+
+Before we proceed, a crucial concept of the storage area must be discussed.
+
+The storage area is a writable directory whose writable subdirectories
+fall into one of the three categories:
+     - module repositories maintained by desire through git;
+     - /foreign/ VCS subroots containing transitory repositories in
+       foreign formats;
+     - metadata repositories used for desire's internode communication
+       and information tracking.
+
+For the time being, the system-wide policy for maintenance of these
+storage roots is not devised yet, so they are effectively per-user.
+
+Unless you go the fully-automated bootstrap way, the first time you run
+desire you will need to prepare an empty writeable directory.
+
+***** Manual installation
+
+	: root="/absolute/path/to/storage-area/"
+
+The remaining of the shell snippet is designed to be pastable into a shell:
+
+#+BEGIN_EXAMPLE
+	mkdir ${root}
+	cd ${root}
+	dependencies="alexandria asdf cl-fad desire executor pergamum iterate"
+	for dep in ${dependencies}
+	do
+		git clone -o git.feelingofgreen.ru git://git.feelingofgreen.ru/$dep
+		# alternative for behind-HTTP-proxy world:
+		# git clone -o git.feelingofgreen.ru http://git.feelingofgreen.ru/shared/src/$dep/.git/
+		ln -s ${root}/$dep/$dep.asd
+	done
+	sbcl --no-userinit --no-sysinit --eval '(load (compile-file "asdf/asdf.lisp"))' \
+	     --eval "(require :desire)" \
+	     --eval "(desire:init \"${root}\")" \
+	     --eval "(in-package :desire)"
+#+END_EXAMPLE
+     
+***** Semi-automated installation
+
+This mode is intended to use ASDF-INSTALL, but alas it doesn't work,
+as you need to be in SBCL without ASDF loaded, because desire depends on a
+development version of ASDF which is not yet integrated into SBCL.
+
+***** Fully automated bootstrap
+
+Desire includes a booststrap script which is located at:
+
+	http://www.feelingofgreen.ru/shared/src/desire/climb.sh
+
+Download that script and run it like that (the trailing slash is important):
+
+	: sh climb.sh /absolute/path/to/storage-root/
+
+The reference for various controls follows.
+
+***** Bootstrap script reference
+
+This script performs following operations:
+
+     -  use git to download modules desire depends on, placing them
+        in the provided storage location;
+     -  load and perform an initial setup of desire;
+     -  optionally install a desired module and its dependencies;
+     -  optionally evaluate an expression in the resulting environment.
+
+Invoke it like this:
+
+#+BEGIN_EXAMPLE
+  climb.sh [OPTION]... [STORAGE-ROOT]
+Bootstrap, update or perform other actions on a desire installation
+in either STORAGE-ROOT, or a location specified in ~/.climb-root
+
+  -u          Self-update and continue processing other options, using
+                the updated version.
+  -n HOSTNAME Use HOSTNAME as a bootstrap node.
+                HOSTNAME must refer to a node participating in desire protocol.
+  -b BRANCH   Check out BRANCH of desire other than 'master'.
+  -t BRANCH   Check out BRANCH of metastore on the bootstrap node other than
+                the default.  The default is the same as the used branch
+                of desire.
+  -m MODULE   Retrieve MODULE, once ready.
+  -s SYSTEM   Install or update the module relevant to SYSTEM, then load it.
+  -a APP      Load system containing APP, as per -s, then launch it.
+  -x EXPR     Evaluate an expression, in the end of it all.
+  -d          Enable debug optimisation of Lisp code.
+  -n          Disable debugger, causing desire dump stack and abort on errors,
+                instead of entering the debugger.
+  -e          Enable explanations about external program invocations.
+  -v          Crank up verbosity.
+  -V          Print version.
+  -h          Display a help message.
+#+END_EXAMPLE
+
+As step zero, when the -u switch is provided, climb.sh is updated using wget
+from the canonical location at http://www.feelingofgreen.ru/shared/src/desire/climb.sh,
+and then normal processing is continued, using the updated version.
+
+During the first step, a storage root location is either created or validated.
+The pre-existing storage root must be a writable directory containing a
+writable 'git' subdirectory.
+
+When STORAGE-ROOT is not specified, ~/.climb-root is looked up for an
+absolute pathname referring to a valid storage location.  If this condition
+is met, that directory is accepted as STORAGE-ROOT, otherwise an error
+is signalled.
+
+When STORAGE-ROOT is specified, it must be either an absolute pathname
+referring to a valid storage location, or it must denote a non-occupied
+filesystem location, with a writable parent directory.
+
+During the second step, desire and its dependencies are either retrieved,
+or updated, in the case when they are already present in STORAGE-ROOT.
+
+Next, a specific branch of desire is checked out, configurable with the
+-d option and defaulting to "master".
+
+Further, the -n and -t options alter, correspondingly, the hostname
+of the desire node used for bootstrap, and a branch of that node's metastore
+to use.  These options default to git.feelingofgreen.ru and
+the name of the branch of desire, accordingly.
+
+During the next step a lisp is started and desire initialisation is attempted,
+with the above determined values of hostname and metastore branch.
+
+Once the initialisation is complete, MODULE, SYSTEM and APP provide
+optional convenience shortcuts for module installation, system loading
+and application launching.  Any of these can be omitted, as the required
+information is easily deduced.  Note that the more granular objects
+determine the objects of lower granularity.
+
+After all these steps, EXPR is executed, if it was provided.
+
+* Workflows
+
+This section assumes that desire was already made operational by either
+means described in the previous chapter.
+
+*** Re-initialisation
+
+The INIT procedure ensures that repositories constituting your desire node
+are in working order.
+    
+Depending on whether you run a well-known desire node (that is, a wishmaster)
+you need to provide the :AS keyword to INIT:
+
+	: (init "/path/to/root/")                            ; for non-well-known mode
+or:
+	: (init "/path/to/root/" :as 'your-node-domain-name) ; for wishmaster mode
+
+The specified root directory will contain all VCS-specific master localities,
+as well as anything module's post-install scripts choose to deliver.
+This pathname is available in =*SELF*=, using the ROOT reader.
+
+Unless you already have a '.meta' module, an initial seed version will be
+downloaded for you.  Currently the wishmaster chosen for this is
+git.feelingofgreen.ru.
+
+This procedure also determines the available VCS tools, as well as conversion
+tools, and determines the set of accessible remotes.
+
+Further, it scans the git locality for known modules, and makes their systems
+registered in the ASDF registry.
+
+*** User aspect
+
+Unless you happen to have some conversion tools, the set of modules available
+to your node is restricted to those available via git remotes.
+
+The LUST function serves to either initially download or update a set of defined
+modules.
+
+APROPOS-DESR and LIST-MODULES provide convenient knowledge base query
+facilities. For a wider set of functions, please see section 3.
+
+*** Wishmaster aspect
+
+From the wishmaster point of view the INIT function also does:
+
+     -  checks that the locally available set of modules covers every module
+        that is claimed to be "well known" to be published by our
+        distributor[fn:7], otherwise signalling an error
+     -  publishes the informations about non-released, converted modules
+        in the gate remote's DEFINITIONS file
+
+******* External executables required for module conversion
+        
+The conversion is performed by external programs:
+
+     -  darcs-to-git[fn:8]
+     -  git cvs, debian package git-cvs
+     -  git svn, debian package git-svn
+
+*** Extending definitions
+
+ADD-MODULE and the accompanying reader macro #@"u://r.l/" is a one-stop
+point useful for manual extension of the set of known entities.  The URI
+type of the URL must name to the VCS used at the given distribution point,
+that is one of 'git', 'http' (which actually means git+http), 'darcs',
+'cvs' or 'svn'.
+
+The required super-entities are either found among current definitions,
+or created on the spot.
+
+SAVE-DEFINITIONS writes out changes into
+<value-of-(ROOT =*SELF*=)>/git/.meta/DEFINITIONS
 
 * Overview of terms
 *** DEFINITIONS
@@ -150,7 +413,7 @@ into a single repository format, currently /git/.  The modules converted
 in such a way are advertised differently from those which are considered
 'released' by the containing distributor.
 
-******* Localities
+***** Localities
 
 /Localities/ serve to express module storage on the local machine.
 /Master localities/ (except the /local gate/, about which see below)
@@ -165,7 +428,7 @@ A scrupulous reader might note that the above description leaves open
 a possibility of existence for /non-master localities/.  While it is true,
 and purposefully so, this concept is not currently employed.
 
-******* Local gate, or gate locality
+***** Local gate, or gate locality
 
 =*SELF*= always contains a special location, a /local gate/ or a /gate locality/,
 which is both a remote and a locality and serves a threefold purpose:
@@ -392,158 +655,6 @@ Following reader macro is enabled by install-add-module-reader:
         Append definitions currently available in METASTORE to the current idea about
         desire's domain.
 
-* Workflow
-*** Streamlined bootstrap
-
-As another step in achieving user relief, desire includes a booststrap script,
-whose canonical permanent location is:
-
-	http://www.feelingofgreen.ru/shared/git/desire/climb.sh
-
-This script performs following operations:
-
-     -  use git to download modules desire depends on, placing them in a
-        subdirectory of /tmp,
-     -  load and perform an initial setup of desire,
-     -  optionally install a desired module and its dependencies;
-
-climb.sh depends on git, a POSIX shell and, obviously, a lisp (currently,
-only SBCL is supported).  Invoke it like this:
-
-#+BEGIN_EXAMPLE
-  climb.sh [OPTION]... [STORAGE-ROOT]
-Bootstrap, update or perform other actions on a desire installation
-in either STORAGE-ROOT, or a location specified in ~/.climb-root
-
-  -u          Self-update and continue processing other options, using
-                the updated version.
-  -n HOSTNAME Use HOSTNAME as a bootstrap node.
-                HOSTNAME must refer to a node participating in desire protocol.
-  -b BRANCH   Check out BRANCH of desire other than 'master'.
-  -t BRANCH   Check out BRANCH of metastore on the bootstrap node other than
-                the default.  The default is the same as the used branch
-                of desire.
-  -m MODULE   Retrieve MODULE, once ready.
-  -s SYSTEM   Install or update the module relevant to SYSTEM, then load it.
-  -a APP      Load system containing APP, as per -s, then launch it.
-  -x EXPR     Evaluate an expression, in the end of it all.
-  -d          Enable debug optimisation of Lisp code.
-  -n          Disable debugger, causing desire dump stack and abort on errors,
-                instead of entering the debugger.
-  -e          Enable explanations about external program invocations.
-  -v          Crank up verbosity.
-  -V          Print version.
-  -h          Display a help message.
-#+END_EXAMPLE
-
-As step zero, when the -u switch is provided, climb.sh is updated using wget
-from the canonical location at http://www.feelingofgreen.ru/shared/git/desire/climb.sh,
-and then normal processing is continued, using the updated version.
-
-During the first step, a storage root location is either created or validated.
-The storage root must be a writable directory containing a writable 'git'
-subdirectory.
-
-When STORAGE-ROOT is not specified, ~/.climb-root is looked up for an
-absolute pathname referring to a valid storage location.  If this condition
-is met, that directory is accepted as STORAGE-ROOT, otherwise an error
-is signalled.
-
-When STORAGE-ROOT is specified, it must be either an absolute pathname
-referring to a valid storage location, or it must denote a non-occupied
-filesystem location, with a writable parent directory.
-
-During the second step, desire and its dependencies are either retrieved,
-or updated, in the case when they are already present in STORAGE-ROOT.
-
-Next, a specific branch of desire is checked out, configurable with the
--d option and defaulting to "master".
-
-Further, the -n and -t options alter, correspondingly, the hostname
-of the desire node used for bootstrap, and a branch of that node's metastore
-to use.  These options default to git.feelingofgreen.ru and
-the name of the branch of desire, accordingly.
-
-During the next step a lisp is started and desire initialisation is attempted,
-with the above determined values of hostname and metastore branch.
-
-Once the initialisation is complete, MODULE, SYSTEM and APP provide
-optional convenience shortcuts for module installation, system loading
-and application launching.  Any of these can be omitted, as the required
-information is easily deduced.  Note that the more granular objects
-determine the objects of lower granularity.
-
-After all these steps, EXPR is executed, if it was provided.
-
-*** Normal, non-bootstrap use
-
-The INIT procedure ensures that your desire node is in working order.
-    
-Depending on whether you run a well-known desire node (that is, a wishmaster)
-you need to provide the :AS keyword to INIT:
-
-	(init "/path/to/root/"), for non-well-known mode
-or:
-	(init "/path/to/root/" :as 'your-node-domain-name), for wishmaster mode
-
-The specified root directory will contain all VCS-specific master localities,
-as well as anything module's post-install scripts choose to deliver.
-This pathname is available in =*SELF*=, using the ROOT reader.
-
-Unless you already have a '.meta' module, an initial seed version will be
-downloaded for you.  Currently the wishmaster chosen for this is
-git.feelingofgreen.ru.
-
-This procedure also determines the available VCS tools, as well as conversion
-tools, and determines the set of accessible remotes.
-
-Further, it scans the git locality for known modules, and makes their systems
-registered in the ASDF registry.
-
-***** User  aspect
-
-Unless you happen to have some conversion tools, the set of modules available
-to your node is restricted to those available via git remotes.
-
-The LUST function serves to initially download and update a set of defined
-modules.
-
-APROPOS-DESR and LIST-MODULES provide convenient knowledge base query
-facilities. For a wider set of functions, please see section 3.
-
-***** Wishmaster aspect
-
-From the wishmaster point of view (note that this happens the INIT function
-also does:
-
-     -  checks that the locally available set of modules covers every module
-        that is claimed to be "well known" to be published by our
-        distributor[fn:7], otherwise signalling an error
-     -  publishes the informations about non-"well known", converted modules
-        in the gate remote's DEFINITIONS file
-
-******* External executables required for module conversion
-        
-The conversion is performed by external programs:
-
-     -  darcs-to-git[fn:8]
-     -  git cvs, debian package git-cvs
-     -  git svn, debian package git-svn
-
-***** Extending definitions
-
-ADD-MODULE and the accompanying reader macro #@"u://r.l/" is a one-stop
-point useful for manual extension of the set of known entities.  The URI
-type of the URL must name to the VCS used at the given distribution point,
-that is one of 'git', 'http' (which actually means git+http), 'darcs',
-'cvs' or 'svn'.
-
-The required super-entities are either found among current definitions,
-or created on the spot.
-
-SAVE-DEFINITIONS writes out changes into
-<value-of-(ROOT =*SELF*=)>/git/.meta/DEFINITIONS
-
 * Shortcomings
 
 Some known problems:
@@ -582,3 +693,10 @@ process.
 
 [fn:9] As per MODULE-LOCALLY-PRESENT-P.
 
+[fn:10] Three of them: full information, incremental and an ASDF-INSTALL-like post-factum one.
+
+[fn:11] Git-centric.
+
+[fn:12] Intermittent availability only, as of now.
+
+[fn:13] It's a heuristic, if you are curious, but it works pretty well.

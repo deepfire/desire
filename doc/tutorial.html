@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+lang="en" xml:lang="en">
+<head>
+<title>Crash desire tutorial</title>
+<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2010-01-14 12:20:17 MSK"/>
+<meta name="author" content="Samium Gromoff"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="style.css" />
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+
+<h1 class="title">Crash desire tutorial</h1>
+
+
+<div style="text-align: center">
+<p>January 14, 2010, 12:20
+</p>
+</div>
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">1 About this document </a>
+<ul>
+<li><a href="#sec-1.1">1.1 Canonical location </a></li>
+</ul>
+</li>
+<li><a href="#sec-2">2 Tutorial </a>
+<ul>
+<li><a href="#sec-2.1">2.1 Entry </a>
+<ul>
+<li><a href="#sec-2.1.1">2.1.1 Re-entry </a></li>
+</ul>
+</li>
+<li><a href="#sec-2.2">2.2 What's available? </a></li>
+<li><a href="#sec-2.3">2.3 Getting it </a></li>
+<li><a href="#sec-2.4">2.4 Loading it </a></li>
+<li><a href="#sec-2.5">2.5 Updating/retrieving a single module </a></li>
+<li><a href="#sec-2.6">2.6 The case of an unknown module </a></li>
+<li><a href="#sec-2.7">2.7 Non-lisp upstreams </a></li>
+<li><a href="#sec-2.8">2.8 Running a buildbot </a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1"><span class="section-number-2">1</span> About this document </h2>
+<div class="outline-text-2" id="text-1">
+
+
+<p>
+This document is intended to provide you with shortest-possible instructions
+for accessing a largest set of desire functionality in minimum of time.
+</p>
+<p>
+In case you want a more thorough material, you should address to the main
+documentation:
+</p>
+<p>
+<a href="http://www.feelingofgreen.ru/shared/src/desire/doc/overview.html">http://www.feelingofgreen.ru/shared/src/desire/doc/overview.html</a>
+</p>
+
+</div>
+
+<div id="outline-container-1.1" class="outline-3">
+<h3 id="sec-1.1"><span class="section-number-3">1.1</span> Canonical location </h3>
+<div class="outline-text-3" id="text-1.1">
+
+
+<p>
+This document has a canonical location:
+</p>
+<p>
+<a href="http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.html">http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.html</a>
+</p>
+<p>
+or, for the Org-mode source:
+</p>
+<p>
+<a href="http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.org">http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.org</a>
+</p>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2"><span class="section-number-2">2</span> Tutorial </h2>
+<div class="outline-text-2" id="text-2">
+
+
+</div>
+
+<div id="outline-container-2.1" class="outline-3">
+<h3 id="sec-2.1"><span class="section-number-3">2.1</span> Entry </h3>
+<div class="outline-text-3" id="text-2.1">
+
+
+<p>
+The easiest way to get desire running is to use its bootstrap script, climb.sh.
+</p>
+<p>
+You'll also need a Lisp (SBCL<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup>, currently) and git<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>.
+</p>
+<p>
+Before that, though, you'll need to decide on a storage area for module storage needs.
+Let's assume that you chose /home/user/desr (it must be an absolute pathname):
+</p>
+<pre class="example">
+wget http://www.feelingofgreen.ru/shared/src/desire/climb.sh
+sh climb.sh /home/user/desr
+</pre>
+
+
+<p>
+Once that's complete, you're presented with a REPL, ready for use of desire.
+</p>
+
+</div>
+
+<div id="outline-container-2.1.1" class="outline-4">
+<h4 id="sec-2.1.1"><span class="section-number-4">2.1.1</span> Re-entry </h4>
+<div class="outline-text-4" id="text-2.1.1">
+
+
+<p>
+The following expressions make desire and the pool of modules managed by it accessible
+from your regular environment:
+</p>
+<pre class="example">
+(load (compile-file "/home/user/desr/asdf/asdf.lisp"))
+(push "/home/user/desr/.asdf-registry/" asdf:*central-registry*)
+(require :desire)
+(desr:init "/home/user/desr/")
+</pre>
+
+
+<p>
+Or, alternatively, as a shell command running SBCL:
+</p>
+<pre class="example">
+sbcl --eval '(load (compile-file "/home/user/desr/asdf/asdf.lisp"))'           \
+     --eval '(push "/home/user/desr/.asdf-registry/" asdf:*central-registry*)' \
+     --eval '(require :desire)'                                                \
+     --eval '(desr:init "/home/user/desr/")'                                   \
+     --eval '(in-package :desire)'
+</pre>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-2.2" class="outline-3">
+<h3 id="sec-2.2"><span class="section-number-3">2.2</span> What's available? </h3>
+<div class="outline-text-3" id="text-2.2">
+
+
+<p>
+As the instructions at the REPL of the bootstrap script suggests, you might lookup what's
+available:
+</p>
+<pre class="example">
+(apropos-desr 'clim)
+</pre>
+
+
+<p>
+or:
+</p><pre class="example">
+(list-modules)
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2.3" class="outline-3">
+<h3 id="sec-2.3"><span class="section-number-3">2.3</span> Getting it </h3>
+<div class="outline-text-3" id="text-2.3">
+
+
+<p>
+To download (or update) a module, along with its declared dependencies<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup>,
+and to make them available:
+</p>
+<pre class="example">
+(lust 'cxml)
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2.4" class="outline-3">
+<h3 id="sec-2.4"><span class="section-number-3">2.4</span> Loading it </h3>
+<div class="outline-text-3" id="text-2.4">
+
+
+<p>
+In order to load a system within a module, while catching (downloading and installing)
+undeclared dependencies<sup><a class="footref" name="fnr.3.2" href="#fn.3">3</a></sup>:
+</p>
+<pre class="example">
+(loadsys 'cxml)
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2.5" class="outline-3">
+<h3 id="sec-2.5"><span class="section-number-3">2.5</span> Updating/retrieving a single module </h3>
+<div class="outline-text-3" id="text-2.5">
+
+
+<p>
+To update or obtain a single module, without touching its dependencies:
+</p>
+<pre class="example">
+(update 'cxml)
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2.6" class="outline-3">
+<h3 id="sec-2.6"><span class="section-number-3">2.6</span> The case of an unknown module </h3>
+<div class="outline-text-3" id="text-2.6">
+
+
+<p>
+What if you want to use a module which desire doesn't know about?  You will first need to
+extend the definitions:
+</p>
+<pre class="example">
+(add-module "darcs+http://some.where/in/the/galaxy")
+</pre>
+
+
+<p>
+Note the special syntax for the URI schema &ndash; it's a hint to desire what VCS the remote
+module is in.  The supported schemas are (one entry per a distinct transport type): 
+</p><ul>
+<li>
+git
+</li>
+<li>
+git+http, http
+</li>
+<li>
+darcs+http, darcs
+</li>
+<li>
+hg+http, hg
+</li>
+<li>
+cvs+rsync
+</li>
+<li>
+svn
+</li>
+<li>
+svn+http
+</li>
+<li>
+svn+rsync
+</li>
+<li>
+tarball, tarball+http
+
+</li>
+</ul>
+
+<p>The CVS pserver designators (in pristine form) are supported as well.
+</p>
+<p>
+When the upstream repository is in a non-git format, you may need to install some extra
+programs to facilitate the conversion:
+</p>
+<dl>
+<dt>cvs</dt><dd>
+git-cvs
+</dd>
+<dt>svn</dt><dd>
+git-svn
+</dd>
+<dt>tarball</dt><dd>
+git-import-orig from debian's git-buildpackage
+
+</dd>
+</dl>
+
+<p>For darcs and hg you don't need anything as desire handles it in an automagic manner. 
+</p>
+<p>
+If ADD-MODULE succeeds you can proceed as outlined in previous sections.  Note that it
+might fail to internalise the definition, because a non-trivial amount of interpretation
+is performed to normalise the URL into a form suitable for desire.
+</p>
+<p>
+ADD-MODULE may also ask you for a 'remote name', in case the URI represents a new remote
+within a distributor for which no automatic name could be chosen.  You're free to enter
+a string without spaces.
+</p>
+<p>
+As you most likely want the changes to persist, you should save the modified definitions
+afterwards (but preferably after you've used LUST or UPDATE on the new definition):
+</p>
+<pre class="example">
+(save-definitions)
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2.7" class="outline-3">
+<h3 id="sec-2.7"><span class="section-number-3">2.7</span> Non-lisp upstreams </h3>
+<div class="outline-text-3" id="text-2.7">
+
+
+<p>
+Nothing prevents you from recording non-lisp repositories and obtaining/updating them in the
+aforementioned manner.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-2.8" class="outline-3">
+<h3 id="sec-2.8"><span class="section-number-3">2.8</span> Running a buildbot </h3>
+<div class="outline-text-3" id="text-2.8">
+
+
+<p>
+This section assumes that you've already loaded desire on the buildmaster's machine,
+using the account which will run the buildmaster.
+</p>
+<ol>
+<li>
+Prepare a clean buildslave account, and make sure you'll be able to log in remotely:
+
+<pre class="example">
+ssh &lt;clean-account&gt;@&lt;buildslave-host&gt;
+</pre>
+
+
+<p>
+without any further input, that is, using a ssh key pair.
+</p>
+</li>
+<li>
+Load the buildbot:
+
+<pre class="example">
+(loadsys :desire-buildbot)
+</pre>
+
+
+</li>
+<li>
+Make your remote lisp account known:
+
+<pre class="example">
+(defhostaccess :buildslave
+               :hostname "&lt;buildslave-host&gt;"
+               :username "&lt;clean-account&gt;"
+               :password "")
+</pre>
+
+
+</li>
+<li>
+If you do not intend to run a webserver to present testing results, you do not
+need to have a running hunchentoot instance and do not have to execute the following:
+
+<pre class="example">
+(desire-buildbot:start-cl-waterfall "URI/prefix")
+</pre>
+
+
+<p>
+If you do, as a consequence of above you'll have a dynamic handler for
+</p>
+<pre class="example">
+http://your.domain:your-hunchentoot-port/URI/prefix
+</pre>
+
+
+</li>
+<li>
+Now, to run the thing:
+
+
+
+
+<pre class="example">(desire-buildbot:one*
+ t   ; "touch" upstream repo
+ t   ; fetch
+ t   ; unwind dependencies and record definitions
+ ;; remote lisp phases
+ t   ; fetch
+ t   ; load
+ nil ; there's no test phase yet, but it can be very easily implemented
+ :credentials :buildslave)
+</pre>
+
+
+
+
+</li>
+<li>
+If you choose to present the results as a static hierarchy of HTML files:
+
+<pre class="example">
+(desire-buildbot:render-cl-waterfall-static #p"/path/to/buildbot-output/")
+</pre>
+
+
+<p>
+There's an API for examining the results: look in buildbot-base.lisp
+</p>
+
+
+</li>
+</ol>
+
+
+
+
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> <a href="http://sourceforge.net/project/showfiles.php?group_id=1373">http://sourceforge.net/project/showfiles.php?group_id=1373</a>
+</p>
+<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> A matter of 'apt-get install git-core' or 'yum install git-core' on most of
+Linux distributions.
+</p>
+<p class="footnote"><sup><a class="footnum" name="fn.3" href="#fnr.3">3</a></sup> The issue of declared dependencies vs. undeclared ones is a controversial one.
+Suffice to say, desire handles it somewhat gracefully.
+</p>
+</div>
+</div>
+<div id="postamble">
+<p class="author"> Author: Samium Gromoff
+<a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
+</p>
+<p class="date"> Date: 2010-01-14 12:20:17 MSK</p>
+<p class="creator">HTML generated by org-mode 6.33f in emacs 23</p>
+</div>
+</div>
+</body>
+</html>
