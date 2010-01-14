@@ -353,6 +353,8 @@ a special module called '.meta'."
            ("git+http" 'git-http-remote)
            ("git-and-http" 'git-combined-remote)
            ("darcs" 'darcs-http-remote)
+           ("darcs+http" 'darcs-http-remote)
+           ("hg" 'hg-http-remote)
            ("hg+http" 'hg-http-remote)
            ("http" (ecase hint
                      (git 'git-http-remote)
@@ -361,12 +363,13 @@ a special module called '.meta'."
                      (svn 'svn-http-remote)
                      (tarball 'tarball-http-remote)
                      ((nil) (definition-error "~@<The 'http' uri type is ambiguous, and there was no hint given.~:@>"))))
-           ("cvs+rsync" 'cvs-rsync-remote)
            ("cvs" 'cvs-native-remote)
+           ("cvs+rsync" 'cvs-rsync-remote)
            (":pserver" 'cvs-native-remote)
            ("svn" 'svn-native-remote)
            ("svn+http" 'svn-http-remote)
            ("svn+rsync" 'svn-rsync-remote)
+           ("tarball" 'tarball-http-remote)
            ("tarball+http" 'tarball-http-remote))))
 
 ;; Used for validation of user input in add-module
