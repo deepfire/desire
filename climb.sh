@@ -200,7 +200,8 @@ case ${LISP} in
         impl=sbcl;;
     ecl )
         impl=ecl;;
-    clisp ) echo "ERROR: CLisp is not supported.";;
+    clisp )
+        impl=clisp;;
     gcl )   echo "ERROR: GCL is not supported.";;
     * )     echo "ERROR: unknown name of a lisp implementation binary: ${LISP}" ;;
 esac
@@ -221,6 +222,17 @@ case ${impl} in
         EVAL="-eval"
         DISABLE_DEBUGGER=""
         QUIET="-q"
+        SUPPRESS_INITS="-norc"
+        ;;
+    clisp )
+        EVAL="-x"
+        if test ! -z "$DISABLE_DEBUGGER"
+        then
+            DISABLE_DEBUGGER="-on-error exit"
+        else
+            DISABLE_DEBUGGER="-on-error debug"
+        fi
+        QUIET="--silent"
         SUPPRESS_INITS="-norc"
         ;;
 esac
@@ -354,6 +366,8 @@ export SBCL_BUILDING_CONTRIB=t
 ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
 	${EVAL} "
 (progn
+    #+clisp (delete-package :asdf-extensions)
+    #+clisp (delete-package :asdf)
     #+ecl
     (require :cmp))" \
 	${EVAL} "
