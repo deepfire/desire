@@ -69,20 +69,15 @@
   (maybe-within-directory directory
     (null (directory-exists-p (subdirectory* nil ".git")))))
 
-(defun move-to-directory (pathname target-directory)
-  (if (pathname-name pathname)
-      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (pathname-directory target-directory) :name (pathname-name pathname))))
-      (sb-posix:rename (namestring pathname) (namestring (make-pathname :directory (append (pathname-directory target-directory) (list (lastcar (pathname-directory pathname)))))))))
-
 (defun (setf git-repository-bare-p) (val &optional directory)
   (maybe-within-directory directory
     (if val
         (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory)
         (progn
           (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
-            (sb-posix:mkdir ".git" #o755)
+            (make-directory ".git" #+unix #o755)
             (dolist (filename git-files)
-              (move-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
+              (rename-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
           (setf (gitvar 'core.bare) "false")
           (git-set-branch-index-tree)
           nil))))

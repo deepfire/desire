@@ -1,6 +1,7 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 (asdf:defsystem :desire
-  :depends-on (:alexandria :iterate :cl-fad :pergamum :executor)
+  :depends-on (:alexandria :iterate :cl-fad :pergamum :executor
+               #+sbcl :sb-posix)
   :components ((:file "dependencies")
                ;; Tier #
                (:file "package" :depends-on ("dependencies"))
@@ -35,4 +36,3 @@
                         :components ((:file "cl-launch")
                                      (:file "xcvb")))
                ))
-  

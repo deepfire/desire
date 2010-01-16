@@ -147,7 +147,7 @@ locally present modules will be marked as converted."
       ;; Quirks
       ;;
       (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
-      (sb-posix:putenv "LISP_FASL_CACHE=NIL")
+      (setenv "LISP_FASL_CACHE" "NIL")
       (syncformat t ";;; All done~%")
       (values))))
 

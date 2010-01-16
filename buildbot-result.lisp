@@ -34,11 +34,10 @@
   (:web-initargs
    :class "excp" :marker "x" :description "an exception occured while running test"))
 
-(progn
-  (sb-mop:finalize-inheritance (find-class 'result-not-yet))
-  (sb-mop:finalize-inheritance (find-class 'result-success))
-  (sb-mop:finalize-inheritance (find-class 'result-failure))
-  (sb-mop:finalize-inheritance (find-class 'result-unhandled-failure)))
+(mapc #'finalize-inheritance '(result-not-yet
+                               result-success
+                               result-failure
+                               result-unhandled-failure))
 
 (defparameter *popup-display-nlines-threshold* 15)
 

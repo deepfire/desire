@@ -14,6 +14,7 @@
    #:synchronisable #:synchronised-p #:synchronisable-last-sync-time #:synchronisable-mirror
    ;; MINI-CLOSER
    #:class-prototype
+   #:finalize-inheritance
    ;; CLASS-SLOT
    #:define-marked-class #:instance-class-marked-value
    #:class-slot #:set-class-slot #:with-class-slot
@@ -25,7 +26,7 @@
    ;; PARSE-URI: strings
    #:parse-uri
    ;; Versions: pergamum
-   #:princ-version-to-string #:bump-version-component #:next-version-variants 
+   #:princ-version-to-string #:bump-version-component #:next-version-variants
    ;; NAMED: alexandria
    #:named #:name #:coerce-to-name #:coerce-to-named #:sort-by-name #:down-case-name #:coerce-to-namestring #:print-aborted-named-object #:slot-or-abort-print-object
    ;; WWW: executor
@@ -90,9 +91,21 @@ REGISTERED, in the mixing-in class precedence list, which provides the
   (:method ((o class))
     #+sbcl
     (sb-mop:class-prototype o)
-    #-(or sbcl)
+    #+ccl
+    (ccl:class-prototype o)
+    #-(or sbcl ccl)
     (not-implemented 'CLASS-PROTOTYPE)))
 
+(defgeneric finalize-inheritance (class)
+  (:method ((o symbol))
+    (finalize-inheritance (find-class o)))
+  (:method ((o class))
+    #+sbcl
+    (sb-mop:finalize-inheritance o)
+    #+ccl
+    (ccl:finalize-inheritance o)
+    #-(or sbcl ccl)
+    (not-implemented 'FINALIZE-INHERITANCE)))
 ;;;;
 ;;;; CLASS-SLOT
 ;;;;
@@ -149,16 +162,16 @@ this function; :from-end values of NIL and T are equivalent unless
 argument to CL:SUBSEQ into the sequence indicating where processing
 stopped."
   (let ((len (length seq))
-        (other-keys (nconc (when test-supplied 
+        (other-keys (nconc (when test-supplied
                              (list :test test))
-                           (when test-not-supplied 
+                           (when test-not-supplied
                              (list :test-not test-not))
-                           (when key-supplied 
+                           (when key-supplied
                              (list :key key)))))
     (unless end (setq end len))
     (if from-end
         (loop for right = end then left
-              for left = (max (or (apply #'position delimiter seq 
+              for left = (max (or (apply #'position delimiter seq
 					 :end right
 					 :from-end t
 					 other-keys)

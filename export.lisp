@@ -25,7 +25,7 @@
 (define-executable gpg)
 
 (defun export-signed-module-tarball (module gpg-homedir &optional gpg-agent-info ref target-locality locality &aux
-                                     (gpg-agent-info (or gpg-agent-info (sb-posix:getenv "GPG_AGENT_INFO")))
+                                     (gpg-agent-info (or gpg-agent-info (getenv "GPG_AGENT_INFO")))
                                      (ref (or ref '("master")))
                                      (module (coerce-to-module module))
                                      (target-locality (or target-locality (local-tarball *self*)))

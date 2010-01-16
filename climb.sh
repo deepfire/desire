@@ -51,6 +51,7 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
 
   -u           Self-update and continue processing other options, using
                 the updated version.
+  -l LISP      Use the LISP binary, instead of the 'sbcl' default.
   -n HOSTNAME  Use HOSTNAME as a bootstrap node.
                 HOSTNAME must refer to a node participating in desire protocol.
   -b BRANCH    Check out BRANCH of desire other than 'master'.
@@ -74,6 +75,9 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
 As step zero, when the -u switch is provided, climb.sh is updated using wget
 from the canonical location at ${argv0_url},
 and then normal processing is continued, using the updated version.
+
+When LISP is provided, it specifies the name of the lisp implementation binary
+to call.
 
 During the first step, a storage root location is either created or validated.
 The storage root must be a writable directory.
@@ -117,10 +121,11 @@ EOF
     exit $1
 }
 
-while getopts :un:b:t:m:s:a:x:k:p:dgevVh opt
+while getopts :ul:n:b:t:m:s:a:x:k:p:dgevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
+        l)  LISP="${OPTARG}";;
         n)  WISHMASTER="${OPTARG}";;
         b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
@@ -131,7 +136,7 @@ do
         k)  PACKAGE="${OPTARG}";;
         p)  PHASES="${OPTARG}";;
         d)  DEBUG="3";;
-        g)  DISABLE_DEBUGGER="--disable-debugger";;
+        g)  DISABLE_DEBUGGER="t";;
         e)  EXPLAIN="t";;
         v)  VERBOSE="t";;
         V)  print_version_and_die;;
@@ -150,6 +155,12 @@ shift $((OPTIND - 1))
 ROOT="$1"
 shift 1
 test "$@" && fail "unknown arguments: $@"
+
+###
+### Argument defaulting and reporting
+###
+test "${VERBOSE}" -a "${LISP}"    && echo "NOTE: will use '${LISP}' as the lisp implementation executable"
+LISP=${LISP:-sbcl}
 
 test "${VERBOSE}" -a "${WISHMASTER}" && echo "NOTE: choosing an alternate bootstrap wishmaster: '${WISHMASTER}'"
 WISHMASTER=${WISHMASTER:-${default_wishmaster}}
@@ -178,6 +189,32 @@ test "${VERBOSE}" -a "${DISABLE_DEBUGGER}" && echo "NOTE: disabling debugger"
 
 test "${VERBOSE}" -a "${EXPLAIN}" && echo "NOTE: turning on execution explanation feature of desire"
 EXPLAIN=${EXPLAIN:-nil}
+
+###
+### Accepted user arguments, on to some validation.
+###
+case ${LISP} in
+    ccl|ccl64|lx86cl|lx86cl64 )
+        impl=ccl;;
+    sbcl )
+        impl=sbcl;;
+    clisp ) echo "ERROR: CLisp is not supported.";;
+    ecl )   echo "ERROR: ECL is not supported.";;
+    gcl )   echo "ERROR: GCL is not supported.";;
+    * )     echo "ERROR: unknown name of a lisp implementation binary: ${LISP}" ;;
+esac
+case ${impl} in
+    sbcl )
+        DISABLE_DEBUGGER="${DISABLE_DEBUGGER:+--disable-debugger}"
+        QUIET="--noinform"
+        SUPPRESS_INITS="--no-sysinit --no-userinit"
+        ;;
+    ccl )
+        DISABLE_DEBUGGER=""
+        QUIET="--quiet"
+        SUPPRESS_INITS="--no-init"
+        ;;
+esac
 
 #######################################################
 ###                                                   #
@@ -305,8 +342,8 @@ CONGRATULATING_MESSAGE="\"
 
 \""
 export SBCL_BUILDING_CONTRIB=t
-sbcl --noinform ${DISABLE_DEBUGGER} \
-     --eval "
+${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
+	--eval "
 (progn
   ;; disable compiler verbosity
   (let ((verbose (and ${DEBUG} ${VERBOSE})))
@@ -315,7 +352,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
   (load (compile-file \"${ROOT}/asdf/asdf.lisp\")))" \
-     --eval "
+	--eval "
 (progn
   (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/\")))
   (defun basic-root-modules-search (system)
@@ -327,7 +364,7 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
                                                          asdf:*system-definition-search-functions*)))
     (asdf:operate (quote asdf:load-op) :desire :verbose nil))
   (in-package :desr))" \
-     --eval "
+	--eval "
 (progn
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
@@ -354,9 +391,9 @@ sbcl --noinform ${DISABLE_DEBUGGER} \
       (loadsys system :verbose ${VERBOSE}))
     (when app
       (run app))))" \
-     --eval "
+	--eval "
 (when ${PACKAGE}
   (in-package ${PACKAGE}))" \
-     --eval "
+	--eval "
 (when (quote ${EXPR})
   ${EXPR})"
