@@ -376,7 +376,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
         file)))
   (let ((asdf:*system-definition-search-functions* (cons (quote basic-root-modules-search)
                                                          asdf:*system-definition-search-functions*)))
-    (asdf:operate (quote asdf:load-op) :desire :verbose nil))
+    (asdf:operate (quote asdf:load-op) :desire :verbose ${VERBOSE}))
   (in-package :desr))" \
 	${EVAL} "
 (progn
