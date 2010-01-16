@@ -198,21 +198,30 @@ case ${LISP} in
         impl=ccl;;
     sbcl )
         impl=sbcl;;
+    ecl )
+        impl=ecl;;
     clisp ) echo "ERROR: CLisp is not supported.";;
-    ecl )   echo "ERROR: ECL is not supported.";;
     gcl )   echo "ERROR: GCL is not supported.";;
     * )     echo "ERROR: unknown name of a lisp implementation binary: ${LISP}" ;;
 esac
 case ${impl} in
     sbcl )
+        EVAL="--eval"
         DISABLE_DEBUGGER="${DISABLE_DEBUGGER:+--disable-debugger}"
         QUIET="--noinform"
         SUPPRESS_INITS="--no-sysinit --no-userinit"
         ;;
     ccl )
+        EVAL="--eval"
         DISABLE_DEBUGGER=""
         QUIET="--quiet"
         SUPPRESS_INITS="--no-init"
+        ;;
+    ecl )
+        EVAL="-eval"
+        DISABLE_DEBUGGER=""
+        QUIET="-q"
+        SUPPRESS_INITS="-norc"
         ;;
 esac
 
@@ -343,16 +352,21 @@ CONGRATULATING_MESSAGE="\"
 \""
 export SBCL_BUILDING_CONTRIB=t
 ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
-	--eval "
+	${EVAL} "
+(progn
+    #+ecl
+    (require :cmp))" \
+	${EVAL} "
 (progn
   ;; disable compiler verbosity
   (let ((verbose (and ${DEBUG} ${VERBOSE})))
-    (setf (values *compile-verbose* *compile-print* *load-verbose*) (values verbose verbose verbose)))
+    (setf (values *compile-verbose* *compile-print* *load-verbose*) (values verbose verbose verbose)
+          #+ecl #+ecl c::*compiler-break-enable* t))
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
   (load (compile-file \"${ROOT}/asdf/asdf.lisp\")))" \
-	--eval "
+	${EVAL} "
 (progn
   (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/\")))
   (defun basic-root-modules-search (system)
@@ -364,7 +378,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
                                                          asdf:*system-definition-search-functions*)))
     (asdf:operate (quote asdf:load-op) :desire :verbose nil))
   (in-package :desr))" \
-	--eval "
+	${EVAL} "
 (progn
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
@@ -391,9 +405,9 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
       (loadsys system :verbose ${VERBOSE}))
     (when app
       (run app))))" \
-	--eval "
+	${EVAL} "
 (when ${PACKAGE}
   (in-package ${PACKAGE}))" \
-	--eval "
+	${EVAL} "
 (when (quote ${EXPR})
   ${EXPR})"
