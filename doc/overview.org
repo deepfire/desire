@@ -6,7 +6,7 @@
 Overview of desire, a software knowledge and distribution system
 #+BEGIN_CENTER
 #+BEGIN: block-update-time :format "%B %d, %Y, %H:%M"
-January 12, 2010, 08:21
+January 16, 2010, 19:37
 #+END:
 #+END_CENTER
 
@@ -19,6 +19,11 @@ This document has a canonical location:
 or, for the Org-mode source:
 
 	http://www.feelingofgreen.ru/shared/src/desire/doc/overview.org
+
+In case you are looking for a short, take-no-prisoners introduction, you may
+consider the crash tutorial:
+
+	http://www.feelingofgreen.ru/shared/src/desire/doc/tutorial.html
 
 * What is desire (supposed to be)?
 
