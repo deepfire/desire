@@ -198,7 +198,7 @@ The values returned are:
           (values distributor (not existing-distributor)
                   remote domain-name-takeover subdomain deduced-path umbrellised-remote-path))))))
 
-(defun make-remote (type domain-name-takeover distributor port path &key name)
+(defun make-remote (type domain-name-takeover distributor port path &rest remote-args &key name &allow-other-keys)
   (flet ((query-remote-name (default-name)
            (format *query-io* "No matching remote found, has to create a new one, but the default name (~A) is occupied.~%~
                                Enter the new remote name, or NIL to abort: " default-name)
@@ -206,21 +206,22 @@ The values returned are:
            (or (prog1 (read *query-io*)
                  (terpri *query-io*))
                (return-from make-remote nil))))
-    (make-instance type
-                   :distributor distributor :domain-name-takeover domain-name-takeover :distributor-port port 
-                   :name (or (prog1 name
-                               (when name
-                                 (format t ";; Choosing provided remote name ~S~%" name)))
-                             (multiple-value-bind (default-name conflicted-default-name) (choose-default-remote-name
-                                                                                          distributor (vcs-type type) (transport type))
-                               (if default-name
-                                   (progn (format t ";; Choosing default remote name ~S~%" default-name)
-                                          default-name)
-                                   (query-remote-name conflicted-default-name))))
-                   :module-names nil
-                   :path path)))
+    (apply #'make-instance type
+           :distributor distributor :domain-name-takeover domain-name-takeover :distributor-port port
+           :name (or (prog1 name
+                       (when name
+                         (format t ";; Choosing provided remote name ~S~%" name)))
+                     (multiple-value-bind (default-name conflicted-default-name) (choose-default-remote-name
+                                                                                  distributor (vcs-type type) (transport type))
+                       (if default-name
+                           (progn (format t ";; Choosing default remote name ~S~%" default-name)
+                                  default-name)
+                           (query-remote-name conflicted-default-name))))
+           :module-names nil
+           :path path
+           (remove-from-plist remote-args :name :distributor :path :module-names))))
 
-(defun ensure-url-remote (url &optional (module-name nil module-name-provided-p) &key remote-name gate-p vcs-type-hint)
+(defun ensure-url-remote (url &optional (module-name nil module-name-provided-p) &rest remote-args &key path gate-p vcs-type-hint &allow-other-keys)
    "Given an URL and an optionally specified MODULE-NAME, try to ensure
 existence of a remote corresponding to the URL.
 This is done by first finding a matching distributor, or creating it, if it
@@ -236,14 +237,14 @@ The values returned are:
   (when *verbose-internalisation*
     (format t "~@<;;; ~@;Tr~@<ying to internalise URL ~S~:[~; for module ~:*~:@(~A~)~]~:[~;, with a provided hint of remote's type being ~:*~A~].~:@>~:@>~%"
             url module-name vcs-type-hint))
-  (multiple-value-bind (type cred hostname port path dirp) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
-    (let ((module-name (or module-name (guess-module-name hostname path))))
+  (multiple-value-bind (type cred hostname port extracted-path dirp) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
+    (let ((module-name (or module-name (guess-module-name hostname extracted-path))))
       (when *verbose-internalisation*
         (format t "~@<;;; ~@;De~@<duced remote type ~A~:[~;, credentials ~:*~A~], hostname ~:@(~A~)~:[~;, port ~:*~D~], path ~S with~:[out~;~] a trailing slash. ~
                              Module name ~A was ~:[guessed~;provided~].~:@>~:@>~%"
-                type cred hostname port path dirp module-name module-name-provided-p))
+                type cred hostname port extracted-path dirp module-name module-name-provided-p))
       (multiple-value-bind (dist created-dist-p remote domain-name-takeover subdomain deduced-path umbrellised-remote-path)
-          (module-ensure-distributor-match-remote type hostname port path dirp module-name)
+          (module-ensure-distributor-match-remote type hostname port extracted-path dirp module-name)
         (when (and created-dist-p *verbose-internalisation*)
           (format t "~@<;;; ~@;Didn't find distributor at ~A, creating it.~:@>~%" hostname))
         (when (and remote *verbose-internalisation*)
@@ -255,8 +256,9 @@ The values returned are:
         (let ((new-remote (unless remote
                             (when *verbose-internalisation*
                               (format t "~@<;;; ~@;Di~@<dn't find a remote for ~S (path ~S) on ~A, creating it.~:@>~:@>~%"
-                                      url (or deduced-path path) (name dist)))
-                            (make-remote type domain-name-takeover dist port (or deduced-path path) :name remote-name))))
+                                      url (or path deduced-path extracted-path) (name dist)))
+                            (apply #'make-remote type domain-name-takeover dist port (or path deduced-path extracted-path)
+                                   (remove-from-plist remote-args :path :gate-p :vcs-type-hint)))))
           (values (or remote new-remote)
                   cred
                   module-name (canonicalise-name subdomain)
@@ -270,11 +272,15 @@ The values returned are:
     (when credentials
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
-(defun add-module (url &optional module-name &key remote-name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*) &aux
+(defun add-module (url &optional module-name &rest remote-args &key name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*) &allow-other-keys &aux
                    (module-name (when module-name (canonicalise-name module-name))))
-  (multiple-value-bind (remote credentials module-name maybe-umbrella-name) (ensure-url-remote url module-name :remote-name remote-name :vcs-type-hint vcs-type)
+  (multiple-value-bind (remote credentials module-name maybe-umbrella-name) (apply #'ensure-url-remote url module-name :vcs-type-hint vcs-type
+                                                                                   (remove-from-plist remote-args
+                                                                                                      :path-whitelist :path-blacklist
+                                                                                                      :if-touch-fails :vcs-type :lust))
     (if remote
-        (lret ((module (ensure-remote-module remote module-name (or maybe-umbrella-name module-name) :credentials credentials :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+        (lret ((module (ensure-remote-module remote module-name (or maybe-umbrella-name module-name)
+                                             :credentials credentials :path-whitelist path-whitelist :path-blacklist path-blacklist)))
           (when *verbose-internalisation*
             (format t "~@<;;; ~@;Cr~@<eated module ~A~:[~; with umbrella ~S~]~
                               ~:[~;, credentials ~:*~A~]~
@@ -299,7 +305,7 @@ The values returned are:
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
   (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (if-touch-fails :error) (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
-    (add-module url name :if-touch-fails if-touch-fails :lust lust :remote-name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+    (add-module url name :if-touch-fails if-touch-fails :lust lust :name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char 'add-module-reader *readtable*))
