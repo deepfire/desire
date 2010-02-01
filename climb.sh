@@ -390,7 +390,10 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
         file)))
   (let ((asdf:*system-definition-search-functions* (cons (quote basic-root-modules-search)
                                                          asdf:*system-definition-search-functions*)))
-    (asdf:operate (quote asdf:load-op) :desire :verbose ${VERBOSE}))
+    (handler-case (asdf:operate (quote asdf:load-op) :desire :verbose ${VERBOSE})
+      (error (c)
+        (format t \"~%Got condition:~%~A~%\" c)
+        (invoke-debugger c))))
   (in-package :desr))" \
 	${EVAL} "
 (progn
