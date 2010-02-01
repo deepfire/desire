@@ -208,7 +208,7 @@ stopped."
 ;;;; PARSE-URI
 ;;;;
 (defun parse-uri (namestring &key slashless-header)
-  "Given an URI namestring, produce its constituent schema, username, 
+  "Given an URI namestring, produce its constituent schema, username,
 password, hostname, port, split path and a boolean specifying whether
 the path refers to a directory as multiple values.
 The optional SLASHLESS-HEADER keyword turns on a hacky mode allowing
@@ -439,11 +439,11 @@ in order of strictly decreasing likelihood."
 #-(or sbcl clozure allegro)
 (eval-when (:compile-toplevel)
   (let ((*print-pretty* t))
-    (simple-style-warn
+    (format t
      "~&~@<  ~@;~A has not been ported to ~A. ~
        We fall back to a portable implementation of readtable iterators. ~
        This implementation has to grovel through all available characters. ~
-       On Unicode-aware implementations this may come with some costs.~@:>" 
+       On Unicode-aware implementations this may come with some costs.~@:>"
      (package-name '#.*package*) (lisp-implementation-type))))
 
 #-(or sbcl clozure allegro)
