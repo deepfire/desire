@@ -379,6 +379,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
+  #+(or sbcl ccl)
   (load (compile-file \"${ROOT}/asdf/asdf.lisp\")))" \
 	${EVAL} "
 (progn
