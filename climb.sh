@@ -372,6 +372,11 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
     (require :cmp))" \
 	${EVAL} "
 (progn
+  (defpackage #:org.feelingofgreen.temp.climb
+    (:use :common-lisp))
+  (in-package #:org.feelingofgreen.temp.climb))" \
+	${EVAL} "
+(progn
   ;; disable compiler verbosity
   (let ((verbose (and ${DEBUG} ${VERBOSE})))
     (setf (values *compile-verbose* *compile-print* *load-verbose*) (values verbose verbose verbose)
