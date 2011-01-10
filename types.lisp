@@ -23,8 +23,8 @@
 ;;;
 ;;; Knobs
 ;;;
-(defvar *default-bootstrap-wishmaster-url*         "git://git.feelingofgreen.ru/")
-(defvar *default-bootstrap-wishmaster-http-url*    "http://git.feelingofgreen.ru/shared/git/")
+(defvar *default-bootstrap-wishmaster*             "git.feelingofgreen.ru")
+(defvar *default-bootstrap-wishmaster-http-suffix* "shared/git/")
 (defvar *desires*                                  nil "List of import descriptions.")
 (defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
 (defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")

@@ -126,7 +126,7 @@ do
     case $opt in
         u)  handle_self_update "$@";;
         l)  LISP="${OPTARG}";;
-        n)  WISHMASTER="${OPTARG}";;
+        n)  ALT_WISHMASTER="${OPTARG}";;
         b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
         m)  MODULES="${OPTARG}";;
@@ -162,8 +162,9 @@ test "$@" && fail "unknown arguments: $@"
 test "${VERBOSE}" -a "${LISP}"    && echo "NOTE: will use '${LISP}' as the lisp implementation executable"
 LISP=${LISP:-sbcl}
 
-test "${VERBOSE}" -a "${WISHMASTER}" && echo "NOTE: choosing an alternate bootstrap wishmaster: '${WISHMASTER}'"
-WISHMASTER=${WISHMASTER:-${default_wishmaster}}
+test "${VERBOSE}" -a "${ALT_WISHMASTER}" && echo "NOTE: choosing an alternate bootstrap wishmaster: '${ALT_WISHMASTER}'"
+WISHMASTER="${ALT_WISHMASTER}"
+WISHMASTER=${WISHMASTER:=${default_wishmaster}}
 test "${VERBOSE}" -a "${DESIRE_BRANCH}" && echo "NOTE: choosing an alternate branch of desire: '${DESIRE_BRANCH}'"
 DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
 test "${VERBOSE}" -a "${METASTORE_BRANCH}" && echo "NOTE: choosing a specific metastore branch: '${METASTORE_BRANCH}'"
@@ -405,7 +406,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
 (block nil
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
-  (handler-case (init \"${ROOT}/\" :wishmaster-branch :${METASTORE_BRANCH} :verbose ${VERBOSE})
+  (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster \"${WISHMASTER}\"} :wishmaster-branch :${METASTORE_BRANCH} :verbose ${VERBOSE})
     (desire-error (c)
       (format t \"~&;;;~%;;; During bootstrap, caught error:~%~A~%\" c)
       (funcall (find-symbol \"QUIT\" #+sbcl :sb-ext #+clisp :ext #+ecl :si #+ccl :ccl))))

@@ -63,8 +63,8 @@
 
 (defun init (path &key
              as
-             (bootstrap-url *default-bootstrap-wishmaster-url*)
-             (bootstrap-http-url *default-bootstrap-wishmaster-http-url*)
+             (wishmaster *default-bootstrap-wishmaster*)
+             (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
              (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
   "Make Desire fully functional, with PATH chosen as storage location.
 
@@ -73,88 +73,92 @@ definition will be looked up. Consequently, an attempt to establish
 an identity relationship with that definition will be performed,
 by looking up locally the modules defined for export. The rest of
 locally present modules will be marked as converted."
-  (let* ((path (fad:pathname-as-directory path))
-         (gate-path (if (pathname-absolute-p path)
-                        path
-                        (merge-pathnames path))))
-    ;;
-    ;; Storage
-    ;;
-    (ensure-root-sanity (parse-namestring gate-path))
-    (let ((meta-path (merge-pathnames #p".meta/" gate-path))
-          (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
+  (flet ((default-bootstrap-wishmaster-urls ()
+           (values (strconcat* "git://" wishmaster "/")
+                   (strconcat* "http://" wishmaster "/" wishmaster-http-suffix))))
+    (let* ((path (fad:pathname-as-directory path))
+           (gate-path (if (pathname-absolute-p path)
+                          path
+                          (merge-pathnames path))))
       ;;
-      ;; Reset
+      ;; Storage
       ;;
-      (clear-definitions)
-      ;;
-      ;; Set up tools
-      ;;
-      ;; NOTE: there's some profound crap there
-      (with-class-slot (git hg darcs cvs svn tarball) required-executables
-        (setf git '(git) hg '(hg python)  darcs '(darcs darcs-fast-export wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
-      (with-class-slot (git hg darcs cvs svn tarball) enabled-p
-        (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
-      (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
-        (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
-      (ensure-committer-identity)
-      ;;
-      ;; Get initial definitions
-      ;;
-      (unless (metastore-present-p meta-path '(definitions))
-        (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S (with HTTP fallback to ~S)~:@>~%"
-                    meta-path bootstrap-url bootstrap-http-url)
-        (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch))
-      (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
-      (read-definitions :force-source t :metastore meta-path)
-      ;;
-      ;; Set up *SELF* and complete definitions
-      ;;
-      (setf *self* (with-measured-time-lapse (sec)
-                       (if-let ((d (and as (distributor as))))
-                         (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
-                                (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
-                         (let ((local-name (canonicalise-name (machine-instance))))
-                           (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
-                           (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path
-                                          :omit-registration t)))
-                     (when verbose
-                       (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
-      (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
-      (read-local-definitions :metastore localmeta-path)
-      (reestablish-metastore-subscriptions meta-path)
-      (when merge-remote-wishmasters
-        (syncformat t ";;; Merging definitions from remote wishmasters...~%")
-        (merge-remote-wishmasters))
-      (setf *unsaved-definition-changes-p* nil)
-      ;;
-      ;; Set up tools for import
-      ;;
-      (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
-      (dolist (type *vcs-appendage-types*)
-        (try-ensure-importer-executable type))
-      (determine-tools-and-update-remote-accessibility)
-      ;;
-      ;; Generic part of system loadability
-      ;;
-      (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
-      (register-locality-with-system-backend *default-system-type* (gate *self*))
-      ;;
-      ;; Per-repository branch model maintenance, system discovery and loadability
-      ;;
-      (syncformat t ";;; Enumerating present modules and systems~%")
-      (enumerate-present-modules-and-systems :verbose verbose)
-      (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
-              (sort (do-present-modules (m)
-                      (collect (name m)))
-                    #'string<))
-      ;;
-      ;; Quirks
-      ;;
-      (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
-      (setenv "LISP_FASL_CACHE" "NIL")
-      (syncformat t ";;; All done~%")
-      (values))))
+      (ensure-root-sanity (parse-namestring gate-path))
+      (let ((meta-path (merge-pathnames #p".meta/" gate-path))
+            (localmeta-path (merge-pathnames #p".local-meta/" gate-path)))
+        ;;
+        ;; Reset
+        ;;
+        (clear-definitions)
+        ;;
+        ;; Set up tools
+        ;;
+        ;; NOTE: there's some profound crap there
+        (with-class-slot (git hg darcs cvs svn tarball) required-executables
+          (setf git '(git) hg '(hg python)  darcs '(darcs darcs-fast-export wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
+        (with-class-slot (git hg darcs cvs svn tarball) enabled-p
+          (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
+        (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
+          (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+        (ensure-committer-identity)
+        ;;
+        ;; Get initial definitions
+        ;;
+        (unless (metastore-present-p meta-path '(definitions))
+          (multiple-value-bind (bootstrap-url bootstrap-http-url) (default-bootstrap-wishmaster-urls)
+            (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S (with HTTP fallback to ~S)~:@>~%"
+                        meta-path bootstrap-url bootstrap-http-url)
+            (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
+        (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
+        (read-definitions :force-source t :metastore meta-path)
+        ;;
+        ;; Set up *SELF* and complete definitions
+        ;;
+        (setf *self* (with-measured-time-lapse (sec)
+                         (if-let ((d (and as (distributor as))))
+                           (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
+                                  (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
+                           (let ((local-name (canonicalise-name (machine-instance))))
+                             (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
+                             (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path
+                                            :omit-registration t)))
+                       (when verbose
+                         (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
+        (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
+        (read-local-definitions :metastore localmeta-path)
+        (reestablish-metastore-subscriptions meta-path)
+        (when merge-remote-wishmasters
+          (syncformat t ";;; Merging definitions from remote wishmasters...~%")
+          (merge-remote-wishmasters))
+        (setf *unsaved-definition-changes-p* nil)
+        ;;
+        ;; Set up tools for import
+        ;;
+        (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
+        (dolist (type *vcs-appendage-types*)
+          (try-ensure-importer-executable type))
+        (determine-tools-and-update-remote-accessibility)
+        ;;
+        ;; Generic part of system loadability
+        ;;
+        (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
+        (register-locality-with-system-backend *default-system-type* (gate *self*))
+        ;;
+        ;; Per-repository branch model maintenance, system discovery and loadability
+        ;;
+        (syncformat t ";;; Enumerating present modules and systems~%")
+        (enumerate-present-modules-and-systems :verbose verbose)
+        (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
+                (sort (do-present-modules (m)
+                        (collect (name m)))
+                      #'string<))
+        ;;
+        ;; Quirks
+        ;;
+        (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
+        (setenv "LISP_FASL_CACHE" "NIL")
+        (syncformat t ";;; All done~%")
+        (values)))))
 
 (defun reinit ()
   "Execute INIT with the arguments that were passed to it last time."
