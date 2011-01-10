@@ -302,7 +302,7 @@ a special module called '.meta'."
   (find-if (of-type 'gate) (distributor-remotes distributor)))
 
 (defclass gate-remote (gate remote) ())
-(defclass gate-locality (gate-remote locality) 
+(defclass gate-locality (gate-remote locality)
   ((unpublished-module-names :accessor gate-unpublished-module-names :initarg :unpublished-module-names :documentation "Complex computation.")
    (hidden-module-names :accessor gate-hidden-module-names :initarg :hidden-module-names :documentation "Complex computation.")))
 
@@ -604,14 +604,14 @@ instead."
             (unless non-conflicting-p default-name))))
 
 (defun init-time-select-remote-name (distributor vcs-type transport &optional specified-name)
-  "Provide a mechanism for init-time name selection for REMOTE with 
+  "Provide a mechanism for init-time name selection for REMOTE with
    DISTRIBUTOR-NAME, and optionally SPECIFIED-NAME.
 
    Collation rules are considered in order, as follows:
       - SPECIFIED-NAME wins,
       - if REMOTE is the only GIT remote in DISTRIBUTOR-NAME, provide a default
         of DISTRIBUTOR-NAME,
-      - if REMOTE is the only remote of its VCS type in DISTRIBUTOR-NAME, 
+      - if REMOTE is the only remote of its VCS type in DISTRIBUTOR-NAME,
         provide a default of DISTRIBUTOR-NAME-VCS-TYPE."
   (let ((distributor-name (name distributor)))
     (cond (specified-name (if (null (find specified-name (distributor-remotes distributor) :key #'name))
