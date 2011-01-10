@@ -24,7 +24,7 @@ handle_self_update() {
 ### Don't change the amount of characters above this comment.
 ###
 
-version="9.11.2"
+version="11.1.0"
 
 argv0="$(basename $0)"
 
@@ -35,7 +35,7 @@ default_desire_branch="master"
 print_version_and_die() {
     cat <<EOF
 climb.sh ${version}
-Copyright (C) 2009 Samium Gromoff.
+Copyright (C) 2009-2011 Samium Gromoff.
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
@@ -402,10 +402,13 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
         (invoke-debugger c))))
   (in-package :desr))" \
 	${EVAL} "
-(progn
+(block nil
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
-  (init \"${ROOT}/\" :wishmaster-branch :${METASTORE_BRANCH} :verbose ${VERBOSE})
+  (handler-case (init \"${ROOT}/\" :wishmaster-branch :${METASTORE_BRANCH} :verbose ${VERBOSE})
+    (desire-error (c)
+      (format t \"~&;;;~%;;; During bootstrap, caught error:~%~A~%\" c)
+      (funcall (find-symbol \"QUIT\" #+sbcl :sb-ext #+clisp :ext #+ecl :si #+ccl :ccl))))
   (format t ${CONGRATULATING_MESSAGE})
   (let* ((app (app (quote ${APP}) :if-does-not-exist :continue))
          (system  (if app

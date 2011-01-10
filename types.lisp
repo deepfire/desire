@@ -23,8 +23,8 @@
 ;;;
 ;;; Knobs
 ;;;
-(defvar *bootstrap-wishmaster-url*                "git://git.feelingofgreen.ru/")
-(defvar *bootstrap-wishmaster-http-url*           "http://git.feelingofgreen.ru/shared/git/")
+(defvar *default-bootstrap-wishmaster-url*         "git://git.feelingofgreen.ru/")
+(defvar *default-bootstrap-wishmaster-http-url*    "http://git.feelingofgreen.ru/shared/git/")
 (defvar *desires*                                  nil "List of import descriptions.")
 (defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
 (defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")
@@ -1319,7 +1319,8 @@ with SYSTEM specifying the driven variable binding."
 
 (defun clone-metastore (url http-url metastore-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
-LOCALITY-PATHNAME. BRANCH is then checked out."
+LOCALITY-PATHNAME. BRANCH is then checked out.  Upon success a non-NIL
+value is returned."
   (within-directory (metastore-pathname :if-does-not-exist :create :if-exists :error)
     (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
       (declare (ignore type cred port path))
@@ -1336,7 +1337,11 @@ LOCALITY-PATHNAME. BRANCH is then checked out."
                                   Retrying in dumb HTTP mode.~:@>~%"
                       remote-name url)
               (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
-              (git "fetch" (down-case-name remote-name))
+              (with-maybe-handled-executable-failures t
+                  (git "fetch" (down-case-name remote-name))
+                (:handler ()
+                  (desire-error "~@<;;; ~@;Could not clone metastore from ~S (with HTTP fallback ~S)~:@>~%"
+                                url http-url)))
               (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
                                   Are we in a HTTP-only environment?  ~
                                   Any further accesses to combined remotes will go through HTTP.~:@>~%")

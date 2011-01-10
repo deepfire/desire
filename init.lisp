@@ -61,7 +61,11 @@
     (find-executable 'gzip)
     (find-executable 'gpg)))
 
-(defun init (path &key as (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
+(defun init (path &key
+             as
+             (bootstrap-url *default-bootstrap-wishmaster-url*)
+             (bootstrap-http-url *default-bootstrap-wishmaster-http-url*)
+             (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
   "Make Desire fully functional, with PATH chosen as storage location.
 
 AS, when specified, will be interpreted as a distributor name, whose
@@ -98,8 +102,9 @@ locally present modules will be marked as converted."
       ;; Get initial definitions
       ;;
       (unless (metastore-present-p meta-path '(definitions))
-        (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S~:@>~%" meta-path *bootstrap-wishmaster-url*)
-        (clone-metastore *bootstrap-wishmaster-url* *bootstrap-wishmaster-http-url* meta-path wishmaster-branch))
+        (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S (with HTTP fallback to ~S)~:@>~%"
+                    meta-path bootstrap-url bootstrap-http-url)
+        (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch))
       (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
       (read-definitions :force-source t :metastore meta-path)
       ;;
