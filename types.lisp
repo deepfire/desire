@@ -30,7 +30,6 @@
 (defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")
 (defvar *self*                                     nil "Possibly unknown distributor whom we identify as.")
 (defvar *combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
-(defvar *http-proxy*                               nil)
 (defvar *default-system-type*                      'asdf-system)
 (defvar *merge-remote-wishmasters*                 t   "Whether to merge definitions from remote wishmasters.")
 (defvar *verbose-repository-maintenance*           nil)
@@ -1340,9 +1339,9 @@ value is returned."
               (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
               (with-maybe-handled-executable-failures t
                   (git "fetch" (down-case-name remote-name))
-                (:handler ()
-                  (desire-error "~@<;;; ~@;Could not clone metastore from ~S (with HTTP fallback ~S)~:@>~%"
-                                url http-url)))
+                (:handler (c)
+                  (desire-error "~@<;;; ~@;Could not clone metastore from HTTP fallback ~S, caught error: ~<~A~:@>~:@>~%"
+                                http-url c)))
               (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
                                   Are we in a HTTP-only environment?  ~
                                   Any further accesses to combined remotes will go through HTTP.~:@>~%")

@@ -108,7 +108,7 @@ locally present modules will be marked as converted."
         (unless (metastore-present-p meta-path '(definitions))
           (multiple-value-bind (bootstrap-url bootstrap-http-url) (default-bootstrap-wishmaster-urls)
             (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S ~
-                                  (with HTTP fallback to ~S~:[~;, and proxy ~S~])~:@>~%"
+                                  (with HTTP fallback to ~S~:[~;, and proxy ~:*~S~])~:@>~%"
                         meta-path bootstrap-url bootstrap-http-url http-proxy)
             (setf *http-proxy* http-proxy)
             (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
