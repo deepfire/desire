@@ -1,6 +1,7 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 (asdf:defsystem :desire
   :depends-on (:alexandria :iterate :cl-fad :pergamum :executor
+               :com.informatimago.common-lisp.lisp-reader
                #+sbcl :sb-posix)
   :components ((:file "dependencies")
                ;; Tier #

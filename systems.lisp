@@ -310,15 +310,42 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                 (or (stringp (second f))
                     (symbolp (second f))))))
     (iter (for pre-read-posn = (file-position stream))
-          (for form = (handler-case (read stream nil 'das-eof)
-                        (serious-condition (cond)
-                          (format t ";; while parsing ~S: got ~S~%" (pathname stream) cond)
-                          ;; seek the offending form
-                          (let ((*read-suppress* t))
-                            (dispatching-macro-character-let #\# (#\? #\.)
-                              (character-syntax-let ((#\: #\Space))
-                                (file-position stream pre-read-posn)
-                                (read stream nil 'das-eof)))))))
+          (for form-nr from 0)
+          (for form = (block nil
+                        (handler-bind
+                            ((cl-reader:symbol-in-missing-package-error
+                              (lambda (cond)
+                                (declare (ignore cond))
+                                (invoke-restart (find-restart 'cl-reader:return-uninterned))))
+                             (cl-reader:symbol-missing-in-package-error
+                              (lambda (cond)
+                                (declare (ignore cond))
+                                (invoke-restart (find-restart 'make-symbol))))
+                             (serious-condition
+                              (lambda (cond)
+                                (format t "~&;;; got ~S, while parsing AS definition from ~S:~%~A~%" cond stream cond)
+                                (let ((cl-reader:*readtable* (cl-reader:copy-readtable)))
+                                  ;; (cl-reader:set-syntax-from-char #\: #\Space)
+                                  (cl-reader:set-dispatch-macro-character #\# #\? (lambda (s c i) (declare (ignore c i)) (cl-reader:read s nil 'das-eof t) nil))
+                                  (cl-reader:set-dispatch-macro-character #\# #\. (lambda (s c i) (declare (ignore c i)) (cl-reader:read s nil 'das-eof t) nil))
+                                  (file-position stream pre-read-posn)
+                                  (handler-bind
+                                      ((cl-reader:symbol-in-missing-package-error
+                                        (lambda (cond)
+                                          (declare (ignore cond))
+                                          (invoke-restart (find-restart 'cl-reader:return-uninterned))))
+                                       (cl-reader:symbol-missing-in-package-error
+                                        (lambda (cond)
+                                          (declare (ignore cond))
+                                          (invoke-restart (find-restart 'make-symbol)))))
+                                    (return (cl-reader:read stream nil 'das-eof)))))))
+                          (cl-reader:read stream nil 'das-eof)
+                          ;; (let ((cl-reader:*readtable* (cl-reader:copy-readtable)))
+                          ;;         ;; (cl-reader:set-syntax-from-char #\: #\Space)
+                          ;;         ;; (cl-reader:set-dispatch-macro-character #\# #\? (lambda (s c i) (declare (ignore s c i)) (cl-reader:read s nil 'das-eof t)))
+                          ;;         (cl-reader:set-dispatch-macro-character #\# #\. (lambda (s c i) (declare (ignore c i)) (cl-reader:read s nil 'das-eof t) nil))
+                          ;;         (cl-reader:read stream nil 'das-eof))
+                          )))
           (until (eq 'das-eof form))
           (when (form-defsystem-p form)
             (collect (funcall fn form))))))

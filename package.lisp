@@ -259,3 +259,5 @@
    #:apropos-desr
    #:list-modules
    #:local-summary))
+
+(pergamum:add-nickname :com.informatimago.common-lisp.lisp-reader.reader :cl-reader)

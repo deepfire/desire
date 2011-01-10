@@ -243,7 +243,7 @@ esac
 ### Done processing user arguments, on to the action. #
 ###                                                   #
 #######################################################
-desire_deps="alexandria asdf cl-fad executor pergamum iterate"
+desire_deps="alexandria asdf cl-fad executor pergamum informatimago iterate"
 
 writable_absolute_directory_p() {
     local path="$1"
