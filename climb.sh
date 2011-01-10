@@ -258,13 +258,22 @@ valid_storage_location_p() {
     writable_absolute_directory_p "${path}"
 }
 
+degraded_to_http=
 clone_module() {
     local root="$1"
     local module="$2"
-    git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/${module}" >/dev/null || \
-        (echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport" && \
-         git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >/dev/null) || \
-        fail "failed to retrieve ${module}"
+    if test -z "${degraded_to_http}"
+    then
+        if ! git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/${module}" >/dev/null
+        then
+            degraded_to_http="T"
+            echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport"
+            clone_module "${root}" "${module}"
+        fi
+    else
+        git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >/dev/null || \
+            fail "failed to retrieve ${module}"
+    fi
 }
 
 update_module() {
