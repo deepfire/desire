@@ -64,6 +64,7 @@
 (defun init (path &key
              as
              (wishmaster *default-bootstrap-wishmaster*)
+             http-proxy
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
              (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
   "Make Desire fully functional, with PATH chosen as storage location.
@@ -106,8 +107,10 @@ locally present modules will be marked as converted."
         ;;
         (unless (metastore-present-p meta-path '(definitions))
           (multiple-value-bind (bootstrap-url bootstrap-http-url) (default-bootstrap-wishmaster-urls)
-            (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S (with HTTP fallback to ~S)~:@>~%"
-                        meta-path bootstrap-url bootstrap-http-url)
+            (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S ~
+                                  (with HTTP fallback to ~S~:[~;, and proxy ~S~])~:@>~%"
+                        meta-path bootstrap-url bootstrap-http-url http-proxy)
+            (setf *http-proxy* http-proxy)
             (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
         (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
         (read-definitions :force-source t :metastore meta-path)

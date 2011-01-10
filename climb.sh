@@ -406,7 +406,10 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
 (block nil
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
-  (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster \"${WISHMASTER}\"} :wishmaster-branch :${METASTORE_BRANCH} :verbose ${VERBOSE})
+  (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster \"${WISHMASTER}\"}
+                                   ${http_proxy:+:http-proxy \"${http_proxy}\"}
+                                   :wishmaster-branch :${METASTORE_BRANCH}
+                                   :verbose ${VERBOSE})
     (desire-error (c)
       (format t \"~&;;;~%;;; During bootstrap, caught error:~%~A~%\" c)
       (funcall (find-symbol \"QUIT\" #+sbcl :sb-ext #+clisp :ext #+ecl :si #+ccl :ccl))))

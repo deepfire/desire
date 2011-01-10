@@ -21,7 +21,9 @@
 (in-package :desire)
 
 
-(define-executable git :may-want-display t :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat"))
+(define-executable git :may-want-display t
+                   :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat" (when *http-proxy*
+                                                                      (strconcat* "http_proxy=" *http-proxy*))))
 
 (define-condition vcs-condition ()
   ((vcs :reader condition-vcs :initarg :vcs)))

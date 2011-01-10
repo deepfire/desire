@@ -30,6 +30,7 @@
 (defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")
 (defvar *self*                                     nil "Possibly unknown distributor whom we identify as.")
 (defvar *combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
+(defvar *http-proxy*                               nil)
 (defvar *default-system-type*                      'asdf-system)
 (defvar *merge-remote-wishmasters*                 t   "Whether to merge definitions from remote wishmasters.")
 (defvar *verbose-repository-maintenance*           nil)
