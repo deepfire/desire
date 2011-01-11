@@ -154,7 +154,7 @@ shift $((OPTIND - 1))
 
 ROOT="$1"
 shift 1
-test "$@" && fail "unknown arguments: $@"
+test "$*" && fail "unknown arguments: $*"
 
 ###
 ### Argument defaulting and reporting
