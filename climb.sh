@@ -95,7 +95,7 @@ During the second step, desire and its dependencies are either retrieved,
 or updated, in the case when they are already present in STORAGE-ROOT.
 
 Next, a specific branch of desire is checked out, configurable with the
--d option and defaulting to "${default_desire_branch}".
+-b option and defaulting to "${default_desire_branch}".
 
 Further, the -n and -t options alter, correspondingly, the hostname
 of the desire node used for bootstrap, and a branch of that node's metastore
