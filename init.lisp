@@ -63,6 +63,7 @@
 
 (defun init (path &key
              as
+             bootstrap-url
              (wishmaster *default-bootstrap-wishmaster*)
              http-proxy
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
@@ -75,7 +76,7 @@ an identity relationship with that definition will be performed,
 by looking up locally the modules defined for export. The rest of
 locally present modules will be marked as converted."
   (flet ((default-bootstrap-wishmaster-urls ()
-           (values (strconcat* "git://" wishmaster "/")
+           (values (or bootstrap-url (strconcat* "git://" wishmaster "/"))
                    (strconcat* "http://" wishmaster "/" wishmaster-http-suffix))))
     (let* ((path (fad:pathname-as-directory path))
            (gate-path (if (pathname-absolute-p path)

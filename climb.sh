@@ -121,12 +121,15 @@ EOF
     exit $1
 }
 
-while getopts :ul:n:b:t:m:s:a:x:k:p:dgevVh opt
+while getopts :ul:r:n:b:t:m:s:a:x:k:p:dgevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
         l)  LISP="${OPTARG}";;
-        n)  ALT_WISHMASTER="${OPTARG}";;
+        r)  ALT_WISHMASTER='local'
+            ALT_BOOTSTRAP_URL="${OPTARG}";;
+        n)  ALT_WISHMASTER="${OPTARG}"
+            BOOTSTRAP_URL="git://${OPTARG}";;
         b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
         m)  MODULES="${OPTARG}";;
@@ -165,6 +168,9 @@ LISP=${LISP:-sbcl}
 test "${VERBOSE}" -a "${ALT_WISHMASTER}" && echo "NOTE: choosing an alternate bootstrap wishmaster: '${ALT_WISHMASTER}'"
 WISHMASTER="${ALT_WISHMASTER}"
 WISHMASTER=${WISHMASTER:=${default_wishmaster}}
+test "${VERBOSE}" -a "${ALT_BOOTSTRAP_URL}" && echo "NOTE: choosing an alternate bootstrap URL: '${ALT_BOOTSTRAP_URL}'"
+BOOTSTRAP_URL="${ALT_BOOTSTRAP_URL}"
+BOOTSTRAP_URL=${ALT_BOOTSTRAP_URL:-git://${WISHMASTER}}
 test "${VERBOSE}" -a "${DESIRE_BRANCH}" && echo "NOTE: choosing an alternate branch of desire: '${DESIRE_BRANCH}'"
 DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
 test "${VERBOSE}" -a "${METASTORE_BRANCH}" && echo "NOTE: choosing a specific metastore branch: '${METASTORE_BRANCH}'"
@@ -264,7 +270,7 @@ clone_module() {
     local module="$2"
     if test -z "${degraded_to_http}"
     then
-        if ! git clone -o "${WISHMASTER}" git://${WISHMASTER}/${desire_dep} "${root}/${module}" >/dev/null
+        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >/dev/null
         then
             degraded_to_http="T"
             echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport"
@@ -416,6 +422,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
   (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster \"${WISHMASTER}\"}
+                                   ${ALT_BOOTSTRAP_URL:+:bootstrap-url \"${BOOTSTRAP_URL}\"}
                                    ${http_proxy:+:http-proxy \"${http_proxy}\"}
                                    :wishmaster-branch :${METASTORE_BRANCH}
                                    :verbose ${VERBOSE})
