@@ -17,4 +17,6 @@
 ***** get rid of VCS-TYPE-HINT
 * MODULE-ENSURE-DISTRIBUTOR-MATCH-REMOTE is an ABOMINATION
 * separate name generation
+* queries of arbitrary wishmasters, including the bootstrap one
+* a HELP command
 

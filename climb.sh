@@ -31,6 +31,7 @@ argv0="$(basename $0)"
 default_wishmaster="git.feelingofgreen.ru"
 default_http_wishmaster="git.feelingofgreen.ru/shared/src"
 default_desire_branch="master"
+VOID="/dev/null"
 
 print_version_and_die() {
     cat <<EOF
@@ -54,6 +55,7 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -l LISP      Use the LISP binary, instead of the 'sbcl' default.
   -n HOSTNAME  Use HOSTNAME as a bootstrap node.
                 HOSTNAME must refer to a node participating in desire protocol.
+  -r URL       Use URL as a bootstrap URL ('file' scheme is allowed).
   -b BRANCH    Check out BRANCH of desire other than 'master'.
   -t BRANCH    Check out BRANCH of metastore on the bootstrap node other than
                 the default.  The default is the same as the used branch
@@ -127,9 +129,9 @@ do
         u)  handle_self_update "$@";;
         l)  LISP="${OPTARG}";;
         r)  ALT_WISHMASTER='local'
-            ALT_BOOTSTRAP_URL="${OPTARG}";;
+            ALT_BOOTSTRAP_URL="${OPTARG%/}";;
         n)  ALT_WISHMASTER="${OPTARG}"
-            BOOTSTRAP_URL="git://${OPTARG}";;
+            BOOTSTRAP_URL="git://${OPTARG%/}";;
         b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
         m)  MODULES="${OPTARG}";;
@@ -169,7 +171,6 @@ test "${VERBOSE}" -a "${ALT_WISHMASTER}" && echo "NOTE: choosing an alternate bo
 WISHMASTER="${ALT_WISHMASTER}"
 WISHMASTER=${WISHMASTER:=${default_wishmaster}}
 test "${VERBOSE}" -a "${ALT_BOOTSTRAP_URL}" && echo "NOTE: choosing an alternate bootstrap URL: '${ALT_BOOTSTRAP_URL}'"
-BOOTSTRAP_URL="${ALT_BOOTSTRAP_URL}"
 BOOTSTRAP_URL=${ALT_BOOTSTRAP_URL:-git://${WISHMASTER}}
 test "${VERBOSE}" -a "${DESIRE_BRANCH}" && echo "NOTE: choosing an alternate branch of desire: '${DESIRE_BRANCH}'"
 DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
@@ -270,14 +271,14 @@ clone_module() {
     local module="$2"
     if test -z "${degraded_to_http}"
     then
-        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >/dev/null
+        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >${VOID}
         then
             degraded_to_http="T"
             echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport"
             clone_module "${root}" "${module}"
         fi
     else
-        git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >/dev/null || \
+        git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >${VOID} || \
             fail "failed to retrieve ${module}"
     fi
 }
@@ -432,7 +433,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
   (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster \"${WISHMASTER}\"}
-                                   ${ALT_BOOTSTRAP_URL:+:bootstrap-url \"${BOOTSTRAP_URL}\"}
+                                   ${ALT_BOOTSTRAP_URL:+:bootstrap-url \"${BOOTSTRAP_URL}/\"}
                                    ${http_proxy:+:http-proxy \"${http_proxy}\"}
                                    :wishmaster-branch :${METASTORE_BRANCH}
                                    :verbose ${VERBOSE})
