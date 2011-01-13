@@ -209,10 +209,10 @@ stopped."
 ;;;;
 (defun parse-uri (namestring &key slashless-header)
   "Given an URI namestring, produce its constituent schema, username,
-password, hostname, port, split path and a boolean specifying whether
-the path refers to a directory as multiple values.
-The optional SLASHLESS-HEADER keyword turns on a hacky mode allowing
-treating CVS locations as URIs."
+password, hostname, port, split path and a boolean, specifying whether
+the path refers to a directory, as multiple values.
+The optional SLASHLESS-HEADER keyword enables tolerant mode, allowing
+for CVS locations to be treated as URIs."
   (let* ((colon-pos (or (position #\: namestring :start 1) (error "~@<No colon in URI ~S.~:@>" namestring))))
     (unless (> (length namestring) (+ colon-pos (if slashless-header 1 3)))
       (error "~<@URI ~S is too short.~:@>" namestring))
