@@ -173,7 +173,7 @@ When no distributor successfully matched, a new one is created.
 When no remote was matched, or no distributor existed, a corresponding remote
 is not created, but rather a path looking like a best match for the parameters
 provided is computed.
-The values returned are: 
+The values returned are:
   - the distributor, either matched or created;
   - a boolean designating whether the distributor was created;
   - the matched remote or NIL;
@@ -237,10 +237,11 @@ The values returned are:
   (when *verbose-internalisation*
     (format t "~@<;;; ~@;Tr~@<ying to internalise URL ~S~:[~; for module ~:*~:@(~A~)~]~:[~;, with a provided hint of remote's type being ~:*~A~].~:@>~:@>~%"
             url module-name vcs-type-hint))
+  ;; XXX: need to ensure that file:/// (aka 'git-locality) remotes are properly handled
   (multiple-value-bind (type cred hostname port extracted-path dirp) (parse-remote-namestring url :slashless (search ":pserver" url) :type-hint vcs-type-hint :gate-p gate-p)
     (let ((module-name (or module-name (guess-module-name hostname extracted-path))))
       (when *verbose-internalisation*
-        (format t "~@<;;; ~@;De~@<duced remote type ~A~:[~;, credentials ~:*~A~], hostname ~:@(~A~)~:[~;, port ~:*~D~], path ~S with~:[out~;~] a trailing slash. ~
+        (format t "~@<;;; ~@;De~@<duced a ~A~:[~;, credentials ~:*~A~], hostname ~:@(~A~)~:[~;, port ~:*~D~], path ~S with~:[out~;~] a trailing slash. ~
                              Module name ~A was ~:[guessed~;provided~].~:@>~:@>~%"
                 type cred hostname port extracted-path dirp module-name module-name-provided-p))
       (multiple-value-bind (dist created-dist-p remote domain-name-takeover subdomain deduced-path umbrellised-remote-path)
@@ -274,10 +275,9 @@ The values returned are:
 
 (defun add-module (url &optional module-name &rest remote-args &key name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*) &allow-other-keys &aux
                    (module-name (when module-name (canonicalise-name module-name))))
-  (multiple-value-bind (remote credentials module-name maybe-umbrella-name) (apply #'ensure-url-remote url module-name :vcs-type-hint vcs-type
-                                                                                   (remove-from-plist remote-args
-                                                                                                      :path-whitelist :path-blacklist
-                                                                                                      :if-touch-fails :vcs-type :lust))
+  (multiple-value-bind (remote credentials module-name maybe-umbrella-name)
+      (apply #'ensure-url-remote url module-name :vcs-type-hint vcs-type
+             (remove-from-plist remote-args :path-whitelist :path-blacklist :if-touch-fails :vcs-type :lust))
     (if remote
         (lret ((module (ensure-remote-module remote module-name (or maybe-umbrella-name module-name)
                                              :credentials credentials :path-whitelist path-whitelist :path-blacklist path-blacklist)))

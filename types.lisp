@@ -1325,7 +1325,7 @@ value is returned."
     (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
       (declare (ignore type cred port path))
       (let ((remote-name (canonicalise-name host)))
-        (with-explanation ("cloning .meta ~A/.meta in ~S" url *default-pathname-defaults*)
+        (with-explanation ("cloning metastore ~A/.meta in ~S" url *default-pathname-defaults*)
           (git "init-db")
           (ensure-gitremote remote-name (concatenate 'string url ".meta"))
           ;; This should go through fetch-git-remote, which is currently impossible
