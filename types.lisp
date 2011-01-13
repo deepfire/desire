@@ -349,6 +349,7 @@ a special module called '.meta'."
 (defun uri-type-to-remote-type (uri-type &key gate-p hint)
   (xform gate-p #'remote-type-promote-to-gate
          (switch (uri-type :test #'string=)
+           ("file" 'git-locality)
            ("git" 'git-native-remote)
            ("git+http" 'git-http-remote)
            ("git-and-http" 'git-combined-remote)
@@ -1324,7 +1325,9 @@ value is returned."
   (within-directory (metastore-pathname :if-does-not-exist :create :if-exists :error)
     (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
       (declare (ignore type cred port path))
-      (let ((remote-name (canonicalise-name host)))
+      (let ((remote-name (case type
+                           (git-locality 'localhost)
+                           (t            (canonicalise-name host)))))
         (with-explanation ("cloning metastore ~A/.meta in ~S" url *default-pathname-defaults*)
           (git "init-db")
           (ensure-gitremote remote-name (concatenate 'string url ".meta"))
@@ -1332,10 +1335,10 @@ value is returned."
           ;; due to how URL works.
           (with-maybe-handled-executable-failures t
               (git "fetch" (down-case-name remote-name))
-            (:handler ()
+            (:handler (c)
               (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
-                                  Retrying in dumb HTTP mode.~:@>~%"
-                      remote-name url)
+                                  Retrying in dumb HTTP mode.~_The error was:~_~A~:@>~%"
+                      remote-name url c)
               (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
               (with-maybe-handled-executable-failures t
                   (git "fetch" (down-case-name remote-name))
