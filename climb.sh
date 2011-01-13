@@ -388,6 +388,13 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
     (require :cmp))" \
 	${EVAL} "
 (progn
+  (defmacro unstyled (verbosep () &body body)
+    \`(flet ((body () ,@body))
+        (if ,verbosep 
+            (body)
+            (handler-bind ((style-warning (function muffle-warning)))
+              (body)))))
+  (export (list (quote unstyled)))
   (defpackage #:org.feelingofgreen.temp.climb
     (:use :common-lisp))
   (in-package #:org.feelingofgreen.temp.climb))" \
@@ -396,12 +403,14 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
   ;; disable compiler verbosity
   (let ((verbose (and ${DEBUG} ${VERBOSE})))
     (setf (values *compile-verbose* *compile-print* *load-verbose*) (values verbose verbose verbose)
-          #+ecl #+ecl c::*compiler-break-enable* t))
+          #+ecl #+ecl
+          c::*compiler-break-enable* t))
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
            (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
   #+(or sbcl ccl)
-  (load (compile-file \"${ROOT}/asdf/asdf.lisp\")))" \
+  (cl-user:unstyled ${VERBOSE} ()
+    (load (compile-file \"${ROOT}/asdf/asdf.lisp\"))))" \
 	${EVAL} "
 (progn
   (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/\")))
@@ -412,7 +421,8 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
         file)))
   (let ((asdf:*system-definition-search-functions* (cons (quote basic-root-modules-search)
                                                          asdf:*system-definition-search-functions*)))
-    (handler-case (asdf:operate (quote asdf:load-op) :desire :verbose ${VERBOSE})
+    (handler-case (cl-user:unstyled ${VERBOSE} ()
+                    (asdf:operate (quote asdf:load-op) :desire :verbose ${VERBOSE}))
       (error (c)
         (format t \"~%Got condition:~%~A~%\" c)
         (invoke-debugger c))))
