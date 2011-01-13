@@ -1,0 +1,20 @@
+#+STARTUP: hidestars odd
+#+TODO: UNKNOWN INCOMPLETE | DONE
+
+
+* merge PARSE-REMOTE-NAMESTRING and ENSURE-URL-REMOTE => INTERN-REMOTE-URL
+*** PARSE-REMOTE-NAMESTRING
+***** C-c C-w C-c:
+******* ENSURE-URL-REMOTE
+******* STEAL-CLBUILD-PROJECTS-FILE
+******* CLONE-METASTORE
+***** namestring -> gate-p -> slashless -> type-hint -> (remote-type, cred, hostname, port, path, directory-p)
+*** ENSURE-URL-REMOTE
+***** C-c C-w C-c:
+******* ADD-MODULE
+******* STEAL-CLBUILD-PROJECTS-FILE
+***** url -> module-name -> path -> gate-p -> vcs-type-hint -> (remote, cred, module-name, subdomain(?!?), new-remote-p)
+***** get rid of VCS-TYPE-HINT
+* MODULE-ENSURE-DISTRIBUTOR-MATCH-REMOTE is an ABOMINATION
+* separate name generation
+
