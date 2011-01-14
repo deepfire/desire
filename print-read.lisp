@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 ;;;
-;;;  (c) copyright 2009 by
+;;;  (c) copyright 2009-2011 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -124,7 +124,9 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                                       (collect (if (find (name m) (module-systems m) :key #'name)
                                                    (down-case-name m)
                                                    (list (down-case-name m)))))))
-              (append (when-let ((port (remote-distributor-port o)))
+              (append (when (eq *self* (remote-distributor o))
+                        (list `(:identity-p t)))
+                      (when-let ((port (remote-distributor-port o)))
                         (list `(:distributor-port ,port)))
                       (when (remote-domain-name-takeover o)
                         (list `(:domain-name-takeover t)))

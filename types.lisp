@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 ;;;
-;;;  (c) copyright 2007-2009 by
+;;;  (c) copyright 2007-2011 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -231,9 +231,11 @@ its 'best remote'."
    :module-names nil))
 
 (defclass gate (location)
-  ((converted-module-names :accessor gate-converted-module-names :initarg :converted-module-names :documentation "Complex computation."))
+  ((converted-module-names :accessor gate-converted-module-names :initarg :converted-module-names :documentation "Complex computation.")
+   (identity-p :reader gate-identity-p :initarg :identity-p))
   (:default-initargs
-   :converted-module-names nil)
+   :converted-module-names nil
+   :identity-p nil)
   (:documentation
    "A location belonging to a WISHMASTER (a distributor participating in
 the DESIRE protocol) which holds (and possibly exports) converted modules."))
