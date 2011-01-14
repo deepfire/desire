@@ -271,7 +271,7 @@ clone_module() {
     local module="$2"
     if test -z "${degraded_to_http}"
     then
-        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >${VOID}
+        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >${VOID} 2>&1
         then
             degraded_to_http="T"
             echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport"
