@@ -289,10 +289,11 @@ clone_module() {
 }
 
 update_module() {
+    # Updating is non-critical.
     local root="$1"
     local module="$2"
     (cd "${root}/${module}" && git fetch "${WISHMASTER}" >${void} 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >${void}) || \
-        fail "failed to update ${module}"
+        echo "failed to update ${module}"
 }
 
 clone_dependencies() {
@@ -328,7 +329,7 @@ update_dependencies() {
 ### See if there is anything we can remember...
 ###
 root_cfg_content="$(cat ${root_cfg} 2>${void})"
-if test -z "${ROOT}" -a "${root}" -a -d "${root_cfg_content}" &&
+if test -z "${ROOT}" -a -d "${root_cfg_content}" &&
     echo "NOTE: found ${root_cfg}, trying to validate its contents as storage location" && valid_storage_location_p "${root_cfg_content}"
 then
     ROOT="${root_cfg_content}"
