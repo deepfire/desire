@@ -152,6 +152,10 @@ locally present modules will be marked as converted."
                       (collect (name m)))
                     #'string<))
       ;;
+      ;; Evolve definitions.
+      ;;
+      (save-definitions :commit-message "Init-time seal." :seal t)
+      ;;
       ;; Quirks
       ;;
       (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
