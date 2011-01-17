@@ -15,13 +15,14 @@
                ;; Tier 3
                (:file "branching" :depends-on ("types"))
                (:file "export" :depends-on ("types"))
+               (:file "names" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
                (:file "systems" :depends-on ("types"))
                ;; Tier 4
                (:file "modules" :depends-on ("branching" "systems"))
                ;; Tier 5
                (:file "import" :depends-on ("modules"))
-               (:file "init" :depends-on ("print-read" "modules" "export"))
+               (:file "init" :depends-on ("print-read" "names" "modules" "export"))
                ;; Tier 6
                (:file "recursor" :depends-on ("import" "init"))
                ;; Tier at-the-end-of-it-all

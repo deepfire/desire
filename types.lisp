@@ -23,7 +23,7 @@
 ;;;
 ;;; Knobs
 ;;;
-(defvar *default-bootstrap-wishmaster*             "git.feelingofgreen.ru")
+(defvar *default-bootstrap-wishmaster-name*        "git.feelingofgreen.ru")
 (defvar *default-bootstrap-wishmaster-http-suffix* "shared/src/")
 (defvar *desires*                                  nil "List of import descriptions.")
 (defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
@@ -1127,16 +1127,6 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                     (or (when (symbolp module)
                           (module module :if-does-not-exist :continue))
                         module)))
-
-(defun canonicalise-name (name &optional preserve-case (package (load-time-value (find-package :desire))))
-  "Given an object's NAME, whether in form of a string, keyword or a symbol
-in any other package, return the canonical name, as a symbol in the
-'DESIRE' package.."
-  (intern (xform (not preserve-case) #'string-upcase
-                 (etypecase name
-                   (symbol (symbol-name name))
-                   (string name)))
-          package))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
   (git-repository-present-p (module-pathname module locality)))

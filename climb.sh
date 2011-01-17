@@ -8,7 +8,7 @@ fail() {
 handle_self_update() {
     if test ! "${climb_updated_p}"
     then
-        if wget "${argv0_url}" -O "$0" > /dev/null 2>&1
+        if wget "${argv0_url}" -O "$0" > ${void} 2>&1
         then
             export climb_updated_p="t"
             bash $0 "$@"
@@ -31,7 +31,9 @@ argv0="$(basename $0)"
 default_wishmaster="git.feelingofgreen.ru"
 default_http_wishmaster="git.feelingofgreen.ru/shared/src"
 default_desire_branch="master"
-VOID="/dev/null"
+
+void="/dev/null"
+root_cfg="${HOME}/.desire-root"
 
 print_version_and_die() {
     cat <<EOF
@@ -48,7 +50,7 @@ print_help_and_die() {
     cat <<EOF
 Usage:  ${argv0} [OPTION]... [STORAGE-ROOT]
 Bootstrap, update or perform other actions on a desire installation
-in either STORAGE-ROOT, or a location specified in ~/.climb-root
+in either STORAGE-ROOT, or a location specified in ${root_cfg}
 
   -u           Self-update and continue processing other options, using
                 the updated version.
@@ -84,7 +86,7 @@ to call.
 During the first step, a storage root location is either created or validated.
 The storage root must be a writable directory.
 
-When STORAGE-ROOT is not specified, ~/.climb-root is looked up for an
+When STORAGE-ROOT is not specified, ${root_cfg} is looked up for an
 absolute pathname referring to a valid storage location.  If this condition
 is met, that directory is accepted as STORAGE-ROOT, otherwise an error
 is signalled.
@@ -155,7 +157,10 @@ do
             print_help_and_die 1;;
     esac
 done
-shift $((OPTIND - 1))
+if test ${OPTIND} > 0
+then
+    shift $((OPTIND - 1))
+fi
 
 ROOT="$1"
 shift 1
@@ -271,14 +276,14 @@ clone_module() {
     local module="$2"
     if test -z "${degraded_to_http}"
     then
-        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >${VOID} 2>&1
+        if ! git clone -o "${WISHMASTER}" ${BOOTSTRAP_URL}/${desire_dep} "${root}/${module}" >${void} 2>&1
         then
             degraded_to_http="T"
             echo "NOTE: failed to go through a native protocol, degrading to a dumb HTTP transport"
             clone_module "${root}" "${module}"
         fi
     else
-        git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >${VOID} || \
+        git clone -o "${WISHMASTER}" http://${default_http_wishmaster}/${desire_dep}/.git/ "${root}/${module}" >${void} || \
             fail "failed to retrieve ${module}"
     fi
 }
@@ -286,7 +291,7 @@ clone_module() {
 update_module() {
     local root="$1"
     local module="$2"
-    (cd "${root}/${module}" && git fetch "${WISHMASTER}" >/dev/null 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >/dev/null) || \
+    (cd "${root}/${module}" && git fetch "${WISHMASTER}" >${void} 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >${void}) || \
         fail "failed to update ${module}"
 }
 
@@ -322,16 +327,16 @@ update_dependencies() {
 ###
 ### See if there is anything we can remember...
 ###
-root="$(cat ~/.climb-root 2>/dev/null)"
-if test -z "${ROOT}" -a "${root}" -a -d "${root}" &&
-    echo "NOTE: found ~/.climb-root, trying to validate its contents as storage location" && valid_storage_location_p "${root}"
+root_cfg_content="$(cat ${root_cfg} 2>${void})"
+if test -z "${ROOT}" -a "${root}" -a -d "${root_cfg_content}" &&
+    echo "NOTE: found ${root_cfg}, trying to validate its contents as storage location" && valid_storage_location_p "${root_cfg_content}"
 then
-    ROOT="${root}"
+    ROOT="${root_cfg_content}"
     test "${VERBOSE}" && echo "NOTE: found traces of previous bootstrap in ${ROOT}, updating and reusing that:"
     update_dependencies "${ROOT}"
 else
     test "${ROOT}" || \
-        fail "~/.climb-root did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue"
+        fail "${root_cfg} did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue"
 
     if test -e "${ROOT}"
     then
@@ -341,8 +346,8 @@ else
     else
         writable_absolute_directory_p "$(dirname ${ROOT})" || \
             fail "\"${ROOT}\" does not exist, and its parent is not a writable directory"
-        test "${VERBOSE}" && echo "NOTE: validated \"${ROOT}\" as new storage location, updating ~/.climb-root"
-        echo -n "${ROOT}" > ~/.climb-root
+        test "${VERBOSE}" && echo "NOTE: validated \"${ROOT}\" as new storage location, updating ${root_cfg}"
+        echo -n "${ROOT}" > ${root_cfg}
         mkdir "${ROOT}" || \
             fail "unable to initialise the storage location at \"${ROOT}\", exiting"
         test "${VERBOSE}" && echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
@@ -432,7 +437,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
 (block nil
   ;; configure desire verbosity
   (setf *execute-explanatory* ${EXPLAIN} *execute-verbosely* ${VERBOSE} *verbose-repository-maintenance* ${VERBOSE})
-  (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster \"${WISHMASTER}\"}
+  (handler-case (init \"${ROOT}/\" ${ALT_WISHMASTER:+:wishmaster-name \"${WISHMASTER}\"}
                                    ${ALT_BOOTSTRAP_URL:+:bootstrap-url \"${BOOTSTRAP_URL}/\"}
                                    ${http_proxy:+:http-proxy \"${http_proxy}\"}
                                    :wishmaster-branch :${METASTORE_BRANCH}
