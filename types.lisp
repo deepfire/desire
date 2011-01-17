@@ -24,6 +24,9 @@
 ;;; Knobs
 ;;;
 (defvar *default-bootstrap-wishmaster-name*        "git.feelingofgreen.ru")
+(defvar *bootstrap-wishmaster*                     nil
+  "This variable, during bootstrap (only if applicable), is set to the
+wishmaster we've bootstrapped from.")
 (defvar *default-bootstrap-wishmaster-http-suffix* "shared/src/")
 (defvar *desires*                                  nil "List of import descriptions.")
 (defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")

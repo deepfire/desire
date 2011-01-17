@@ -29,5 +29,13 @@ in any other package, return the canonical name, as a symbol in the
                    (string name)))
           package))
 
-(defun choose-local-name ()
-  (canonicalise-name (machine-instance)))
+(defun choose-local-name (root-pathname)
+  "Choose a name for *SELF*.  Disambiguate, if we're doing a local
+bootstrap."
+  (let ((host-based-name (canonicalise-name (machine-instance))))
+    (cond ((and *bootstrap-wishmaster*
+                (eq (name *bootstrap-wishmaster*) host-based-name))
+           (strconc* (string host-based-name) "-"
+                     (normalise-name (namestring root-pathname))))
+          (t
+           host-based-name))))

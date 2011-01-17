@@ -117,7 +117,7 @@ locally present modules will be marked as converted."
                        (if-let ((d (and as (distributor as))))
                          (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
                                 (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
-                         (let ((local-name (choose-local-name)))
+                         (let ((local-name (choose-local-name gate-path)))
                            (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
                            (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path
                                           :omit-registration t)))
