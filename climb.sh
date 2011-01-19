@@ -28,12 +28,13 @@ version="11.1.0"
 
 argv0="$(basename $0)"
 
+default_root="${HOME}/.desire"
+default_lisp="sbcl"
 default_wishmaster="git.feelingofgreen.ru"
 default_http_wishmaster="git.feelingofgreen.ru/shared/src"
 default_desire_branch="master"
 
 void="/dev/null"
-root_cfg="${HOME}/.desire-root"
 
 print_version_and_die() {
     cat <<EOF
@@ -49,16 +50,18 @@ EOF
 print_help_and_die() {
     cat <<EOF
 Usage:  ${argv0} [OPTION]... [STORAGE-ROOT]
-Bootstrap, update or perform other actions on a desire installation
-in either STORAGE-ROOT, or a location specified in ${root_cfg}
+Bootstrap, update or perform other actions on a desire installation in
+either STORAGE-ROOT or the default location in '${default_root}'
+(possibly set by ${defaults}).
 
   -u           Self-update and continue processing other options, using
                 the updated version.
+  -r ROOT      Use bootstrap ROOT location.
   -l LISP      Use the LISP binary, instead of the 'sbcl' default.
-  -n HOSTNAME  Use HOSTNAME as a bootstrap node.
+  -n HOSTNAME  Use HOSTNAME as a bootstrap node.  Defaults to the contents of
+                ${wishmaster_cfg}, whenever it's present.
                 HOSTNAME must refer to a node participating in desire protocol.
-  -r URL       Use URL as a bootstrap URL ('file' scheme is allowed).
-  -b BRANCH    Check out BRANCH of desire other than 'master'.
+  -b URL       Use URL as a bootstrap URL ('file' scheme is allowed).
   -t BRANCH    Check out BRANCH of metastore on the bootstrap node other than
                 the default.  The default is the same as the used branch
                 of desire.
@@ -76,44 +79,47 @@ in either STORAGE-ROOT, or a location specified in ${root_cfg}
   -V           Print version.
   -h           Display this help message.
 
-As step zero, when the -u switch is provided, climb.sh is updated using wget
-from the canonical location at ${argv0_url},
-and then normal processing is continued, using the updated version.
+As step zero, when the -u switch is provided, climb.sh is updated
+using wget from the canonical location at ${argv0_url}, and then
+normal processing is continued, using the updated version.
 
-When LISP is provided, it specifies the name of the lisp implementation binary
-to call.
+When LISP is provided, it specifies the name of the lisp
+implementation binary to call.
 
-During the first step, a storage root location is either created or validated.
-The storage root must be a writable directory.
+During the first step, a storage root location is either created or
+validated.  The storage root must be a writable directory.
 
-When STORAGE-ROOT is not specified, ${root_cfg} is looked up for an
-absolute pathname referring to a valid storage location.  If this condition
-is met, that directory is accepted as STORAGE-ROOT, otherwise an error
-is signalled.
+When STORAGE-ROOT is not specified, the value of the ROOT variable
+within the ${defaults} file is looked up for an absolute pathname
+referring to a valid storage location.  If this condition is met, that
+directory is accepted as STORAGE-ROOT, otherwise an error is
+signalled.
 
 When STORAGE-ROOT is specified, it must be either an absolute pathname
-referring to a valid storage location, or it must denote a non-occupied
-filesystem location, with a writable parent directory.
+referring to a valid storage location, or it must denote a
+non-occupied filesystem location, with a writable parent directory.
 
-During the second step, desire and its dependencies are either retrieved,
-or updated, in the case when they are already present in STORAGE-ROOT.
+During the second step, desire and its dependencies are either
+retrieved, or updated, in the case when they are already present in
+STORAGE-ROOT.
 
-Next, a specific branch of desire is checked out, configurable with the
--b option and defaulting to "${default_desire_branch}".
+Next, a specific branch of desire is checked out, configurable with
+the -b option and defaulting to "${default_desire_branch}".
 
-Further, the -n and -t options alter, correspondingly, the hostname
-of the desire node used for bootstrap, and a branch of that node's metastore
-to use.  These options default to ${default_wishmaster} and
+Further, the -n and -t options alter, correspondingly, the hostname of
+the desire node used for bootstrap, and a branch of that node's
+metastore to use.  These options default to ${default_wishmaster} and
 the name of the branch of desire, accordingly.
 
-During the next step a lisp is started and desire initialisation is attempted,
-with the above determined values of hostname and metastore branch.
+During the next step a lisp is started and desire initialisation is
+attempted, with the above determined values of hostname and metastore
+branch.
 
 Once the initialisation is complete, MODULE, SYSTEM and APP provide
 optional convenience shortcuts for module installation, system loading
-and application launching.  Any of these can be omitted, as the required
-information is easily deduced.  Note that the more granular objects
-determine the objects of lower granularity.
+and application launching.  Any of these can be omitted, as the
+required information is easily deduced.  Note that the more granular
+objects determine the objects of lower granularity.
 
 After all these steps, EXPR is executed, if it was provided, with
 PACKAGE optionally set as current.
@@ -129,12 +135,13 @@ while getopts :ul:r:n:b:t:m:s:a:x:k:p:dgevVh opt
 do
     case $opt in
         u)  handle_self_update "$@";;
-        l)  LISP="${OPTARG}";;
-        r)  ALT_WISHMASTER='local'
+        l)  ALT_LISP="${OPTARG}";;
+        r)  ROOT="${OPTARG}";;
+        b)  ALT_WISHMASTER='local'
             ALT_BOOTSTRAP_URL="${OPTARG%/}";;
+        # b)  DESIRE_BRANCH="${OPTARG}";;
         n)  ALT_WISHMASTER="${OPTARG}"
             BOOTSTRAP_URL="git://${OPTARG%/}";;
-        b)  DESIRE_BRANCH="${OPTARG}";;
         t)  METASTORE_BRANCH="${OPTARG}";;
         m)  MODULES="${OPTARG}";;
         s)  SYSTEM="${OPTARG}";;
@@ -161,22 +168,51 @@ if test ${OPTIND} > 0
 then
     shift $((OPTIND - 1))
 fi
+test "$*" && \
+    fail "unknown arguments: $*"
 
-ROOT="$1"
-shift 1
-test "$*" && fail "unknown arguments: $*"
+###
+### Storable parameter processing
+###
+# contains:
+# default_root
+# default_lisp
+# default_wishmaster
+defaults="${HOME}/.desire-defaults"
+if test -f "${defaults}"
+then
+    . "${defaults}"
+fi
 
 ###
 ### Argument defaulting and reporting
 ###
-test "${VERBOSE}" -a "${LISP}"    && echo "NOTE: will use '${LISP}' as the lisp implementation executable"
-LISP=${LISP:-sbcl}
+ROOT="${ROOT:-${default_root}}"
+test "${VERBOSE}" && echo "NOTE: using '${ROOT}' as storage root"
+
+LISP=${ALT_LISP:-"${default_lisp}"}
+test "${VERBOSE}" && echo "NOTE: will use '${LISP}' as the lisp implementation executable"
 
 test "${VERBOSE}" -a "${ALT_WISHMASTER}" && echo "NOTE: choosing an alternate bootstrap wishmaster: '${ALT_WISHMASTER}'"
 WISHMASTER="${ALT_WISHMASTER}"
 WISHMASTER=${WISHMASTER:=${default_wishmaster}}
+
+###
+if test ! -f "${defaults}"
+then
+    echo "NOTE: recording default options in '${defaults}'"
+    ( cat <<EOF
+default_root='${ROOT}'
+default_lisp='${LISP}'
+default_wishmaster='${WISHMASTER}'
+EOF
+        ) > "${defaults}"
+fi
+
+###
 test "${VERBOSE}" -a "${ALT_BOOTSTRAP_URL}" && echo "NOTE: choosing an alternate bootstrap URL: '${ALT_BOOTSTRAP_URL}'"
 BOOTSTRAP_URL=${ALT_BOOTSTRAP_URL:-git://${WISHMASTER}}
+
 test "${VERBOSE}" -a "${DESIRE_BRANCH}" && echo "NOTE: choosing an alternate branch of desire: '${DESIRE_BRANCH}'"
 DESIRE_BRANCH=${DESIRE_BRANCH:-${default_desire_branch}}
 test "${VERBOSE}" -a "${METASTORE_BRANCH}" && echo "NOTE: choosing a specific metastore branch: '${METASTORE_BRANCH}'"
@@ -257,17 +293,28 @@ esac
 #######################################################
 desire_deps="alexandria asdf cl-fad executor pergamum informatimago iterate"
 
-writable_absolute_directory_p() {
-    local path="$1"
-    test "${path##/}" != "${path}" || fail "${path} is not an absolute pathname"
-    test -d "${path}" || fail "${path} does not refer to a directory"
-    test -w "${path}" || fail "${path} is not writable"
-    return 0
+valid_directory_pathname_p() {
+    test "${1##/}" != "${1}"
+    return $?
 }
 
-valid_storage_location_p() {
+ensure_root() {
     local path="$1"
-    writable_absolute_directory_p "${path}"
+    if test -d "${path}"
+    then
+        test -d "${path}" || fail "${path} does not refer to a directory"
+        test -w "${path}" || fail "${path} is not writable"
+    else
+        mkdir "${path}" || \
+            fail "failed to create storage directory at '${path}'"
+    fi
+}
+
+git_set_head_index_tree() {
+    local path="$1"
+    local ref="$2"
+    ( cd "${path}" && git reset --hard "${ref}" )
+    return $?
 }
 
 degraded_to_http=
@@ -296,17 +343,7 @@ update_module() {
         echo "failed to update ${module}"
 }
 
-clone_dependencies() {
-    local root="$1"
-    for desire_dep in ${desire_deps} desire
-    do
-        test "${VERBOSE}" && echo -n "      ${desire_dep}: "
-        clone_module "${root}" "${desire_dep}"
-        test "${VERBOSE}" && echo "ok"
-    done
-}
-
-update_dependencies() {
+clone_or_update_dependencies() {
     local root="$1"
     for desire_dep in ${desire_deps} desire
     do
@@ -325,50 +362,30 @@ update_dependencies() {
         test "${VERBOSE}" && echo "ok"
     done
 }
-###
-### See if there is anything we can remember...
-###
-root_cfg_content="$(cat ${root_cfg} 2>${void})"
-if test -z "${ROOT}" -a -d "${root_cfg_content}" &&
-    echo "NOTE: found ${root_cfg}, trying to validate its contents as storage location" && valid_storage_location_p "${root_cfg_content}"
-then
-    ROOT="${root_cfg_content}"
-    test "${VERBOSE}" && echo "NOTE: found traces of previous bootstrap in ${ROOT}, updating and reusing that:"
-    update_dependencies "${ROOT}"
-else
-    test "${ROOT}" || \
-        fail "${root_cfg} did not refer to a writable directory, nor was STORAGE-ROOT specified, cannot continue"
 
-    if test -e "${ROOT}"
-    then
-        valid_storage_location_p "${ROOT}" || \
-            fail "failed to validate an occupied filesystem location at \"${ROOT}\" as a storage location"
-        update_dependencies "${ROOT}"
-    else
-        writable_absolute_directory_p "$(dirname ${ROOT})" || \
-            fail "\"${ROOT}\" does not exist, and its parent is not a writable directory"
-        test "${VERBOSE}" && echo "NOTE: validated \"${ROOT}\" as new storage location, updating ${root_cfg}"
-        echo -n "${ROOT}" > ${root_cfg}
-        mkdir "${ROOT}" || \
-            fail "unable to initialise the storage location at \"${ROOT}\", exiting"
-        test "${VERBOSE}" && echo "NOTE: initialised storage location ok. Retrieving and loading desire and its dependencies:"
-        clone_dependencies "${ROOT}"
-    fi
-fi
+###
+### The start of it all
+###
+valid_directory_pathname_p "${ROOT}" || \
+    fail "${ROOT} is not an absolute pathname"
+ROOT="${ROOT%%/}"
+
+ensure_root "${ROOT}"
+clone_or_update_dependencies "${ROOT}"
 
 test "${VERBOSE}" && echo "NOTE: checking out '${DESIRE_BRANCH}' branch of desire..."
-( cd ${ROOT}/desire && git reset --hard "${WISHMASTER}/${DESIRE_BRANCH}" ) || \
-    fail "failed to check out branch '${DESIRE_BRANCH}' of desire"
+git_set_head_index_tree "${ROOT}/desire" "${WISHMASTER}/${DESIRE_BRANCH}" || \
+    fail "failed to check out  '${DESIRE_BRANCH}' of desire"
 
 test "${VERBOSE}" && echo "NOTE: cranking up verbosity"
-VERBOSE=${VERBOSE:-nil}
+VERBOSE="${VERBOSE:-nil}"
 
 #######################################################
 ###                                                   #
 ### Shrug off chains of POSIX...                      #
 ###                                                   #
 #######################################################
-test "${VERBOSE}" == "t" && echo "NOTE: all done going into lisp..."
+if test "x${VERBOSE}" == "xt"; then echo "NOTE: all done going into lisp..."; fi
 CONGRATULATING_MESSAGE="\"
 
 
