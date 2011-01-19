@@ -119,8 +119,7 @@ locally present modules will be marked as converted."
                                 (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
                          (let ((local-name (choose-local-name gate-path)))
                            (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
-                           (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path
-                                          :omit-registration t)))
+                           (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path)))
                      (when verbose
                        (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
       (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
