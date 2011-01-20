@@ -1356,8 +1356,9 @@ value is returned."
   (within-directory (metastore-pathname)
     (iter (for (nil remote-name branch-name) in (remove-if-not #'ref-remotep (refs-by-value (ref-value '("master") metastore-pathname)
                                                                                             metastore-pathname)))
+          ;; that's a pretty silent assumption: the gate remote is named after the entity
           (for d = (distributor (string-upcase remote-name) :if-does-not-exist :continue))
-          (unless d (continue))
+          (unless d (next-iteration))
           (for rel = (make-instance 'definition-subscription :from *self* :to d :branch branch-name))
           (set-rel d *self* rel)
           (set-rel *self* d rel))))
