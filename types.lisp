@@ -1383,7 +1383,10 @@ value is returned."
 (defun merge-remote-wishmasters ()
   (do-wishmasters (w)
     (unless (eq w *self*)
-      (merge-remote-wishmaster w))))
+      (ignore-errors
+        ;; This is clearly non-critical, as we chiefly rely
+        ;; on the initially-obtain information.
+        (merge-remote-wishmaster w)))))
 
 ;;;
 ;;; Desires.  Bitrotten and unused.
