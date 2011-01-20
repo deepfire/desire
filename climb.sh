@@ -349,10 +349,8 @@ clone_or_update_dependencies() {
     do
         test "${VERBOSE}" && echo -n "      $desire_dep: "
         # Handle stashed modules.
-        if test -d "${root}/${desire_dep}_"
-        then
+        test -d "${root}/${desire_dep}_" && \
             mv "${root}/${desire_dep}_" "${root}/${desire_dep}"
-        fi
         if test -d "${root}/${desire_dep}"
         then
             update_module "${root}" "${desire_dep}"
