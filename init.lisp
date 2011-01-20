@@ -43,6 +43,9 @@
        (first (directory (subfile (module-pathname module) (list :wild-inferiors name) :type type)))))
 
 (defgeneric try-ensure-importer-executable (type)
+  (:method :around (o)
+    (ignore-errors
+      (call-next-method)))
   (:method ((o (eql 'darcs)))
     (when-let ((executable (module-wildfile :bzr-fastimport "darcs-fast-export")))
       (setf (executable 'darcs-fast-export) executable)))
