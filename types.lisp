@@ -1039,12 +1039,12 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
         ,@(unless condition `((declare (ignore ,condition-sym))))
         ,@handler-body))))
 
-(defvar *git-fetch-recovery-attempt* nil)
+(defvar *attempting-git-fetch-recovery* nil)
 
 (defun git-fetch-remote (remote module-name &optional directory)
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (maybe-within-directory directory
-    (with-maybe-handled-executable-failures (not *git-fetch-recovery-attempt*)
+    (with-maybe-handled-executable-failures (not *attempting-git-fetch-recovery*)
         (let ((module-url (url remote module-name)))
           (ensure-gitremote (name remote) module-url)
           (git "fetch" (down-case-name remote)))
@@ -1056,7 +1056,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
                           Retrying in dumb HTTP mode.~:@>~%"
                 (name remote) (url remote module-name))
         (let ((*combined-remotes-prefer-native-over-http* nil)
-              (*git-fetch-recovery-attempt* t))
+              (*attempting-git-fetch-recovery* t))
           (git-fetch-remote remote module-name))
         (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
                           Are we in a HTTP-only environment?  ~
