@@ -30,7 +30,8 @@ Defaults to NIL.")
 (define-reported-condition fetch-failure (module-error remote-error)
   ((execution-error :reader condition-execution-error :initarg :execution-error))
   (:report (remote module execution-error)
-           "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>" (coerce-to-name module) remote execution-error))
+           "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>"
+           (coerce-to-name module) (string-id remote) execution-error))
 (define-reported-condition repository-not-clean-during-fetch (repository-error executable-failure) ()
   (:report (locality module)
            "~@<Repository for ~S in ~S has uncommitted changes during fetch.~:@>" (coerce-to-name module) locality))
@@ -331,7 +332,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                    (fetch-module-using-remote best-remote name url repo-dir)
                    (when *default-publishable*
                      (declare-module-converted name locality)))))
-             (syncformat t ";; Done fetching module ~A~%" name))))
+             (syncformat t ";; Done fetching ~A~%" name))))
     (notice-module-repository module nil locality)
     (sync-module module locality))
   (values))

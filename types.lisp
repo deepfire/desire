@@ -73,6 +73,12 @@ SAVE-DEFINITIONS was called.")
   (:documentation
    "Base class for all desire objects."))
 
+(defgeneric string-id (o)
+  (:documentation
+   "Return a short string identifying O.")
+  (:method ((o desirable))
+    (format nil "<~A ~S>" (type-of o) (name o))))
+
 ;;;;
 ;;;; Distributor
 ;;;;
@@ -99,6 +105,9 @@ SAVE-DEFINITIONS was called.")
    (svn         :accessor local-svn     :documentation "Transitory svn locality of a locally-accessible distributor.")
    (tarball     :accessor local-tarball :documentation "Transitory tarball locality of a locally-accessible distributor.")))
 
+(defmethod string-id ((o local-distributor))
+  (format nil "<~A ~A, gate: ~S>" (type-of o) (name o) (remote-path (gate o))))
+
 (defgeneric locality (specifier &optional local-distributor)
   (:documentation
    "Return the master locality of type denoted by SPECIFIER withing LOCAL-DISTRIBUTOR.")
@@ -108,6 +117,9 @@ SAVE-DEFINITIONS was called.")
 (defclass relationship ()
   ((from :accessor rel-from :initarg :from)
    (to :accessor rel-to :initarg :to)))
+
+(defmethod string-id ((o relationship))
+  (format nil "<~A between ~A -> ~A>" (type-of o) (short-id (rel-from o)) (short-id (rel-to o))))
 
 (defclass definition-subscription (relationship)
   ((branch :accessor rel-branch :initarg :branch)))
@@ -250,6 +262,10 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
   (:default-initargs
    :registrator #'(setf loc)
    :scan-p nil))
+
+(defmethod string-id ((o locality))
+  (format nil "<~A at ~S>" (type-of o) (locality-pathname o)))
+
 (defclass remote (location registered)
   ((distributor :accessor remote-distributor :initarg :distributor :documentation "Specified.")
    (domain-name-takeover :accessor remote-domain-name-takeover :initarg :domain-name-takeover :documentation "Specified.")
@@ -264,6 +280,9 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :distributor-port nil
    :domain-name-takeover nil
    :credentials nil))
+
+(defmethod string-id ((o remote))
+  (format nil "<~A ~A at ~S>" (type-of o) (name o) (url o "<module>")))
 
 (defun %set-remote-path (remote path slot-name)
   (setf (slot-value remote slot-name) path
@@ -310,6 +329,9 @@ a special module called '.meta'."
 (defclass gate-locality (gate-remote locality)
   ((unpublished-module-names :accessor gate-unpublished-module-names :initarg :unpublished-module-names :documentation "Complex computation.")
    (hidden-module-names :accessor gate-hidden-module-names :initarg :hidden-module-names :documentation "Complex computation.")))
+
+(defmethod string-id ((o gate-locality))
+  (format nil "<~A at ~S, ~S>" (type-of o) (url o "<module>") (locality-pathname o)))
 
 ;;;;
 ;;;; Location * VCS
