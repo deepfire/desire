@@ -291,7 +291,7 @@ esac
 ### Done processing user arguments, on to the action. #
 ###                                                   #
 #######################################################
-desire_deps="alexandria asdf cl-fad executor pergamum informatimago iterate"
+desire_deps="alexandria cl-fad executor pergamum informatimago iterate"
 
 valid_directory_pathname_p() {
     test "${1##/}" != "${1}"
@@ -429,10 +429,7 @@ ${LISP} ${QUIET} ${SUPPRESS_INITS} ${DISABLE_DEBUGGER} \
           c::*compiler-break-enable* t))
   (declaim (optimize (debug ${DEBUG}))
            #+sbcl
-           (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))
-  #+(or sbcl ccl)
-  (cl-user:unstyled ${VERBOSE} ()
-    (load (compile-file \"${ROOT}/asdf/asdf.lisp\"))))" \
+           (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning)))" \
 	${EVAL} "
 (progn
   (defparameter *asdf-root* (pathname-directory (parse-namestring \"${ROOT}/\")))
