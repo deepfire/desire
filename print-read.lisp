@@ -22,6 +22,7 @@
 
 
 (defvar *read-universal-time*)
+(defvar *read-time-definitions-author*)
 (defvar *read-time-enclosing-distributor*)
 (defvar *read-time-enclosing-remote*)
 (defvar *read-time-force-source* nil)
@@ -69,20 +70,38 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
         (union (slot-value subject 'module-names) source-proposed-value))))
 
 (defmethod print-object ((o distributor) stream)
-  (format stream "~@<#D(~;~A~{ ~S~}~;)~:@>"
-          (string (name o)) (sort (copy-list (distributor-remotes o)) #'string< :key (compose #'string #'name))))
+  (format stream "~@<#D(~;~A~{ ~<~S ~A~:@>~}~
+                            ~{ ~S~}~
+                            ~;)~:@>"
+          (string (name o))
+          (when (eq *self* o)
+            (list `(:identity-p t)))
+          (sort (copy-list (distributor-remotes o)) #'string< :key (compose #'string #'name))))
 
-(defun read-distributor (name &rest remotes)
-  (let* ((owner (distributor name :if-does-not-exist :continue))
-         (subject owner))
-    (lret* ((d (or subject (make-instance 'distributor :name name :last-sync-time *read-universal-time* :synchronised-p t)))
-            (*read-time-enclosing-distributor* d)
-            (*desirable-interpreter-dispatch-table* '((remote . read-remote))))
-      (setf (distributor-remotes d)
-            (iter (for remote-form in remotes)
-                  (collect (interpret-desirable remote-form))))
-      (when (wishmasterp d)
-        (setf (gate d) (find-if (of-type 'gate) (distributor-remotes d)))))))
+(defun read-distributor (name &rest properties-and-remotes)
+  (multiple-value-bind (properties remotes)
+      (if-let ((keyposn (position-if #'keywordp properties-and-remotes :from-end t)))
+        (values (subseq properties-and-remotes 0 (+ keyposn 2))
+                (subseq properties-and-remotes (+ keyposn 2)))
+        (values nil properties-and-remotes))
+    (destructuring-bind (&key identity-p) properties
+      (let* ((owner (distributor name :if-does-not-exist :continue))
+             (subject owner))
+        (lret* ((d (or subject (make-instance 'distributor :name name
+                                              :last-sync-time *read-universal-time*
+                                              :synchronised-p t)))
+                (*read-time-enclosing-distributor* d)
+                (*desirable-interpreter-dispatch-table* '((remote . read-remote))))
+          (when identity-p
+            (when *read-time-definitions-author*
+              (definitions-error "~@<Inconsistent DEFINITIONS: ~
+                                     two distributors claim authorship.~:@>"))
+            (setf *read-time-definitions-author* d))
+          (setf (distributor-remotes d)
+                (iter (for remote-form in remotes)
+                      (collect (interpret-desirable remote-form))))
+          (when (wishmasterp d)
+            (setf (gate d) (find-if (of-type 'gate) (distributor-remotes d)))))))))
 
 (defun system-simple-p (system)
   "Determine whether SYSTEM meets the requirements for a simple system."
@@ -124,9 +143,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                                       (collect (if (find (name m) (module-systems m) :key #'name)
                                                    (down-case-name m)
                                                    (list (down-case-name m)))))))
-              (append (when (eq *self* (remote-distributor o))
-                        (list `(:identity-p t)))
-                      (when-let ((port (remote-distributor-port o)))
+              (append (when-let ((port (remote-distributor-port o)))
                         (list `(:distributor-port ,port)))
                       (when (remote-domain-name-takeover o)
                         (list `(:domain-name-takeover t)))
@@ -384,11 +401,11 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 (defgeneric read-definitions (&key source force-source metastore)
   (:method (&key (source *self*) (force-source (eq source *self*)) (metastore (meta *self*)))
     "Load definitions of the world from METASTORE."
-    (let ((*read-time-merge-source-distributor* source)
-          (*read-time-force-source* force-source))
+    (lret ((*read-time-merge-source-distributor* source)
+           (*read-time-force-source* force-source)
+           *read-time-definitions-author*)
       (with-open-metafile (definitions 'definitions metastore)
-        (read-definitions-from-stream definitions))
-      (values))))
+        (read-definitions-from-stream definitions)))))
 
 (defgeneric read-local-definitions (&key metastore)
   (:method (&key (metastore (localmeta *self*)))

@@ -112,7 +112,9 @@ locally present modules will be marked as converted."
           (setf *http-proxy* http-proxy)
           (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
       (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
-      (read-definitions :force-source t :metastore meta-path)
+      (let ((last-author (read-definitions :force-source t :metastore meta-path)))
+        (syncformat t "~@<;;; ~@;Last author of DEFINITIONS just read: ~A~:@>~%"
+                    (if last-author (name last-author) "Unknown")))
       ;;
       ;; Set up *SELF* and complete definitions
       ;;
