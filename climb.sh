@@ -339,7 +339,7 @@ update_module() {
     # Updating is non-critical.
     local root="$1"
     local module="$2"
-    (cd "${root}/${module}" && git fetch "${WISHMASTER}" >${void} 2>&1 && git reset --hard "remotes/${WISHMASTER}/master" >${void}) || \
+    (cd "${root}/${module}" && git fetch -q "${WISHMASTER}"; git reset --hard "remotes/${WISHMASTER}/master" >${void}) || \
         echo "failed to update ${module}"
 }
 
