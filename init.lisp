@@ -35,13 +35,6 @@
       (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
       (setf (gitvar 'user.name nil t) username))))
 
-(defun module-wildfile (module name &key type &aux
-                        (module (coerce-to-module module)))
-  (and (or (module-locally-present-p module (gate *self*) t)
-           (update module)
-           t)
-       (first (directory (subfile (module-pathname module) (list :wild-inferiors name) :type type)))))
-
 (defgeneric try-ensure-importer-executable (type)
   (:method :around (o)
     (ignore-errors

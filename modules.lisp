@@ -32,6 +32,17 @@
            "~@<During system discovery in module ~A: found a definition for system ~A from ~:[host-provided system set~;module ~A~].~:@>"
            (name module) (name system) (system-module system) (name (system-module system))))
 
+(defun try-ensure-module (module &aux
+                          (module (coerce-to-module module)))
+  (or (module-locally-present-p module (gate *self*) t)
+      (update module)
+      t))
+
+(defun module-wildfile (module name &key type &aux
+                        (module (coerce-to-module module)))
+  (when (try-ensure-module module)
+    (first (directory (subfile (module-pathname module) (list :wild-inferiors name) :type type)))))
+
 ;;;;
 ;;;; System discovery
 ;;;;
