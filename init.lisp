@@ -151,6 +151,7 @@ locally present modules will be marked as converted."
       ;;
       ;; Evolve definitions.
       ;;
+      (linearise-self (merge-pathnames #p"self.lisp" meta-path))
       (save-definitions :commit-message "Init-time seal." :seal t)
       ;;
       ;; Quirks

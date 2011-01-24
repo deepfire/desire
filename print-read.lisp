@@ -438,6 +438,70 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     (format stream "~&;;; -*- Mode: Lisp -*-~%;;;~%;;; Gate unpublished & hidden:~%;;;~%")
     (print-gate-local-definitions (gate *self*) stream)))
 
+(defun linearise-self (filename)
+  (labels ((impl-components       ()  #+sbcl '(:sb-posix :sb-grovel))
+           (component-parent      (x) #+asdf (asdf:component-parent x))
+           (component-impl-part-p (x) #+asdf (member (string-upcase (asdf:component-name x)) (impl-components)
+                                                     :test #'string=))
+           (prologue              ()  #+asdf `((mapcar #'require ',(append (impl-components)
+                                                                           '(#+asdf :asdf)))
+                                               (defun mark-component-loaded (x)
+                                                 #+asdf
+                                                 (let ((system (asdf:find-system x)))
+                                                   (asdf::register-system x system)
+                                                   (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
+                                                         (get-universal-time))))
+                                               (defun load-system (files)
+                                                 (let ((temp-file #p"temp.lisp"))
+                                                   (with-compilation-unit ()
+                                                     (loop :for designator :in files
+                                                        :do
+                                                        (if (stringp designator)
+                                                            (mark-component-loaded designator)
+                                                            (destructuring-bind (orig-filename string) designator
+                                                              (with-open-file (f temp-file :direction :output
+                                                                                 :if-does-not-exist :create :if-exists :supersede)
+                                                                (write-string string f)
+                                                                (finish-output f)
+                                                                (multiple-value-bind (fasl warningsp errorsp) (compile-file f)
+                                                                  (declare (ignore warningsp))
+                                                                  (if errorsp
+                                                                      (error "~@<Caught an error, while compiling ~S.~:@>" orig-filename)
+                                                                      (load fasl))))))))))))
+           (spectacle-components  ()  #+asdf (mapcar #'cdr
+                                                     (remove-if-not (of-type 'asdf:load-op)
+                                                                    (asdf::traverse (make-instance 'asdf:load-op :force :all)
+                                                                                    (asdf:find-system :desire))
+                                                                    :key #'car)))
+           (component-source-p    (x) #+asdf (typep x 'asdf:cl-source-file))
+           (component-system-p    (x) #+asdf (typep x 'asdf:system))
+           (component-name        (x) #+asdf (asdf:component-name x))
+           (component-filename    (x) #+asdf (asdf:component-pathname x))
+           (epilogue              ()         `(in-package :desire)))
+    (let* ((*package* (find-package :desire))
+           (*print-case* :downcase))
+      (with-output-to-file (f filename)
+        (format f ";;; -*- Mode: Lisp -*-~%~
+                   ;;;~%~%~
+                   ~{~S~%~%~}"
+                (prologue))
+        (write-line "(load-system" f)
+        (write-line "`(" f)
+        (iter (for c in (spectacle-components))
+              (cond ((component-source-p c)
+                     (let ((parent (component-parent c)))
+                       (when (component-impl-part-p parent)
+                         (next-iteration)))
+                     (write (list (component-filename c)
+                                  (file-as-string (component-filename c))) :stream f))
+                    ((component-system-p c)
+                     (when (component-impl-part-p c)
+                       (next-iteration))
+                     (write (component-name c) :stream f)))
+              (terpri f))
+        (write-line "))" f) ; close LOAD-SYSTEM
+        (write (epilogue) :stream f)))))
+
 (defgeneric save-definitions (&key seal commit-message)
   (:method (&key seal (commit-message "Updated DEFINITIONS"))
     "Save current model of the world within METASTORE.
