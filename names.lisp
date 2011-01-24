@@ -35,7 +35,7 @@ bootstrap."
   (let ((host-based-name (canonicalise-name (machine-instance))))
     (cond ((and *bootstrap-wishmaster*
                 (eq (name *bootstrap-wishmaster*) host-based-name))
-           (strconc* (string host-based-name) "-"
-                     (normalise-name (namestring root-pathname))))
+           (strconcat* (string host-based-name) "-"
+                       (canonicalise-name (namestring root-pathname))))
           (t
            host-based-name))))

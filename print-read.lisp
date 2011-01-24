@@ -94,7 +94,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                 (*desirable-interpreter-dispatch-table* '((remote . read-remote))))
           (when identity-p
             (when *read-time-definitions-author*
-              (definitions-error "~@<Inconsistent DEFINITIONS: ~
+              (definition-error "~@<Inconsistent DEFINITIONS: ~
                                      two distributors claim authorship.~:@>"))
             (setf *read-time-definitions-author* d))
           (setf (distributor-remotes d)
@@ -439,35 +439,39 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     (print-gate-local-definitions (gate *self*) stream)))
 
 (defun linearise-self (filename)
-  (labels ((impl-components       ()  #+sbcl '(:sb-posix :sb-grovel))
+  (labels ((prologue ()
+             `((mapcar #'require ',(append (impl-components)
+                                           '(#+asdf :asdf)))
+               (defun mark-component-loaded (x)
+                 #+asdf
+                 (let ((system (asdf:find-system x)))
+                   (asdf::register-system x system)
+                   (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
+                         (get-universal-time))))
+               (defmacro with-no-noise (() &body body)
+                 `(let (())
+                    ,@body))
+               (defun load-system (files)
+                 (let ((temp-file #p"temp.lisp"))
+                   (with-compilation-unit ()
+                     (loop :for designator :in files
+                        :do
+                        (if (stringp designator)
+                            (mark-component-loaded designator)
+                            (destructuring-bind (orig-filename string) designator
+                              (with-open-file (f temp-file :direction :output
+                                                 :if-does-not-exist :create :if-exists :supersede)
+                                (write-string string f)
+                                (finish-output f)
+                                (multiple-value-bind (fasl warningsp errorsp) (compile-file f)
+                                  (declare (ignore warningsp))
+                                  (if errorsp
+                                      (error "~@<Caught an error, while compiling ~S.~:@>" orig-filename)
+                                      (load fasl))))))))))))
+           (impl-components       ()  #+sbcl '(:sb-posix :sb-grovel))
            (component-parent      (x) #+asdf (asdf:component-parent x))
            (component-impl-part-p (x) #+asdf (member (string-upcase (asdf:component-name x)) (impl-components)
                                                      :test #'string=))
-           (prologue              ()  #+asdf `((mapcar #'require ',(append (impl-components)
-                                                                           '(#+asdf :asdf)))
-                                               (defun mark-component-loaded (x)
-                                                 #+asdf
-                                                 (let ((system (asdf:find-system x)))
-                                                   (asdf::register-system x system)
-                                                   (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
-                                                         (get-universal-time))))
-                                               (defun load-system (files)
-                                                 (let ((temp-file #p"temp.lisp"))
-                                                   (with-compilation-unit ()
-                                                     (loop :for designator :in files
-                                                        :do
-                                                        (if (stringp designator)
-                                                            (mark-component-loaded designator)
-                                                            (destructuring-bind (orig-filename string) designator
-                                                              (with-open-file (f temp-file :direction :output
-                                                                                 :if-does-not-exist :create :if-exists :supersede)
-                                                                (write-string string f)
-                                                                (finish-output f)
-                                                                (multiple-value-bind (fasl warningsp errorsp) (compile-file f)
-                                                                  (declare (ignore warningsp))
-                                                                  (if errorsp
-                                                                      (error "~@<Caught an error, while compiling ~S.~:@>" orig-filename)
-                                                                      (load fasl))))))))))))
            (spectacle-components  ()  #+asdf (mapcar #'cdr
                                                      (remove-if-not (of-type 'asdf:load-op)
                                                                     (asdf::traverse (make-instance 'asdf:load-op :force :all)

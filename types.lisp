@@ -119,7 +119,7 @@ SAVE-DEFINITIONS was called.")
    (to :accessor rel-to :initarg :to)))
 
 (defmethod string-id ((o relationship))
-  (format nil "<~A between ~A -> ~A>" (type-of o) (short-id (rel-from o)) (short-id (rel-to o))))
+  (format nil "<~A between ~A -> ~A>" (type-of o) (string-id (rel-from o)) (string-id (rel-to o))))
 
 (defclass definition-subscription (relationship)
   ((branch :accessor rel-branch :initarg :branch)))
