@@ -190,7 +190,7 @@
    #:simple-module-error
    #:simple-system-error
    #:simple-application-error
-   #:simple-repository-error 
+   #:simple-repository-error
    #:recursor-progress-halted
    #:counterproductive-system-definition
    #:insatiable-desire
@@ -199,6 +199,8 @@
    #:module-status
    #:module-public-packages
    ;; print-read.lisp
+   #:*bootstrap-time-components*
+   #:linearise-self
    #:serialise-definitions
    #:read-definitions
    #:save-definitions

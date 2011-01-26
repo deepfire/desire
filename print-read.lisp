@@ -439,38 +439,65 @@ The value returned is the merged type for SUBJECT-REMOTE.")
     (print-gate-local-definitions (gate *self*) stream)))
 
 (defun linearise-self (filename)
-  (labels ((prologue ()
-             `((mapcar #'require ',(append (impl-components)
-                                           '(#+asdf :asdf)))
-               (defun mark-component-loaded (x)
-                 #+asdf
-                 (let ((system (asdf:find-system x)))
-                   (asdf::register-system x system)
-                   (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
-                         (get-universal-time))))
+  (labels ((ecl-impl-components ()  '(:cmp))
+           (sbcl-impl-components () '(:sb-posix :sb-grovel))
+           (dump-time-impl-components ()
+             #+ecl  (ecl-impl-components)
+             #+sbcl (sbcl-impl-components))
+           (prologue (source-components &aux (source-files-nr (length source-components)))
+             `("#+sbcl  (declaim (sb-ext:muffle-conditions sb-ext:code-deletion-note sb-ext:compiler-note style-warning))"
+               "#+ecl"  (mapcar #'require ',(append (ecl-impl-components)))
+               "#+sbcl" (mapcar #'require ',(append (sbcl-impl-components)))
+               #+asdf   (require :asdf)
+               (write-string "; desire boot: (preparing..         )")
+               (finish-output)
+               (defun debugp ()
+                 #+asdf (asdf::getenv "DESIRE_DEBUG"))
+               (let ((*completed* 0))
+                 (defun update-status (&aux (total ,source-files-nr) (width 20.0))
+                   (write-char #\Return)
+                   (write-string "; desire boot: ")
+                   (write-char #\()
+                   (incf *completed*)
+                   (let ((barrier (/ (* width *completed*) total)))
+                     (dotimes (i (floor (* width *completed*) total))
+                       (write-char #\.))
+                     (write-char (if (= total *completed*) #\: #\>))
+                     (dotimes (i (ceiling (* width (- total *completed*)) total))
+                       (write-char #\Space)))
+                   (write-char #\))
+                   (finish-output)))
+               "#-(or ecl)" (defmacro with-no-noise-system-dependent (() &body body) `(progn ,@body))
+               "#+ecl (defmacro with-no-noise-system-dependent (() &body body) `(handler-bind ((c::compiler-note #'muffle-warning)) ,@body))"
                (defmacro with-no-noise (() &body body)
-                 `(let (())
-                    ,@body))
+                 `(let (*compile-verbose* *compile-print* *load-verbose*)
+                    (handler-bind ((style-warning #'muffle-warning))
+                      (with-no-noise-system-dependent ()
+                        ,@body))))
                (defun load-system (files)
                  (let ((temp-file #p"temp.lisp"))
-                   (with-compilation-unit ()
-                     (loop :for designator :in files
-                        :do
-                        (if (stringp designator)
-                            (mark-component-loaded designator)
-                            (destructuring-bind (orig-filename string) designator
-                              (with-open-file (f temp-file :direction :output
-                                                 :if-does-not-exist :create :if-exists :supersede)
-                                (write-string string f)
-                                (finish-output f)
-                                (multiple-value-bind (fasl warningsp errorsp) (compile-file f)
-                                  (declare (ignore warningsp))
-                                  (if errorsp
-                                      (error "~@<Caught an error, while compiling ~S.~:@>" orig-filename)
-                                      (load fasl))))))))))))
-           (impl-components       ()  #+sbcl '(:sb-posix :sb-grovel))
+                   (with-no-noise ()
+                     (with-compilation-unit ()
+                       (loop :for designator :in files
+                          :do
+                          (destructuring-bind (orig-filename string) designator
+                            (with-open-file (f temp-file :direction :output
+                                               :if-does-not-exist :create :if-exists :supersede)
+                              (when (debugp)
+                                (format f "~S~%" `(progn
+                                                    (format t "~%; desire boot, loading ~S~%" ;
+                                                            (namestring ,orig-filename))
+                                                    (finish-output))))
+                              (write-string string f)
+                              (finish-output f))
+                            (multiple-value-bind (fasl warningsp errorsp) (compile-file temp-file)
+                              (declare (ignore warningsp))
+                              (if errorsp
+                                  (error "~@<Caught an error, while compiling ~S.~:@>" orig-filename)
+                                  (load fasl)))
+                            (update-status)))))))))
            (component-parent      (x) #+asdf (asdf:component-parent x))
-           (component-impl-part-p (x) #+asdf (member (string-upcase (asdf:component-name x)) (impl-components)
+           (impl-component-p      (x) #+asdf (member (string-upcase (asdf:component-name x)) (dump-time-impl-components)
                                                      :test #'string=))
            (spectacle-components  ()  #+asdf (mapcar #'cdr
                                                      (remove-if-not (of-type 'asdf:load-op)
@@ -481,30 +508,45 @@ The value returned is the merged type for SUBJECT-REMOTE.")
            (component-system-p    (x) #+asdf (typep x 'asdf:system))
            (component-name        (x) #+asdf (asdf:component-name x))
            (component-filename    (x) #+asdf (asdf:component-pathname x))
-           (epilogue              ()         `(in-package :desire)))
+           (epilogue              ()         `((fresh-line)
+                                               (init))))
     (let* ((*package* (find-package :desire))
-           (*print-case* :downcase))
+           (*print-case* :downcase)
+           (spectacle-components (spectacle-components)))
       (with-output-to-file (f filename)
         (format f ";;; -*- Mode: Lisp -*-~%~
                    ;;;~%~%~
-                   ~{~S~%~%~}"
-                (prologue))
-        (write-line "(load-system" f)
-        (write-line "`(" f)
-        (iter (for c in (spectacle-components))
+                   ~{~A~%~}~
+                   ~{~A~%~}~
+                   (load-system~%~
+                   `(~%"
+                (iter (for clause in (prologue (remove-if-not (lambda (x)
+                                                                (and (component-source-p x)
+                                                                     (not (impl-component-p (component-parent x)))))
+                                                              spectacle-components)))
+                      (collect (xform-if-not #'stringp #'write-to-string clause)))
+                ;; should we need to upgrade ASDF, it's here..
+                ;; NOTE: remember to fetch the thing from the wishmaster!
+                `(#+(and nil asdf)
+                  ,(write-to-string `(when (char= #\1 (char asdf::*asdf-version* 0))
+                                       (load-system
+                                        `((#p"src/asdf2/asdf.lisp"
+                                             ,,(file-as-string (merge-pathnames "asdf.lisp" (module-pathname :asdf))))))))))
+        (iter (for c in spectacle-components)
               (cond ((component-source-p c)
                      (let ((parent (component-parent c)))
-                       (when (component-impl-part-p parent)
+                       (when (impl-component-p parent)
                          (next-iteration)))
-                     (write (list (component-filename c)
-                                  (file-as-string (component-filename c))) :stream f))
+                     (let ((filename (component-filename c)))
+                       (write (list filename (file-as-string filename)) :stream f)))
                     ((component-system-p c)
-                     (when (component-impl-part-p c)
+                     (when (impl-component-p c)
                        (next-iteration))
                      (write (component-name c) :stream f)))
               (terpri f))
-        (write-line "))" f) ; close LOAD-SYSTEM
-        (write (epilogue) :stream f)))))
+        (let ((*package* (find-package :common-lisp-user)))
+          (format f "))~%~%~{~S~%~%~}" (epilogue)))
+        (finish-output f)))))
 
 (defgeneric save-definitions (&key seal commit-message)
   (:method (&key seal (commit-message "Updated DEFINITIONS"))

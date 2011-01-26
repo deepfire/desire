@@ -22,6 +22,13 @@
 
 
 (defparameter *vcs-appendage-types* '(darcs hg))
+(defvar       *bootstrap-time-components* nil
+  "Populated by the linearised bootstrap (see LINEARISE-SELF),
+for the purpose of INIT-time download and registration of already-loaded components.")
+
+(defun source-hub-location-p (directory)
+  (some (lambda (x) (directory-exists-p (merge-pathnames x directory)))
+        '("alexandria/" "cl-ppcre/" "cffi/" "desire/" "iterate/")))
 
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
@@ -57,13 +64,15 @@
     (find-executable 'gzip)
     (find-executable 'gpg)))
 
-(defun init (path &key
+(defun init (&rest args
+             &key (path *default-pathname-defaults* path-specified-p)
              as
              bootstrap-url
              (wishmaster-name *default-bootstrap-wishmaster-name*)
              http-proxy
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
-             (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose)
+             (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose &aux
+             (path (fad:pathname-as-directory path)))
   "Make Desire fully functional, with PATH chosen as storage location.
 
 AS, when specified, will be interpreted as a distributor name, whose
@@ -71,6 +80,13 @@ definition will be looked up. Consequently, an attempt to establish
 an identity relationship with that definition will be performed,
 by looking up locally the modules defined for export. The rest of
 locally present modules will be marked as converted."
+  (unless (or path-specified-p
+              (source-hub-location-p path)
+              (yes-or-no-p "~@<;; ~@;~S doesn't contain familiar Lisp libraries.~_~
+                               Register it for use as a Lisp software storage root?~_~
+                               ('no' to choose another place):~:@>~%"
+                           path))
+    (apply #'init :path (read-line) (remove-from-plist args :path)))
   (flet ((default-bootstrap-wishmaster-urls ()
            (values (or bootstrap-url (strconcat* "git://" wishmaster-name "/"))
                    (strconcat* "http://" wishmaster-name "/" wishmaster-http-suffix))))
@@ -127,6 +143,15 @@ locally present modules will be marked as converted."
         (syncformat t ";;; Merging definitions from remote wishmasters...~%")
         (merge-remote-wishmasters))
       (setf *unsaved-definition-changes-p* nil)
+      ;;
+      ;; Obtain self, if doing bootstrap:
+      ;;
+      (when *bootstrap-time-components*
+        (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
+        (mapc #'update *bootstrap-time-components*)
+        #+asdf
+        (mapc #')
+        (setf *bootstrap-time-components* nil))
       ;;
       ;; Set up tools for import
       ;;

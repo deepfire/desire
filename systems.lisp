@@ -77,6 +77,15 @@ part is done by ENSURE-SYSTEM-LOADABLE.")
   (:method ((type (eql 'asdf-system)) locality)
     (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
 
+(defgeneric mark-system-loaded (system)
+  (:documentation
+   "Ensure that SYSTEM is registered as loaded within its backend.")
+  (:method ((o asdf-system))
+    (let ((system (asdf:find-system (name o))))
+      (asdf::register-system (name o) system)
+      (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
+            (get-universal-time)))))
+
 (defgeneric ensure-system-loadable (system &optional locality path)
   (:documentation
    "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's
