@@ -22,7 +22,7 @@
 
 
 (defparameter *vcs-appendage-types* '(darcs hg))
-(defvar       *bootstrap-time-components* nil
+(defvar       *bootstrap-time-component-names* nil
   "Populated by the linearised bootstrap (see LINEARISE-SELF),
 for the purpose of INIT-time download and registration of already-loaded components.")
 
@@ -146,12 +146,12 @@ locally present modules will be marked as converted."
       ;;
       ;; Obtain self, if doing bootstrap:
       ;;
-      (when *bootstrap-time-components*
+      (when *bootstrap-time-component-names*
         (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
-        (mapc #'update *bootstrap-time-components*)
+        (mapc #'update *bootstrap-time-component-names*)
         #+asdf
-        (mapc #')
-        (setf *bootstrap-time-components* nil))
+        (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
+        (setf *bootstrap-time-component-names* nil))
       ;;
       ;; Set up tools for import
       ;;

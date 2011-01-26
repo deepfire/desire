@@ -199,7 +199,7 @@
    #:module-status
    #:module-public-packages
    ;; print-read.lisp
-   #:*bootstrap-time-components*
+   #:*bootstrap-time-component-names*
    #:linearise-self
    #:serialise-definitions
    #:read-definitions
