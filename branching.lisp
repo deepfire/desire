@@ -55,6 +55,7 @@ Defaults to T.")
   "See if the master branch is driven by the user, that is out of desire's control."
   (not (ref= '("master") '("tracker") repo-dir)))
 
-(defun ensure-tracker-branch (&optional repo-dir (ref (get-head repo-dir)))
+(defun ensure-tracker-branch (&optional repo-dir ref &aux
+                              (ref (or ref (get-head repo-dir))))
   (unless (git-branch-present-p :tracker repo-dir)
     (git-set-branch :tracker repo-dir ref)))
