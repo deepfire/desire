@@ -81,7 +81,7 @@ system TYPE within LOCALITY."
     (labels ((check-present-system-sanity (system)
                (unless (typep system system-type)
                  (system-error system "~@<During system discovery in module ~A: asked for a system ~S of type ~S, got one of type ~S~:@>"
-                               system-type (name system) (type-of system)))
+                               (name module) (name system) system-type (type-of system)))
                (unless (eq module (system-module system))
                  (error 'system-name-conflict :system system :module module))
                system)
