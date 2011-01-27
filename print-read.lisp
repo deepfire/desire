@@ -531,7 +531,7 @@ bootstrap-geared, single-file form of desire.")
 (defbootvar *completed* 0)
 
 (defbootfun debugp ()
-  #+asdf (asdf::getenv "DESIRE_DEBUG"))
+  #+asdf (funcall (find-symbol "GETENV" :asdf) "DESIRE_DEBUG"))
 
 (defbootfun update-progress (total &aux (width 20.0))
   (write-char #\Return)
