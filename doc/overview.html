@@ -7,7 +7,7 @@ lang="en" xml:lang="en">
 <title>Overview of desire, a software knowledge and distribution system</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2010-01-16 19:37:31 MSK"/>
+<meta name="generated" content="2011-01-27 15:07:31 MSK"/>
 <meta name="author" content="Samium Gromoff"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -21,6 +21,9 @@ lang="en" xml:lang="en">
   .target { }
   .timestamp { color: #bebebe; }
   .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
   p.verse { margin-left: 3% }
   pre {
 	border: 1pt solid #AEBDCC;
@@ -31,10 +34,17 @@ lang="en" xml:lang="en">
         overflow:auto;
   }
   table { border-collapse: collapse; }
-  td, th { vertical-align: top; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
   dt { font-weight: bold; }
   div.figure { padding: 0.5em; }
   div.figure p { text-align: center; }
+  textarea { overflow-x: auto; }
   .linenr { font-size:smaller }
   .code-highlighted {background-color:#ffff00;}
   .org-info-js_info-navigation { border-style:none; }
@@ -67,6 +77,7 @@ lang="en" xml:lang="en">
  }
 /*]]>*///-->
 </script>
+
 </head>
 <body>
 <div id="content">
@@ -88,82 +99,82 @@ lang="en" xml:lang="en">
 <li><a href="#sec-2">2 What is desire (supposed to be)? </a></li>
 <li><a href="#sec-3">3 What can desire do for you <i>now</i>? </a>
 <ul>
-<li><a href="#sec-3.1">3.1 End user </a></li>
-<li><a href="#sec-3.2">3.2 Upstreams </a>
+<li><a href="#sec-3_1">3.1 End user </a></li>
+<li><a href="#sec-3_2">3.2 Upstreams </a>
 <ul>
-<li><a href="#sec-3.2.1">3.2.1 Non-participating upstreams </a></li>
-<li><a href="#sec-3.2.2">3.2.2 Participating upstreams a.k.a. wishmasters </a></li>
+<li><a href="#sec-3_2_1">3.2.1 Non-participating upstreams </a></li>
+<li><a href="#sec-3_2_2">3.2.2 Participating upstreams a.k.a. wishmasters </a></li>
 </ul>
 </li>
-<li><a href="#sec-3.3">3.3 Tinkerer </a></li>
+<li><a href="#sec-3_3">3.3 Tinkerer </a></li>
 </ul>
 </li>
 <li><a href="#sec-4">4 Installation </a>
 <ul>
-<li><a href="#sec-4.1">4.1 Requirements </a></li>
-<li><a href="#sec-4.2">4.2 Bootstrap and initialisation </a>
+<li><a href="#sec-4_1">4.1 Requirements </a></li>
+<li><a href="#sec-4_2">4.2 Bootstrap and initialisation </a>
 <ul>
-<li><a href="#sec-4.2.1">4.2.1 Manual installation </a></li>
-<li><a href="#sec-4.2.2">4.2.2 Semi-automated installation </a></li>
-<li><a href="#sec-4.2.3">4.2.3 Fully automated bootstrap </a></li>
-<li><a href="#sec-4.2.4">4.2.4 Bootstrap script reference </a></li>
+<li><a href="#sec-4_2_1">4.2.1 Manual installation </a></li>
+<li><a href="#sec-4_2_2">4.2.2 Semi-automated installation </a></li>
+<li><a href="#sec-4_2_3">4.2.3 Fully automated bootstrap </a></li>
+<li><a href="#sec-4_2_4">4.2.4 Bootstrap script reference </a></li>
 </ul></li>
 </ul>
 </li>
 <li><a href="#sec-5">5 Workflows </a>
 <ul>
-<li><a href="#sec-5.1">5.1 Re-initialisation </a></li>
-<li><a href="#sec-5.2">5.2 User aspect </a></li>
-<li><a href="#sec-5.3">5.3 Wishmaster aspect </a>
+<li><a href="#sec-5_1">5.1 Re-initialisation </a></li>
+<li><a href="#sec-5_2">5.2 User aspect </a></li>
+<li><a href="#sec-5_3">5.3 Wishmaster aspect </a>
 <ul>
 <li>
 <ul>
-<li><a href="#sec-5.3.1">5.3.1 External executables required for module conversion </a></li>
+<li><a href="#sec-5_3_1">5.3.1 External executables required for module conversion </a></li>
 </ul></li>
 </ul>
 </li>
-<li><a href="#sec-5.4">5.4 Extending definitions </a></li>
+<li><a href="#sec-5_4">5.4 Extending definitions </a></li>
 </ul>
 </li>
 <li><a href="#sec-6">6 Overview of terms </a>
 <ul>
-<li><a href="#sec-6.1">6.1 DEFINITIONS </a></li>
-<li><a href="#sec-6.2">6.2 Distributors </a>
+<li><a href="#sec-6_1">6.1 DEFINITIONS </a></li>
+<li><a href="#sec-6_2">6.2 Distributors </a>
 <ul>
-<li><a href="#sec-6.2.1">6.2.1 Wishmasters </a></li>
+<li><a href="#sec-6_2_1">6.2.1 Wishmasters </a></li>
 </ul>
 </li>
-<li><a href="#sec-6.3">6.3 Locations </a>
+<li><a href="#sec-6_3">6.3 Locations </a>
 <ul>
-<li><a href="#sec-6.3.1">6.3.1 Remotes </a>
+<li><a href="#sec-6_3_1">6.3.1 Remotes </a>
 <ul>
-<li><a href="#sec-6.3.1.1">6.3.1.1 Non-gate remotes </a></li>
-<li><a href="#sec-6.3.1.2">6.3.1.2 Gate remotes, or gates </a></li>
+<li><a href="#sec-6_3_1_1">6.3.1.1 Non-gate remotes </a></li>
+<li><a href="#sec-6_3_1_2">6.3.1.2 Gate remotes, or gates </a></li>
 </ul>
 </li>
-<li><a href="#sec-6.3.2">6.3.2 Localities </a></li>
-<li><a href="#sec-6.3.3">6.3.3 Local gate, or gate locality </a></li>
+<li><a href="#sec-6_3_2">6.3.2 Localities </a></li>
+<li><a href="#sec-6_3_3">6.3.3 Local gate, or gate locality </a></li>
 </ul>
 </li>
-<li><a href="#sec-6.4">6.4 Modules </a>
+<li><a href="#sec-6_4">6.4 Modules </a>
 <ul>
-<li><a href="#sec-6.4.1">6.4.1 Pseudo-modules </a></li>
+<li><a href="#sec-6_4_1">6.4.1 Pseudo-modules </a></li>
 </ul>
 </li>
-<li><a href="#sec-6.5">6.5 Systems </a></li>
-<li><a href="#sec-6.6">6.6 Applications </a></li>
+<li><a href="#sec-6_5">6.5 Systems </a></li>
+<li><a href="#sec-6_6">6.6 Applications </a></li>
 </ul>
 </li>
 <li><a href="#sec-7">7 API (aka end-user interface) </a>
 <ul>
-<li><a href="#sec-7.1">7.1 Initial chores &amp; storage location choice </a></li>
-<li><a href="#sec-7.2">7.2 Performing knowledge base queries </a></li>
-<li><a href="#sec-7.3">7.3 Making wishes </a>
+<li><a href="#sec-7_1">7.1 Initial chores &amp; storage location choice </a></li>
+<li><a href="#sec-7_2">7.2 Performing knowledge base queries </a></li>
+<li><a href="#sec-7_3">7.3 Making wishes </a>
 <ul>
-<li><a href="#sec-7.3.1">7.3.1 Reader macros for add-module </a></li>
+<li><a href="#sec-7_3_1">7.3.1 Reader macros for add-module </a></li>
 </ul>
 </li>
-<li><a href="#sec-7.4">7.4 Less frequently used functions </a></li>
+<li><a href="#sec-7_4">7.4 Less frequently used functions </a></li>
 </ul>
 </li>
 <li><a href="#sec-8">8 Shortcomings </a></li>
@@ -244,13 +255,14 @@ an automated patch applicator providing a set of XCVBified projects;
 <li>
 a buildbot with a master/slave architecture and a web interface
 supporting both static and dynamic page generation.
-
 </li>
 </ul>
 </li>
 </ul>
 
-<p>If this sounds like running in all directions, it probably is, as the goal
+
+<p>
+If this sounds like running in all directions, it probably is, as the goal
 of desire is to become a substrate supporting all source-code-related
 activities &ndash; module enumeration, (re-)distribution, upstream tracking,
 release management, packaging, testing etc.
@@ -266,9 +278,9 @@ release management, packaging, testing etc.
 
 </div>
 
-<div id="outline-container-3.1" class="outline-3">
-<h3 id="sec-3.1"><span class="section-number-3">3.1</span> End user </h3>
-<div class="outline-text-3" id="text-3.1">
+<div id="outline-container-3_1" class="outline-3">
+<h3 id="sec-3_1"><span class="section-number-3">3.1</span> End user </h3>
+<div class="outline-text-3" id="text-3_1">
 
 
 <p>
@@ -282,20 +294,21 @@ central system of a module<sup><a class="footref" name="fnr.3" href="#fn.3">3</a
 <li>
 you can ask it about available modules in an apropos-like fashion, because of
 the availability of an explicitly declared nomenclature;
-
 </li>
 </ul>
 
-<p>Additionally, you can use it to track non-lisp upstreams &ndash; without dependency handling,
+
+<p>
+Additionally, you can use it to track non-lisp upstreams &ndash; without dependency handling,
 for obvious reasons.
 </p>
 </div>
 
 </div>
 
-<div id="outline-container-3.2" class="outline-3">
-<h3 id="sec-3.2"><span class="section-number-3">3.2</span> Upstreams </h3>
-<div class="outline-text-3" id="text-3.2">
+<div id="outline-container-3_2" class="outline-3">
+<h3 id="sec-3_2"><span class="section-number-3">3.2</span> Upstreams </h3>
+<div class="outline-text-3" id="text-3_2">
 
 
 <p>
@@ -315,15 +328,16 @@ to end-users;
 </li>
 <li>
 buildbot-style testing on <a href="http://feelingofgreen.ru/desire-waterfall">http://feelingofgreen.ru/desire-waterfall</a> <sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup>.
-
 </li>
 </ul>
 
+
+
 </div>
 
-<div id="outline-container-3.2.1" class="outline-4">
-<h4 id="sec-3.2.1"><span class="section-number-4">3.2.1</span> Non-participating upstreams </h4>
-<div class="outline-text-4" id="text-3.2.1">
+<div id="outline-container-3_2_1" class="outline-4">
+<h4 id="sec-3_2_1"><span class="section-number-4">3.2.1</span> Non-participating upstreams </h4>
+<div class="outline-text-4" id="text-3_2_1">
 
 
 <p>
@@ -334,9 +348,9 @@ of modules released by you and of their dependencies, that is, if they are not r
 
 </div>
 
-<div id="outline-container-3.2.2" class="outline-4">
-<h4 id="sec-3.2.2"><span class="section-number-4">3.2.2</span> Participating upstreams a.k.a. wishmasters </h4>
-<div class="outline-text-4" id="text-3.2.2">
+<div id="outline-container-3_2_2" class="outline-4">
+<h4 id="sec-3_2_2"><span class="section-number-4">3.2.2</span> Participating upstreams a.k.a. wishmasters </h4>
+<div class="outline-text-4" id="text-3_2_2">
 
 
 <p>
@@ -357,17 +371,18 @@ semi-automatic ASDF-INSTALL exporter;
 </li>
 <li>
 possibility to run a local instance of the buildbot.
-
 </li>
 </ul>
+
+
 </div>
 </div>
 
 </div>
 
-<div id="outline-container-3.3" class="outline-3">
-<h3 id="sec-3.3"><span class="section-number-3">3.3</span> Tinkerer </h3>
-<div class="outline-text-3" id="text-3.3">
+<div id="outline-container-3_3" class="outline-3">
+<h3 id="sec-3_3"><span class="section-number-3">3.3</span> Tinkerer </h3>
+<div class="outline-text-3" id="text-3_3">
 
 
 <p>
@@ -385,11 +400,12 @@ web-sphere where people could register and manipulate their projects);
 <li>
 extend the buildbot infrastructure, perhaps adding things like automated
 package generation phase;
-
 </li>
 </ul>
 
-<p>I won't go into details at this point, but I believe that desire provides enough
+
+<p>
+I won't go into details at this point, but I believe that desire provides enough
 foothold to make all that feasible, if not easy-ish.
 </p>
 <p>
@@ -413,9 +429,9 @@ with a REPL fully prepared for input of desire commands.
 
 </div>
 
-<div id="outline-container-4.1" class="outline-3">
-<h3 id="sec-4.1"><span class="section-number-3">4.1</span> Requirements </h3>
-<div class="outline-text-3" id="text-4.1">
+<div id="outline-container-4_1" class="outline-3">
+<h3 id="sec-4_1"><span class="section-number-3">4.1</span> Requirements </h3>
+<div class="outline-text-3" id="text-4_1">
 
 
 <p>
@@ -425,9 +441,9 @@ Absolute requirements at this point are a POSIX shell, git and SBCL.
 
 </div>
 
-<div id="outline-container-4.2" class="outline-3">
-<h3 id="sec-4.2"><span class="section-number-3">4.2</span> Bootstrap and initialisation </h3>
-<div class="outline-text-3" id="text-4.2">
+<div id="outline-container-4_2" class="outline-3">
+<h3 id="sec-4_2"><span class="section-number-3">4.2</span> Bootstrap and initialisation </h3>
+<div class="outline-text-3" id="text-4_2">
 
 
 <p>
@@ -446,11 +462,12 @@ in a semi-automated manner, with assist of ASDF-INSTALL;
 </li>
 <li>
 in a completely automated manner, using the bootstrap script.
-
 </li>
 </ul>
 
-<p>Before we proceed, a crucial concept of the storage area must be discussed.
+
+<p>
+Before we proceed, a crucial concept of the storage area must be discussed.
 </p>
 <p>
 The storage area is a writable directory whose writable subdirectories
@@ -466,11 +483,12 @@ foreign formats;
 <li>
 metadata repositories used for desire's internode communication
 and information tracking.
-
 </li>
 </ul>
 
-<p>For the time being, the system-wide policy for maintenance of these
+
+<p>
+For the time being, the system-wide policy for maintenance of these
 storage roots is not devised yet, so they are effectively per-user.
 </p>
 <p>
@@ -480,9 +498,9 @@ desire you will need to prepare an empty writeable directory.
 
 </div>
 
-<div id="outline-container-4.2.1" class="outline-4">
-<h4 id="sec-4.2.1"><span class="section-number-4">4.2.1</span> Manual installation </h4>
-<div class="outline-text-4" id="text-4.2.1">
+<div id="outline-container-4_2_1" class="outline-4">
+<h4 id="sec-4_2_1"><span class="section-number-4">4.2.1</span> Manual installation </h4>
+<div class="outline-text-4" id="text-4_2_1">
 
 
 <pre class="example">
@@ -514,14 +532,13 @@ sbcl --no-userinit --no-sysinit --eval '(load (compile-file "asdf/asdf.lisp"))' 
 
 
 
-
 </div>
 
 </div>
 
-<div id="outline-container-4.2.2" class="outline-4">
-<h4 id="sec-4.2.2"><span class="section-number-4">4.2.2</span> Semi-automated installation </h4>
-<div class="outline-text-4" id="text-4.2.2">
+<div id="outline-container-4_2_2" class="outline-4">
+<h4 id="sec-4_2_2"><span class="section-number-4">4.2.2</span> Semi-automated installation </h4>
+<div class="outline-text-4" id="text-4_2_2">
 
 
 <p>
@@ -533,9 +550,9 @@ development version of ASDF which is not yet integrated into SBCL.
 
 </div>
 
-<div id="outline-container-4.2.3" class="outline-4">
-<h4 id="sec-4.2.3"><span class="section-number-4">4.2.3</span> Fully automated bootstrap </h4>
-<div class="outline-text-4" id="text-4.2.3">
+<div id="outline-container-4_2_3" class="outline-4">
+<h4 id="sec-4_2_3"><span class="section-number-4">4.2.3</span> Fully automated bootstrap </h4>
+<div class="outline-text-4" id="text-4_2_3">
 
 
 <p>
@@ -559,9 +576,9 @@ The reference for various controls follows.
 
 </div>
 
-<div id="outline-container-4.2.4" class="outline-4">
-<h4 id="sec-4.2.4"><span class="section-number-4">4.2.4</span> Bootstrap script reference </h4>
-<div class="outline-text-4" id="text-4.2.4">
+<div id="outline-container-4_2_4" class="outline-4">
+<h4 id="sec-4_2_4"><span class="section-number-4">4.2.4</span> Bootstrap script reference </h4>
+<div class="outline-text-4" id="text-4_2_4">
 
 
 <p>
@@ -580,11 +597,12 @@ in the provided storage location;
 </li>
 <li>
  optionally evaluate an expression in the resulting environment.
-
 </li>
 </ul>
 
-<p>Invoke it like this:
+
+<p>
+Invoke it like this:
 </p>
 
 
@@ -613,7 +631,6 @@ in either STORAGE-ROOT, or a location specified in ~/.climb-root
   -V          Print version.
   -h          Display a help message.
 </pre>
-
 
 
 
@@ -684,9 +701,9 @@ means described in the previous chapter.
 
 </div>
 
-<div id="outline-container-5.1" class="outline-3">
-<h3 id="sec-5.1"><span class="section-number-3">5.1</span> Re-initialisation </h3>
-<div class="outline-text-3" id="text-5.1">
+<div id="outline-container-5_1" class="outline-3">
+<h3 id="sec-5_1"><span class="section-number-3">5.1</span> Re-initialisation </h3>
+<div class="outline-text-3" id="text-5_1">
 
 
 <p>
@@ -729,9 +746,9 @@ registered in the ASDF registry.
 
 </div>
 
-<div id="outline-container-5.2" class="outline-3">
-<h3 id="sec-5.2"><span class="section-number-3">5.2</span> User aspect </h3>
-<div class="outline-text-3" id="text-5.2">
+<div id="outline-container-5_2" class="outline-3">
+<h3 id="sec-5_2"><span class="section-number-3">5.2</span> User aspect </h3>
+<div class="outline-text-3" id="text-5_2">
 
 
 <p>
@@ -739,7 +756,7 @@ Unless you happen to have some conversion tools, the set of modules available
 to your node is restricted to those available via git remotes.
 </p>
 <p>
-The LUST function serves to either initially download or update a set of defined
+The DESIRE function serves to either initially download or update a set of defined
 modules.
 </p>
 <p>
@@ -750,9 +767,9 @@ facilities. For a wider set of functions, please see section 3.
 
 </div>
 
-<div id="outline-container-5.3" class="outline-3">
-<h3 id="sec-5.3"><span class="section-number-3">5.3</span> Wishmaster aspect </h3>
-<div class="outline-text-3" id="text-5.3">
+<div id="outline-container-5_3" class="outline-3">
+<h3 id="sec-5_3"><span class="section-number-3">5.3</span> Wishmaster aspect </h3>
+<div class="outline-text-3" id="text-5_3">
 
 
 <p>
@@ -767,15 +784,16 @@ distributor<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup>, otherw
 <li>
  publishes the informations about non-released, converted modules
 in the gate remote's DEFINITIONS file
-
 </li>
 </ul>
 
+
+
 </div>
 
-<div id="outline-container-5.3.1" class="outline-5">
-<h5 id="sec-5.3.1"><span class="section-number-5">5.3.1</span> External executables required for module conversion </h5>
-<div class="outline-text-5" id="text-5.3.1">
+<div id="outline-container-5_3_1" class="outline-5">
+<h5 id="sec-5_3_1"><span class="section-number-5">5.3.1</span> External executables required for module conversion </h5>
+<div class="outline-text-5" id="text-5_3_1">
 
 
 <p>
@@ -790,17 +808,18 @@ The conversion is performed by external programs:
 </li>
 <li>
  git svn, debian package git-svn
-
 </li>
 </ul>
+
+
 </div>
 </div>
 
 </div>
 
-<div id="outline-container-5.4" class="outline-3">
-<h3 id="sec-5.4"><span class="section-number-3">5.4</span> Extending definitions </h3>
-<div class="outline-text-3" id="text-5.4">
+<div id="outline-container-5_4" class="outline-3">
+<h3 id="sec-5_4"><span class="section-number-3">5.4</span> Extending definitions </h3>
+<div class="outline-text-3" id="text-5_4">
 
 
 <p>
@@ -830,9 +849,9 @@ SAVE-DEFINITIONS writes out changes into
 
 </div>
 
-<div id="outline-container-6.1" class="outline-3">
-<h3 id="sec-6.1"><span class="section-number-3">6.1</span> DEFINITIONS </h3>
-<div class="outline-text-3" id="text-6.1">
+<div id="outline-container-6_1" class="outline-3">
+<h3 id="sec-6_1"><span class="section-number-3">6.1</span> DEFINITIONS </h3>
+<div class="outline-text-3" id="text-6_1">
 
 
 <p>
@@ -848,9 +867,9 @@ carry information about terms covered in this section.
 
 </div>
 
-<div id="outline-container-6.2" class="outline-3">
-<h3 id="sec-6.2"><span class="section-number-3">6.2</span> Distributors </h3>
-<div class="outline-text-3" id="text-6.2">
+<div id="outline-container-6_2" class="outline-3">
+<h3 id="sec-6_2"><span class="section-number-3">6.2</span> Distributors </h3>
+<div class="outline-text-3" id="text-6_2">
 
 
 <p>
@@ -865,9 +884,9 @@ of distribution of sets of similarly-accessible modules.
 
 </div>
 
-<div id="outline-container-6.2.1" class="outline-4">
-<h4 id="sec-6.2.1"><span class="section-number-4">6.2.1</span> Wishmasters </h4>
-<div class="outline-text-4" id="text-6.2.1">
+<div id="outline-container-6_2_1" class="outline-4">
+<h4 id="sec-6_2_1"><span class="section-number-4">6.2.1</span> Wishmasters </h4>
+<div class="outline-text-4" id="text-6_2_1">
 
 
 <p>
@@ -887,11 +906,12 @@ as a process of informing a client node, and
 </li>
 <li>
 upstream module conversion, which ends up populating the <i>gate</i>;
-
 </li>
 </ul>
 
-<p>The upstream module conversion process serves to simplify life of average
+
+<p>
+The upstream module conversion process serves to simplify life of average
 desire users by repackaging modules available through a variety
 of distribution means<sup><a class="footref" name="fnr.8" href="#fn.8">8</a></sup> into a common DVCS format.
 </p>
@@ -904,9 +924,9 @@ through the variable called <code>*SELF*</code>.
 
 </div>
 
-<div id="outline-container-6.3" class="outline-3">
-<h3 id="sec-6.3"><span class="section-number-3">6.3</span> Locations </h3>
-<div class="outline-text-3" id="text-6.3">
+<div id="outline-container-6_3" class="outline-3">
+<h3 id="sec-6_3"><span class="section-number-3">6.3</span> Locations </h3>
+<div class="outline-text-3" id="text-6_3">
 
 
 <p>
@@ -917,9 +937,9 @@ in which case they are, unsurprisingly, /remotes/<sup><a class="footref" name="f
 
 </div>
 
-<div id="outline-container-6.3.1" class="outline-4">
-<h4 id="sec-6.3.1"><span class="section-number-4">6.3.1</span> Remotes </h4>
-<div class="outline-text-4" id="text-6.3.1">
+<div id="outline-container-6_3_1" class="outline-4">
+<h4 id="sec-6_3_1"><span class="section-number-4">6.3.1</span> Remotes </h4>
+<div class="outline-text-4" id="text-6_3_1">
 
 
 <p>
@@ -942,15 +962,16 @@ an internet port number, and
 </li>
 <li>
 some additional quirks necessary to access the remote repository;
-
 </li>
 </ul>
 
+
+
 </div>
 
-<div id="outline-container-6.3.1.1" class="outline-5">
-<h5 id="sec-6.3.1.1"><span class="section-number-5">6.3.1.1</span> Non-gate remotes </h5>
-<div class="outline-text-5" id="text-6.3.1.1">
+<div id="outline-container-6_3_1_1" class="outline-5">
+<h5 id="sec-6_3_1_1"><span class="section-number-5">6.3.1.1</span> Non-gate remotes </h5>
+<div class="outline-text-5" id="text-6_3_1_1">
 
 
 <p>
@@ -961,9 +982,9 @@ nodes not participating in the desire protocol.
 
 </div>
 
-<div id="outline-container-6.3.1.2" class="outline-5">
-<h5 id="sec-6.3.1.2"><span class="section-number-5">6.3.1.2</span> Gate remotes, or gates </h5>
-<div class="outline-text-5" id="text-6.3.1.2">
+<div id="outline-container-6_3_1_2" class="outline-5">
+<h5 id="sec-6_3_1_2"><span class="section-number-5">6.3.1.2</span> Gate remotes, or gates </h5>
+<div class="outline-text-5" id="text-6_3_1_2">
 
 
 <p>
@@ -988,9 +1009,9 @@ in such a way are advertised differently from those which are considered
 
 </div>
 
-<div id="outline-container-6.3.2" class="outline-4">
-<h4 id="sec-6.3.2"><span class="section-number-4">6.3.2</span> Localities </h4>
-<div class="outline-text-4" id="text-6.3.2">
+<div id="outline-container-6_3_2" class="outline-4">
+<h4 id="sec-6_3_2"><span class="section-number-4">6.3.2</span> Localities </h4>
+<div class="outline-text-4" id="text-6_3_2">
 
 
 <p>
@@ -1013,9 +1034,9 @@ and purposefully so, this concept is not currently employed.
 
 </div>
 
-<div id="outline-container-6.3.3" class="outline-4">
-<h4 id="sec-6.3.3"><span class="section-number-4">6.3.3</span> Local gate, or gate locality </h4>
-<div class="outline-text-4" id="text-6.3.3">
+<div id="outline-container-6_3_3" class="outline-4">
+<h4 id="sec-6_3_3"><span class="section-number-4">6.3.3</span> Local gate, or gate locality </h4>
+<div class="outline-text-4" id="text-6_3_3">
 
 
 <p>
@@ -1031,20 +1052,21 @@ export of the aforementioned converted modules, and
 </li>
 <li>
 distribution point for modules released by the local distributor.
-
 </li>
 </ul>
 
-<p>Naturally, the last two points only apply to well-known wishmasters.
+
+<p>
+Naturally, the last two points only apply to well-known wishmasters.
 </p>
 </div>
 </div>
 
 </div>
 
-<div id="outline-container-6.4" class="outline-3">
-<h3 id="sec-6.4"><span class="section-number-3">6.4</span> Modules </h3>
-<div class="outline-text-3" id="text-6.4">
+<div id="outline-container-6_4" class="outline-3">
+<h3 id="sec-6_4"><span class="section-number-3">6.4</span> Modules </h3>
+<div class="outline-text-3" id="text-6_4">
 
 
 <p>
@@ -1085,15 +1107,16 @@ in DEFINITIONS;
 <li>
 hidden, modules physically present in the local gate, but made
 unavailable to anonymous remote clients<sup><a class="footref" name="fnr.11" href="#fn.11">11</a></sup>.
-
 </li>
 </ul>
 
+
+
 </div>
 
-<div id="outline-container-6.4.1" class="outline-4">
-<h4 id="sec-6.4.1"><span class="section-number-4">6.4.1</span> Pseudo-modules </h4>
-<div class="outline-text-4" id="text-6.4.1">
+<div id="outline-container-6_4_1" class="outline-4">
+<h4 id="sec-6_4_1"><span class="section-number-4">6.4.1</span> Pseudo-modules </h4>
+<div class="outline-text-4" id="text-6_4_1">
 
 
 <p>
@@ -1107,17 +1130,18 @@ information storage and exchange.  Currently there are two common pseudo-modules
 <li>
 <b>.local-meta</b>, a hidden repository used to store local information, which
 currently amounts to tracking unpublished and hidden modules.
-
 </li>
 </ul>
+
+
 </div>
 </div>
 
 </div>
 
-<div id="outline-container-6.5" class="outline-3">
-<h3 id="sec-6.5"><span class="section-number-3">6.5</span> Systems </h3>
-<div class="outline-text-3" id="text-6.5">
+<div id="outline-container-6_5" class="outline-3">
+<h3 id="sec-6_5"><span class="section-number-3">6.5</span> Systems </h3>
+<div class="outline-text-3" id="text-6_5">
 
 
 <p>
@@ -1149,9 +1173,9 @@ for local (and not-so-local) needs.
 
 </div>
 
-<div id="outline-container-6.6" class="outline-3">
-<h3 id="sec-6.6"><span class="section-number-3">6.6</span> Applications </h3>
-<div class="outline-text-3" id="text-6.6">
+<div id="outline-container-6_6" class="outline-3">
+<h3 id="sec-6_6"><span class="section-number-3">6.6</span> Applications </h3>
+<div class="outline-text-3" id="text-6_6">
 
 
 <p>
@@ -1172,9 +1196,9 @@ and actionable.
 
 </div>
 
-<div id="outline-container-7.1" class="outline-3">
-<h3 id="sec-7.1"><span class="section-number-3">7.1</span> Initial chores &amp; storage location choice </h3>
-<div class="outline-text-3" id="text-7.1">
+<div id="outline-container-7_1" class="outline-3">
+<h3 id="sec-7_1"><span class="section-number-3">7.1</span> Initial chores &amp; storage location choice </h3>
+<div class="outline-text-3" id="text-7_1">
 
 
 <dl>
@@ -1203,16 +1227,17 @@ The local distributor set up during INIT, be it well-known or not.
 
 <p>
 The root directory containing all VCS-specific locations of LOCAL-DISTRIBUTOR, chosen during INIT-time.
-</p>
-</dd>
+</p></dd>
 </dl>
-</div>
+
 
 </div>
 
-<div id="outline-container-7.2" class="outline-3">
-<h3 id="sec-7.2"><span class="section-number-3">7.2</span> Performing knowledge base queries </h3>
-<div class="outline-text-3" id="text-7.2">
+</div>
+
+<div id="outline-container-7_2" class="outline-3">
+<h3 id="sec-7_2"><span class="section-number-3">7.2</span> Performing knowledge base queries </h3>
+<div class="outline-text-3" id="text-7_2">
 
 <dl>
 <dt>distributor name &amp;key (if-does-not-exist :error) =&gt; distributor</dt><dd>
@@ -1319,33 +1344,34 @@ and the output of the toucher executable as the secondary value.
 <p>
 Determine whether system designated by SYSTEM-DESIGNATOR is loadable in LOCALITY, which defaults
 to the local gate locality.
-</p>
-</dd>
+</p></dd>
 </dl>
-</div>
+
 
 </div>
 
-<div id="outline-container-7.3" class="outline-3">
-<h3 id="sec-7.3"><span class="section-number-3">7.3</span> Making wishes </h3>
-<div class="outline-text-3" id="text-7.3">
+</div>
+
+<div id="outline-container-7_3" class="outline-3">
+<h3 id="sec-7_3"><span class="section-number-3">7.3</span> Making wishes </h3>
+<div class="outline-text-3" id="text-7_3">
 
 
 <dl>
-<dt>lust &amp;rest module-names =&gt; boolean</dt><dd>
+<dt>desire module-name-or-names =&gt; boolean</dt><dd>
 
 <p>
-Make modules with MODULE-NAMES locally available.
+Make modules with MODULE-NAME-OR-NAMES locally available.
 </p>
 </dd>
-<dt>add-module url &amp;key module-name systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) =&gt; module</dt><dd>
+<dt>add-module url &amp;key module-name systemlessp (system-type desr:*default-system-type*) obtain =&gt; module</dt><dd>
 
 <p>
 Define a new module, with download location specified by URL, and the module's name
 either deduced from the URL, or provided via MODULE-NAME.
 </p>
 <p>
-When LUST is non-NIL, the module is fetched after its definition is internalised.
+When OBTAIN is non-NIL, the module is fetched after its definition is internalised.
 </p>
 </dd>
 <dt>update module-designator &amp;optional (locality (gate <b>self</b>)) =&gt; &lt;no values&gt;</dt><dd>
@@ -1368,16 +1394,10 @@ Stop advertising MODULE in DEFINITIONS, as well as make it inaccessible
 to general public through LOCALITY.
 </p>
 </dd>
-<dt><code>*auto-lust*</code> =&gt; boolean</dt><dd>
-
-<p>
-Whether to automatically LUST the modules during ADD-MODULE.  Defaults to NIL.
-</p>
-</dd>
 <dt><code>*fetch-errors-serious*</code> =&gt; boolean</dt><dd>
 
 <p>
-Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE.
+Whether to raise an error when external executables fail to fetch modules during DESIRE or UPDATE.
 Defaults to NIL.
 </p>
 </dd>
@@ -1404,17 +1424,17 @@ a clean one to proceed, do accordingly to the value of this variable:
 :ERROR  -  raise an error.
 </li>
 </ul>
-
-<p>Defaults to :RESET.
-</p>
 </dd>
 </dl>
 
+<p>Defaults to :RESET.
+</p>
+
 </div>
 
-<div id="outline-container-7.3.1" class="outline-4">
-<h4 id="sec-7.3.1"><span class="section-number-4">7.3.1</span> Reader macros for add-module </h4>
-<div class="outline-text-4" id="text-7.3.1">
+<div id="outline-container-7_3_1" class="outline-4">
+<h4 id="sec-7_3_1"><span class="section-number-4">7.3.1</span> Reader macros for add-module </h4>
+<div class="outline-text-4" id="text-7_3_1">
 
 
 <p>
@@ -1422,7 +1442,7 @@ Following reader macro is enabled by install-add-module-reader:
 </p>
 <pre class="example">
 #@"u://r.l"
-#@("u://r.l" &amp;optional module-name &amp;key (lust *auto-lust*))
+#@("u://r.l" &amp;key name obtain)
 </pre>
 
 
@@ -1431,9 +1451,9 @@ Following reader macro is enabled by install-add-module-reader:
 
 </div>
 
-<div id="outline-container-7.4" class="outline-3">
-<h3 id="sec-7.4"><span class="section-number-3">7.4</span> Less frequently used functions </h3>
-<div class="outline-text-3" id="text-7.4">
+<div id="outline-container-7_4" class="outline-3">
+<h3 id="sec-7_4"><span class="section-number-3">7.4</span> Less frequently used functions </h3>
+<div class="outline-text-3" id="text-7_4">
 
 
 <dl>
@@ -1481,9 +1501,10 @@ optionally committing changes, when SEAL is non-NIL.
 <p>
 Append definitions currently available in METASTORE to the current idea about
 desire's domain.
-</p>
-</dd>
+</p></dd>
 </dl>
+
+
 </div>
 </div>
 
@@ -1514,9 +1535,9 @@ not exactly being common
 <li>
 calls out to an obscene amount of external executables, thereby only
 being able to guess about failure reasons
-
 </li>
 </ul>
+
 
 
 <hr/>
@@ -1575,10 +1596,9 @@ a .git/git-daemon-export-ok file.
 </div>
 <div id="postamble">
 <p class="author"> Author: Samium Gromoff
-<a href="mailto:_deepfire@feelingofgreen.ru">&lt;_deepfire@feelingofgreen.ru&gt;</a>
 </p>
-<p class="date"> Date: 2010-01-16 19:37:31 MSK</p>
-<p class="creator">HTML generated by org-mode 6.33f in emacs 23</p>
+<p class="date"> Date: 2011-01-27 15:07:31 MSK</p>
+<p class="creator">HTML generated by org-mode 7.4 in emacs 23</p>
 </div>
 </div>
 </body>

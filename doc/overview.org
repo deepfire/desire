@@ -302,7 +302,7 @@ registered in the ASDF registry.
 Unless you happen to have some conversion tools, the set of modules available
 to your node is restricted to those available via git remotes.
 
-The LUST function serves to either initially download or update a set of defined
+The DESIRE function serves to either initially download or update a set of defined
 modules.
 
 APROPOS-DESR and LIST-MODULES provide convenient knowledge base query
@@ -587,14 +587,14 @@ and actionable.
 
 *** Making wishes
 
-      - lust &rest module-names => boolean ::
-        Make modules with MODULE-NAMES locally available.
+      - desire module-name-or-names => boolean ::
+        Make modules with MODULE-NAME-OR-NAMES locally available.
 
-      - add-module url &key module-name systemlessp (system-type desr:*default-system-type*) (lust desr:*auto-lust*) => module ::
+      - add-module url &key module-name systemlessp (system-type desr:*default-system-type*) obtain => module ::
         Define a new module, with download location specified by URL, and the module's name
         either deduced from the URL, or provided via MODULE-NAME.
 
-        When LUST is non-NIL, the module is fetched after its definition is internalised.
+        When OBTAIN is non-NIL, the module is fetched after its definition is internalised.
 
       - update module-designator &optional (locality (gate *self*)) => <no values> ::
         Update a module specified by MODULE-DESIGNATOR, possibly specifying the target LOCALITY.
@@ -607,11 +607,8 @@ and actionable.
         Stop advertising MODULE in DEFINITIONS, as well as make it inaccessible
         to general public through LOCALITY.
 
-      - =*auto-lust*= => boolean ::
-        Whether to automatically LUST the modules during ADD-MODULE.  Defaults to NIL.
-
       - =*fetch-errors-serious*= => boolean ::
-        Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE.
+        Whether to raise an error when external executables fail to fetch modules during DESIRE or UPDATE.
         Defaults to NIL.
 
       - =*follow-upstream*= => boolean ::
@@ -631,7 +628,7 @@ and actionable.
 Following reader macro is enabled by install-add-module-reader:
 
 : #@"u://r.l"
-: #@("u://r.l" &optional module-name &key (lust *auto-lust*))
+: #@("u://r.l" &key name obtain)
 
 *** Less frequently used functions
 

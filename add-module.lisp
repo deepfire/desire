@@ -21,8 +21,6 @@
 (in-package :desire)
 
 
-(defvar *auto-lust* nil
-  "Whether to automatically LUST the modules during ADD-MODULE.")
 (defvar *verbose-internalisation* nil
   "Whether to comment on the progress of matching provided URLs vs. candidate remotes.")
 
@@ -272,12 +270,12 @@ The values returned are:
     (when credentials
       (push (list module-name (cred-name credentials)) (remote-module-credentials remote)))))
 
-(defun add-module (url &optional module-name &rest remote-args &key name path-whitelist path-blacklist (if-touch-fails :error) vcs-type (lust *auto-lust*) &allow-other-keys &aux
+(defun add-module (url &optional module-name &rest remote-args &key name path-whitelist path-blacklist (if-touch-fails :error) vcs-type obtain &allow-other-keys &aux
                    (module-name (when module-name (canonicalise-name module-name))))
   (multiple-value-bind (remote credentials module-name maybe-umbrella-name) (apply #'ensure-url-remote url module-name :vcs-type-hint vcs-type
                                                                                    (remove-from-plist remote-args
                                                                                                       :path-whitelist :path-blacklist
-                                                                                                      :if-touch-fails :vcs-type :lust))
+                                                                                                      :if-touch-fails :vcs-type :obtain))
     (if remote
         (lret ((module (ensure-remote-module remote module-name (or maybe-umbrella-name module-name)
                                              :credentials credentials :path-whitelist path-whitelist :path-blacklist path-blacklist)))
@@ -297,15 +295,15 @@ The values returned are:
                 (:abort (return-from add-module nil))
                 (:warn (format t "~@<;; ~@;Failed to reach module ~A via remote deduced from URL ~S:~%~S.~:@>" module-name url output))
                 (:continue)))
-            (when lust
+            (when obtain
               (let ((*fetch-errors-serious* t))
-                (lust (name module))))))
+                (desire (name module))))))
         (format t "~@<;; ~@;Re~@<mote for ~A was not created.~:@>~:@>~%" url))))
 
 (defun add-module-reader (stream &optional char sharp)
   (declare (ignore char sharp))
-  (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (if-touch-fails :error) (lust *auto-lust*)) (ensure-cons (read stream nil nil t))
-    (add-module url name :if-touch-fails if-touch-fails :lust lust :name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
+  (destructuring-bind (url &key name remote-name vcs-type path-whitelist path-blacklist (if-touch-fails :error) obtain) (ensure-cons (read stream nil nil t))
+    (add-module url name :if-touch-fails if-touch-fails :obtain obtain :name remote-name :vcs-type vcs-type :path-whitelist path-whitelist :path-blacklist path-blacklist)))
 
 (defun install-add-module-reader (&optional (char #\@))
   (set-dispatch-macro-character #\# char 'add-module-reader *readtable*))
@@ -313,18 +311,19 @@ The values returned are:
 (defun add-module-local (name &optional (mode :publish) (locality (gate *self*)) &key path-whitelist path-blacklist)
   (let ((name (canonicalise-name name)))
     (unless (typep locality 'gate)
-      (locality-error locality "~@<Asked to add module ~A to a non-gate ~A.~:@>" name locality))
+      (locality-error locality "~@<Asked to add module ~A at a non-gate ~A.~:@>" name (string-id locality)))
     (when (location-defines-module-p locality name)
       (module-error name "~@<Module ~A is already provided by ~A.~:@>" name (locality-pathname locality)))
     (let ((repo-dir (module-pathname name locality)))
       (unless (git-repository-present-p repo-dir)
         (module-error name "~@<Module ~A doesn't appear to have a repository with objects in ~S.~:@>" name repo-dir)))
-    (let* ((present (module name :if-does-not-exist :continue))
-           (m (or present (make-instance 'module :name name :umbrella name :path-whitelist path-whitelist :path-blacklist path-blacklist))))
-      (ecase mode
-        (:publish (location-link-module locality m))
-        (:convert (push name (gate-converted-module-names locality)))
-        (:unpublished (push name (gate-unpublished-module-names locality)))
-        (:hidden (push name (gate-hidden-module-names locality))))
-      (notice-module-repository m t locality)
-      (desire (list name) :skip-present t :seal nil))))
+    (with-module name
+        (lret* ((present (module name :if-does-not-exist :continue))
+                (m (or present (make-instance 'module :name name :umbrella name :path-whitelist path-whitelist :path-blacklist path-blacklist))))
+          (ecase mode
+            (:publish (location-link-module locality m))
+            (:convert (push name (gate-converted-module-names locality)))
+            (:unpublished (push name (gate-unpublished-module-names locality)))
+            (:hidden (push name (gate-hidden-module-names locality))))
+          (notice-module-repository m t locality))
+      (remove-module name))))

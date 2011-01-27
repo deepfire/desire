@@ -251,7 +251,7 @@ Defined keywords:
    - COMPLETE - whether to obtain all modules' systems, even those not
      part of main module systems' complete dependency graphs, default is NIL."
   (when-let ((module-system-specs (mapcar (curry #'xform-if-not #'consp #'list)
-                                          (map-list-tree (compose #'canonicalise-name #'coerce-to-name) desires))))
+                                          (map-list-tree (compose #'canonicalise-name #'coerce-to-name) (ensure-list desires)))))
     (syncformat t "; Satisfying desire for ~D module~:*~P:~%" (length module-system-specs))
     (satisfy-modules module-system-specs (gate *self*) *default-system-type* nil (mapcar #'make-unwanted-present
                                                                                          *implementation-provided-system-names*)
@@ -264,11 +264,6 @@ Defined keywords:
                                                            (mapcar #'car module-system-specs) (endp (rest module-system-specs)))))
     (syncformat t "; All done.~%")
     (values)))
-
-(defun lust (&rest desires)
-  "A spread interface function for DESIRE.
-Updates present specified modules and skips present depended ones."
-  (desire desires))
 
 (defun loadsys (system &key verbose)
   "Load SYSTEM, while attempting to recover missing systems,
