@@ -992,6 +992,7 @@ This notably excludes converted modules."
 (define-simple-error module-error :object-initarg :module)
 (define-simple-error system-error :object-initarg :system)
 (define-simple-error application-error :object-initarg :application)
+(define-simple-error repository-error :object-initarg :pathname)
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))
