@@ -21,6 +21,11 @@
 (in-package :desire)
 
 
+(defvar *internal-module-names*
+  (mapcar #'canonicalise-name
+          '(".META" ".LOCAL-META"))
+  "The list of module names reserved to desire itself.")
+
 (define-reported-condition module-systems-unloadable-error (module-error)
   ((systems :reader condition-systems :initarg :systems))
   (:report (module systems)
@@ -51,11 +56,14 @@
          (path (truename repo-dir))
          (subdirs (unless totally-black
                     (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=))
-                               (directory (subdirectory path '(:wild))))))
+                               (with-simple-restart (continue "~@<Return NIL.~:@>")
+                                 (directory (subdirectory path '(:wild)))))))
          (pass1 (unless totally-black
-                  (append (directory (subfile path '(:wild) :type system-pathname-type))
+                  (append (with-simple-restart (continue "~@<Return NIL.~:@>")
+                            (directory (subfile path '(:wild) :type system-pathname-type)))
                           (iter (for subdir in subdirs)
-                                (appending (directory (subwild subdir '(:wild-inferiors) :name :wild :type system-pathname-type)))))))
+                                (appending (with-simple-restart (continue "~@<Return NIL.~:@>")
+                                             (directory (subwild subdir '(:wild-inferiors) :name :wild :type system-pathname-type))))))))
          (blacklist-patterns (unless totally-black
                                (list* (subwild path '("test"))
                                       (subwild path '("tests"))
@@ -87,7 +95,7 @@ system TYPE within LOCALITY."
     (labels ((check-present-system-sanity (system)
                (unless (typep system system-type)
                  (system-error system "~@<During system discovery in module ~A: asked for a system ~S of type ~S, got one of type ~S~:@>"
-                               system-type (name system) (type-of system)))
+                               (name module) (name system) system-type (type-of system)))
                (unless (eq module (system-module system))
                  (error 'system-name-conflict :system system :module module))
                system)
@@ -200,7 +208,7 @@ meets desire's operational requirements.")
     (let ((repo-dir (module-pathname o locality)))
       (when *verbose-repository-maintenance*
         (format t "~@<;; ~@;Processing ~A's repository at ~S~:@>~%" (name o) repo-dir))
-      (ensure-tracker-branch repo-dir (ref-value "master" repo-dir))
+      (ensure-tracker-branch repo-dir (ref-value "master" repo-dir :if-does-not-exist :continue))
       (discover-and-register-module-systems o *verbose-repository-maintenance* *default-system-type* locality)
       (dolist (s (module-systems o))
         (direct-system-dependencies s))
@@ -217,18 +225,37 @@ meets desire's operational requirements.")
 (defgeneric module-post-install (name module locality pathname)
   (:method ((name symbol) (module module) (locality locality) pathname)))
 
-(defun enumerate-present-modules-and-systems (&key drop-system-caches verbose)
-  (when drop-system-caches
-    (drop-system-caches *default-system-type*))
-  (with-measured-time-lapse (sec)
-      (do-present-modules (module)
-        (when verbose
-          (syncformat t ";;; Processing module ~A~%" (name module)))
-        (notice-module-repository module nil))
-    (when verbose
-      (syncformat t ";;; Ensured branches and performed system discovery and query in ~D seconds.~%" sec)))
-  (mapc #'ensure-host-system *implementation-provided-system-names*)
-  (with-measured-time-lapse (sec) (update-system-set-dependencies t)
-    (when verbose
-      (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec)))
+;;;;
+;;;; Batch operation
+;;;;
+(defmacro with-batch-module-operation ((failed-modules) &body body)
+  `(let (,failed-modules)
+     (handler-bind ((error (lambda (c)
+                             (assert (boundp '*module*))
+                             (push (list *module* c) ,failed-modules)
+                             (invoke-restart (find-restart 'skip-module)))))
+       ,@body)))
+
+;;;
+;;; Actual batch operations
+(defun scan-locality (&optional (locality (gate *self*)) &key (known t) (unknown t))
+  ""
+  (with-batch-module-operation (failed)
+    (when known
+      (do-present-modules (module locality)
+        (notice-module-repository module nil locality)))
+    (when unknown
+      (when-let ((new (iter (for subdir in (directory (merge-pathnames "*/" (locality-pathname locality))))
+                            (let ((name (canonicalise-name (lastcar (pathname-directory subdir)))))
+                              (with-module name
+                                  (when-let ((module (and (not (module name :if-does-not-exist :continue))
+                                                          (not (member name *internal-module-names*))
+                                                          (git-repository-present-p subdir)
+                                                          (add-module-local name :publish locality))))
+                                    (collect (name module))))))))
+        (format t "~@<;; ~@;Found new modules:~{ ~A~}~:@>~%" new)))
+    (when failed
+      (format t "~@<;; ~@;While processing ~A, following modules failed:~{ ~A~}~:@>~%"
+              (locality-pathname locality) (mapcar (compose #'coerce-to-name #'first) failed))))
+  (update-system-set-dependencies t)
   (values))

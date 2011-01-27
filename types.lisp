@@ -20,6 +20,19 @@
 
 (in-package :desire)
 
+;;;;
+;;;; Fundamentals
+;;;;
+(defun canonicalise-name (name &optional preserve-case (package (load-time-value (find-package :desire))))
+  "Given an object's NAME, whether in form of a string, keyword or a symbol
+in any other package, return the canonical name, as a symbol in the
+'DESIRE' package.."
+  (intern (xform (not preserve-case) #'string-upcase
+                 (etypecase name
+                   (symbol (symbol-name name))
+                   (string name)))
+          package))
+
 ;;;
 ;;; Knobs
 ;;;
@@ -654,13 +667,14 @@ instead."
 
 (defun compute-path-form (path)
   `(lambda ()
-     (declare (special *module* *umbrella*))
      (list ,@(iter (for (elt . rest) on path)
                    (collect
                        (etypecase elt
                          ((or string (eql :no/) (eql :/))
                           elt)
-                         ((member *module* *umbrella*)
+                         ((member *module*)
+                          `(funcall (find-symbol "NAME" :desire) (symbol-value (find-symbol ,(symbol-name elt) :desire))))
+                         ((member *umbrella*)
                           `(symbol-value (find-symbol ,(symbol-name elt) :desire)))
                          (t
                           (definition-error
@@ -877,7 +891,7 @@ Find out whether SYSTEM is hidden."
 ;;;; Object nomenclature
 ;;;;
 (define-root-container *distributors*   distributor   :name-transform-fn coerce-to-namestring :remover %remove-distributor :coercer t :mapper map-distributors :iterator do-distributors)
-(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :remover %remove-module :coercer t :mapper map-modules :if-exists :error :iterator do-modules)
+(define-root-container *modules*        module        :name-transform-fn coerce-to-namestring :remover %remove-module :coercer t :mapper map-modules :if-exists :error)
 (define-root-container *leaves*         leaf          :name-transform-fn coerce-to-namestring :type module :mapper map-leaves :if-exists :continue)
 (define-root-container *nonleaves*      nonleaf       :name-transform-fn coerce-to-namestring :type module :mapper map-nonleaves :if-exists :continue)
 (define-root-container *systems*        system        :name-transform-fn coerce-to-namestring :remover %remove-system :coercer t :mapper map-systems :if-exists :error :iterator do-systems)
@@ -1007,6 +1021,7 @@ This notably excludes converted modules."
 (define-simple-error module-error :object-initarg :module)
 (define-simple-error system-error :object-initarg :system)
 (define-simple-error application-error :object-initarg :application)
+(define-simple-error repository-error :object-initarg :pathname)
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))
@@ -1090,11 +1105,35 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 ;;;; Modules, in context of knowledge base
 ;;;;
 (defvar *module*)
+
+(defun invoke-operating-on-module (module fn handle-fn)
+  (let ((*module* module))
+    (restart-case (funcall fn)
+      (skip-module ()
+        :report "Skip processing this module, marking it as having failed the operation."
+        (funcall handle-fn)
+        (return-from invoke-operating-on-module nil)))))
+
+(defmacro with-module (module form &body handle-body)
+  "Evaluate FORM within dynamic context, where *MODULE* is bound to
+the result of evaluation of MODULE, and with a restart, called
+SKIP-MODULE, active, where its activation will cause WITH-MODULE to
+immediately return NIL.  HANDLE-BODY provides a way to customise the
+behavior of the SKIP-MODULE restart."
+  `(invoke-operating-on-module ,module (lambda () ,form) (lambda () ,@handle-body)))
+
+(defmacro do-modules ((module &optional block-name) &body body)
+  `(iter ,@(when block-name `(,block-name))
+         (for (,nil ,module) in-hashtable *modules*)
+         (with-module ,module
+             (progn ,@body))))
+
 (defvar *umbrella*)
 
 (defgeneric compile-remote-module-path-strings (remote module module-name)
   (:method :around ((r remote) module module-name)
-    (let ((*module* (when module-name (downstring module-name)))
+    ;; That's the only place, except WITH-MODULE, where we can bind *MODULE*.
+    (let ((*module* module)
           (*umbrella* (when module (downstring (module-umbrella module)))))
       (declare (special *module* *umbrella*))
       (iter (for insn-spec in (call-next-method))
@@ -1401,14 +1440,6 @@ value is returned."
         (metastore (meta *self*)))
     (within-wishmaster-meta (wishmaster branch :update-p t)
       (read-definitions :source wishmaster :force-source nil :metastore metastore))))
-
-(defun merge-remote-wishmasters ()
-  (do-wishmasters (w)
-    (unless (eq w *self*)
-      (ignore-errors
-        ;; This is clearly non-critical, as we chiefly rely
-        ;; on the initially-obtain information.
-        (merge-remote-wishmaster w)))))
 
 ;;;;
 ;;;; Localities.  Utilities not used anywhere at this moment.

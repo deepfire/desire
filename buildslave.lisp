@@ -109,7 +109,7 @@
   (:method (phase-name module-names verbose)
     (iter (for mn in module-names)
           (syncformat t "(:name ~S :mode ~(~S~)~%~
-                         ~S~%" 
+                         ~S~%"
                       mn phase-name
                       *beginning-of-result-marker*)
           (destructuring-bind (&key return-value condition backtrace) (run-module-test phase-name mn verbose)
@@ -117,7 +117,7 @@
                            ~S~%~
                            :status ~S :condition ~S :backtrace ~S)~%"
                         condition (type-of condition)
-                        *end-of-result-marker* 
+                        *end-of-result-marker*
                         return-value (format nil "~A" condition) backtrace)))))
 
 (defun run-test-phases-with-markers (phase-names module-names &key verbose &aux

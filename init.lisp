@@ -141,7 +141,9 @@ locally present modules will be marked as converted."
       (reestablish-metastore-subscriptions meta-path)
       (when merge-remote-wishmasters
         (syncformat t ";;; Merging definitions from remote wishmasters...~%")
-        (merge-remote-wishmasters))
+        (do-wishmasters (w)
+          (unless (eq w *self*)
+            (merge-remote-wishmaster w))))
       (setf *unsaved-definition-changes-p* nil)
       ;;
       ;; Obtain self, if doing bootstrap:
@@ -168,7 +170,7 @@ locally present modules will be marked as converted."
       ;; Per-repository branch model maintenance, system discovery and loadability
       ;;
       (syncformat t ";;; Enumerating present modules and systems~%")
-      (enumerate-present-modules-and-systems :verbose verbose)
+      (scan-locality (gate *self*) :known t :unknown t)
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
               (sort (do-present-modules (m)
                       (collect (name m)))
@@ -188,8 +190,9 @@ locally present modules will be marked as converted."
 
 (defun reinit ()
   "Execute INIT with the arguments that were passed to it last time."
-  (init (root *self*) :as (when (distributor (name *self*) :if-does-not-exist :continue)
-                            (name *self*))))
+  (init :path (root *self*)
+        :as (when (distributor (name *self*) :if-does-not-exist :continue)
+              (name *self*))))
 
 (defun reinstall-old-self-and-fix-gate (self)
   (lret ((incumbent-gate (gate (distributor (name self))))

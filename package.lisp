@@ -237,7 +237,6 @@
    ;; recursor.lisp
    #:*fetch-errors-serious*
    #:desire
-   #:lust
    #:loadsys
    ;; desire.lisp :: tests
    #:run-module-test
@@ -249,7 +248,6 @@
    #:*beginning-of-result-marker*
    #:*end-of-result-marker*
    ;; add-module.lisp
-   #:*auto-lust*
    #:add-distributor
    #:add-module
    #:add-module-reader
