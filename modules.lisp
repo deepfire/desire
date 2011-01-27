@@ -45,11 +45,14 @@
          (path (truename repo-dir))
          (subdirs (unless totally-black
                     (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=))
-                               (directory (subdirectory path '(:wild))))))
+                               (with-simple-restart (continue "~@<Return NIL.~:@>")
+                                 (directory (subdirectory path '(:wild)))))))
          (pass1 (unless totally-black
-                  (append (directory (subfile path '(:wild) :type system-pathname-type))
+                  (append (with-simple-restart (continue "~@<Return NIL.~:@>")
+                            (directory (subfile path '(:wild) :type system-pathname-type)))
                           (iter (for subdir in subdirs)
-                                (appending (directory (subwild subdir '(:wild-inferiors) :name :wild :type system-pathname-type)))))))
+                                (appending (with-simple-restart (continue "~@<Return NIL.~:@>")
+                                             (directory (subwild subdir '(:wild-inferiors) :name :wild :type system-pathname-type))))))))
          (blacklist-patterns (unless totally-black
                                (list* (subwild path '("test"))
                                       (subwild path '("tests"))
