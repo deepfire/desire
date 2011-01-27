@@ -393,7 +393,11 @@ The lists of pathnames returned have following semantics:
   (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
     (let ((normalised-ref (rest ref))) ; strip the "refs" component
       (if dereference
-          (values (or refval (ref-value normalised-ref directory)) normalised-ref)
+          (values (or refval
+                      (ref-value normalised-ref directory :if-does-not-exist :continue)
+                      (repository-error directory "~@<Reffile ~S references a missing ref ~S.~:@>"
+                                        pathname normalised-ref))
+                  normalised-ref)
           (or normalised-ref refval)))))
 
 (defun set-symbolic-reffile-value (pathname value)
