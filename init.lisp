@@ -132,7 +132,9 @@ locally present modules will be marked as converted."
         (reestablish-metastore-subscriptions meta-path)
         (when merge-remote-wishmasters
           (syncformat t ";;; Merging definitions from remote wishmasters...~%")
-          (merge-remote-wishmasters))
+          (do-wishmasters (w)
+            (unless (eq w *self*)
+              (merge-remote-wishmaster w))))
         (setf *unsaved-definition-changes-p* nil)
         ;;
         ;; Set up tools for import

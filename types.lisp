@@ -1381,11 +1381,6 @@ value is returned."
     (within-wishmaster-meta (wishmaster branch :update-p t)
       (read-definitions :source wishmaster :force-source nil :metastore metastore))))
 
-(defun merge-remote-wishmasters ()
-  (do-wishmasters (w)
-    (unless (eq w *self*)
-      (merge-remote-wishmaster w))))
-
 ;;;;
 ;;;; Localities.  Utilities not used anywhere at this moment.
 ;;;;
