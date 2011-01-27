@@ -236,7 +236,7 @@ COMPLETE designates the breadth of system satisfaction -- when COMPLETE
 is non-NIL, it means that every system present in every module is a source
 of potential dependencies, which need to be satisfied.  When COMPLETE is NIL,
 only the system chosen (heuristically) by MODULE-CENTRAL-SYSTEM is considered
-as a source of dependencies. 
+as a source of dependencies.
 
 When individual desires are symbols, they are interpreted as module names.
 When they are lists, their first element is interpreted as a module name,
@@ -245,7 +245,7 @@ a more controlled alternative to the more blunt COMPLETE required system
 specification method.
 
 Defined keywords:
-   - SKIP-PRESENT - whether to skip updating specified modules which are 
+   - SKIP-PRESENT - whether to skip updating specified modules which are
      already present, defaults to NIL;
    - SEAL - whether to commit any definition changes, default is T;
    - COMPLETE - whether to obtain all modules' systems, even those not
@@ -257,7 +257,6 @@ Defined keywords:
                                                                                          *implementation-provided-system-names*)
                      :sure-as-hell
                      :complete complete :skip-present skip-present :skip-missing skip-missing :verbose verbose)
-      
     (when *unsaved-definition-changes-p*
       (syncformat t "; Definitions modified, writing~:[~; and committing~] changes.~%" seal)
       (save-definitions :seal seal :commit-message (format nil "Added~{ ~A~} and ~:[their~;its~] dependencies."

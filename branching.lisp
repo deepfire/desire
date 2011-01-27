@@ -42,7 +42,7 @@ Defaults to T.")
 
 (defvar *drive-git-masters-matching-trackers* t
   "Whether desire should be in control of the 'master' branches in modules
-natively git, when they match 'tracker' branches before module update, 
+natively git, when they match 'tracker' branches before module update,
 essentially equating it to the 'tracker' branch.
 Defaults to T.")
 

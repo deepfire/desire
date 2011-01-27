@@ -190,7 +190,7 @@
    #:simple-module-error
    #:simple-system-error
    #:simple-application-error
-   #:simple-repository-error 
+   #:simple-repository-error
    #:recursor-progress-halted
    #:counterproductive-system-definition
    #:insatiable-desire

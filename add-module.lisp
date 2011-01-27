@@ -26,7 +26,7 @@
 
 (defun add-distributor (type hostname port path &key gate-p)
   "Make a distributor residing at HOSTNAME, with a remote of TYPE,
-accesible at PORT and PATH. 
+accesible at PORT and PATH.
 When GATE-P is true, the remote will be set as distributor's gate
 remote, in which case TYPE must be subtype of GIT."
   (lret ((d (make-instance 'distributor :name hostname)))
@@ -131,9 +131,9 @@ of a module URL and try to deduce name of the module."
 (defun match-module-url-components-against-remote-set (raw-distributor-name subdomain port pathname-component-list dirp raw-module-name remotes)
   "Given parsed components of an URL:
    - the RAW-DISTIBUTOR-NAME (really a domain name) against which it matched,
-   - the possible additional SUBDOMAIN part, 
-   - PORT, 
-   - PATHNAME-COMPONENT-LIST, 
+   - the possible additional SUBDOMAIN part,
+   - PORT,
+   - PATHNAME-COMPONENT-LIST,
    - whether the URL has a trailing slash, as specified by DIRP
 and the RAW-MODULE-NAME, try to find a matching remote among REMOTES."
   ;; first, detect if the domain name of the distributor is a function of module or its umbrella
@@ -171,7 +171,7 @@ When no distributor successfully matched, a new one is created.
 When no remote was matched, or no distributor existed, a corresponding remote
 is not created, but rather a path looking like a best match for the parameters
 provided is computed.
-The values returned are: 
+The values returned are:
   - the distributor, either matched or created;
   - a boolean designating whether the distributor was created;
   - the matched remote or NIL;
