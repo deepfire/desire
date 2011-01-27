@@ -152,7 +152,7 @@ locally present modules will be marked as converted."
         ;; Per-repository branch model maintenance, system discovery and loadability
         ;;
         (syncformat t ";;; Enumerating present modules and systems~%")
-        (enumerate-present-modules-and-systems :verbose verbose)
+        (scan-locality (gate *self*) :known t :unknown t)
         (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
                 (sort (do-present-modules (m)
                         (collect (name m)))

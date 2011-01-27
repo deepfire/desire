@@ -385,6 +385,7 @@ The value returned is the merged type for SUBJECT-REMOTE.")
           (*read-time-force-source* force-source))
       (with-open-metafile (definitions 'definitions metastore)
         (read-definitions-from-stream definitions))
+      (mapc #'ensure-host-system *implementation-provided-system-names*)
       (values))))
 
 (defgeneric read-local-definitions (&key metastore)

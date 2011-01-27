@@ -211,18 +211,37 @@ meets desire's operational requirements.")
 (defgeneric module-post-install (name module locality pathname)
   (:method ((name symbol) (module module) (locality locality) pathname)))
 
-(defun enumerate-present-modules-and-systems (&key drop-system-caches verbose)
-  (when drop-system-caches
-    (drop-system-caches *default-system-type*))
-  (with-measured-time-lapse (sec)
-      (do-present-modules (module)
-        (when verbose
-          (syncformat t ";;; Processing module ~A~%" (name module)))
-        (notice-module-repository module nil))
-    (when verbose
-      (syncformat t ";;; Ensured branches and performed system discovery and query in ~D seconds.~%" sec)))
-  (mapc #'ensure-host-system *implementation-provided-system-names*)
-  (with-measured-time-lapse (sec) (update-system-set-dependencies t)
-    (when verbose
-      (syncformat t ";;; Computed full system dependencies in ~D seconds.~%" sec)))
+;;;;
+;;;; Batch operation
+;;;;
+(defmacro with-batch-module-operation ((failed-modules) &body body)
+  `(let (,failed-modules)
+     (handler-bind ((error (lambda (c)
+                             (assert (boundp '*module*))
+                             (push (list *module* c) ,failed-modules)
+                             (invoke-restart (find-restart 'skip-module)))))
+       ,@body)))
+
+;;;
+;;; Actual batch operations
+(defun scan-locality (&optional (locality (gate *self*)) &key (known t) (unknown t))
+  ""
+  (with-batch-module-operation (failed)
+    (when known
+      (do-present-modules (module locality)
+        (notice-module-repository module nil locality)))
+    (when unknown
+      (when-let ((new (iter (for subdir in (directory (merge-pathnames "*/" (locality-pathname locality))))
+                            (let ((name (canonicalise-name (lastcar (pathname-directory subdir)))))
+                              (with-module name
+                                  (when-let ((module (and (not (module name :if-does-not-exist :continue))
+                                                          (not (member name *internal-module-names*))
+                                                          (git-repository-present-p subdir)
+                                                          (add-module-local name :publish locality))))
+                                    (collect (name module))))))))
+        (format t "~@<;; ~@;Found new modules:~{ ~A~}~:@>~%" new)))
+    (when failed
+      (format t "~@<;; ~@;While processing ~A, following modules failed:~{ ~A~}~:@>~%"
+              (locality-pathname locality) (mapcar (compose #'coerce-to-name #'first) failed))))
+  (update-system-set-dependencies t)
   (values))
