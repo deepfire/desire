@@ -21,6 +21,11 @@
 (in-package :desire)
 
 
+(defvar *internal-module-names*
+  (mapcar #'canonicalise-name
+          '(".META" ".LOCAL-META"))
+  "The list of module names reserved to desire itself.")
+
 (define-reported-condition module-systems-unloadable-error (module-error)
   ((systems :reader condition-systems :initarg :systems))
   (:report (module systems)
