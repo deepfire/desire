@@ -194,7 +194,7 @@ meets desire's operational requirements.")
     (let ((repo-dir (module-pathname o locality)))
       (when *verbose-repository-maintenance*
         (format t "~@<;; ~@;Processing ~A's repository at ~S~:@>~%" (name o) repo-dir))
-      (ensure-tracker-branch repo-dir (ref-value "master" repo-dir))
+      (ensure-tracker-branch repo-dir (ref-value "master" repo-dir :if-does-not-exist :continue))
       (discover-and-register-module-systems o *verbose-repository-maintenance* *default-system-type* locality)
       (dolist (s (module-systems o))
         (direct-system-dependencies s))
