@@ -295,7 +295,7 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
    :credentials nil))
 
 (defmethod string-id ((o remote))
-  (format nil "<~A ~A at ~S>" (type-of o) (name o) (url o "<module>")))
+  (format nil "<~A ~A at ~S>" (type-of o) (name o) (url o '<module>)))
 
 (defun %set-remote-path (remote path slot-name)
   (setf (slot-value remote slot-name) path
@@ -344,7 +344,7 @@ a special module called '.meta'."
    (hidden-module-names :accessor gate-hidden-module-names :initarg :hidden-module-names :documentation "Complex computation.")))
 
 (defmethod string-id ((o gate-locality))
-  (format nil "<~A at ~S, ~S>" (type-of o) (url o "<module>") (locality-pathname o)))
+  (format nil "<~A at ~S, ~S>" (type-of o) (url o '<module>) (locality-pathname o)))
 
 ;;;;
 ;;;; Location * VCS
