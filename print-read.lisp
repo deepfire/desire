@@ -586,7 +586,7 @@ bootstrap-geared, single-file form of desire.")
                  (load fasl)))
            (update-progress files-nr))))))
 
-(defun linearise-self (filename)
+(defun linearise-self (&optional (filename (merge-pathnames #p"self.lisp" (meta *self*))))
   (let* ((*package* (find-package :desire))
          (*print-case* :downcase)
          (spectacle (self-spectacle))
