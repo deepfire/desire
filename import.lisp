@@ -307,7 +307,8 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
 
 (defun update (module &optional (locality (gate *self*)) &key pass-output &aux
                (module (coerce-to-module module)))
-  (if-let ((best-remote (module-best-remote module :allow-self t :if-does-not-exist :continue)))
+  (if-let ((best-remote (or (module-best-remote module :if-does-not-exist :continue)
+                            (module-best-remote module :if-does-not-exist :continue :allow-self t))))
     (if (eq *self* (remote-distributor best-remote))
         (syncformat t ";; Module ~A is local, skipping update~%" (name module))
         (let* ((url (url best-remote module))
