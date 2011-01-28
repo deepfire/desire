@@ -11,6 +11,8 @@
    ;;   knobs
    #:*verbose-repository-maintenance*
    ;; types.lisp
+   #:*desire-version*
+   ;;
    #:desirable
    #:distributor
    #:location
