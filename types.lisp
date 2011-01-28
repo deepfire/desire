@@ -672,9 +672,7 @@ instead."
                        (etypecase elt
                          ((or string (eql :no/) (eql :/))
                           elt)
-                         ((member *module*)
-                          `(funcall (find-symbol "NAME" :desire) (symbol-value (find-symbol ,(symbol-name elt) :desire))))
-                         ((member *umbrella*)
+                         ((member *module* *umbrella*)
                           `(symbol-value (find-symbol ,(symbol-name elt) :desire)))
                          (t
                           (definition-error
@@ -1133,7 +1131,7 @@ behavior of the SKIP-MODULE restart."
 (defgeneric compile-remote-module-path-strings (remote module module-name)
   (:method :around ((r remote) module module-name)
     ;; That's the only place, except WITH-MODULE, where we can bind *MODULE*.
-    (let ((*module* module)
+    (let ((*module* (when module-name (downstring module-name)))
           (*umbrella* (when module (downstring (module-umbrella module)))))
       (declare (special *module* *umbrella*))
       (iter (for insn-spec in (call-next-method))
