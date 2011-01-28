@@ -52,6 +52,17 @@
   #-sbcl 4096)
 
 ;;;;
+;;;; ARGV, stolen from common-db/portability.lisp
+;;;;
+(defun argv ()
+  #-(or sbcl ccl ecl clisp allegro) (not-implemented 'argv)
+  #+sbcl sb-ext:*posix-argv*
+  #+ccl ccl:*command-line-argument-list*
+  #+ecl (si::command-args)
+  #+clisp (ext:argv)
+  #+allegro (sys:command-line-arguments))
+
+;;;;
 ;;;; REGISTERED
 ;;;;
 (defclass registered (named)
