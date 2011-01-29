@@ -67,15 +67,52 @@ For case-insensitive systems the name is in upper case.")
 ;; This is /just/ for two functions below.
 ;; Use SYSTEM-DEFINITION-REGISTRY-SYMLINK-PATH for your needs.
 (defun locality-asdf-registry-path (locality)
-  (subdirectory* (locality-pathname locality) ".asdf-registry"))
+  (merge-pathnames ".asdf-registry/" (locality-pathname locality)))
 
 (defgeneric register-locality-with-system-backend (type locality)
   (:documentation
    "Do the module-agnostic part of the rituals needed for making systems
 within LOCALITY loadable using BACKEND-TYPE.  The other, module-specific
-part is done by ENSURE-SYSTEM-LOADABLE.")
-  (:method ((type (eql 'asdf-system)) locality)
-    (pushnew (ensure-directories-exist (locality-asdf-registry-path locality)) asdf:*central-registry* :test #'equal)))
+part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
+  (:method ((type (eql 'asdf-system)) locality &aux
+            (asdf-user-config-directory (merge-pathnames ".config/common-lisp/source-registry.conf.d/"
+                                                         (user-homedir-pathname)))
+            (desire-asdf-source-location-registry (merge-pathnames "50-desire.conf" asdf-user-config-directory))
+            (system-registry-path (locality-asdf-registry-path locality)))
+    (flet ((takeover-config ()
+             (with-output-to-file (f desire-asdf-source-location-registry)
+               (write `(:include ,system-registry-path) :stream f))))
+      (ensure-directories-exist asdf-user-config-directory)
+      (ensure-directories-exist system-registry-path)
+      ;; Preserve the existing file, whenever its first form is what we want.
+      (if-let ((form (and (file-exists-p desire-asdf-source-location-registry)
+                          (with-open-file (f desire-asdf-source-location-registry :if-does-not-exist nil)
+                            (when f (let ((*read-eval* nil)) (read f)))))))
+        (destructuring-bind (option maybe-stored-system-registry-path) form
+          (if (eq option :include)
+              (unless (equal maybe-stored-system-registry-path system-registry-path)
+                (syncformat "~@<;; ~@;Taking over source registry entry ~S.~_Redirecting source registry from ~S to ~S.~:@>~%"
+                            desire-asdf-source-location-registry maybe-stored-system-registry-path system-registry-path))
+              (takeover-config)))
+        (takeover-config))
+      (asdf:initialize-source-registry))))
+
+(defgeneric ensure-module-systems-loadable-using-backend-of-system (module system)
+  (:documentation
+   "Ensure that MODULE's systems are loadable via backend of SYSTEM.")
+  (:method ((o module) (s asdf-system) &aux
+            (systems (module-systems o)))
+    (let* ((directories (mapcar (lambda (x) (make-pathname :name nil :type nil :defaults x))
+                                (sort (remove-duplicates (mapcar #'system-definition-pathname systems)
+                                                         :test (lambda (x y) (equal (pathname-directory x)
+                                                                                    (pathname-directory y))))
+                                      #'pathname<)))
+           (locality (gate *self*))
+           (registry-path (locality-asdf-registry-path locality)))
+      (ensure-directories-exist registry-path)
+      (with-output-to-file (f (merge-pathnames (strconcat* "50-" (down-case-name o) ".conf") registry-path))
+        (dolist (d directories)
+          (format f "~S~%" `(:directory ,d)))))))
 
 (defgeneric mark-system-loaded (system)
   (:documentation
@@ -85,20 +122,6 @@ part is done by ENSURE-SYSTEM-LOADABLE.")
       (asdf::register-system (name o) system)
       (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
             (get-universal-time)))))
-
-(defgeneric ensure-system-loadable (system &optional locality path)
-  (:documentation
-   "Ensure that SYSTEM is loadable at PATH, which defaults to SYSTEM's
-definition path within its module within LOCALITY.")
-  (:method :before ((o system) &optional locality path)
-    (declare (ignore path locality))
-    (unless (system-locally-present-p o)
-      (system-error o "~@<Cannot ensure loadability of a non-locally-present system ~A.~:@>"
-                    (name o))))
-  (:method ((o asdf-system) &optional (locality (gate *self*)) path)
-    (let ((definition-pathname (or path (system-definition-pathname o))))
-      (ensure-symlink (system-definition-registry-symlink-path o locality)
-                      definition-pathname))))
 
 (defgeneric system-definition-registry-symlink-path (system &optional locality)
   (:documentation

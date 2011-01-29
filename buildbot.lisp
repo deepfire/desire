@@ -577,7 +577,7 @@
     (bisect-load test module affector-set :purge-store purge-store :credentials credentials :verbose verbose)))
 
 (defun cleanup (dir)
-  (let* ((dir (subdirectory* dir "src" "syscalls"))
+  (let* ((dir (merge-pathnames "src/syscalls/" dir))
          (abl-subdir (subdirectory* dir "sbcl-1.0.31.32-linux-x86-64")))
     (when (fad:directory-exists-p abl-subdir)
       (fad:delete-directory-and-files abl-subdir))

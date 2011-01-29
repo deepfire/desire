@@ -22,16 +22,16 @@
 
 
 (defun make-xcvb-using-asdf (locality-directory)
-  (within-directory ((subdirectory* locality-directory "xcvb"))
+  (within-directory ((merge-pathnames "xcvb/" locality-directory))
     (with-explanation ("copying example configure.mk into XCVB root")
       (cp "doc/configure.mk.example" "configure.mk"))
-    (with-environment-extension `(,(concatenate 'string "PATH=" (getenv "PATH") ":" (namestring (subdirectory* (root *self*) "bin"))))
+    (with-environment-extension `(,(concatenate 'string "PATH=" (getenv "PATH") ":" (namestring (merge-pathnames "bin/" (root *self*)))))
       (with-explanation ("making XCVB using ASDF")
         (make "xcvb-using-asdf" `("PREFIX=" ,(root *self*))
-              `("INSTALL_IMAGE=" ,(subdirectory* (root *self*) "images"))
+              `("INSTALL_IMAGE=" ,(merge-pathnames "images/" (root *self*)))
               `("INSTALL_LISP=" ,locality-directory)
               `("LISP_SOURCE=" ,locality-directory)
-              `("LISP_SYSTEMS=" ,(subdirectory* locality-directory ".asdf-registry")))))))
+              `("LISP_SYSTEMS=" ,(merge-pathnames ".asdf-registry/" locality-directory)))))))
 
 (defmethod module-post-install ((module-name (eql 'xcvb)) module locality pathname)
   (make-xcvb-using-asdf pathname))

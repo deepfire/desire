@@ -1,8 +1,19 @@
 ;;; -*- Mode: Lisp; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 (asdf:defsystem :desire
-  :depends-on (:alexandria :iterate :cl-fad :pergamum :executor
+  :depends-on (#+asdf
+               :asdf
+               #+xcvb
+               :xcvb
+               ;;
+               :alexandria
+               :iterate
+               :cl-fad
+               :split-sequence
+               :command-line-arguments
                :com.informatimago.common-lisp.lisp-reader
-               #+sbcl :sb-posix)
+               ;;
+               :pergamum
+               :executor)
   :components ((:file "dependencies")
                ;; Tier #
                (:file "package" :depends-on ("dependencies"))

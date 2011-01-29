@@ -6,8 +6,13 @@
   (:export
    ;; FADdy
    #:pathname-absolute-p
+   #:pathname>
+   #:pathname<
    ;; Page size
    #:virtual-memory-page-size
+   ;; from common-db/portability.lisp
+   #:*globally-quitting*
+   #:quit
    ;; REGISTERED
    #:registered #:registered-registrator #:fully-qualified-name
    ;; SYNCHRONISABLE
@@ -22,7 +27,7 @@
    #:print-decoded-time
    ;;; encumbered
    ;; Strings: iterate
-   #:extract-delimited-substrings #:downstring #:split-sequence
+   #:extract-delimited-substrings #:downstring
    ;; PARSE-URI: strings
    #:parse-uri
    ;; Versions: pergamum
@@ -44,6 +49,23 @@
 (defun pathname-absolute-p (pathname)
   (eq (car (pathname-directory pathname)) :absolute))
 
+(defun pathname> (x y)
+  (iter (for (xelt . xrest) on (rest (pathname-directory x)))
+        (for (yelt . yrest) on (rest (pathname-directory y)))
+        (cond ((string= xelt yelt)
+               (cond ((and xrest (not yrest)) (return t))
+                     ((and yrest (not xrest)) (return nil))))
+              ((string> xelt yelt) (return t))
+              (t                   (return nil)))))
+
+(defun pathname< (y x)
+  (iter (for (xelt . xrest) on (rest (pathname-directory x)))
+        (for (yelt . yrest) on (rest (pathname-directory y)))
+        (cond ((string= xelt yelt)
+               (cond ((and xrest (not yrest)) (return t))
+                     ((and yrest (not xrest)) (return nil))))
+              ((string> xelt yelt) (return t))
+              (t                   (return nil)))))
 ;;;;
 ;;;; Page size
 ;;;;
@@ -52,15 +74,23 @@
   #-sbcl 4096)
 
 ;;;;
-;;;; ARGV, stolen from common-db/portability.lisp
+;;;; QUIT, stolen from common-db/portability.lisp
 ;;;;
-(defun argv ()
-  #-(or sbcl ccl ecl clisp allegro) (not-implemented 'argv)
-  #+sbcl sb-ext:*posix-argv*
-  #+ccl ccl:*command-line-argument-list*
-  #+ecl (si::command-args)
-  #+clisp (ext:argv)
-  #+allegro (sys:command-line-arguments))
+(defvar *globally-quitting* nil
+  "Whether or not we are leaving the executable.")
+
+(defun quit (&optional (status 0))
+  "Exit."
+  #-(or sbcl ecl clisp ccl) (declare (ignore status))
+  #-(or sbcl ecl clisp ccl) (not-implemented 'quit)
+  (setf *globally-quitting* t)
+  #+sbcl (sb-ext:quit :unix-status status)
+  #+clisp (ext:quit status)
+  #+ecl (si:quit status)
+  #+ccl (progn
+          ;; #'CCL:QUIT has a tendency to hang and busyloop.
+          (finish-output)
+          (exit status)))
 
 ;;;;
 ;;;; REGISTERED
@@ -161,60 +191,6 @@ REGISTERED, in the mixing-in class precedence list, which provides the
 (defun downstring (x)
   (string-downcase (string x)))
 
-(defun split-sequence (delimiter seq &key (count nil) (remove-empty-subseqs nil) (from-end nil) (start 0) (end nil) (test nil test-supplied) (test-not nil test-not-supplied) (key nil key-supplied))
-  "Return a list of subsequences in seq delimited by delimiter.
-
-If :remove-empty-subseqs is NIL, empty subsequences will be included
-in the result; otherwise they will be discarded.  All other keywords
-work analogously to those for CL:SUBSTITUTE.  In particular, the
-behaviour of :from-end is possibly different from other versions of
-this function; :from-end values of NIL and T are equivalent unless
-:count is supplied. The second return value is an index suitable as an
-argument to CL:SUBSEQ into the sequence indicating where processing
-stopped."
-  (let ((len (length seq))
-        (other-keys (nconc (when test-supplied
-                             (list :test test))
-                           (when test-not-supplied
-                             (list :test-not test-not))
-                           (when key-supplied
-                             (list :key key)))))
-    (unless end (setq end len))
-    (if from-end
-        (loop for right = end then left
-              for left = (max (or (apply #'position delimiter seq
-					 :end right
-					 :from-end t
-					 other-keys)
-				  -1)
-			      (1- start))
-              unless (and (= right (1+ left))
-                          remove-empty-subseqs) ; empty subseq we don't want
-              if (and count (>= nr-elts count))
-              ;; We can't take any more. Return now.
-              return (values (nreverse subseqs) right)
-              else 
-              collect (subseq seq (1+ left) right) into subseqs
-              and sum 1 into nr-elts
-              until (< left start)
-              finally (return (values (nreverse subseqs) (1+ left))))
-      (loop for left = start then (+ right 1)
-            for right = (min (or (apply #'position delimiter seq 
-					:start left
-					other-keys)
-				 len)
-			     end)
-            unless (and (= right left) 
-                        remove-empty-subseqs) ; empty subseq we don't want
-            if (and count (>= nr-elts count))
-            ;; We can't take any more. Return now.
-            return (values subseqs left)
-            else
-            collect (subseq seq left right) into subseqs
-            and sum 1 into nr-elts
-            until (>= right end)
-            finally (return (values subseqs right))))))
-
 ;;;;
 ;;;; PARSE-URI
 ;;;;
@@ -245,7 +221,7 @@ for CVS locations to be treated as URIs."
                                      (when (plusp (length port))
                                        (handler-case (parse-integer port)
                                          (error () (error "~@<Not a number in port position of URI ~S.~:@>" namestring))))))
-              (when slash-pos (split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))
+              (when slash-pos (split-sequence:split-sequence #\/ (subseq namestring slash-pos) :remove-empty-subseqs t))
               (char= #\/ (aref namestring (1- (length namestring))))))))
 
 ;;;;

@@ -33,7 +33,7 @@ for the purpose of INIT-time download and registration of already-loaded compone
 (defun ensure-root-sanity (directory)
   (unless (directory-exists-p directory)
     (desire-error "~@<The specified storage area at ~S does not exist.~:@>" directory))
-  (ensure-directories-exist (subdirectory* directory "tmp"))
+  (ensure-directories-exist (merge-pathnames "tmp/" directory))
   directory)
 
 (defun ensure-committer-identity ()
@@ -64,15 +64,59 @@ for the purpose of INIT-time download and registration of already-loaded compone
     (find-executable 'gzip)
     (find-executable 'gpg)))
 
+;;;
+;;; Entry
+;;;
+(defun entry (&aux (option-spec *option-spec*))
+  (let ((args (command-line-arguments:process-command-line-options
+               option-spec (command-line-arguments:get-command-line-arguments))))
+    (destructuring-bind (&key help version
+                              app system module
+                              bot-phases
+                              verbose
+                              &allow-other-keys) args
+      (cond ((or help version)
+             (cond (help    (command-line-arguments:show-option-help option-spec))
+                   (version (syncformat t "desire package management substrate bootstrap sequence, version ~A.~%" *desire-version*)))
+             (e.0:quit))
+            (t
+             (apply #'init (remove-from-plist :help :version
+                                              :app :system :module
+                                              :bot-phases
+                                              :verbose))
+             (let* ((app (app app :if-does-not-exist :continue))
+                    (systems (append (when app    (list (app-system app)))
+                                     (when system (ensure-list (system system :if-does-not-exist :continue)))))
+                    (bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
+                    (modules (append (when system (list (system-module system)))
+                                     (when module (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue))
+                                                                      (split-sequence:split-sequence #\Space module :remove-empty-subseqs t))))))
+                    (desire (append (ensure-list app) (ensure-list system) (ensure-list module))))
+               (when (and desire (not modules))
+                 (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
+                        desire))
+               (when modules
+                 (desire modules :verbose verbose :skip-present t)
+                 #+nil
+                 (if phases
+                     (buildslave modules phases verbose)
+                     (desire modules :verbose verbose :skip-present t)))
+               (mapc (rcurry #'loadsys :verbose verbose) systems)
+               (when app
+                 (run app))))))))
+
 (defun init (&rest args
-             &key (path *default-pathname-defaults* path-specified-p)
+             &key
              as
+             (root *default-pathname-defaults* path-specified-p)
+             (bootstrap-name *default-bootstrap-wishmaster-name*)
              bootstrap-url
-             (wishmaster-name *default-bootstrap-wishmaster-name*)
              http-proxy
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
-             (merge-remote-wishmasters *merge-remote-wishmasters*) (wishmaster-branch :master) verbose &aux
-             (path (fad:pathname-as-directory path)))
+             (merge-remote-wishmasters *merge-remote-wishmasters*)
+             (wishmaster-branch :master)
+             verbose &aux
+             (root (fad:pathname-as-directory root)))
   "Make Desire fully functional, with PATH chosen as storage location.
 
 AS, when specified, will be interpreted as a distributor name, whose
@@ -81,19 +125,18 @@ an identity relationship with that definition will be performed,
 by looking up locally the modules defined for export. The rest of
 locally present modules will be marked as converted."
   (unless (or path-specified-p
-              (source-hub-location-p path)
+              (source-hub-location-p root)
               (yes-or-no-p "~@<;; ~@;~S doesn't contain familiar Lisp libraries.~_~
                                Register it for use as a Lisp software storage root?~_~
                                ('no' to choose another place):~:@>~%"
-                           path))
-    (apply #'init :path (read-line) (remove-from-plist args :path)))
+                           root))
+    (apply #'init :root (read-line) (remove-from-plist args :root)))
   (flet ((default-bootstrap-wishmaster-urls ()
-           (values (or bootstrap-url (strconcat* "git://" wishmaster-name "/"))
-                   (strconcat* "http://" wishmaster-name "/" wishmaster-http-suffix))))
-    (let* ((path (fad:pathname-as-directory path))
-           (gate-path (lret ((gate-path (if (pathname-absolute-p path)
-                                            path
-                                            (merge-pathnames path))))
+           (values (or bootstrap-url (strconcat* "git://" bootstrap-name "/"))
+                   (strconcat* "http://" bootstrap-name "/" wishmaster-http-suffix))))
+    (let* ((gate-path (lret ((gate-path (if (pathname-absolute-p root)
+                                            root
+                                            (merge-pathnames root))))
                         (ensure-root-sanity (parse-namestring gate-path))))
            (meta-path (merge-pathnames #p".meta/" gate-path))
            (localmeta-path (merge-pathnames #p".local-meta/" gate-path))
@@ -146,15 +189,6 @@ locally present modules will be marked as converted."
             (merge-remote-wishmaster w))))
       (setf *unsaved-definition-changes-p* nil)
       ;;
-      ;; Obtain self, if doing bootstrap:
-      ;;
-      (when-let ((systems (mapcar #'system *bootstrap-time-component-names*)))
-        (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
-        (mapc #'update (remove-duplicates (mapcar #'system-module systems)))
-        #+asdf
-        (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
-        (setf *bootstrap-time-component-names* nil))
-      ;;
       ;; Set up tools for import
       ;;
       (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
@@ -171,6 +205,16 @@ locally present modules will be marked as converted."
       ;;
       (syncformat t ";;; Enumerating present modules and systems~%")
       (scan-locality (gate *self*) :known t :unknown t)
+      ;;
+      ;; Finish bootstrap
+      ;;
+      (when-let ((systems (mapcar #'system *bootstrap-time-component-names*)))
+        (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
+        (mapc #'update (remove-duplicates (mapcar #'system-module systems)))
+        #+asdf
+        (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
+        (setf *bootstrap-time-component-names* nil))
+      ;;
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
               (sort (do-present-modules (m)
                       (collect (name m)))
@@ -190,7 +234,7 @@ locally present modules will be marked as converted."
 
 (defun reinit ()
   "Execute INIT with the arguments that were passed to it last time."
-  (init :path (root *self*)
+  (init :root (root *self*)
         :as (when (distributor (name *self*) :if-does-not-exist :continue)
               (name *self*))))
 
@@ -239,6 +283,3 @@ to patch the newfangled world according to that."
     (carry-over-module-locality-presence-cache-from-old-gate old-gate *self*))
   ;; Metastore subscriptions?
   )
-
-(defun self-check ()
-  (eq *self* (distributor :git.feelingofgreen.ru)))

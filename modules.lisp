@@ -57,7 +57,7 @@
          (subdirs (unless totally-black
                     (remove-if (lambda (p) (member (lastcar (pathname-directory p)) '(".git" "_darcs") :test #'string=))
                                (with-simple-restart (continue "~@<Return NIL.~:@>")
-                                 (directory (subdirectory path '(:wild)))))))
+                                 (directory (merge-pathnames "*/" path))))))
          (pass1 (unless totally-black
                   (append (with-simple-restart (continue "~@<Return NIL.~:@>")
                             (directory (subfile path '(:wild) :type system-pathname-type)))
@@ -115,8 +115,7 @@ system TYPE within LOCALITY."
                                           (remove-system present-system)
                                           nil)))
                                   (register-new-system (canonicalise-name name) path))))
-                 (notice-system-definition system path)
-                 (ensure-system-loadable system locality path))))
+                 (notice-system-definition system path))))
       (let ((systems
              (iter (for path in sysfiles)
                    (for name in sysnames)
@@ -144,7 +143,21 @@ system TYPE within LOCALITY."
                          (format t "~@<;;;; ~@;Ignoring system definition ~S within module ~A.~:@>~%" path (name module))))))))
         (dolist (s (set-difference (module-systems module) systems))
           (do-remove-system s))
-        (setf (module-systems module) systems)))))
+        (setf (module-systems module) systems)
+        (ensure-module-systems-loadable module)))))
+
+;;;
+;;; System loadability
+;;;
+(defun ensure-module-systems-loadable (module &aux
+                                       (module (coerce-to-module module)))
+  (let* ((systems (module-systems module)))
+    (when-let ((different-types (let ((types (remove-duplicates (mapcar #'type-of systems))))
+                                  (when (> (length types) 1)
+                                    types))))
+      (module-error module "~@<Incoherent system set in ~S: differing types of constituent systems:~{ ~S~}.~:@>"
+                    different-types))
+    (ensure-module-systems-loadable-using-backend-of-system module (first systems))))
 
 ;;;;
 ;;;; Module <-> system mapping heuristic

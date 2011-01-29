@@ -71,7 +71,7 @@ Return status indicates whether there were changes and a new commit was done."
 (defun metastore-present-p (directory &optional required-metafiles)
   "Determine if a metastore is present in DIRECTORY, optionally
 additionally requiring that REQUIRED-METAFILES are present."
-  (and (directory-exists-p (subdirectory* directory ".git"))
+  (and (directory-exists-p (merge-pathnames ".git/" directory))
        (every (compose #'file-exists-p
                        (rcurry #'metafile-path directory))
               required-metafiles)))

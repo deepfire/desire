@@ -522,7 +522,7 @@ differ in only slight detail -- gate property, for example."
 (defun cvs-locality-lock-path (cvs-locality)
   "Provide the fixed definition of lock directory for CVS repositories,
    within CVS-LOCALITY."
-  (subdirectory* (locality-pathname cvs-locality) ".cvs-locks"))
+  (merge-pathnames ".cvs-locks/" (locality-pathname cvs-locality)))
 
 (defun module-pathname (module &optional (locality (gate *self*)))
   "Return MODULE's path in LOCALITY, which defaults to master Git locality."
@@ -1225,15 +1225,23 @@ cache results."
         (update-module-presence module locality)
         nil)))
 
-(defun module-best-remote (module &key (if-does-not-exist :error) allow-self)
+(defun module-best-remote (module &key (if-does-not-exist :error) allow-self (prefer-self t))
   "Return the preferred remote among those providing MODULE.
-Currently implements a static 'gates are preferred' policy."
-  (let ((module (coerce-to-module module)))
-    (or (choose-gate-or-else (do-remotes (r)
-                               (when (and (location-defines-module-p r module)
-                                          (or allow-self
-                                              (not (eq (remote-distributor r) *self*))))
-                                 (collect r))))
+Currently implements a static 'gates are preferred' policy.
+
+Note: PREFER-SELF doesn't quite work, because of CHOOSE-GATE-OR-ELSE."
+  (let ((module (coerce-to-module module))
+        own-remote)
+    (or (choose-gate-or-else (let ((remotes
+                                    (do-remotes (r)
+                                      (when (location-defines-module-p r module)
+                                        (if (eq (remote-distributor r) *self*)
+                                            (when allow-self
+                                              (setf own-remote r))
+                                            (collect r))))))
+                               (append (when prefer-self (ensure-list own-remote))
+                                       remotes
+                                       (unless prefer-self (ensure-list own-remote)))))
         (ecase if-does-not-exist
           (:error (error 'insatiable-desire :desire module))
           (:continue nil)))))

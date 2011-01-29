@@ -2,7 +2,7 @@
 
 (defpackage desire
   (:nicknames :desr)
-  (:use :common-lisp :alexandria :pergamum :iterate :portable-spawn :executor :elsewhere.0)
+  (:use :common-lisp :alexandria :pergamum :iterate :portable-spawn :executor :elsewhere.0 :split-sequence)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow #:*modules*)
   (:export
@@ -12,6 +12,7 @@
    #:*verbose-repository-maintenance*
    ;; types.lisp
    #:*desire-version*
+   #:canonicalise-name
    ;;
    #:desirable
    #:distributor
@@ -61,8 +62,6 @@
    #:asdf-system
    #:mudballs-system
    #:xcvb-system
-   ;;
-   #:canonicalise-name
    ;;   types.lisp :: direct knowledge base manipulation
    #:map-distributors
    #:map-locations
@@ -114,6 +113,7 @@
    #:reset-metastore
    ;;   types.lisp :: global UI
    #:clear-definitions
+   #:entry
    #:init
    #:reload-definitions
    #:vcs-enabled-p
@@ -213,13 +213,13 @@
    #:undeclared-system-dependency
    #:condition-guilty-set
    #:system-loadable-p
-   #:ensure-system-loadable
    #:module-systems-unloadable-error
    ;; modules.lisp
    #:system-name-conflict
    #:module-central-system
    #:module-post-install
    #:sync-module
+   #:ensure-module-systems-loadable
    ;; gittage.lisp
    #:repo-var
    #:module-git-branches

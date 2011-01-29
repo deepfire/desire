@@ -60,18 +60,18 @@
 (defun git-repository-has-objects-p (directory)
   (not (null (or (directory (subfile directory '(".git" "objects" "pack" :wild) :type :wild))
                  (find-if (lambda (x) (= 2 (length (lastcar (pathname-directory x)))))
-                          (directory (subdirectory directory '(".git" "objects" :wild))))))))
+                          (directory (merge-pathnames ".git/objects/*/" directory)))))))
 
 (defun git-repository-present-p (&optional (directory *default-pathname-defaults*))
   "See if MODULE repository and source code is available at LOCALITY."
   (and (directory-exists-p directory)
        (within-directory (directory)
-         (and (directory-exists-p (subdirectory* nil ".git"))
+         (and (directory-exists-p (merge-pathnames ".git/"))
               (git-repository-has-objects-p nil)))))
 
 (defun git-repository-bare-p (&optional directory)
   (maybe-within-directory directory
-    (null (directory-exists-p (subdirectory* nil ".git")))))
+    (null (directory-exists-p (merge-pathnames ".git/")))))
 
 (defun (setf git-repository-bare-p) (val &optional directory)
   (maybe-within-directory directory
@@ -449,7 +449,7 @@ The lists of pathnames returned have following semantics:
       (multiple-value-bind (status output) (with-captured-executable-output ()
                                              (git "branch"))
         (declare (ignore status))
-        (mapcar (compose #'make-keyword #'string-upcase) 
+        (mapcar (compose #'make-keyword #'string-upcase)
                 (remove-if
                  (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
                  (mapcan (curry #'split-sequence #\Space)
