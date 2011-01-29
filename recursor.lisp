@@ -224,7 +224,7 @@
             :verbose verbose))
          (return (values module-dictionary system-dictionary)))))
 
-(defun desire (desires &key complete skip-present skip-missing (seal t) verbose)
+(defun get (desires &key complete skip-present skip-missing (seal t) verbose)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
 Desire satisfaction means:
@@ -269,5 +269,5 @@ Defined keywords:
 which might be absent due to undeclared dependencies."
   (load-system (coerce-to-system system)
                (lambda (system)
-                 (desire (list (list (system-module system) system))
-                         :skip-present t :verbose verbose))))
+                 (get (list (list (system-module system) system))
+                      :skip-present t :verbose verbose))))

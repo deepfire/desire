@@ -4,7 +4,9 @@
   (:nicknames :desr)
   (:use :common-lisp :alexandria :pergamum :iterate :portable-spawn :executor :elsewhere.0 :split-sequence)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
-  (:shadow #:*modules*)
+  (:shadow
+   #:*modules*
+   #:get)
   (:export
    ;; dependencies.lisp
    #:name
@@ -238,7 +240,7 @@
    #:update
    ;; recursor.lisp
    #:*fetch-errors-serious*
-   #:desire
+   #:get
    #:loadsys
    ;; desire.lisp :: tests
    #:run-module-test

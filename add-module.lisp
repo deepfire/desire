@@ -297,7 +297,7 @@ The values returned are:
                 (:continue)))
             (when obtain
               (let ((*fetch-errors-serious* t))
-                (desire (name module))))))
+                (get (name module))))))
         (format t "~@<;; ~@;Re~@<mote for ~A was not created.~:@>~:@>~%" url))))
 
 (defun add-module-reader (stream &optional char sharp)

@@ -96,11 +96,11 @@ for the purpose of INIT-time download and registration of already-loaded compone
                  (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
                         desire))
                (when modules
-                 (desire modules :verbose verbose :skip-present t)
+                 (get modules :verbose verbose :skip-present t)
                  #+nil
                  (if phases
                      (buildslave modules phases verbose)
-                     (desire modules :verbose verbose :skip-present t)))
+                     (get modules :verbose verbose :skip-present t)))
                (mapc (rcurry #'loadsys :verbose verbose) systems)
                (when app
                  (run app))))))))

@@ -235,7 +235,7 @@
 (define-condition buildbot-error (buildbot-condition desire-error) ())
 (define-condition buildmaster-condition (buildbot-condition) ())
 (define-condition buildmaster-error (buildmaster-condition buildbot-error) ())
-(define-condition remote-lisp-condition (buildbot-condition) 
+(define-condition remote-lisp-condition (buildbot-condition)
   ((ctx :reader condition-ctx :initarg :ctx)))
 (define-condition remote-lisp-error (remote-lisp-condition buildbot-error) ())
 (define-simple-error buildmaster-error)

@@ -195,7 +195,7 @@
   (:method ((m-r buildmaster-run) (p master-reachability-phase) current-result &key &allow-other-keys)
     (run-module-test :master-reachability-phase (result-module current-result) nil t))
   (:method ((m-r buildmaster-run) (p master-update-phase) current-result &key &allow-other-keys)
-    ;; XXX: need to ensure that the working directory is up to date (the default) -- 
+    ;; XXX: need to ensure that the working directory is up to date (the default) --
     ;; that we drive masters, etc.
     (prog1 (run-module-test :master-update-phase (result-module current-result) nil t)
       (setf (result-commit current-result) (desr::git-commit-log '("tracker")
