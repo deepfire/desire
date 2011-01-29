@@ -46,6 +46,20 @@
            (name system) (mapcar #'name guilty-set)))
 
 ;;;;
+;;;; Generic
+;;;;
+(defvar *source-registry-update-pending* nil)
+
+(defun invoke-with-source-registry-change (type fn)
+  (unwind-protect (let ((*source-registry-update-pending* t))
+                    (funcall fn))
+    (unless *source-registry-update-pending*
+      (reread-system-backend-source-registry type))))
+
+(defmacro with-source-registry-change (type &body body)
+  `(invoke-with-source-registry-change ,type (lambda () ,@body)))
+
+;;;;
 ;;;; Backends
 ;;;;
 (defun system-type-from-definition (pathname)
@@ -60,12 +74,18 @@ For case-insensitive systems the name is in upper case.")
   (:method ((type (eql 'asdf-system)) pathname)
     (string-upcase (pathname-name pathname))))
 
+(defgeneric reread-system-backend-source-registry (type)
+  (:documentation
+   "Ensure that the runtime configuration of TYPE backend corresponds
+with its on-disc configuration.")
+  (:method ((type (eql 'asdf-system)))
+    (asdf:initialize-source-registry)))
+
 (defgeneric drop-system-backend-definition-cache (type)
   (:method ((o (eql 'asdf-system)))
     (clrhash asdf::*defined-systems*)))
 
 ;; This is /just/ for two functions below.
-;; Use SYSTEM-DEFINITION-REGISTRY-SYMLINK-PATH for your needs.
 (defun locality-asdf-registry-path (locality)
   (merge-pathnames ".asdf-registry/" (locality-pathname locality)))
 
@@ -74,6 +94,8 @@ For case-insensitive systems the name is in upper case.")
    "Do the module-agnostic part of the rituals needed for making systems
 within LOCALITY loadable using BACKEND-TYPE.  The other, module-specific
 part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
+  (:method :after (type locality)
+    (reread-system-backend-source-registry type))
   (:method ((type (eql 'asdf-system)) locality &aux
             (asdf-user-config-directory (merge-pathnames ".config/common-lisp/source-registry.conf.d/"
                                                          (user-homedir-pathname)))
@@ -94,12 +116,14 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
                 (syncformat "~@<;; ~@;Taking over source registry entry ~S.~_Redirecting source registry from ~S to ~S.~:@>~%"
                             desire-asdf-source-location-registry maybe-stored-system-registry-path system-registry-path))
               (takeover-config)))
-        (takeover-config))
-      (asdf:initialize-source-registry))))
+        (takeover-config)))))
 
 (defgeneric ensure-module-systems-loadable-using-backend-of-system (module system)
   (:documentation
    "Ensure that MODULE's systems are loadable via backend of SYSTEM.")
+  (:method :around (o s)
+    (with-source-registry-change (type-of s)
+      (call-next-method)))
   (:method ((o module) (s asdf-system) &aux
             (systems (module-systems o)))
     (let* ((directories (mapcar (lambda (x) (make-pathname :name nil :type nil :defaults x))
@@ -122,14 +146,6 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
       (asdf::register-system (name o) system)
       (setf (gethash 'asdf:load-op (asdf::component-operation-times system))
             (get-universal-time)))))
-
-(defgeneric system-definition-registry-symlink-path (system &optional locality)
-  (:documentation
-   "This is functionality badly abstracted.")
-  (:method :around (system &optional locality)
-    (subfile (call-next-method system locality) (list (down-case-name system)) :type (system-pathname-type system)))
-  (:method ((o asdf-system) &optional (locality (gate *self*)))
-    (locality-asdf-registry-path locality)))
 
 (defgeneric compute-direct-system-dependencies (system)
   (:documentation
@@ -156,8 +172,7 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
     (declare (ignore locality))
     t)
   (:method ((o asdf-system) &optional (locality (gate *self*)))
-    (equal (symlink-target-file (system-definition-registry-symlink-path o locality))
-           (system-definition-pathname o))))
+    (not (not (ignore-errors (asdf:find-system (name o)))))))
 
 (defgeneric load-system (system &optional missing-dependency-handler)
   (:method ((o asdf-system) &optional missing-dependency-handler)

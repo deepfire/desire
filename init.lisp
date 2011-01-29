@@ -200,20 +200,22 @@ locally present modules will be marked as converted."
       ;;
       (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
       (register-locality-with-system-backend *default-system-type* (gate *self*))
-      ;;
-      ;; Per-repository branch model maintenance, system discovery and loadability
-      ;;
-      (syncformat t ";;; Enumerating present modules and systems~%")
-      (scan-locality (gate *self*) :known t :unknown t)
-      ;;
-      ;; Finish bootstrap
-      ;;
-      (when-let ((systems (mapcar #'system *bootstrap-time-component-names*)))
-        (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
-        (mapc #'update (remove-duplicates (mapcar #'system-module systems)))
-        #+asdf
-        (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
-        (setf *bootstrap-time-component-names* nil))
+      (with-source-registry-change *default-system-type*
+        ;;
+        ;; Per-repository branch model maintenance, system discovery and loadability
+        ;;
+        (syncformat t ";;; Enumerating present modules and systems~%")
+        (scan-locality (gate *self*) :known t :unknown t)
+        ;;
+        ;; Finish bootstrap
+        ;;
+        (when-let ((systems (mapcar #'system *bootstrap-time-component-names*)))
+          (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
+          (mapc #'update (remove-duplicates (mapcar #'system-module systems)))))
+      ;; ..finish finishing..
+      #+asdf
+      (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
+      (setf *bootstrap-time-component-names* nil)
       ;;
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
               (sort (do-present-modules (m)
