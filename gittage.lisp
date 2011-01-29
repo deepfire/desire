@@ -60,7 +60,8 @@
 (defun git-repository-has-objects-p (directory)
   (not (null (or (directory (subfile directory '(".git" "objects" "pack" :wild) :type :wild))
                  (find-if (lambda (x) (= 2 (length (lastcar (pathname-directory x)))))
-                          (directory (merge-pathnames ".git/objects/*/" directory)))))))
+                          (directory (merge-pathnames ".git/objects/*/" (or directory
+                                                                            *default-pathname-defaults*))))))))
 
 (defun git-repository-present-p (&optional (directory *default-pathname-defaults*))
   "See if MODULE repository and source code is available at LOCALITY."
