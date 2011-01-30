@@ -627,10 +627,16 @@ bootstrap-geared, single-file form of desire.")
              (with-no-noise-impl-dependent ()
                (body)))))))
 
+(defboot "#+(or sbcl clisp)")
+(defbootfun command-line-arguments ()
+  (command-line-arguments:get-command-line-arguments))
+
+(defboot "#-(or sbcl clisp)")
+(defbootfun command-line-arguments ())
+
 (defbootfun process-early-options ()
   (destructuring-bind (&key help version verbose quiet &allow-other-keys)
-      (command-line-arguments:process-command-line-options
-       *option-spec* (command-line-arguments:get-command-line-arguments))
+      (command-line-arguments:process-command-line-options *option-spec* (command-line-arguments))
     (setf *quiet*   quiet
           *verbose* verbose)
     (cond

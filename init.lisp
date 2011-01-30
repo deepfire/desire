@@ -69,7 +69,9 @@ for the purpose of INIT-time download and registration of already-loaded compone
 ;;;
 (defun entry (&aux (option-spec *option-spec*))
   (let ((args (command-line-arguments:process-command-line-options
-               option-spec (command-line-arguments:get-command-line-arguments))))
+               option-spec
+               #+(or sbcl clisp) (command-line-arguments:get-command-line-arguments)
+               #-(or sbcl clisp) nil)))
     (destructuring-bind (&key help version
                               app system module
                               bot-phases
