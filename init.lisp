@@ -240,7 +240,7 @@ locally present modules will be marked as converted."
       ;;
       (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
       (setenv "LISP_FASL_CACHE" "NIL")
-      (syncformat t ";;; All done~%")
+      (syncformat t ";;; desire node fully functional~%")
       (values))))
 
 (defun reinit ()
