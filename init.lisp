@@ -80,7 +80,8 @@ for the purpose of INIT-time download and registration of already-loaded compone
                    (version (syncformat t "desire package management substrate bootstrap sequence, version ~A.~%" *desire-version*)))
              (e.0:quit))
             (t
-             (apply #'init (remove-from-plist :help :version
+             (apply #'init (remove-from-plist args
+                                              :help :version
                                               :app :system :module
                                               :bot-phases
                                               :verbose))
