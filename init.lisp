@@ -105,6 +105,13 @@ for the purpose of INIT-time download and registration of already-loaded compone
                (when app
                  (run app))))))))
 
+(defun maybe-yes-or-no-p (bool format-control &rest args)
+  (or (when bool
+        (apply #'format *query-io* format-control args)
+        (write-line "<accepted 'yes'>")
+        t)
+      (apply #'yes-or-no-p format-control args)))
+
 (defun init (&rest args
              &key
              as
@@ -115,7 +122,9 @@ for the purpose of INIT-time download and registration of already-loaded compone
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
              (merge-remote-wishmasters *merge-remote-wishmasters*)
              (wishmaster-branch :master)
-             verbose &aux
+             yes
+             verbose
+             &aux
              (root (fad:pathname-as-directory root)))
   "Make Desire fully functional, with PATH chosen as storage location.
 
@@ -126,10 +135,10 @@ by looking up locally the modules defined for export. The rest of
 locally present modules will be marked as converted."
   (unless (or path-specified-p
               (source-hub-location-p root)
-              (yes-or-no-p "~@<;; ~@;~S doesn't contain familiar Lisp libraries.~_~
-                               Register it for use as a Lisp software storage root?~_~
-                               ('no' to choose another place):~:@>~%"
-                           root))
+              (maybe-yes-or-no-p yes "~@<;; ~@;~S doesn't contain familiar Lisp libraries.~_~
+                                      Register it for use as a Lisp software storage root?~_~
+                                      ('no' to choose another place):~:@>~%"
+                                 root))
     (apply #'init :root (read-line) (remove-from-plist args :root)))
   (flet ((default-bootstrap-wishmaster-urls ()
            (values (or bootstrap-url (strconcat* "git://" bootstrap-name "/"))
