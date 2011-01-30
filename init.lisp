@@ -128,6 +128,7 @@ for the purpose of INIT-time download and registration of already-loaded compone
              yes
              verbose
              &aux
+             (as (when as (canonicalise-name as)))
              (root (fad:pathname-as-directory root)))
   "Make Desire fully functional, with PATH chosen as storage location.
 

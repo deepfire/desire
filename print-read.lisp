@@ -464,7 +464,7 @@ When SEAL-P is non-NIL, the changes are committed."
 ;;; Automated desire bootstrap generation
 ;;;
 (defparameter *option-spec*
-  '(#+nil (("as" #\r)        :type string  :documentation "")
+  '(("as"                    :type string  :documentation "Provide the name for self, within the desire node namespace.")
     #+nil (("update" #\u)    :type string  :documentation "") ;; N/A
     (("root" #\r)            :type string  :documentation "Register and manage ROOT as central source code location.")
     #+nil (("lisp" #\l)      :type string  :documentation "") ;; N/A
