@@ -199,7 +199,10 @@ locally present modules will be marked as converted."
         (syncformat t ";;; Merging definitions from remote wishmasters...~%")
         (do-wishmasters (w)
           (unless (eq w *self*)
-            (merge-remote-wishmaster w))))
+            (ignore-errors
+              ;; This is clearly non-critical, as we chiefly rely
+              ;; on the initially-obtained information
+              (merge-remote-wishmaster w)))))
       (setf *unsaved-definition-changes-p* nil)
       ;;
       ;; Set up tools for import
