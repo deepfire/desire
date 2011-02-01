@@ -225,7 +225,8 @@ locally present modules will be marked as converted."
         ;;
         (when-let ((systems (mapcar #'system *bootstrap-time-component-names*)))
           (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
-          (mapc #'update (remove-duplicates (mapcar #'system-module systems)))))
+          (dolist (m (remove-duplicates (mapcar #'system-module systems)))
+            (update m (gate *self*)))))
       ;; ..finish finishing..
       #+asdf
       (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
