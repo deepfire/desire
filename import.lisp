@@ -305,7 +305,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
   (notice-module-repository module nil locality)
   t)
 
-(defun update (module &optional (locality (gate *self*)) &key pass-output &aux
+(defun update (module &optional (locality (gate *self*)) &key pass-output (if-fail :error) &aux
                (module (coerce-to-module module)))
   (if-let ((best-remote (or (module-best-remote module :if-does-not-exist :continue)
                             (module-best-remote module :if-does-not-exist :continue :allow-self t))))
@@ -330,7 +330,9 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                 (format t ";; Done fetching ~A~%" name)
                 (when *default-publishable*
                   (declare-module-converted name locality)))))))
-    (error 'insatiable-desire :desire module))
+    (ecase if-fail
+      (:error (error 'insatiable-desire :desire module))
+      ((nil)  (return-from update))))
   (notice-module-repository module nil locality)
   (sync-module module locality)
   (values))
