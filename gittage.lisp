@@ -39,6 +39,17 @@
 
 (define-simple-error git-error)
 
+(defun missing-remote-error (name &optional directory &aux
+                             (path (or directory *default-pathname-defaults*)))
+  (repository-error path "~@<At ~S: remote ~A not found, and no URL was provided.~:@>"
+                    path name))
+
+(defun extort-remote-url (name &optional directory)
+  (restart-case (missing-remote-error name directory)
+    (specify (specified-url)
+      :report "Specify URL for the missing remote."
+      specified-url)))
+
 ;;;;
 ;;;; Commits
 ;;;;
@@ -234,26 +245,33 @@ The lists of pathnames returned have following semantics:
                   (collect url into urls)))
               (finally (return (values names urls))))))))
 
-(defun git-remote-present-p (name &optional url directory)
+(defun find-gitremote (name &optional directory)
   (multiple-value-bind (remote-names urls) (gitremotes directory)
     (iter (for remote-name in remote-names)
           (for remote-url in urls)
-          (finding remote-name
-                   such-that (and (eq name remote-name)
-                                  (or (not url)
-                                      (string= url remote-url)))))))
+          (finding remote-url such-that (eq name remote-name)))))
 
-(defun git-add-remote (name url &optional directory)
+(defun add-gitremote (name url &optional directory)
   (maybe-within-directory directory
     (with-explanation ("adding a git remote ~A (~A) in ~S" name url *default-pathname-defaults*)
       (git "remote" "add" (downstring name) url))))
 
-(defun ensure-gitremote (name url &optional directory)
-  (let ((present-p (git-remote-present-p name url directory)))
-    (unless present-p
-      (when (git-remote-present-p name nil directory) ; exists, but with a different name?
-        (git "remote" "rm" (downstring name)))        ; must clean..
-      (git-add-remote (downstring name) url directory))))
+(defun remove-gitremote (name &optional directory)
+  (maybe-within-directory directory
+    (with-explanation ("removing git remote ~A in ~S" name *default-pathname-defaults*)
+      (git "remote" "rm" (downstring name)))))
+
+(defun ensure-gitremote (name &optional url directory)
+  (let* ((found-url (find-gitremote name directory))
+         (found-good-url-p (and found-url (if url
+                                              (string/= url found-url)
+                                              t))))
+    (unless (or found-good-url-p url)
+      (setf url (extort-remote-url name (or directory *default-pathname-defaults*))))
+    (when (and found-url (not found-good-url-p))
+      (remove-gitremote name directory))
+    (unless found-good-url-p
+      (add-gitremote (downstring name) url directory))))
 
 (defun fetch-gitremote (remote-name &optional directory)
   (maybe-within-directory directory
@@ -508,6 +526,34 @@ in a temporary pseudo-commit."
       (ensure-clean-repository if-changes)
       (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
         (git "checkout" (flatten-path-list ref))))))
+
+(defun invoke-with-branch-change (before-branch after-branch if-changes fn)
+  (unwind-protect (progn
+                    (git-set-head-index-tree before-branch if-changes)
+                    (funcall fn))
+    (git-set-head-index-tree after-branch if-changes)))
+
+(defmacro with-branch-change ((before-branch-form after-branch-form &key (if-changes :stash))
+                              &body body)
+  `(invoke-with-branch-change ,before-branch-form ,after-branch-form ,if-changes
+                              (lambda () ,@body)))
+
+(defun invoke-with-gitremote (remote-name fn
+                              &key update url (if-remote-does-not-exist :fetch))
+  (unless (find-gitremote remote-name)
+    (ecase if-remote-does-not-exist
+      (:fetch (ensure-gitremote remote-name url))
+      (:error (missing-remote-error remote-name))))
+  (when update
+    (fetch-gitremote remote-name))
+  (funcall fn))
+
+(defmacro with-gitremote ((remote &key update url (if-remote-does-not-exist :fetch))
+                          &body body)
+  `(invoke-with-gitremote ,remote (lambda () ,@body)
+                          ,@(maybe-prop :update update)
+                          ,@(maybe-prop :url url)
+                          :if-remote-does-not-exist ,if-remote-does-not-exist))
 
 ;;;;
 ;;;; Queries

@@ -1082,12 +1082,13 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (maybe-within-directory directory
     (with-maybe-handled-executable-failures (not *attempting-git-fetch-recovery*)
-        (let ((module-url (url remote module-name)))
-          (ensure-gitremote (name remote) module-url)
-          (git "fetch" (down-case-name remote)))
+        (with-gitremote ((name remote) :update t :url (url remote module-name))
+          t)
       (:handler (c)
-        ;; Already using a dumb, proxy-enabled transport?  Nothing we can do here, then..
-        (unless *combined-remotes-prefer-native-over-http*
+        ;; Not a combined remote, or already degraded to a dumb,
+        ;; transport?  Nothing we can do here, then..
+        (unless (and (typep remote 'git-combined-remote)
+                     *combined-remotes-prefer-native-over-http*)
           (error c))
         (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
                           Retrying in dumb HTTP mode.~:@>~%"
@@ -1436,9 +1437,8 @@ value is returned."
   (once-only (wishmaster)
     `(within-directory ((meta *self*))
        ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
-       (unwind-protect (progn (git-set-head-index-tree (make-remote-ref (down-case-name ,wishmaster) ,branch))
-                              ,@body)
-         (git-set-head-index-tree :master)))))
+       (with-branch-change ((make-remote-ref (down-case-name ,wishmaster) ,branch) :master)
+         ,@body))))
 
 (defun merge-remote-wishmaster (wishmaster)
   "Merge definitions from WISHMASTER."
