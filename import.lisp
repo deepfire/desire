@@ -305,7 +305,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
   (notice-module-repository module nil locality)
   t)
 
-(defun update (module &optional (locality (gate *self*)) &key pass-output (if-update-fails nil) &aux
+(defun update (module &key (locality (gate *self*)) pass-output (if-update-fails nil) &aux
                (module (coerce-to-module module)))
   (if-let ((best-remote (or (module-best-remote module :if-does-not-exist :continue)
                             (module-best-remote module :if-does-not-exist :continue :allow-self t))))
