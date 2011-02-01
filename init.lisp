@@ -214,8 +214,6 @@ locally present modules will be marked as converted."
       ;;
       ;; Generic part of system loadability
       ;;
-      (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
-      (register-locality-with-system-backend *default-system-type* (gate *self*))
       (with-source-registry-change *default-system-type*
         ;;
         ;; Per-repository branch model maintenance, system discovery and loadability
@@ -232,6 +230,8 @@ locally present modules will be marked as converted."
       #+asdf
       (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
       (setf *bootstrap-time-component-names* nil)
+      (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
+      (register-locality-with-system-backend *default-system-type* (gate *self*))
       ;;
       (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
               (sort (do-present-modules (m)
