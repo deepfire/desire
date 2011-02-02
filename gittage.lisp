@@ -556,33 +556,28 @@ in a temporary pseudo-commit."
                           :if-remote-does-not-exist ,if-remote-does-not-exist))
 
 ;;;;
+;;;; Repository-level operations
+;;;;
+(defun invoke-with-git-repository-write-access (path fn)
+  (within-directory (path :if-does-not-exist :create)
+    (handler-bind ((error (lambda (c)
+                            (declare (ignore c))
+                            ;; Maintain the gate-has-useful-directories-only invariant.
+                            (when (and (directory-created-p)
+                                       (not (git-repository-has-objects-p path)))
+                              (fad:delete-directory-and-files path))
+                            #| Continue signalling. |#)))
+      (unless (or (directory-created-p)
+                  (git-repository-has-objects-p nil))
+        (error 'empty-repository :pathname path))
+      (funcall fn (directory-created-p)))))
+
+(defmacro with-git-repository-write-access ((new-repo-p) path &body body)
+  `(invoke-with-git-repository-write-access ,path (lambda (,new-repo-p) ,@body)))
+
+;;;;
 ;;;; Queries
 ;;;;
-(defmacro if-bind (var test &body then/else)
-  "Anaphoric IF control structure.
-
-VAR (a symbol) will be bound to the primary value of TEST. If
-TEST returns a true value then THEN will be executed, otherwise
-ELSE will be executed."
-  (assert (first then/else)
-          (then/else)
-          "IF-BIND missing THEN clause.")
-  (destructuring-bind (then &optional else)
-      then/else
-    `(let ((,var ,test))
-       (if ,var ,then ,else))))
-
-(defmacro cond-bind (var &body clauses)
-  "Just like COND but VAR will be bound to the result of the
-  condition in the clause when executing the body of the clause."
-  (if clauses
-      (destructuring-bind ((test &rest body) &rest others)
-          clauses
-        `(if-bind ,var ,test
-                  (progn ,@body)
-                  (cond-bind ,var ,@others)))
-      nil))
-
 (defun prefixp (prefix sequence)
   (nth-value 1 (starts-with-subseq prefix sequence :return-suffix t)))
 
@@ -599,10 +594,10 @@ and commit message of the corresponding commit as multiple values."
             (iter (for line = (read-line s nil nil))
                   (while (and line (plusp (length line))))
                   (incf posn (1+ (length line)))
-                  (cond-bind suffix
-                    ((prefixp "commit " line)  (setf commit-id suffix))
-                    ((prefixp "Author: " line) (setf author suffix))
-                    ((prefixp "Date:   " line) (setf date suffix))))
+                  (cond-let
+                    ((suffix (prefixp "commit " line))  (setf commit-id suffix))
+                    ((suffix (prefixp "Author: " line)) (setf author suffix))
+                    ((suffix (prefixp "Date:   " line)) (setf date suffix))))
             (unless (and commit-id author date)
               (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
             (let ((message (string-right-trim '(#\Newline)
