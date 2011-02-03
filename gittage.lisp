@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 ;;;
-;;;  (c) copyright 2007-2009 by
+;;;  (c) copyright 2007-2011 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -50,53 +50,47 @@
       :report "Specify URL for the missing remote."
       specified-url)))
 
-;;;;
-;;;; Commits
-;;;;
-(defclass commit ()
-  ((id :reader commit-id :initarg :id)
-   (date :reader commit-date :initarg :date)
-   (author :reader commit-author :initarg :author)
-   (message :reader commit-message :initarg :message)))
+;;;
+;;; Repositories
+;;;
+(defvar *repository*)
 
-(defclass git-commit (commit)
-  ())
+(defun dotgit (pathname)
+  "Given a repository PATHNAME, return the path to its git storage
+directory."
+  (merge-pathnames ".git/" pathname))
 
-(defun make-commit (id date author message)
-  (make-instance 'git-commit :id id :date date :author author :message message))
-
-;;;;
-;;;; Repositories
-;;;;
 (defun git-repository-has-objects-p (directory)
-  (not (null (or (directory (subfile directory '(".git" "objects" "pack" :wild) :type :wild))
+  (not (null (or (directory (subfile directory '("objects" "pack" :wild) :type :wild))
                  (find-if (lambda (x) (= 2 (length (lastcar (pathname-directory x)))))
-                          (directory (merge-pathnames ".git/objects/*/" (or directory
-                                                                            *default-pathname-defaults*))))))))
+                          (directory (merge-pathnames ".git/objects/*/" directory)))))))
 
-(defun git-repository-present-p (&optional (directory *default-pathname-defaults*))
-  "See if MODULE repository and source code is available at LOCALITY."
+(defun git-nonbare-repository-present-p (directory &aux
+                                         (dotgit (dotgit directory)))
+  "See if repository in DIRECTORY and source code is available at LOCALITY."
   (and (directory-exists-p directory)
-       (within-directory (directory)
-         (and (directory-exists-p (merge-pathnames ".git/"))
-              (git-repository-has-objects-p nil)))))
+       (directory-exists-p dotgit)
+       (git-repository-has-objects-p dotgit)))
 
-(defun git-repository-bare-p (&optional directory)
-  (maybe-within-directory directory
-    (null (directory-exists-p (merge-pathnames ".git/")))))
+(defun git-repository-bare-p (directory)
+  "See if the DIRECTORY, which is known to contain a git repository is
+bare or not."
+  (null (directory-exists-p (dotgit directory))))
 
-(defun (setf git-repository-bare-p) (val &optional directory)
-  (maybe-within-directory directory
-    (if val
-        (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory)
-        (progn
-          (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild))))
-            (make-directory ".git" #+unix #o755)
-            (dolist (filename git-files)
-              (rename-to-directory filename (make-pathname :directory '(:relative ".git") :name (pathname-name filename) :type (pathname-type filename)))))
-          (setf (gitvar 'core.bare) "false")
-          (git-set-branch-index-tree)
-          nil))))
+(defun (setf git-repository-bare-p) (val directory &aux
+                                     (dotgit (dotgit directory)))
+  (when val
+    (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory))
+  (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild
+                                             :defaults *default-pathname-defaults*))))
+    (make-directory dotgit #+unix #o755)
+    (dolist (filename git-files)
+      (rename-to-directory filename (make-pathname :directory (pathname-directory dotgit)
+                                                   :name (pathname-name filename)
+                                                   :type (pathname-type filename)))))
+  (setf (gitvar 'core.bare directory) "false")
+  (git-set-branch-index-tree nil directory)
+  nil)
 
 (defun git-repository-world-readable-p (&optional directory)
   "See, whether or not MODULE within LOCALITY is allowed to be exported
@@ -203,6 +197,64 @@ The lists of pathnames returned have following semantics:
 (defun git-repository-update-for-dumb-servers (&optional directory)
   (maybe-within-directory directory
     (git "update-server-info")))
+
+;;;
+;;; Policies
+;;;
+;; policy atom:
+;;   - an attribute set
+;;     - on update, what to do with unsaved changes?
+;;   - default, or path-specific
+;; policy:
+;;   - a set of policy atoms
+;;
+(defstruct policy-atom
+  (unsaved-changes nil :type (or null (member :stash :reset :error)))
+  (missing-master  nil :type (or null (member :create-on-head :error))))
+
+(defclass repository-policy (registered)
+  ((atoms :initargs :atoms))
+  (:default-initargs
+   :atoms (make-hash-table :test 'equalp)))
+
+(define-subcontainer policy-atom :key-type t :container-slot atoms)
+
+(defparameter *repository-policies*
+  (alist-hash-table
+   `((:default . ,(make-policy-atom :unsaved-changes :stash
+                                    :missing-master  :create-on-head)))
+   :test 'eq))
+
+(define-root-container *repository-policies* repository-policy :key-type symbol :coercer t)
+
+(defvar *default-repository-policy* (repository-policy :default))
+(defvar *repository-policy*         *default-repository-policy*)
+
+(defun invoke-with-repository-policy (policy fn)
+  (let ((*repository-policy* (coerce-to-repository-policy policy)))
+    (funcall fn)))
+
+(defmacro with-repository-policy (policy &body body)
+  `(invoke-with-repository-policy ,policy (lambda () ,@body)))
+
+(defun repository-policy-value (value-name)
+  (or (slot-value *repository-policy* value-name)
+      (slot-value *default-repository-policy* value-name)))
+
+;;;;
+;;;; Commits
+;;;;
+(defclass commit ()
+  ((id :reader commit-id :initarg :id)
+   (date :reader commit-date :initarg :date)
+   (author :reader commit-author :initarg :author)
+   (message :reader commit-message :initarg :message)))
+
+(defclass git-commit (commit)
+  ())
+
+(defun make-commit (id date author message)
+  (make-instance 'git-commit :id id :date date :author author :message message))
 
 ;;;
 ;;; Config variables
@@ -558,17 +610,18 @@ in a temporary pseudo-commit."
 ;;;;
 ;;;; Repository-level operations
 ;;;;
-(defun invoke-with-git-repository-write-access (path fn)
+(defun invoke-with-git-repository-write-access (path fn &aux
+                                                (dotgit (dotgit path)))
   (within-directory (path :if-does-not-exist :create)
     (handler-bind ((error (lambda (c)
                             (declare (ignore c))
                             ;; Maintain the gate-has-useful-directories-only invariant.
                             (when (and (directory-created-p)
-                                       (not (git-repository-has-objects-p path)))
+                                       (not (git-repository-has-objects-p dotgit)))
                               (fad:delete-directory-and-files path))
                             #| Continue signalling. |#)))
       (unless (or (directory-created-p)
-                  (git-repository-has-objects-p nil))
+                  (git-repository-has-objects-p dotgit))
         (error 'empty-repository :pathname path))
       (funcall fn (directory-created-p)))))
 

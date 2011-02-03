@@ -1194,7 +1194,7 @@ behavior of the SKIP-MODULE restart."
                         module)))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
-  (git-repository-present-p (module-pathname module locality)))
+  (git-nonbare-repository-present-p (module-pathname module locality)))
 
 (defun update-module-presence (module &optional (locality (gate *self*)) (force-to nil forcep))
   "Recompute MODULE's presence in LOCALITY, updating MODULE's presence cache.

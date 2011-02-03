@@ -263,7 +263,7 @@ meets desire's operational requirements.")
                               (with-module name
                                   (when-let ((module (and (not (module name :if-does-not-exist :continue))
                                                           (not (member name *internal-module-names*))
-                                                          (git-repository-present-p subdir)
+                                                          (git-nonbare-repository-present-p subdir)
                                                           (add-module-local name :publish locality))))
                                     (collect (name module))))))))
         (format t "~@<;; ~@;Found new modules:~{ ~A~}~:@>~%" new)))

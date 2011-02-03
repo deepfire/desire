@@ -193,7 +193,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
     (with-explanation ("on behalf of module ~A, converting from ~A to ~A: ~S => ~S" name (vcs-type o) *gate-vcs-type* from-repo-dir *default-pathname-defaults*)
       (call-next-method)))
   (:method ((o darcs-locality) name from-repo-dir)
-    (if (git-repository-present-p)
+    (if (git-nonbare-repository-present-p *default-pathname-defaults*)
         (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
           (when untracked
             (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
@@ -208,7 +208,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
       (pipe (darcs-fast-export from-repo-dir)
             (git "fast-import"))))
   (:method ((o hg-locality) name from-repo-dir)
-    (unless (git-repository-present-p)
+    (unless (git-nonbare-repository-present-p *default-pathname-defaults*)
       (git "init"))
     (let ((*output* nil)
           (*error* nil))
