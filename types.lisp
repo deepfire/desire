@@ -1081,26 +1081,23 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 (defun git-fetch-remote (remote module-name &optional directory)
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (maybe-within-directory directory
-    (with-maybe-handled-executable-failures (not *attempting-git-fetch-recovery*)
-        (with-gitremote ((name remote) :url (url remote module-name))
-          (fetch-gitremote (name remote)))
-      (:handler (c)
-        ;; Not a combined remote, or already degraded to a dumb,
-        ;; transport?  Nothing we can do here, then..
+    (with-condition-recourses error (with-gitremote ((name remote) :url (url remote module-name))
+                                      (fetch-gitremote (name remote)))
+      (:retry-with-http (c)
         (unless (and (typep remote 'git-combined-remote)
                      *combined-remotes-prefer-native-over-http*)
+          ;; Not a combined remote, or already degraded to a dumb,
+          ;; transport?  Nothing we can do here, then..
           (error c))
         (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
-                          Retrying in dumb HTTP mode.~:@>~%"
+                            Retrying in dumb HTTP mode.~:@>~%"
                 (name remote) (url remote module-name))
-        (let ((*combined-remotes-prefer-native-over-http* nil)
-              (*attempting-git-fetch-recovery* t))
-          (git-fetch-remote remote module-name))
-        (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
-                          Are we in a HTTP-only environment?  ~
-                          Any further accesses to combined remotes will go through HTTP.~:@>~%")
-        (setf *combined-remotes-prefer-native-over-http* nil)
-        t))))
+        (let ((*combined-remotes-prefer-native-over-http* nil))
+          (multiple-value-prog1 (try)
+            (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
+                                Are we in a HTTP-only environment?  ~
+                                Any further accesses to combined remotes will go through HTTP.~:@>~%")
+            (setf *combined-remotes-prefer-native-over-http* nil)))))))
 
 ;;;;
 ;;;; Modules, in context of knowledge base
