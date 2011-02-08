@@ -55,84 +55,76 @@
 ;;;
 (defvar *repository*)
 
-(defun dotgit (pathname)
-  "Given a repository PATHNAME, return the path to its git storage
-directory."
-  (merge-pathnames ".git/" pathname))
+(define-binder with-repository *repository*)
 
-(defun git-repository-has-objects-p (directory)
+(defun git-predicate (directory explanation-format-control git-arguments)
+  (with-executable-options (:explanation `(,explanation-format-control ,directory) :output nil)
+    (within-directory (directory)
+      (not (with-shell-predicate (apply #'git git-arguments))))))
+
+(defmacro defgitpredicate (name (explanation-format-control) &body git-arguments)
+  `(defun ,name (&optional (directory *repository*))
+     (git-predicate directory ,explanation-format-control '(,@git-arguments))))
+
+;; directory level
+(defun directory-has-git-objects-p (directory)
   (not (null (or (directory (subfile directory '("objects" "pack" :wild) :type :wild))
                  (find-if (lambda (x) (= 2 (length (lastcar (pathname-directory x)))))
                           (directory (merge-pathnames ".git/objects/*/" directory)))))))
 
-(defun git-nonbare-repository-present-p (directory &aux
+(defun dotgit (directory)
+  "Given a repository DIRECTORY, return the path to its git storage
+directory."
+  (merge-pathnames ".git/" directory))
+
+;; repository level
+(defun git-nonbare-repository-present-p (&optional (directory *repository*) &aux
                                          (dotgit (dotgit directory)))
   "See if repository in DIRECTORY and source code is available at LOCALITY."
   (and (directory-exists-p directory)
        (directory-exists-p dotgit)
-       (git-repository-has-objects-p dotgit)))
+       (directory-has-git-objects-p dotgit)))
 
-(defun git-repository-bare-p (directory)
+(defun git-repository-bare-p (&optional (directory *repository*))
   "See if the DIRECTORY, which is known to contain a git repository is
 bare or not."
   (null (directory-exists-p (dotgit directory))))
 
-(defun (setf git-repository-bare-p) (val directory &aux
+(defun (setf git-repository-bare-p) (val &optional (directory *repository*) &aux
                                      (dotgit (dotgit directory)))
   (when val
     (git-error "~@<Couldn't make git repository at ~S bare: not implemented.~:@>" directory))
-  (let ((git-files (directory (make-pathname :directory '(:relative) :name :wild
-                                             :defaults *default-pathname-defaults*))))
-    (make-directory dotgit #+unix #o755)
-    (dolist (filename git-files)
-      (rename-to-directory filename (make-pathname :directory (pathname-directory dotgit)
-                                                   :name (pathname-name filename)
-                                                   :type (pathname-type filename)))))
+  (make-directory dotgit #+unix #o755)
+  (dolist (filename (directory (merge-pathnames "*" directory)))
+    (rename-to-directory filename dotgit))
   (setf (gitvar 'core.bare directory) "false")
   (git-set-branch-index-tree nil directory)
   nil)
 
-(defun git-repository-world-readable-p (&optional directory)
-  "See, whether or not MODULE within LOCALITY is allowed to be exported
-   for the purposes of git-daemon."
-  (file-exists-p (subfile* directory ".git" "git-daemon-export-ok")))
+(defun git-repository-world-readable-p (&optional (directory *repository*))
+  "See, whether or not repository within DIRECTORY allows itself to be
+exported for the purposes of git-daemon."
+  (file-exists-p (merge-pathnames ".git/git-daemon-export-ok" directory)))
 
-(defun (setf git-repository-world-readable-p) (val &optional directory)
+(defun (setf git-repository-world-readable-p) (val &optional (directory *repository*))
   "Change git-daemon's idea about world-readability of DIRECTORY."
-  (let ((path (subfile* directory ".git" "git-daemon-export-ok")))
+  (let ((path (merge-pathnames ".git/git-daemon-export-ok" directory)))
     (if val
         (open path :direction :probe :if-does-not-exist :create)
         (when (file-exists-p path)
           (delete-file path)))
     val))
 
-(defun git-repository-unstaged-changes-p (&optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("determining whether git repository at ~S has unstaged changes" *default-pathname-defaults*)
-      (with-avoided-executable-output ()
-        (not (with-valid-exit-codes ((0 t)
-                                     (1 nil)
-                                     (128 nil))
-               (git "diff" "--exit-code")))))))
+(defgitpredicate git-repository-unstaged-changes-p ("determining whether git repository at ~S has unstaged changes")
+  "diff" "--exit-code")
 
-(defun git-repository-staged-changes-p (&optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("determining whether git repository at ~S has staged changes" *default-pathname-defaults*)
-      (with-avoided-executable-output ()
-        (not (with-valid-exit-codes ((0 t)
-                                     (1 nil)
-                                     (128 nil))
-               (git "diff" "--cached" "--exit-code")))))))
+(defgitpredicate git-repository-staged-changes-p ("determining whether git repository at ~S has staged changes")
+  "diff" "--exit-code" "--cached")
 
-(defun git-repository-changes-p (&optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("determining whether git repository at ~S has staged or unstaged changes" *default-pathname-defaults*)
-      (not (with-valid-exit-codes ((0 t)
-                                   (1 nil)
-                                   (128 nil))
-             (git "diff" "--exit-code" "--summary" "HEAD" "--"))))))
+(defgitpredicate git-repository-changes-p ("determining whether git repository at ~S has staged or unstaged changes")
+  "diff" "--exit-code" "--summary" "HEAD" "--")
 
-(defun git-repository-status (&optional directory)
+(defun git-repository-status (&optional (directory *repository*))
   "Examine status of the git repository within DIRECTORY and return lists of pathnames as multiple values.
 The lists of pathnames returned have following semantics:
     - staged modified,
@@ -140,62 +132,62 @@ The lists of pathnames returned have following semantics:
     - staged new,
     - unstaged modified,
     - unstaged deleted."
-  (maybe-within-directory directory
-    (with-explanation ("determining status of git repository at ~S" *default-pathname-defaults*)
-      (multiple-value-bind (status output) (with-captured-executable-output ()
-                                             (with-shell-predicate
-                                                 (git "status")))
-        (declare (ignore status))
-        (with-input-from-string (s output)
-          (flet ((seek-past-marker ()
-                   (iter (for line = (read-line s nil nil))
-                         (unless line
-                           (error "~@<Premature EOF while reading from 'git status'.~:@>"))
-                         (while (not (string= line "#")))))
-                 (collect-prefixed ()
-                   (iter (for line = (read-line s nil nil))
-                         (unless (starts-with-subseq "#	" line)
-                           (finish))
-                         (unless (starts-with-subseq #(#\# #\Tab) line)
-                           (error "~@<Bad constituent ~S while reading from 'git status'.~:@>" line))
-                         (collect (subseq line 2))))
-                 (process-entries (list)
-                   (iter (for entry in list)
-                         (multiple-value-bind (modifid-p mod-suffix) (starts-with-subseq "new file:   " entry :return-suffix t)
-                           (multiple-value-bind (deled-p del-suffix) (starts-with-subseq "deleted:    " entry :return-suffix t)
-                             (multiple-value-bind (new-p new-suffix) (starts-with-subseq "modified:   " entry :return-suffix t)
-                               (cond (modifid-p (collect mod-suffix into new))
-                                     (deled-p   (collect del-suffix into deleted))
-                                     (new-p     (collect new-suffix into modified))
-                                     (t (error "~@<Bad constituent ~S while reading from 'git status'.~:@>" entry))))))
-                         (finally (return (values modified deleted new))))))
-            (iter outer
-                  (with staged-modified) (with staged-deleted) (with staged-new)
-                  (with unstaged-modified) (with unstaged-deleted)
-                  (with untracked)
-                  (for line = (read-line s nil nil))
-                  (while line)
-                  (switch (line :test #'string=)
-                    ("# Changes to be committed:"
-                     (seek-past-marker)
-                     (setf (values staged-modified staged-deleted staged-new)
-                           (process-entries (collect-prefixed))))
-                    ("# Changed but not updated:"
-                     (seek-past-marker)
-                     (setf (values unstaged-modified unstaged-deleted)
-                           (process-entries (collect-prefixed))))
-                    ("# Untracked files:"
-                     (seek-past-marker)
-                     (setf untracked (collect-prefixed)))
-                    (t
-                     (unless (or (starts-with-subseq "# On branch " line)
-                                 (string= line "nothing to commit (working directory clean)")
-                                 (string= line "nothing added to commit but untracked files present (use \"git add\" to track)"))
-                       (error "~@<Unrecognised header ~S while reading from 'git status'.~:@>" line))))
-                  (finally (return-from outer (values staged-modified staged-deleted staged-new unstaged-modified unstaged-deleted untracked))))))))))
+  (multiple-value-bind (status output)
+      (with-executable-options (:explanation `("determining status of git repository at ~S" ,directory)
+                                :output :capture)
+        (within-directory (directory)
+          (with-shell-predicate (git "status"))))
+    (declare (ignore status))
+    (with-input-from-string (s output)
+      (flet ((seek-past-marker ()
+               (iter (for line = (read-line s nil nil))
+                     (unless line
+                       (error "~@<Premature EOF while reading from 'git status'.~:@>"))
+                     (while (not (string= line "#")))))
+             (collect-prefixed ()
+               (iter (for line = (read-line s nil nil))
+                     (unless (starts-with-subseq "#	" line)
+                       (finish))
+                     (unless (starts-with-subseq #(#\# #\Tab) line)
+                       (error "~@<Bad constituent ~S while reading from 'git status'.~:@>" line))
+                     (collect (subseq line 2))))
+             (process-entries (list)
+               (iter (for entry in list)
+                     (multiple-value-bind (modifid-p mod-suffix) (starts-with-subseq "new file:   " entry :return-suffix t)
+                       (multiple-value-bind (deled-p del-suffix) (starts-with-subseq "deleted:    " entry :return-suffix t)
+                         (multiple-value-bind (new-p new-suffix) (starts-with-subseq "modified:   " entry :return-suffix t)
+                           (cond (modifid-p (collect mod-suffix into new))
+                                 (deled-p   (collect del-suffix into deleted))
+                                 (new-p     (collect new-suffix into modified))
+                                 (t (error "~@<Bad constituent ~S while reading from 'git status'.~:@>" entry))))))
+                     (finally (return (values modified deleted new))))))
+        (iter outer
+              (with staged-modified) (with staged-deleted) (with staged-new)
+              (with unstaged-modified) (with unstaged-deleted)
+              (with untracked)
+              (for line = (read-line s nil nil))
+              (while line)
+              (switch (line :test #'string=)
+                ("# Changes to be committed:"
+                 (seek-past-marker)
+                 (setf (values staged-modified staged-deleted staged-new)
+                       (process-entries (collect-prefixed))))
+                ("# Changed but not updated:"
+                 (seek-past-marker)
+                 (setf (values unstaged-modified unstaged-deleted)
+                       (process-entries (collect-prefixed))))
+                ("# Untracked files:"
+                 (seek-past-marker)
+                 (setf untracked (collect-prefixed)))
+                (t
+                 (unless (or (starts-with-subseq "# On branch " line)
+                             (string= line "nothing to commit (working directory clean)")
+                             (string= line "nothing added to commit but untracked files present (use \"git add\" to track)"))
+                   (error "~@<Unrecognised header ~S while reading from 'git status'.~:@>" line))))
+              (finally (return-from outer (values staged-modified staged-deleted staged-new unstaged-modified unstaged-deleted untracked))))))))
 
-(defun git-repository-update-for-dumb-servers (&optional directory)
-  (maybe-within-directory directory
+(defun git-repository-update-for-dumb-servers (&optional (directory *repository*))
+  (within-directory (directory)
     (git "update-server-info")))
 
 ;;;
@@ -262,11 +254,11 @@ The lists of pathnames returned have following semantics:
 (defun gitvar (var &optional directory)
   (declare (type symbol var))
   (maybe-within-directory directory
-    (with-captured-executable-output ()
+    (with-executable-options (:explanation `("getting value of git variable ~A" ,(symbol-name var))
+                              :output :capture)
       (multiple-value-bind (setp output)
-          (with-explanation ("getting value of git variable ~A" (symbol-name var))
-            (with-shell-predicate
-              (git "config" (string-downcase (symbol-name var)))))
+          (with-shell-predicate
+              (git "config" (string-downcase (symbol-name var))))
         (when setp
           (string-right-trim '(#\Return #\Newline) output))))))
 
@@ -281,21 +273,22 @@ The lists of pathnames returned have following semantics:
 ;;;
 (defun gitremotes (&optional directory)
   (maybe-within-directory directory
-    (with-explanation ("listing git remotes in ~S" *default-pathname-defaults*)
-      (multiple-value-bind (status output) (with-captured-executable-output ()
-                                             (git "remote" "-v"))
-        (declare (ignore status))
-        (iter (for line in (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))
-              (while (plusp (length line)))
-              (destructuring-bind (name url &optional fetch-or-push)
-                  (iter (for str in (split-sequence #\Space line :remove-empty-subseqs t))
-                        (nconcing
-                         (split-sequence #\Tab str :remove-empty-subseqs t)))
-                (when (or (not fetch-or-push)
-                          (string= "(fetch)" fetch-or-push))
-                  (collect (canonicalise-name name) into names)
-                  (collect url into urls)))
-              (finally (return (values names urls))))))))
+    (multiple-value-bind (status output)
+        (with-executable-options (:explanation `("listing git remotes in ~S" ,*default-pathname-defaults*)
+                                  :output :capture)
+          (git "remote" "-v"))
+      (declare (ignore status))
+      (iter (for line in (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))
+            (while (plusp (length line)))
+            (destructuring-bind (name url &optional fetch-or-push)
+                (iter (for str in (split-sequence #\Space line :remove-empty-subseqs t))
+                      (nconcing
+                       (split-sequence #\Tab str :remove-empty-subseqs t)))
+              (when (or (not fetch-or-push)
+                        (string= "(fetch)" fetch-or-push))
+                (collect (canonicalise-name name) into names)
+                (collect url into urls)))
+            (finally (return (values names urls)))))))
 
 (defun find-gitremote (name &optional directory)
   (multiple-value-bind (remote-names urls) (gitremotes directory)
@@ -516,15 +509,16 @@ The lists of pathnames returned have following semantics:
 ;;;
 (defun git-branches (&optional directory)
   (maybe-within-directory directory
-    (with-explanation ("listing git branches in ~S" *default-pathname-defaults*)
-      (multiple-value-bind (status output) (with-captured-executable-output ()
-                                             (git "branch"))
-        (declare (ignore status))
-        (mapcar (compose #'make-keyword #'string-upcase)
-                (remove-if
-                 (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
-                 (mapcan (curry #'split-sequence #\Space)
-                         (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))))
+    (multiple-value-bind (status output)
+        (with-executable-options (:explanation `("listing git branches in ~S" ,*default-pathname-defaults*)
+                                  :output :capture)
+          (git "branch"))
+      (declare (ignore status))
+      (mapcar (compose #'make-keyword #'string-upcase)
+              (remove-if
+               (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
+               (mapcan (curry #'split-sequence #\Space)
+                       (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))))
 
 
 (defun git-branch-present-p (name &optional directory)
@@ -591,20 +585,17 @@ in a temporary pseudo-commit."
                               (lambda () ,@body)))
 
 (defun invoke-with-gitremote (remote-name fn
-                              &key update url (if-remote-does-not-exist :fetch))
+                              &key url (if-remote-does-not-exist :create))
   (unless (find-gitremote remote-name)
     (ecase if-remote-does-not-exist
-      (:fetch (ensure-gitremote remote-name url))
-      (:error (missing-remote-error remote-name))))
-  (when update
-    (fetch-gitremote remote-name))
+      (:create (ensure-gitremote remote-name url))
+      (:error  (missing-remote-error remote-name))))
   (funcall fn))
 
-(defmacro with-gitremote ((remote &key update url (if-remote-does-not-exist :fetch))
+(defmacro with-gitremote ((remote &key url (if-remote-does-not-exist :create))
                           &body body)
   `(invoke-with-gitremote ,remote (lambda () ,@body)
-                          ,@(maybe-prop :update update)
-                          ,@(maybe-prop :url url)
+                          ,@(maybe-prop* :url url)
                           :if-remote-does-not-exist ,if-remote-does-not-exist))
 
 ;;;;
@@ -617,11 +608,11 @@ in a temporary pseudo-commit."
                             (declare (ignore c))
                             ;; Maintain the gate-has-useful-directories-only invariant.
                             (when (and (directory-created-p)
-                                       (not (git-repository-has-objects-p dotgit)))
+                                       (not (directory-has-git-objects-p dotgit)))
                               (fad:delete-directory-and-files path))
                             #| Continue signalling. |#)))
       (unless (or (directory-created-p)
-                  (git-repository-has-objects-p dotgit))
+                  (directory-has-git-objects-p dotgit))
         (error 'empty-repository :pathname path))
       (funcall fn (directory-created-p)))))
 
@@ -638,24 +629,25 @@ in a temporary pseudo-commit."
   "Given a REF and an optional REPOSITORY-DIR, return the commit id, author, date
 and commit message of the corresponding commit as multiple values."
   (maybe-within-directory repository-dir
-    (with-explanation ("querying commit log of ~S at ~S" ref *default-pathname-defaults*)
-      (multiple-value-bind (status output) (with-captured-executable-output ()
-                                             (git "log" "-1" (cook-refval ref)))
-        (declare (ignore status))
-        (with-input-from-string (s output)
-          (let (commit-id author date (posn 0))
-            (iter (for line = (read-line s nil nil))
-                  (while (and line (plusp (length line))))
-                  (incf posn (1+ (length line)))
-                  (cond-let
-                    ((suffix (prefixp "commit " line))  (setf commit-id suffix))
-                    ((suffix (prefixp "Author: " line)) (setf author suffix))
-                    ((suffix (prefixp "Date:   " line)) (setf date suffix))))
-            (unless (and commit-id author date)
-              (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
-            (let ((message (string-right-trim '(#\Newline)
-                                              (subseq output (+ 5 posn)))))
-              (make-commit (parse-commit-id commit-id) date author message))))))))
+    (multiple-value-bind (status output)
+        (with-executable-options (:explanation `("querying commit log of ~S at ~S" ,ref ,*default-pathname-defaults*)
+                                  :output :capture)
+          (git "log" "-1" (cook-refval ref)))
+      (declare (ignore status))
+      (with-input-from-string (s output)
+        (let (commit-id author date (posn 0))
+          (iter (for line = (read-line s nil nil))
+                (while (and line (plusp (length line))))
+                (incf posn (1+ (length line)))
+                (cond-let
+                  ((suffix (prefixp "commit " line))  (setf commit-id suffix))
+                  ((suffix (prefixp "Author: " line)) (setf author suffix))
+                  ((suffix (prefixp "Date:   " line)) (setf date suffix))))
+          (unless (and commit-id author date)
+            (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
+          (let ((message (string-right-trim '(#\Newline)
+                                            (subseq output (+ 5 posn)))))
+            (make-commit (parse-commit-id commit-id) date author message)))))))
 
 (defun git-repository-last-version-from-tag (&optional repository-dir)
   (maybe-within-directory repository-dir

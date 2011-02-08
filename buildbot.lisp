@@ -482,7 +482,7 @@
          (m-r (make-instance 'buildmaster-run :locality gate :phases phases :modules modules)))
     (multiple-value-bind (status condition context)
         (with-captured-buildbot-errors ()
-          (with-maybe-verbose-termination (verbose-comm)
+          (with-maybe-verbose-termination verbose-comm
             (with-active-period (m-r)
               (let ((rest-phases (master-run-phases m-r))
                     (result-marker (advance-result m-r)))
@@ -505,9 +505,9 @@
                                                                                :verbose
                                                                                :verbose-comm-starting-phase
                                                                                :verbose-comm-starting-module)))
-                          `(run-test-phases-with-markers ',(mapcar (compose #'make-keyword #'type-of) rest-phases)
-                                                         ',(mapcar #'make-keyword module-names)
-                                                         :verbose ,verbose)
+                        `(run-test-phases-with-markers ',(mapcar (compose #'make-keyword #'type-of) rest-phases)
+                                                       ',(mapcar #'make-keyword module-names)
+                                                       :verbose ,verbose)
                         (dolist (p rest-phases)
                           (setf (remote-phase-ctx p) ctx))
                         (iter (for (phase . phases) on rest-phases)

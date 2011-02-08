@@ -1082,8 +1082,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (maybe-within-directory directory
     (with-maybe-handled-executable-failures (not *attempting-git-fetch-recovery*)
-        (with-gitremote ((name remote) :update t :url (url remote module-name))
-          t)
+        (with-gitremote ((name remote) :url (url remote module-name))
+          (fetch-gitremote (name remote)))
       (:handler (c)
         ;; Not a combined remote, or already degraded to a dumb,
         ;; transport?  Nothing we can do here, then..

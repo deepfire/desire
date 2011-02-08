@@ -370,7 +370,8 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                                 (invoke-restart (find-restart 'make-symbol))))
                              (serious-condition
                               (lambda (cond)
-                                (format t "~&;;; got ~S, while parsing AS definition from ~S:~%~A~%" cond stream cond)
+                                (format t "~&~@<;;; ~@;got ~S, while parsing AS definition from ~S:~_~A~@:>~%"
+                                        cond stream cond)
                                 (let ((cl-reader:*readtable* (cl-reader:copy-readtable)))
                                   ;; (cl-reader:set-syntax-from-char #\: #\Space)
                                   (cl-reader:set-dispatch-macro-character #\# #\? (lambda (s c i) (declare (ignore c i)) (cl-reader:read s nil 'das-eof t) nil))

@@ -75,38 +75,40 @@ for the purpose of INIT-time download and registration of already-loaded compone
     (destructuring-bind (&key help version
                               app system module
                               bot-phases
-                              verbose
+                              break-on-signals verbose
                               &allow-other-keys) args
       (cond ((or help version)
              (cond (help    (command-line-arguments:show-option-help option-spec))
                    (version (syncformat t "desire package management substrate bootstrap sequence, version ~A.~%" *desire-version*)))
              (e.0:quit))
             (t
-             (apply #'init (remove-from-plist args
-                                              :help :version
-                                              :app :system :module
-                                              :bot-phases
-                                              :verbose))
-             (let* ((app (app app :if-does-not-exist :continue))
-                    (systems (append (when app    (list (app-system app)))
-                                     (when system (ensure-list (system system :if-does-not-exist :continue)))))
-                    (bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
-                    (modules (append (when system (list (system-module system)))
-                                     (when module (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue))
-                                                                      (split-sequence:split-sequence #\Space module :remove-empty-subseqs t))))))
-                    (desire (append (ensure-list app) (ensure-list system) (ensure-list module))))
-               (when (and desire (not modules))
-                 (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
-                        desire))
-               (when modules
-                 (get modules :verbose verbose :skip-present t)
-                 #+nil
-                 (if phases
-                     (buildslave modules phases verbose)
-                     (get modules :verbose verbose :skip-present t)))
-               (mapc (rcurry #'loadsys :verbose verbose) systems)
-               (when app
-                 (run app))))))))
+             (let ((*break-on-signals* (when break-on-signals 'error)))
+               (apply #'init (remove-from-plist args
+                                                :help :version
+                                                :app :system :module
+                                                :bot-phases
+                                                :break-on-signals
+                                                :debug))
+               (let* ((app (app app :if-does-not-exist :continue))
+                      (systems (append (when app    (list (app-system app)))
+                                       (when system (ensure-list (system system :if-does-not-exist :continue)))))
+                      (bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
+                      (modules (append (when system (list (system-module system)))
+                                       (when module (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue))
+                                                                        (split-sequence:split-sequence #\Space module :remove-empty-subseqs t))))))
+                      (desire (append (ensure-list app) (ensure-list system) (ensure-list module))))
+                 (when (and desire (not modules))
+                   (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
+                          desire))
+                 (when modules
+                   (get modules :verbose verbose :skip-present t)
+                   #+nil
+                   (if phases
+                       (buildslave modules phases verbose)
+                       (get modules :verbose verbose :skip-present t)))
+                 (mapc (rcurry #'loadsys :verbose verbose) systems)
+                 (when app
+                   (run app)))))))))
 
 (defun maybe-yes-or-no-p (bool format-control &rest args)
   (or (when bool
@@ -219,7 +221,7 @@ locally present modules will be marked as converted."
         ;; Per-repository branch model maintenance, system discovery and loadability
         ;;
         (syncformat t ";;; Enumerating present modules and systems~%")
-        (scan-locality (gate *self*) :known t :unknown t)
+        (scan-locality (gate *self*) :known t :unknown t :verbose verbose)
         ;;
         ;; Finish bootstrap
         ;;

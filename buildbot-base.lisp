@@ -167,8 +167,8 @@
     (complete-action o (specific-action-subclass o 'success) initargs)))
 
 (defvar *verbose-termination* nil)
-(define-execute-with-bound-variable *verbose-termination*
-  (:binding verbose-termination t :define-with-maybe-macro t))
+(define-binder with-verbose-termination *verbose-termination* :fixed-value t)
+(define-binder with-verbose-termination *verbose-termination* :fixed-value t :maybe t)
 
 (defun invoke-with-tracked-termination (action handlep fn)
   (let (normally-executed-p

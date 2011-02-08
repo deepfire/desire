@@ -151,7 +151,7 @@ system TYPE within LOCALITY."
 ;;;
 (defun ensure-module-systems-loadable (module &aux
                                        (module (coerce-to-module module)))
-  (let* ((systems (module-systems module)))
+  (when-let ((systems (module-systems module)))
     (when-let ((different-types (let ((types (remove-duplicates (mapcar #'type-of systems))))
                                   (when (> (length types) 1)
                                     types))))
@@ -231,7 +231,7 @@ meets desire's operational requirements.")
 
 (defun sync-module (module &optional locality &aux
                     (locality (or locality (gate *self*))))
-  (with-avoided-executable-output ()
+  (let ((*executable-standard-output* nil))
     (git-repository-update-for-dumb-servers
      (module-pathname (coerce-to-module module) locality))))
 
@@ -251,7 +251,7 @@ meets desire's operational requirements.")
 
 ;;;
 ;;; Actual batch operations
-(defun scan-locality (&optional (locality (gate *self*)) &key (known t) (unknown t))
+(defun scan-locality (&optional (locality (gate *self*)) &key (known t) (unknown t) verbose)
   ""
   (with-batch-module-operation (failed)
     (when known
@@ -268,7 +268,10 @@ meets desire's operational requirements.")
                                     (collect (name module))))))))
         (format t "~@<;; ~@;Found new modules:~{ ~A~}~:@>~%" new)))
     (when failed
-      (format t "~@<;; ~@;While processing ~A, following modules failed:~{ ~A~}~:@>~%"
-              (locality-pathname locality) (mapcar (compose #'coerce-to-name #'first) failed))))
+      (format t "~@<;; ~@;While scanning ~A, following modules failed:~{ ~A~}~:@>~%"
+              (locality-pathname locality) (mapcar (compose #'coerce-to-name #'first) failed))
+      (when verbose
+        (iter (for (name error) in failed)
+              (format t "~@<;; ~@;in ~A:~_~A~:@>~%" name error)))))
   (update-system-set-dependencies t)
   (values))

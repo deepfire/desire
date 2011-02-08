@@ -464,28 +464,30 @@ When SEAL-P is non-NIL, the changes are committed."
 ;;; Automated desire bootstrap generation
 ;;;
 (defparameter *option-spec*
-  '(("as"                    :type string  :documentation "Provide the name for self, within the desire node namespace.")
-    #+nil (("update" #\u)    :type string  :documentation "") ;; N/A
-    (("root" #\r)            :type string  :documentation "Register and manage ROOT as central source code location.")
-    #+nil (("lisp" #\l)      :type string  :documentation "") ;; N/A
-    (("bootstrap-name" #\n)  :type string  :documentation "Specify the hostname of the bootstrap desire node.")
-    (("bootstrap-url" #\b)   :type string  :documentation "Specify an URL of a bootstrap desire node.")
-    (("http-proxy" #\y)      :type string  :documentation "Specify the HTTP proxy. Defaults to ${http_proxy}.")
+  '(("as"                     :type string  :documentation "Provide the name for self, within the desire node namespace.")
+    #+nil (("update" #\u)     :type string  :documentation "") ;; N/A
+    (("root" #\r)             :type string  :documentation "Register and manage ROOT as central source code location.")
+    #+nil (("lisp" #\l)       :type string  :documentation "") ;; N/A
+    (("bootstrap-name" #\n)   :type string  :documentation "Specify the hostname of the bootstrap desire node.")
+    (("bootstrap-url" #\b)    :type string  :documentation "Specify an URL of a bootstrap desire node.")
+    (("http-proxy" #\y)       :type string  :documentation "Specify the HTTP proxy. Defaults to ${http_proxy}.")
     #+nil (("branch" #\t)     :type string  :documentation "") ;; N/A
-    (("module" #\m)          :type string  :documentation "Retrieve a space-separated list of MODULEs, once ready.")
-    (("system" #\s)          :type string  :documentation "Install or update the module relevant to specified SYSTEM, then load it.")
-    (("app" #\a)             :type string  :documentation "Load system containing APP, as per -s, then launch it.")
-    (("eval" #\x)            :type string  :documentation "Evaluate an expression, after loading/obtaining everything.")
-    (("package" #\k)         :type string  :documentation "Specify the package to evaluate the above expression in.")
-    (("bot-phase" #\p)       :type string  :documentation "")
+    (("module" #\m)           :type string  :documentation "Retrieve a space-separated list of MODULEs, once ready.")
+    (("system" #\s)           :type string  :documentation "Install or update the module relevant to specified SYSTEM, then load it.")
+    (("app" #\a)              :type string  :documentation "Load system containing APP, as per -s, then launch it.")
+    (("eval" #\x)             :type string  :documentation "Evaluate an expression, after loading/obtaining everything.")
+    (("package" #\k)          :type string  :documentation "Specify the package to evaluate the above expression in.")
+    (("bot-phase" #\p)        :type string  :documentation "")
     #+nil (("optimize-debug" #\d)  :type boolean :documentation "") ;; N/A
-    ("yes"                   :type boolean :documentation "Accept 'yes' as an answer for binary interactive questions.")
-    (("no-debugger" #\g)     :type boolean :documentation "Disable debugger, causing desire dump stack and abort on errors, instead of entering the debugger.")
-    (("explain" #\e)         :type boolean :documentation "Enable explanations about external program invocations.")
-    (("verbose" #\v)         :type boolean :documentation "Include debugging output.")
-    (("quiet" #\q)           :type boolean :documentation "Exclude non-critical output.")
-    (("version" #\V)         :type boolean :documentation "Print version and exit.")
-    (("help" #\h)            :type boolean :documentation "Print help and exit.")))
+    ("yes"                    :type boolean :documentation "Accept 'yes' as an answer for binary interactive questions.")
+    (("no-debugger" #\g)      :type boolean :documentation "Disable debugger, causing desire dump stack and abort on errors, instead of entering the debugger.")
+    (("break-on-signals" #\B) :type boolean :documentation "Execute with *BREAK-ON-SIGNALS* bound to ERROR.")
+    (("explain" #\e)          :type boolean :documentation "Enable explanations about external program invocations.")
+    ("debug"                  :type boolean :documentation "Proclaim debug optimisation.")
+    (("verbose" #\v)          :type boolean :documentation "Include debugging output.")
+    (("quiet" #\q)            :type boolean :documentation "Exclude non-critical output.")
+    (("version" #\V)          :type boolean :documentation "Print version and exit.")
+    (("help" #\h)             :type boolean :documentation "Print help and exit.")))
 
 (defparameter *impl-components*
   (alist-hash-table
@@ -635,11 +637,13 @@ bootstrap-geared, single-file form of desire.")
 (defbootfun command-line-arguments ())
 
 (defbootfun process-early-options ()
-  (destructuring-bind (&key help version verbose quiet &allow-other-keys)
+  (destructuring-bind (&key help version verbose debug quiet &allow-other-keys)
       (command-line-arguments:process-command-line-options *option-spec* (command-line-arguments))
     (setf *quiet*   quiet
           *verbose* verbose)
     (cond
+      (debug
+       (proclaim '(optimize debug)))
       ((or help version)
        (cond
          (help    (command-line-arguments:show-option-help *option-spec*))

@@ -57,9 +57,8 @@ Defaults to NIL.")
 
 (defgeneric touch-remote-module (remote module)
   (:method :around ((o remote) name)
-    (with-unaffected-executable-output ()
-      (with-explanation ("attempting to touch module ~A in ~S" (coerce-to-name name) (url o name))
-        (call-next-method))))
+    (with-executable-options (:explanation `("attempting to touch module ~A in ~S" ,(coerce-to-name name) ,(url o name)))
+      (call-next-method)))
   (:method ((o git-remote) name)
     (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)
@@ -104,19 +103,20 @@ Only for remotes of type SEPARATE-CLONE.")
    "Update the local repository, maybe creating it first.
 Note that the provided directory is the final directory in the gate locality.")
   (:method :around ((o remote) name url repo-dir)
-    (with-error-resignaling (executable-failure
-                             ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
-      (with-error-resignaling (missing-executable
+    (let ((*repository* repo-dir))
+      (with-error-resignaling (executable-failure
                                ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
-        (with-git-repository-write-access (*new-repository-p*) repo-dir
-          (when (and (not *new-repository-p*) *follow-upstream*)
-            (ensure-clean-repository *dirty-repository-behaviour*))
-          (let ((*source-remote* o))
-            (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
-              (call-next-method)))
-          (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
-                                                 (t :continue)))
-          (setf (git-repository-world-readable-p) *default-world-readable*)))))
+        (with-error-resignaling (missing-executable
+                                 ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
+          (with-git-repository-write-access (*new-repository-p*) repo-dir
+            (when (and (not *new-repository-p*) *follow-upstream*)
+              (ensure-clean-repository *dirty-repository-behaviour*))
+            (let ((*source-remote* o))
+              (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
+                (call-next-method)))
+            (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
+                                                   (t :continue)))
+            (setf (git-repository-world-readable-p) *default-world-readable*))))))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
@@ -312,7 +312,7 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                                     (invoke-restart (find-restart 'retry)))
                              :test-function (of-type 'repository-not-clean-during-fetch)
                              :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))
-              (with-maybe-unaffected-executable-output (pass-output)
+              (let ((*executable-standard-output* (if pass-output t *executable-standard-output*)))
                 (format t ";; Fetching module ~A from ~A remote ~A, ~A~%" name (vcs-type best-remote) (name best-remote) url)
                 (fetch-module-using-remote best-remote name url repo-dir)
                 (format t ";; Done fetching ~A~%" name)
