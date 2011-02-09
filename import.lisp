@@ -114,7 +114,7 @@ Note that the provided directory is the final directory in the gate locality.")
             (let ((*source-remote* o))
               (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
                 (call-next-method)))
-            (git-set-head-index-tree :master (cond ((or *follow-upstream* (directory-created-p)) :reset)
+            (git-set-head-index-tree :master (cond ((or *follow-upstream* *new-repository-p*) :reset)
                                                    (t :continue)))
             (setf (git-repository-world-readable-p) *default-world-readable*))))))
   ;; ========================== branch model aspect =============================
