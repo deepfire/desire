@@ -1413,9 +1413,8 @@ value is returned."
               (setf *combined-remotes-prefer-native-over-http* nil)
               t)))
         ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
-        (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") nil))
-              (head-in-clouds-p (head-in-clouds-p)))
-          (git-set-branch :master nil remote-master-val (not head-in-clouds-p)))
+        (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") nil)))
+          (git-set-branch :master nil remote-master-val (not (head-detached-p))))
         (git-set-head-index-tree :master)
         (git-set-branch-index-tree (make-remote-ref remote-name branch))))))
 

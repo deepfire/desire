@@ -98,44 +98,44 @@ Only for remotes of type SEPARATE-CLONE.")
     (with-explanation ("initialising git repository of module ~A in ~S" name *default-pathname-defaults*)
       (git "init-db"))))
 
-(defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname)
+(defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname &optional branch)
   (:documentation
-   "Update the local repository, maybe creating it first.
-Note that the provided directory is the final directory in the gate locality.")
-  (:method :around ((o remote) name url repo-dir)
-    (let ((*repository* repo-dir))
-      (with-error-resignaling (executable-failure
-                               ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
-        (with-error-resignaling (missing-executable
-                                 ((cond) 'fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
-          (with-git-repository-write-access (*new-repository-p*) repo-dir
-            (when (and (not *new-repository-p*) *follow-upstream*)
-              (ensure-clean-repository *dirty-repository-behaviour*))
-            (let ((*source-remote* o))
-              (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
-                (call-next-method)))
-            (git-set-head-index-tree :master (cond ((or *follow-upstream* *new-repository-p*) :reset)
-                                                   (t :continue)))
-            (setf (git-repository-world-readable-p) *default-world-readable*))))))
+   "Update the local repository, maybe creating it first.  Note that
+the provided directory is the final directory in the gate locality.")
+  (:method :around ((o remote) name url repo-dir &optional branch)
+    (declare (type null branch))
+    (let ((*repository* repo-dir)
+          (branch (repository-policy-value :operating-branch)))
+      (with-error-resignaling
+          ((executable-failure ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
+           (missing-executable ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond))))
+        (with-git-repository-write-access (*new-repository-p*) repo-dir
+          (when (and (not *new-repository-p*) *follow-upstream*)
+            (ensure-clean-repository *dirty-repository-behaviour*))
+          (let ((*source-remote* o))
+            (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
+              (call-next-method remote module-name url final-gate-repo-pathname branch)))
+          (git-set-head-index-tree branch (cond ((or *follow-upstream* *new-repository-p*) :reset)
+                                                (t :continue)))
+          (setf (git-repository-world-readable-p) *default-world-readable*)))))
   ;; ========================== branch model aspect =============================
-  (:method ((o git-remote) name url repo-dir)
+  (:method ((o git-remote) name url repo-dir &optional branch)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
 Note that this method doesn't affect working tree, instead deferring that
 to the above :AROUND method."
-    (cond (*new-repository-p*
-           (init-db-when-new-repository name)
-           (ensure-gitremote (name o) (url o name)))
-          (t
-           (ensure-tracker-branch)))
+    (when *new-repository-p*
+      (init-db-when-new-repository name)
+      (ensure-gitremote (name o) (url o name)))
+    (ensure-tracker-branch)
     (let ((we-drive-master-p (or *new-repository-p* *drive-git-masters* (and *drive-git-masters-matching-trackers*
                                                                              (not (master-detached-p))))))
       (git-fetch-remote o name)
       (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil))
-            (head-in-clouds-p (head-in-clouds-p)))
+            (head-in-clouds-p (head-detached-p)))
         (git-set-branch :tracker nil remote-master-val (not head-in-clouds-p))
         (when we-drive-master-p
           (git-set-branch :master nil remote-master-val (not head-in-clouds-p))))))
-  (:method :around ((o nongit-mixin) name url repo-dir)
+  (:method :around ((o nongit-mixin) name url repo-dir &optional branch)
     (unless *new-repository-p*
       (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
@@ -144,16 +144,16 @@ to the above :AROUND method."
       (git "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-refval master-val))))
   ;; ====================== end of branch model aspect ==========================
   ;; direct fetch, non-git
-  (:method ((o cvs-native-remote) name url repo-dir)
+  (:method ((o cvs-native-remote) name url repo-dir &optional branch)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
       (git "cvsimport" "-d" url (or cvs-module-name (downstring name)))))
-  (:method ((o svn-direct) name url repo-dir)
+  (:method ((o svn-direct) name url repo-dir &optional branch)
     (multiple-value-bind (url wrinkle) (url o (module name))
       (when *new-repository-p*
         (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" name url *default-pathname-defaults*)
           (git "svn" "init" url wrinkle)))
       (git "svn" "fetch")))
-  (:method ((o tarball-http-remote) name url-template repo-dir)
+  (:method ((o tarball-http-remote) name url-template repo-dir &optional branch)
     (init-db-when-new-repository name)
     (iter (with last-version = (if *new-repository-p*
                                    (initial-tarball-version o)
@@ -168,20 +168,20 @@ to the above :AROUND method."
               (with-explanation ("on behalf of module ~A, importing tarball version ~A" name (princ-version-to-string next-version))
                 (git "import-orig" localised-tarball))))))
   ;; indirect-fetch
-  (:method :around ((o separate-clone) name url repo-dir)
+  (:method :around ((o separate-clone) name url repo-di &optionalr branch)
     "Note that the fetches will be done later anyway."
     (let ((transit-repo-dir (module-pathname name (locality o))))
       (unless (directory-exists-p transit-repo-dir)
         (clone-transit-module-using-remote o name url transit-repo-dir)))
     (call-next-method))
-  (:method :before ((o darcs-http-remote) name url repo-dir)
+  (:method :before ((o darcs-http-remote) name url repo-dir &optional branch)
     (darcs "pull" "--all" "--repodir" (module-pathname name (locality o)) url))
-  (:method :before ((o hg-http-remote) name url repo-dir)
+  (:method :before ((o hg-http-remote) name url repo-dir &optional branch)
     (declare (ignore url))
     (hg "pull" "-R" (module-pathname name (locality o))))
-  (:method :before ((o rsync) name url repo-dir)
+  (:method :before ((o rsync) name url repo-di &optionalr branch)
     (rsync "-ravPz" url (module-pathname name (locality o))))
-  (:method ((o indirect-fetch) name url repo-dir)
+  (:method ((o indirect-fetch) name url repo-dir &optional branch)
     (convert-transit-module-using-locality (locality o) name (module-pathname name (locality o)))))
 
 (defgeneric convert-transit-module-using-locality (source-locality name source-repository)
@@ -295,35 +295,45 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
 
 (defun update (module &key (locality (gate *self*)) pass-output (if-update-fails nil) &aux
                (module (coerce-to-module module)))
+  "Decide on a best location to obtain the MODULE from,
+fetch it from there, possibly mark the result as redistributed and
+analyse its contents for constituent systems.
+
+Unless the module was already present, failure to find a remote,
+when IF-UPDATE-FAILS is :ERROR, causes an error to be signalled."
   (if-let ((best-remote (or (module-best-remote module :if-does-not-exist :continue)
                             (module-best-remote module :if-does-not-exist :continue :allow-self t))))
     (if (eq *self* (remote-distributor best-remote))
         (syncformat t ";; Module ~A is local, skipping update~%" (name module))
         (let* ((url (url best-remote module))
-               (name (name module))
-               (repo-dir (module-pathname name locality)))
+               (module-name (name module))
+               (repo-dir (module-pathname module-name locality)))
+          ;; handle buildbot's stashing shenanigans
           (when (module-stashed-repo-present-p module locality)
-            (syncformat t ";; Unstashing module ~A~%" (name module))
+            (syncformat t ";; Unstashing module ~A~%" module-name)
             (unstash-module module locality))
+          ;; do fetch
           (with-maybe-just-printing-conditions (t fetch-failure) (not *fetch-errors-serious*)
             (restart-bind ((retry (lambda ()
-                                    (maybe-within-directory repo-dir
+                                    (within-directory (repo-dir)
                                       (git "gui"))
                                     (invoke-restart (find-restart 'retry)))
                              :test-function (of-type 'repository-not-clean-during-fetch)
                              :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))
               (let ((*executable-standard-output* (if pass-output t *executable-standard-output*)))
-                (format t ";; Fetching module ~A from ~A remote ~A, ~A~%" name (vcs-type best-remote) (name best-remote) url)
-                (fetch-module-using-remote best-remote name url repo-dir)
-                (format t ";; Done fetching ~A~%" name)
+                (format t ";; Fetching module ~A from ~A remote ~A, ~A~%"
+                        module-name (vcs-type best-remote) (name best-remote) url)
+                (fetch-module-using-remote best-remote module-name url repo-dir)
+                (format t ";; Done fetching ~A~%" module-name)
                 (when *default-publishable*
-                  (declare-module-converted name locality)))))))
-    (if (and (module-locally-present-p module)
-             (ecase if-update-fails
-               ((nil)  t)
-               (:error nil)))
-        (return-from update)
-        (error 'insatiable-desire :desire module)))
-  (notice-module-repository module nil locality)
-  (sync-module module locality)
+                  (declare-module-converted module-name locality)))))
+          ;; alright, fetch went good, now tie in changes
+          (notice-module-repository module nil locality)
+          (sync-module module locality)))
+    ;; no acceptable remote found..
+    (unless (and (module-locally-present-p module)
+                 (ecase if-update-fails
+                   ((nil)  t)
+                   (:error nil)))
+      (error 'insatiable-desire :desire module)))
   (values))

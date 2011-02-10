@@ -23,9 +23,13 @@
 
 (defvar *http-proxy*                               nil)
 
-(define-executable git :may-want-display t
-                   :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat" (when *http-proxy*
-                                                                      (strconcat* "http_proxy=" *http-proxy*))))
+(define-executable (%git git)
+    :may-want-display t
+    :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat" (when *http-proxy*
+                                                       (strconcat* "http_proxy=" *http-proxy*))))
+
+(defun git (work-tree &rest args)
+  (apply #'%git (strconcat* "--work-tree=" work-tree) args))
 
 (define-condition vcs-condition ()
   ((vcs :reader condition-vcs :initarg :vcs)))
@@ -39,12 +43,11 @@
 
 (define-simple-error git-error)
 
-(defun missing-remote-error (name &optional directory &aux
-                             (path (or directory *default-pathname-defaults*)))
-  (repository-error path "~@<At ~S: remote ~A not found, and no URL was provided.~:@>"
-                    path name))
+(defun missing-remote-error (name &optional (directory *repository*))
+  (repository-error directory "~@<At ~S: remote ~A not found, and no URL was provided.~:@>"
+                    directory name))
 
-(defun extort-remote-url (name &optional directory)
+(defun extort-remote-url (name &optional (directory *repository*))
   (restart-case (missing-remote-error name directory)
     (specify (specified-url)
       :report "Specify URL for the missing remote."
@@ -59,8 +62,7 @@
 
 (defun git-predicate (directory explanation-format-control git-arguments)
   (with-executable-options (:explanation `(,explanation-format-control ,directory) :output nil)
-    (within-directory (directory)
-      (not (with-shell-predicate (apply #'git git-arguments))))))
+    (not (with-shell-predicate (apply #'git directory git-arguments)))))
 
 (defmacro defgitpredicate (name (explanation-format-control) &body git-arguments)
   `(defun ,name (&optional (directory *repository*))
@@ -108,11 +110,11 @@ exported for the purposes of git-daemon."
 
 (defun (setf git-repository-world-readable-p) (val &optional (directory *repository*))
   "Change git-daemon's idea about world-readability of DIRECTORY."
-  (let ((path (merge-pathnames ".git/git-daemon-export-ok" directory)))
+  (let ((flag-path (merge-pathnames ".git/git-daemon-export-ok" directory)))
     (if val
-        (open path :direction :probe :if-does-not-exist :create)
-        (when (file-exists-p path)
-          (delete-file path)))
+        (open flag-path :direction :probe :if-does-not-exist :create)
+        (when (file-exists-p flag-path)
+          (delete-file flag-path)))
     val))
 
 (defgitpredicate git-repository-unstaged-changes-p ("determining whether git repository at ~S has unstaged changes")
@@ -135,8 +137,7 @@ The lists of pathnames returned have following semantics:
   (multiple-value-bind (status output)
       (with-executable-options (:explanation `("determining status of git repository at ~S" ,directory)
                                 :output :capture)
-        (within-directory (directory)
-          (with-shell-predicate (git "status"))))
+        (with-shell-predicate (git directory "status")))
     (declare (ignore status))
     (with-input-from-string (s output)
       (flet ((seek-past-marker ()
@@ -187,8 +188,7 @@ The lists of pathnames returned have following semantics:
               (finally (return-from outer (values staged-modified staged-deleted staged-new unstaged-modified unstaged-deleted untracked))))))))
 
 (defun git-repository-update-for-dumb-servers (&optional (directory *repository*))
-  (within-directory (directory)
-    (git "update-server-info")))
+  (git directory "update-server-info"))
 
 ;;;
 ;;; Policies
@@ -201,8 +201,9 @@ The lists of pathnames returned have following semantics:
 ;;   - a set of policy atoms
 ;;
 (defstruct policy-atom
-  (unsaved-changes nil :type (or null (member :stash :reset :error)))
-  (missing-master  nil :type (or null (member :create-on-head :error))))
+  (unsaved-changes  nil :type (or null (member :stash :reset :error)))
+  (missing-master   nil :type (or null (member :create-on-head :error)))
+  (operating-branch nil :type keyword))
 
 (defclass repository-policy (registered)
   ((atoms :initargs :atoms))
@@ -211,10 +212,35 @@ The lists of pathnames returned have following semantics:
 
 (define-subcontainer policy-atom :key-type t :container-slot atoms)
 
+(defun make-repository-policy (name &rest atom-specs)
+  (make-instance 'repository-policy :name name
+                 :atoms (alist-hash-table (mapcar (lambda (spec) (cons (first spec) (second spec)))
+                                                  atom-specs)
+                                          :test 'equalp)))
+
+(defun make-default-repository-policy (name &rest properties &key &allow-other-keys)
+  (make-repository-policy name (list nil (apply #'make-policy-atom properties)))))
+
 (defparameter *repository-policies*
   (alist-hash-table
-   `((:default . ,(make-policy-atom :unsaved-changes :stash
-                                    :missing-master  :create-on-head)))
+   `((:default .  ,(make-default-repository-policy
+                    :default
+                    :unsaved-changes     :stash
+                    :missing-master      :create-on-head
+                    :operating-branch    :master
+                    :preexisting-gitless :take-over))
+     (:new-repo . ,(make-default-repository-policy
+                    :new-repo
+                    :unsaved-changes     :error
+                    :missing-master      :error
+                    :operating-branch    :master
+                    :preexisting-gitless :error))
+     (:cautious . ,(make-default-repository-policy
+                    :cautious
+                    :unsaved-changes     :error
+                    :missing-master      :error
+                    :operating-branch    :
+                    :preexisting-gitless :error)))
    :test 'eq))
 
 (define-root-container *repository-policies* repository-policy :key-type symbol :coercer t)
@@ -251,77 +277,70 @@ The lists of pathnames returned have following semantics:
 ;;;
 ;;; Config variables
 ;;;
-(defun gitvar (var &optional directory)
+(defun gitvar (var &optional (directory *repository*))
   (declare (type symbol var))
-  (maybe-within-directory directory
-    (with-executable-options (:explanation `("getting value of git variable ~A" ,(symbol-name var))
-                              :output :capture)
-      (multiple-value-bind (setp output)
-          (with-shell-predicate
-              (git "config" (string-downcase (symbol-name var))))
-        (when setp
-          (string-right-trim '(#\Return #\Newline) output))))))
+  (with-executable-options (:explanation `("getting value of git variable ~A" ,(symbol-name var))
+                            :output :capture)
+    (multiple-value-bind (setp output) (with-shell-predicate (git directory "config" (string-downcase (symbol-name var))))
+      (when setp
+        (string-right-trim '(#\Return #\Newline) output)))))
 
-(defun (setf gitvar) (val var &optional directory globalp)
+(defun (setf gitvar) (val var &optional (directory *repository*) globalp)
   (declare (type symbol var) (type string val))
-  (maybe-within-directory directory
-    (with-explanation ("setting git variable ~A to ~A" (symbol-name var) val)
-      (apply #'git "config" (xform globalp (curry #'cons "--global") (list "--replace-all" (string-downcase (symbol-name var)) val))))))
+  (with-explanation ("setting git variable ~A to ~A" (symbol-name var) val)
+    (apply #'git directory "config"
+           (xform globalp (curry #'cons "--global") (list "--replace-all" (string-downcase (symbol-name var)) val)))))
 
 ;;;
 ;;; Remotes
 ;;;
-(defun gitremotes (&optional directory)
-  (maybe-within-directory directory
-    (multiple-value-bind (status output)
-        (with-executable-options (:explanation `("listing git remotes in ~S" ,*default-pathname-defaults*)
-                                  :output :capture)
-          (git "remote" "-v"))
-      (declare (ignore status))
-      (iter (for line in (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))
-            (while (plusp (length line)))
-            (destructuring-bind (name url &optional fetch-or-push)
-                (iter (for str in (split-sequence #\Space line :remove-empty-subseqs t))
-                      (nconcing
-                       (split-sequence #\Tab str :remove-empty-subseqs t)))
-              (when (or (not fetch-or-push)
-                        (string= "(fetch)" fetch-or-push))
-                (collect (canonicalise-name name) into names)
-                (collect url into urls)))
-            (finally (return (values names urls)))))))
+(defun gitremotes (&optional (directory *repository*))
+  (multiple-value-bind (status output)
+      (with-executable-options (:explanation `("listing git remotes in ~S" ,directory)
+                                :output :capture)
+        (git directory "remote" "-v"))
+    (declare (ignore status))
+    (iter (for line in (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))
+          (while (plusp (length line)))
+          (destructuring-bind (name url &optional fetch-or-push)
+              (iter (for str in (split-sequence #\Space line :remove-empty-subseqs t))
+                    (nconcing
+                     (split-sequence #\Tab str :remove-empty-subseqs t)))
+            (when (or (not fetch-or-push)
+                      (string= "(fetch)" fetch-or-push))
+              (collect (canonicalise-name name) into names)
+              (collect url into urls)))
+          (finally (return (values names urls))))))
 
-(defun find-gitremote (name &optional directory)
+(defun find-gitremote (name &optional (directory *repository*))
   (multiple-value-bind (remote-names urls) (gitremotes directory)
     (iter (for remote-name in remote-names)
           (for remote-url in urls)
           (finding remote-url such-that (eq name remote-name)))))
 
-(defun add-gitremote (name url &optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("adding a git remote ~A (~A) in ~S" name url *default-pathname-defaults*)
-      (git "remote" "add" (downstring name) url))))
+(defun add-gitremote (name url &optional (directory *repository*))
+  (with-explanation ("adding a git remote ~A (~A) in ~S" name url directory)
+    (git directory "remote" "add" (downstring name) url)))
 
-(defun remove-gitremote (name &optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("removing git remote ~A in ~S" name *default-pathname-defaults*)
-      (git "remote" "rm" (downstring name)))))
+(defun remove-gitremote (name &optional (directory *repository*))
+  (with-explanation ("removing git remote ~A in ~S" name directory)
+    (git directory "remote" "rm" (downstring name))))
 
-(defun ensure-gitremote (name &optional url directory)
+(defun ensure-gitremote (name &optional url (directory *repository*))
   (let* ((found-url (find-gitremote name directory))
          (found-good-url-p (and found-url (if url
                                               (string/= url found-url)
                                               t))))
     (unless (or found-good-url-p url)
-      (setf url (extort-remote-url name (or directory *default-pathname-defaults*))))
+      (setf url (extort-remote-url name directory)))
     (when (and found-url (not found-good-url-p))
       (remove-gitremote name directory))
     (unless found-good-url-p
       (add-gitremote (downstring name) url directory))))
 
-(defun fetch-gitremote (remote-name &optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("fetching from git remote ~A in ~S" remote-name *default-pathname-defaults*)
-      (git "fetch" (downstring remote-name)))))
+(defun fetch-gitremote (remote-name &optional (directory *repository*))
+  (with-explanation ("fetching from git remote ~A in ~S" remote-name directory)
+    (git directory "fetch" (downstring remote-name))))
 
 ;;;
 ;;; Raw refs
@@ -336,7 +355,7 @@ The lists of pathnames returned have following semantics:
         (cons "heads" ref)
         ref)))
 
-(defun ref-path (ref &optional directory)
+(defun ref-path (ref &optional (directory *repository*))
   (subfile directory (list* ".git" "refs" (canonicalise-ref ref))))
 
 (defun path-ref (pathname directory)
@@ -441,19 +460,19 @@ The lists of pathnames returned have following semantics:
               (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref (or directory *default-pathname-defaults*)))
               (:continue nil))))))
 
-(defun ref-coerce-to-value (ref-or-value &optional directory)
+(defun ref-coerce-to-value (ref-or-value &optional (directory *repository*))
   (if (integerp ref-or-value)
       ref-or-value
       (ref-value ref-or-value directory)))
 
 (defgeneric ref= (ref-x ref-y &optional directory)
-  (:method (x y &optional directory)
+  (:method (x y &optional (directory *repository*))
     (ref= (ref-coerce-to-value x directory) (ref-coerce-to-value y directory)))
-  (:method ((x integer) (y integer) &optional directory)
+  (:method ((x integer) (y integer) &optional (directory *repository*))
     (declare (ignore directory))
     (= x y)))
 
-(defun symbolic-reffile-value (pathname &optional dereference directory)
+(defun symbolic-reffile-value (pathname &optional dereference (directory *repository*))
   (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
     (let ((normalised-ref (rest ref))) ; strip the "refs" component
       (if dereference
@@ -472,94 +491,87 @@ The lists of pathnames returned have following semantics:
 ;;;
 ;;; HEAD operation
 ;;;
-(defun head-pathname (&optional directory remote)
+(defun head-pathname (&optional (directory *repository*) remote)
   (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
 
-(defun get-head (&optional directory remote (dereference t))
+(defun get-head (&optional (directory *repository*) remote (dereference t))
   (symbolic-reffile-value (head-pathname directory remote) dereference directory))
 
-(defun set-head (new-value &optional directory remote)
+(defun set-head (new-value &optional (directory *repository*) remote)
   (declare (type (or cons (integer 0)) new-value))
   (set-symbolic-reffile-value (head-pathname directory remote) new-value))
 
-(defun git-detach-head (&optional directory)
-  (maybe-within-directory directory
-    (set-head (get-head))))
+(defun git-detach-head (&optional (directory *repository*))
+  (set-head (get-head directory) directory))
 
-(defun head-in-clouds-p (&optional directory remote)
+(defun head-detached-p (&optional (directory *repository*) remote)
   (let ((head (get-head directory remote nil)))
     (not (or (integerp head)
              (ref-value head directory :if-does-not-exist :continue)))))
 
 (defun invoke-with-maybe-detached-head (directory detachp fn)
-  (maybe-within-directory directory
-    (if detachp
-        (let ((current-head (get-head)))
-          (unwind-protect (progn (git-detach-head)
-                                 (funcall fn))
-            (when current-head
-              (set-head current-head))))
-        (funcall fn))))
+  (if detachp
+      (let ((current-head (get-head directory)))
+        (unwind-protect (progn (git-detach-head directory)
+                               (funcall fn))
+          (when current-head
+            (set-head current-head directory))))
+      (funcall fn)))
 
-(defmacro with-maybe-detached-head ((&optional directory detachp) &body body)
+(defmacro with-maybe-detached-head ((&optional (directory '*repository) detachp) &body body)
   `(invoke-with-maybe-detached-head ,directory ,detachp  (lambda () ,@body)))
 
 ;;;
 ;;; Branches
 ;;;
-(defun git-branches (&optional directory)
-  (maybe-within-directory directory
-    (multiple-value-bind (status output)
-        (with-executable-options (:explanation `("listing git branches in ~S" ,*default-pathname-defaults*)
-                                  :output :capture)
-          (git "branch"))
-      (declare (ignore status))
-      (mapcar (compose #'make-keyword #'string-upcase)
-              (remove-if
-               (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
-               (mapcan (curry #'split-sequence #\Space)
-                       (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output))))))))
+(defun git-branches (&optional (directory *repository*))
+  (multiple-value-bind (status output)
+      (with-executable-options (:explanation `("listing git branches in ~S" ,*default-pathname-defaults*)
+                                :output :capture)
+        (git directory "branch"))
+    (declare (ignore status))
+    (mapcar (compose #'make-keyword #'string-upcase)
+            (remove-if
+             (lambda (x) (or (zerop (length x)) (and (= 1 (length x)) (char= #\* (schar x 0)))))
+             (mapcan (curry #'split-sequence #\Space)
+                     (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))
 
 
-(defun git-branch-present-p (name &optional directory)
+(defun git-branch-present-p (name &optional (directory *repository*))
   (or (not (null (probe-file (ref-path (downstring name) directory))))
       (member name (git-branches directory) :test #'string=)))
 
-(defun git-remove-branch (name &optional directory)
-  (maybe-within-directory directory
-    (with-explanation ("removing git branch ~A in ~S" name *default-pathname-defaults*)
-      (nth-value 0 (git "branch" "-d" (downstring name))))))
+(defun git-remove-branch (name &optional (directory *repository*))
+  (with-explanation ("removing git branch ~A in ~S" name directory)
+    (nth-value 0 (git directory "branch" "-d" (downstring name)))))
 
-(defun git-set-noncurrent-branch (branchname &optional directory (refvalue (get-head directory)))
+(defun git-set-noncurrent-branch (branchname &optional (directory *repository*) (refvalue (get-head directory)))
   (declare (type (or list (integer 0)) refvalue))
-  (maybe-within-directory directory
-    (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S" branchname (consp refvalue) refvalue *default-pathname-defaults*)
-      (nth-value 0 (git "branch" "-f" (downstring branchname) (cook-refval refvalue))))))
+  (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S"
+                     branchname (consp refvalue) refvalue directory)
+    (nth-value 0 (git directory "branch" "-f" (downstring branchname) (cook-refval refvalue)))))
 
-(defun git-set-branch (name &optional directory (refvalue (get-head directory)) possibly-current-p)
+(defun git-set-branch (name &optional (directory *repository*) (refvalue (get-head directory)) possibly-current-p)
   (with-maybe-detached-head (directory possibly-current-p)
     (git-set-noncurrent-branch name directory refvalue)))
 
-(defun git-set-branch-index-tree (&optional ref directory)
-  (maybe-within-directory directory
-    (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" *default-pathname-defaults* ref)
-      (apply #'git "reset" "--hard" (when ref (list (flatten-path-list ref) "--"))))))
+(defun git-set-branch-index-tree (&optional ref (directory *repository*))
+  (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" directory ref)
+    (apply #'git directory "reset" "--hard" (when ref (list (flatten-path-list ref) "--")))))
 
-(defun git-stash (&optional directory)
+(defun git-stash (&optional (directory *repository*))
   "Same as GIT-SET-BRANCH-INDEX-TREE with no arguments, but saves changes
 in a temporary pseudo-commit."
-  (maybe-within-directory directory
-    (with-explanation ("stashing changes in git repository at ~S" *default-pathname-defaults*)
-      (git "stash"))))
+  (with-explanation ("stashing changes in git repository at ~S" directory)
+    (git directory "stash")))
 
-(defun ensure-clean-repository (&optional (if-changes :stash) directory)
+(defun ensure-clean-repository (&optional (if-changes (repository-policy-value :unsaved-changes)) directory)
   (maybe-within-directory directory
     (with-retry-restarts ((hardreset-repository ()
                             :report "Clear all uncommitted changes, both staged and unstaged."
                             (git-set-branch-index-tree)))
       (when (git-repository-changes-p)
         (ecase if-changes
-          (:continue)
           (:stash (git-stash))
           (:reset (git-set-branch-index-tree))
           (:error (git-error "~@<~:[Uns~;S~]taged changes in git repository ~S.~:@>"
@@ -606,14 +618,17 @@ in a temporary pseudo-commit."
   (within-directory (path :if-does-not-exist :create)
     (handler-bind ((error (lambda (c)
                             (declare (ignore c))
-                            ;; Maintain the gate-has-useful-directories-only invariant.
+                            ;; Maintain the no-useless-directories-added invariant.
+                            ;; non-negotiable
                             (when (and (directory-created-p)
                                        (not (directory-has-git-objects-p dotgit)))
                               (fad:delete-directory-and-files path))
                             #| Continue signalling. |#)))
       (unless (or (directory-created-p)
                   (directory-has-git-objects-p dotgit))
-        (error 'empty-repository :pathname path))
+        (ecase (repository-policy-value :preexisting-gitless)
+          (:error     (error 'empty-repository :pathname path))
+          (:take-over nil)))
       (funcall fn (directory-created-p)))))
 
 (defmacro with-git-repository-write-access ((new-repo-p) path &body body)
