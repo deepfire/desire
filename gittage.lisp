@@ -29,6 +29,7 @@
                                                        (strconcat* "http_proxy=" *http-proxy*))))
 
 (defun git (work-tree &rest args)
+  (declare (string work-tree))
   (apply #'%git (strconcat* "--work-tree=" work-tree) args))
 
 (define-condition vcs-condition ()
@@ -201,14 +202,15 @@ The lists of pathnames returned have following semantics:
 ;;   - a set of policy atoms
 ;;
 (defstruct policy-atom
-  (unsaved-changes  nil :type (or null (member :stash :reset :error)))
-  (missing-master   nil :type (or null (member :create-on-head :error)))
-  (operating-branch nil :type keyword))
+  (unsaved-changes     nil :type (or null (member :error :reset :stash)))
+  (missing-master      nil :type (or null (member :error :create-on-head)))
+  (operating-branch    nil :type (or (eql t) keyword))
+  (preexisting-gitless nil :type (or null (member :error :take-over))))
 
-(defclass repository-policy (registered)
-  ((atoms :initargs :atoms))
+(defclass repository-policy (named)
+  ((atoms :initarg :atoms))
   (:default-initargs
-   :atoms (make-hash-table :test 'equalp)))
+   :atoms       (make-hash-table :test 'equalp)))
 
 (define-subcontainer policy-atom :key-type t :container-slot atoms)
 
@@ -219,7 +221,7 @@ The lists of pathnames returned have following semantics:
                                           :test 'equalp)))
 
 (defun make-default-repository-policy (name &rest properties &key &allow-other-keys)
-  (make-repository-policy name (list nil (apply #'make-policy-atom properties)))))
+  (make-repository-policy name (list nil (apply #'make-policy-atom properties))))
 
 (defparameter *repository-policies*
   (alist-hash-table
@@ -239,7 +241,7 @@ The lists of pathnames returned have following semantics:
                     :cautious
                     :unsaved-changes     :error
                     :missing-master      :error
-                    :operating-branch    :
+                    :operating-branch    t ; use detached operation?
                     :preexisting-gitless :error)))
    :test 'eq))
 
@@ -556,6 +558,9 @@ The lists of pathnames returned have following semantics:
     (git-set-noncurrent-branch name directory refvalue)))
 
 (defun git-set-branch-index-tree (&optional ref (directory *repository*))
+  "Set the current branch, the index and the working tree to the state
+at REF.  When REF is NIL, set the index and the working tree to the
+ref of the current branch."
   (with-explanation ("hard-resetting repository in ~S~:[~; to ~:*~S~]" directory ref)
     (apply #'git directory "reset" "--hard" (when ref (list (flatten-path-list ref) "--")))))
 
@@ -565,57 +570,54 @@ in a temporary pseudo-commit."
   (with-explanation ("stashing changes in git repository at ~S" directory)
     (git directory "stash")))
 
-(defun ensure-clean-repository (&optional (if-changes (repository-policy-value :unsaved-changes)) directory)
-  (maybe-within-directory directory
-    (with-retry-restarts ((hardreset-repository ()
-                            :report "Clear all uncommitted changes, both staged and unstaged."
-                            (git-set-branch-index-tree)))
-      (when (git-repository-changes-p)
-        (ecase if-changes
-          (:stash (git-stash))
-          (:reset (git-set-branch-index-tree))
-          (:error (git-error "~@<~:[Uns~;S~]taged changes in git repository ~S.~:@>"
-                             (git-repository-staged-changes-p directory) (or directory *default-pathname-defaults*))))))))
+(defun ensure-clean-repository (&optional (if-changes (repository-policy-value :unsaved-changes)) (directory *repository*))
+  (with-retry-restarts ((hardreset-repository ()
+                          :report "Clear all uncommitted changes, both staged and unstaged."
+                          (git-set-branch-index-tree nil directory)))
+    (when (git-repository-changes-p directory)
+      (ecase if-changes
+        (:stash (git-stash directory))
+        (:reset (git-set-branch-index-tree nil directory))
+        (:error (git-error "~@<~:[Uns~;S~]taged changes in git repository ~S.~:@>"
+                           (git-repository-staged-changes-p directory) directory))))))
 
-(defun git-set-head-index-tree (ref &optional (if-changes :stash) directory)
+(defun git-set-head-index-tree (ref &optional (if-changes :stash) (directory *repository*))
   (let ((ref (mapcar #'downstring (ensure-cons ref))))
-    (maybe-within-directory directory
-      (ref-value ref nil)
-      (ensure-clean-repository if-changes)
-      (with-explanation ("checking out ~S in ~S" ref *default-pathname-defaults*)
-        (git "checkout" (flatten-path-list ref))))))
+    (ref-value ref directory)
+    (ensure-clean-repository if-changes directory)
+    (with-explanation ("checking out ~S in ~S" ref directory)
+      (git directory "checkout" (flatten-path-list ref)))))
 
-(defun invoke-with-branch-change (before-branch after-branch if-changes fn)
+(defun invoke-with-branch-change (directory before-branch after-branch if-changes fn)
   (unwind-protect (progn
-                    (git-set-head-index-tree before-branch if-changes)
+                    (git-set-head-index-tree before-branch if-changes directory)
                     (funcall fn))
-    (git-set-head-index-tree after-branch if-changes)))
+    (git-set-head-index-tree after-branch if-changes directory)))
 
-(defmacro with-branch-change ((before-branch-form after-branch-form &key (if-changes :stash))
+(defmacro with-branch-change ((before-branch-form after-branch-form &key (if-changes :stash) (directory '*repository*))
                               &body body)
-  `(invoke-with-branch-change ,before-branch-form ,after-branch-form ,if-changes
+  `(invoke-with-branch-change ,directory ,before-branch-form ,after-branch-form ,if-changes
                               (lambda () ,@body)))
 
 (defun invoke-with-gitremote (remote-name fn
-                              &key url (if-remote-does-not-exist :create))
-  (unless (find-gitremote remote-name)
+                              &key url (if-remote-does-not-exist :create) (directory *repository*))
+  (unless (find-gitremote remote-name directory)
     (ecase if-remote-does-not-exist
-      (:create (ensure-gitremote remote-name url))
-      (:error  (missing-remote-error remote-name))))
+      (:create (ensure-gitremote remote-name url directory))
+      (:error  (missing-remote-error remote-name directory))))
   (funcall fn))
 
-(defmacro with-gitremote ((remote &key url (if-remote-does-not-exist :create))
+(defmacro with-gitremote ((remote &key (url nil urlp) (if-remote-does-not-exist nil if-remote-does-not-exist-p)
+                                  (directory nil directoryp))
                           &body body)
-  `(invoke-with-gitremote ,remote (lambda () ,@body)
-                          ,@(maybe-prop* :url url)
-                          :if-remote-does-not-exist ,if-remote-does-not-exist))
+  `(invoke-with-gitremote ,remote (lambda () ,@body) ,@(pass-&key* url if-remote-does-not-exist directory)))
 
 ;;;;
 ;;;; Repository-level operations
 ;;;;
 (defun invoke-with-git-repository-write-access (path fn &aux
                                                 (dotgit (dotgit path)))
-  (within-directory (path :if-does-not-exist :create)
+  (with-directory (path :if-does-not-exist :create)
     (handler-bind ((error (lambda (c)
                             (declare (ignore c))
                             ;; Maintain the no-useless-directories-added invariant.
@@ -640,35 +642,33 @@ in a temporary pseudo-commit."
 (defun prefixp (prefix sequence)
   (nth-value 1 (starts-with-subseq prefix sequence :return-suffix t)))
 
-(defun git-commit-log (ref &optional repository-dir)
-  "Given a REF and an optional REPOSITORY-DIR, return the commit id, author, date
-and commit message of the corresponding commit as multiple values."
-  (maybe-within-directory repository-dir
-    (multiple-value-bind (status output)
-        (with-executable-options (:explanation `("querying commit log of ~S at ~S" ,ref ,*default-pathname-defaults*)
-                                  :output :capture)
-          (git "log" "-1" (cook-refval ref)))
-      (declare (ignore status))
-      (with-input-from-string (s output)
-        (let (commit-id author date (posn 0))
-          (iter (for line = (read-line s nil nil))
-                (while (and line (plusp (length line))))
-                (incf posn (1+ (length line)))
-                (cond-let
-                  ((suffix (prefixp "commit " line))  (setf commit-id suffix))
-                  ((suffix (prefixp "Author: " line)) (setf author suffix))
-                  ((suffix (prefixp "Date:   " line)) (setf date suffix))))
-          (unless (and commit-id author date)
-            (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref *default-pathname-defaults*))
-          (let ((message (string-right-trim '(#\Newline)
-                                            (subseq output (+ 5 posn)))))
-            (make-commit (parse-commit-id commit-id) date author message)))))))
+(defun git-commit-log (ref &optional (directory *repository*))
+  "Given a REF, return the commit id, author, date and commit message
+of the corresponding commit as multiple values."
+  (multiple-value-bind (status output)
+      (with-executable-options (:explanation `("querying commit log of ~S at ~S" ,ref ,directory)
+                                :output :capture)
+        (git directory "log" "-1" (cook-refval ref)))
+    (declare (ignore status))
+    (with-input-from-string (s output)
+      (let (commit-id author date (posn 0))
+        (iter (for line = (read-line s nil nil))
+              (while (and line (plusp (length line))))
+              (incf posn (1+ (length line)))
+              (cond-let
+                ((suffix (prefixp "commit " line))  (setf commit-id suffix))
+                ((suffix (prefixp "Author: " line)) (setf author suffix))
+                ((suffix (prefixp "Date:   " line)) (setf date suffix))))
+        (unless (and commit-id author date)
+          (git-error "~@<Error parsing commit log of ~X at ~S.~:@>" ref directory))
+        (let ((message (string-right-trim '(#\Newline)
+                                          (subseq output (+ 5 posn)))))
+          (make-commit (parse-commit-id commit-id) date author message))))))
 
-(defun git-repository-last-version-from-tag (&optional repository-dir)
-  (maybe-within-directory repository-dir
-    (multiple-value-bind (successp output)
-        (with-explanation ("determining version last recorded in ~S" *default-pathname-defaults*)
-          (git "log" "-1" "--tags" "--decorate=short"))
-      (declare (ignore successp))
-      (when-let ((version (first (extract-delimited-substrings output "tag: upstream/" #\,))))
-        (mapcar #'parse-integer (split-sequence #\. version))))))
+(defun git-repository-last-version-from-tag (&optional (directory *repository*))
+  (multiple-value-bind (successp output)
+      (with-explanation ("determining version last recorded in ~S" directory)
+        (git directory "log" "-1" "--tags" "--decorate=short"))
+    (declare (ignore successp))
+    (when-let ((version (first (extract-delimited-substrings output "tag: upstream/" #\,))))
+      (mapcar #'parse-integer (split-sequence #\. version)))))
