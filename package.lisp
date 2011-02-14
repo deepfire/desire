@@ -223,6 +223,7 @@
    #:sync-module
    #:ensure-module-systems-loadable
    ;; gittage.lisp
+   #:*repository*
    #:repo-var
    #:module-git-branches
    #:module-git-remotes
@@ -231,11 +232,6 @@
    #:module-bare-p
    #:module-locally-present-p
    #:module-world-readable-p
-   ;; branching.lisp
-   #:*follow-upstream*
-   #:*drive-git-masters*
-   #:*drive-git-masters-matching-trackers*
-   #:*dirty-repository-behaviour*
    ;; import.lisp
    #:update
    ;; recursor.lisp

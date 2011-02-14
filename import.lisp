@@ -102,6 +102,14 @@ Only for remotes of type SEPARATE-CLONE.")
   (:documentation
    "Update the local repository, maybe creating it first.  Note that
 the provided directory is the final directory in the gate locality.")
+  ;; So, it appears that the above gives us the mandate to change files.
+  ;; the only question is whether it gives us the mandate to:
+  ;;   - change the current branch (unless it's desire-specific)
+  ;;   - change the branch HEAD points to
+  ;;
+  ;; However, I'd guess we'd want a lighter variant, for the reason of:
+  ;;   - transparent updates, with desire-specific, and maybe tracker branch updates
+  ;; We'd have to factor, then.
   (:method :around ((o remote) name url repo-dir &optional branch)
     (declare (type null branch))
     (let ((*repository* repo-dir)
@@ -110,11 +118,47 @@ the provided directory is the final directory in the gate locality.")
           ((executable-failure ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
            (missing-executable ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond))))
         (with-git-repository-write-access (*new-repository-p*) repo-dir
+          ;; Let's go exhaustive.
+          ;; entirely painless:
+          ;;   - newness, sweet as morning dew
+          ;;   - an empty dir, as in really, completely empty, essentially equal to the above
+          ;;   - clean, on a desire-specific branch
+          ;;     - go ahead, in all above cases
+          ;; systematic approach equals absolute safety:
+          ;;   - clean, on non-desire branch
+          ;;     - switch to a desire branch
+          ;; potentially dangerous:
+          ;;   - gitless, not quite empty dir: will, possibly, cause painful conflicts, sooner or later
+          ;;     - an error is definitely warranted
+          ;; critical:
+          ;;   - unsaved changes, no matter index or tree
+          ;;     - stash: moderately safe, although requires notification
+          ;;     - reset: can only do this if policy says so
+          ;;     - ..no other real choices.
           (when (and (not *new-repository-p*) *follow-upstream*)
             (ensure-clean-repository *dirty-repository-behaviour*))
           (let ((*source-remote* o))
-            (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S" name (transport o) (vcs-type o) url repo-dir)
-              (call-next-method remote module-name url final-gate-repo-pathname branch)))
+            (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
+                               name (transport o) (vcs-type o) url repo-dir)
+              (call-next-method o name url repo-dir branch)))
+          ;; what to do with post-update-ly unsaved changes?
+          ;; - concurrent repository modifications
+          ;;   - well, don't do them!
+          ;; - conversion crap (do we have any in-place convertors?
+          ;;   - right, if it does happen, shall be dealt with..
+          ;; question: how vitally important is it to keep stuff clean?
+          ;; - in the former case, it's not quite really our business
+          ;; - in the latter case, yeah, all known cases must be plugged
+          ;; problem: no convincing way to discern between those.
+          ;; how policies can help:
+          ;; - the user can say: I never do concurrent modification,
+          ;;   which would effectively mean that we can interpret everything
+          ;;   as if any unsaved post-changes are of our own making
+          ;; - barring that, well, there's no certainty added and a painful
+          ;;   choice must be made:
+          ;;   - reset
+          ;;   - leave as-is
+          ;;   - stash
           (git-set-head-index-tree branch (cond ((or *follow-upstream* *new-repository-p*) :reset)
                                                 (t :continue)))
           (setf (git-repository-world-readable-p) *default-world-readable*)))))
@@ -168,7 +212,7 @@ to the above :AROUND method."
               (with-explanation ("on behalf of module ~A, importing tarball version ~A" name (princ-version-to-string next-version))
                 (git "import-orig" localised-tarball))))))
   ;; indirect-fetch
-  (:method :around ((o separate-clone) name url repo-di &optionalr branch)
+  (:method :around ((o separate-clone) name url repo-di &optional branch)
     "Note that the fetches will be done later anyway."
     (let ((transit-repo-dir (module-pathname name (locality o))))
       (unless (directory-exists-p transit-repo-dir)
@@ -179,7 +223,7 @@ to the above :AROUND method."
   (:method :before ((o hg-http-remote) name url repo-dir &optional branch)
     (declare (ignore url))
     (hg "pull" "-R" (module-pathname name (locality o))))
-  (:method :before ((o rsync) name url repo-di &optionalr branch)
+  (:method :before ((o rsync) name url repo-di &optional branch)
     (rsync "-ravPz" url (module-pathname name (locality o))))
   (:method ((o indirect-fetch) name url repo-dir &optional branch)
     (convert-transit-module-using-locality (locality o) name (module-pathname name (locality o)))))

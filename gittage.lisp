@@ -204,6 +204,7 @@ The lists of pathnames returned have following semantics:
 (defstruct policy-atom
   (unsaved-changes     nil :type (or null (member :error :reset :stash)))
   (missing-master      nil :type (or null (member :error :create-on-head)))
+  ;; hmm, it's not entirely clear this is the correct answer for a multitude of relevant questions
   (operating-branch    nil :type (or (eql t) keyword))
   (preexisting-gitless nil :type (or null (member :error :take-over))))
 
