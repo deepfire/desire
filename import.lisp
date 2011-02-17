@@ -112,8 +112,7 @@ the provided directory is the final directory in the gate locality.")
   ;; We'd have to factor, then.
   (:method :around ((o remote) name url repo-dir &optional branch)
     (declare (type null branch))
-    (let ((*repository* repo-dir)
-          (branch (repository-policy-value :operating-branch)))
+    (let ((branch (repository-policy-value :operating-branch)))
       (with-error-resignaling
           ((executable-failure ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
            (missing-executable ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond))))

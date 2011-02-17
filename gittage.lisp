@@ -617,7 +617,8 @@ in a temporary pseudo-commit."
 ;;;; Repository-level operations
 ;;;;
 (defun invoke-with-git-repository-write-access (path fn &aux
-                                                (dotgit (dotgit path)))
+                                                (dotgit (dotgit path))
+                                                (*repository* path))
   (with-directory (path :if-does-not-exist :create)
     (handler-bind ((error (lambda (c)
                             (declare (ignore c))
