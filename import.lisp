@@ -296,47 +296,6 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                 (return-from determine-available-module-tarball-version-starting-after (values url next-version-variant))))
         (setf current-depth-version (first current-depth-variants))))
 
-(defun module-stashed-pathname (module &optional (locality (gate *self*)) &aux
-                                (pathname (module-pathname module locality)))
-  (lret ((stashed (make-pathname :defaults pathname)))
-    (setf (lastcar (pathname-directory stashed))
-          (concatenate 'string (lastcar (pathname-directory stashed)) "_"))))
-
-(defun module-stashed-repo-present-p (module &optional (locality (gate *self*)) &aux
-                                      (module (coerce-to-module module)))
-  (directory-exists-p (module-stashed-pathname module locality)))
-
-(defun module-stashed-p (module &optional (locality (gate *self*)) &aux
-                         (module (coerce-to-module module)))
-  (let ((normally-present-p (directory-exists-p (module-pathname module locality)))
-        (stashed-present-p (directory-exists-p (module-stashed-pathname module locality))))
-    (when (and normally-present-p stashed-present-p)
-      (module-error module "~@<Inconsistent presence of module ~A: both main and stashed directories exist.~:@>" (name module)))
-    (unless (or normally-present-p stashed-present-p)
-      (module-error module "~@<Module ~A is not present, when checking for stashed-ness.~:@>" (name module)))
-    stashed-present-p))
-
-(defun stash-module (module &optional (drop-system-caches t) (locality (gate *self*)) &aux
-                     (module (coerce-to-module module)))
-  (when (module-stashed-p module)
-    (module-error module "~@<Module ~A is already stashed.~:@>" (name module)))
-  (format t "~@<;; ~@;Stashing module ~A.~:@>~%" (name module))
-  (rename-file (module-pathname module locality) (module-stashed-pathname module locality))
-  (setf (module-scan-positive-localities module) nil)
-  (when drop-system-caches
-    (dolist (s (module-systems module) t)
-      (system-makunpresent s))))
-
-(defun unstash-module (module &optional (locality (gate *self*)) &aux
-                       (module (coerce-to-module module)))
-  (unless (module-stashed-p module)
-    (module-error module "~@<Module ~A is not stashed.~:@>" (name module)))
-  (format t "~@<;; ~@;Unstashing module ~A.~:@>~%" (name module))
-  (rename-file (module-stashed-pathname module locality) (module-pathname module locality))
-  (module-locally-present-p module locality) ; restore locality presence cache
-  (notice-module-repository module nil locality)
-  t)
-
 (defun update (module &key (locality (gate *self*)) pass-output (if-update-fails nil) &aux
                (module (coerce-to-module module)))
   "Decide on a best location to obtain the MODULE from,
