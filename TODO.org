@@ -2,6 +2,19 @@
 #+TODO: UNKNOWN INCOMPLETE | DONE
 
 
+
+* Desiderata
+*** about factoring
+
+    factoring is way too expensive, by now.
+
+    only go for minor factoring -- let the crap accumulate,
+    until there's actually some outside usage for desire..
+
+    only features from now on.
+
+    sad.
+
 * merge PARSE-REMOTE-NAMESTRING and ENSURE-URL-REMOTE => INTERN-REMOTE-URL
 *** PARSE-REMOTE-NAMESTRING
 ***** C-c C-w C-c:
