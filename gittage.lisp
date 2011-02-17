@@ -451,6 +451,12 @@ The lists of pathnames returned have following semantics:
     (remove nil (append (map-heads #'ref-if-= directory)
                         (map-all-remote-heads #'ref-if-= directory)))))
 
+(defun set-ref-file-value (ref directory value)
+  (let ((path (ref-path ref directory)))
+    (ensure-directories-exist path)
+    (with-output-to-file (s path)
+      (write-string (cook-refval value t) s))))
+
 (defun ref-value (ref directory &key (if-does-not-exist :error))
   (let* ((ref (canonicalise-ref ref))
          (path (ref-path ref directory)))
