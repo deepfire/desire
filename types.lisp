@@ -343,7 +343,8 @@ a special module called '.meta'."
 (defclass gate-remote (gate remote) ())
 (defclass gate-locality (gate-remote locality)
   ((unpublished-module-names :accessor gate-unpublished-module-names :initarg :unpublished-module-names :documentation "Complex computation.")
-   (hidden-module-names :accessor gate-hidden-module-names :initarg :hidden-module-names :documentation "Complex computation.")))
+   (hidden-module-names :accessor gate-hidden-module-names :initarg :hidden-module-names :documentation "Complex computation.")
+   (temp-directory :reader gate-temp-directory)))
 
 (defmethod string-id ((o gate-locality))
   (format nil "<~A at ~S, ~S>" (type-of o) (url o '<module>) (locality-pathname o)))
@@ -517,6 +518,7 @@ differ in only slight detail -- gate property, for example."
               (gate-hidden-module-names o) hidden-names)))))
 
 (defmethod shared-initialize :after ((o gate-locality) slot-names &key &allow-other-keys)
+  (setf (slot-value o 'temp-directory) (merge-pathnames "tmp/" (locality-pathname o)))
   (update-gate-conversions o))
 
 (defun cvs-locality-lock-path (cvs-locality)
