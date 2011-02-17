@@ -1,6 +1,6 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: DESIRE; Base: 10; indent-tabs-mode: nil; show-trailing-whitespace: t -*-
 ;;;
-;;;  (c) copyright 2007-2009 by
+;;;  (c) copyright 2007-2011 by
 ;;;           Samium Gromoff (_deepfire@feelingofgreen.ru)
 ;;;
 ;;; This library is free software; you can redistribute it and/or
@@ -48,7 +48,7 @@ Defaults to NIL.")
   (define-executable darcs-fast-export)
   (define-executable hg)
   (define-executable hg-fast-export)
-  (define-executable python)        ; this is for hg-to-git.py
+  (define-executable python)            ; this is for hg-to-git.py
   (define-executable rsync)
   (define-executable cvs)
   ;; these are needed for XCVB stack's postinstall
@@ -184,18 +184,18 @@ to the above :AROUND method."
     (call-next-method); must operate on the local master
     (let ((master-val (ref-value '("master") nil)))
       (git-set-branch :tracker nil master-val t)
-      (git "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-refval master-val))))
+      (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-refval master-val))))
   ;; ====================== end of branch model aspect ==========================
   ;; direct fetch, non-git
   (:method ((o cvs-native-remote) name url repo-dir &optional branch)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
-      (git "cvsimport" "-d" url (or cvs-module-name (downstring name)))))
+      (git *repository* "cvsimport" "-d" url (or cvs-module-name (downstring name)))))
   (:method ((o svn-direct) name url repo-dir &optional branch)
     (multiple-value-bind (url wrinkle) (url o (module name))
       (when *new-repository-p*
         (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" name url *default-pathname-defaults*)
-          (git "svn" "init" url wrinkle)))
-      (git "svn" "fetch")))
+          (git *repository* "svn" "init" url wrinkle)))
+      (git *repository* "svn" "fetch")))
   (:method ((o tarball-http-remote) name url-template repo-dir &optional branch)
     (init-db-when-new-repository name)
     (iter (with last-version = (if *new-repository-p*
@@ -209,8 +209,9 @@ to the above :AROUND method."
                                               name (name o) url)))
                  (localised-tarball (merge-pathnames (subseq url (1+ slash-pos)) (gate-temp-directory (gate *self*)))))
             (with-file-from-www (localised-tarball url)
-              (with-explanation ("on behalf of module ~A, importing tarball version ~A" name (princ-version-to-string next-version))
-                (git "import-orig" localised-tarball))))))
+              (with-executable-options (:explanation `("on behalf of module ~A, importing tarball version ~A"
+                                                       ,name ,(princ-version-to-string next-version)))
+                (git *repository* "import-orig" localised-tarball))))))
   ;; indirect-fetch
   (:method :around ((o separate-clone) name url repo-di &optional branch)
     "Note that the fetches will be done later anyway."
@@ -280,7 +281,8 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
     (when *new-repository-p*
       (multiple-value-bind (url wrinkle) (url *source-remote* name)
         (declare (ignore url))
-        (with-explanation ("on behalf of module ~A, setting up svn to git conversion: ~S => ~S" name from-repo-dir *default-pathname-defaults*)
+        (with-executable-options (:explanation `("on behalf of module ~A, setting up svn to git conversion: ~S => ~S"
+                                                 name from-repo-dir *default-pathname-defaults*))
           (git "svn" "init" `("file://" ,from-repo-dir ,wrinkle))))) ;; 'file://' -- gratuitious SVN complication
     (git "svn" "fetch")))
 
