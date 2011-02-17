@@ -368,7 +368,7 @@ The lists of pathnames returned have following semantics:
 (defun parse-commit-id (string)
   (parse-integer string :radix #x10))
 
-(defun %read-ref (pathname)
+(defun read-ref-file (pathname)
   (lret ((refval (parse-commit-id (file-as-string pathname))))
     (unless (not (minusp refval))
       (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval))))
@@ -432,7 +432,7 @@ The lists of pathnames returned have following semantics:
 
 (defun map-pathnames-full-refs (fn pathnames directory)
   (iter (for pathname in pathnames)
-        (collect (funcall fn (path-ref pathname directory) (%read-ref pathname)))))
+        (collect (funcall fn (path-ref pathname directory) (read-ref-file pathname)))))
 
 (defun map-heads (fn directory)
   (append (map-pathnames-full-refs fn (head-pathnames directory) directory)
@@ -461,7 +461,7 @@ The lists of pathnames returned have following semantics:
   (let* ((ref (canonicalise-ref ref))
          (path (ref-path ref directory)))
     (if (probe-file path)
-        (%read-ref path)
+        (read-ref-file path)
         (or (car (remove nil (map-packed-refs (lambda (r v) (declare (ignore v)) (equal ref r))
                                               (lambda (r v) (declare (ignore r)) v)
                                               directory)))
