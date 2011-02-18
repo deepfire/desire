@@ -346,7 +346,7 @@ The lists of pathnames returned have following semantics:
     (git directory "fetch" (downstring remote-name))))
 
 ;;;
-;;; Raw refs
+;;; Ref names
 ;;;
 (defun ref-shortp (ref)
   (endp (cdr ref)))
@@ -358,31 +358,6 @@ The lists of pathnames returned have following semantics:
         (cons "heads" ref)
         ref)))
 
-(defun ref-path (ref &optional (directory *repository*))
-  (subfile directory (list* ".git" "refs" (canonicalise-ref ref))))
-
-(defun path-ref (pathname directory)
-  (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
-    (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
-
-(defun parse-commit-id (string)
-  (parse-integer string :radix #x10))
-
-(defun read-ref-file (pathname)
-  (lret ((refval (parse-commit-id (file-as-string pathname))))
-    (unless (not (minusp refval))
-      (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval))))
-
-(defun parse-refval (string)
-  (if (equalp (subseq string 0 5) "ref: ")
-      (values (split-sequence #\/ (subseq string 5)))
-      (values nil (parse-commit-id  string))))
-
-(defun cook-refval (refvalue &optional prepend-refs)
-  (etypecase refvalue
-    (integer (format nil "~40,'0X" refvalue))
-    (list (flatten-path-list (xform prepend-refs (curry #'cons "refs") refvalue)))))
-
 (defun ref-headp (ref)
   (or (ref-shortp ref) (string= "heads" (first ref))))
 
@@ -393,8 +368,45 @@ The lists of pathnames returned have following semantics:
   `("remotes" ,(downstring remote-name) ,(downstring branch)))
 
 ;;;
-;;; Raw refs & iteration
+;;; Ref content
 ;;;
+(defun parse-commit-id (string)
+  (parse-integer string :radix #x10))
+
+(defun parse-ref-value (string)
+  (if (equalp (subseq string 0 5) "ref: ")
+      (values (split-sequence #\/ (subseq string 5)))
+      (values nil (parse-commit-id  string))))
+
+(defun cook-ref-value (refvalue &optional prepend-refs)
+  (etypecase refvalue
+    (integer (format nil "~40,'0X" refvalue))
+    (list (flatten-path-list (xform prepend-refs (curry #'cons "refs") refvalue)))))
+
+;;;
+;;; Ref files
+;;;
+(defun file-path-ref (pathname directory)
+  (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
+    (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
+
+(defun ref-file-path (ref &optional (directory *repository*))
+  (subfile directory (list* ".git" "refs" (canonicalise-ref ref))))
+
+(defun ref-file-present-p (name &optional (directory *repository*))
+  (probe-file (ref-file-path (xform-if-not #'listp #'downstring name) directory)))
+
+(defun ref-file-value (pathname)
+  (lret ((refval (parse-commit-id (file-as-string pathname))))
+    (unless (not (minusp refval))
+      (git-error "~@<Bad value in ref ~S: ~S.~:@>" pathname refval))))
+
+(defun set-ref-file-value (ref directory value)
+  (let ((path (ref-file-path ref directory)))
+    (ensure-directories-exist path)
+    (with-output-to-file (s path)
+      (write-string (cook-ref-value value t) s))))
+
 (defun head-pathnames (directory)
   (remove nil (directory (subwild directory `(".git" "refs" "heads") :name :wild :type :wild)
                          #+sbcl :resolve-symlinks #+sbcl nil)
@@ -409,7 +421,9 @@ The lists of pathnames returned have following semantics:
   (remove-if (lambda (p &aux (name (pathname-name p))) (or (null name) (string= name "HEAD")))
              (directory (subwild directory `(".git" "refs" "remotes" ,(downstring remote)) :name :wild :type :wild)
                         #+sbcl :resolve-symlinks #+sbcl nil)))
-
+;;;
+;;; Raw refs & iteration
+;;;
 (defmacro do-packed-refs ((ref refval directory) &body body)
   (with-gensyms (packed-refs-path s line 1read-offt)
     `(let ((,packed-refs-path (subfile ,directory '(".git" "packed-refs"))))
@@ -432,7 +446,7 @@ The lists of pathnames returned have following semantics:
 
 (defun map-pathnames-full-refs (fn pathnames directory)
   (iter (for pathname in pathnames)
-        (collect (funcall fn (path-ref pathname directory) (read-ref-file pathname)))))
+        (collect (funcall fn (file-path-ref pathname directory) (ref-file-value pathname)))))
 
 (defun map-heads (fn directory)
   (append (map-pathnames-full-refs fn (head-pathnames directory) directory)
@@ -450,18 +464,14 @@ The lists of pathnames returned have following semantics:
   (flet ((ref-if-= (r v) (when (= v refval) r)))
     (remove nil (append (map-heads #'ref-if-= directory)
                         (map-all-remote-heads #'ref-if-= directory)))))
-
-(defun set-ref-file-value (ref directory value)
-  (let ((path (ref-path ref directory)))
-    (ensure-directories-exist path)
-    (with-output-to-file (s path)
-      (write-string (cook-refval value t) s))))
-
+;;;
+;;; Refs
+;;;
 (defun ref-value (ref directory &key (if-does-not-exist :error))
   (let* ((ref (canonicalise-ref ref))
-         (path (ref-path ref directory)))
+         (path (ref-file-path ref directory)))
     (if (probe-file path)
-        (read-ref-file path)
+        (ref-file-value path)
         (or (car (remove nil (map-packed-refs (lambda (r v) (declare (ignore v)) (equal ref r))
                                               (lambda (r v) (declare (ignore r)) v)
                                               directory)))
@@ -482,7 +492,7 @@ The lists of pathnames returned have following semantics:
     (= x y)))
 
 (defun symbolic-reffile-value (pathname &optional dereference (directory *repository*))
-  (multiple-value-bind (ref refval) (parse-refval (file-line pathname))
+  (multiple-value-bind (ref refval) (parse-ref-value (file-line pathname))
     (let ((normalised-ref (rest ref))) ; strip the "refs" component
       (if dereference
           (values (or refval
@@ -496,7 +506,7 @@ The lists of pathnames returned have following semantics:
   (with-output-to-file (reffile pathname)
     (when (consp value)
       (write-string "ref: " reffile))
-    (write-string (cook-refval value t) reffile)))
+    (write-string (cook-ref-value value t) reffile)))
 ;;;
 ;;; HEAD operation
 ;;;
@@ -545,9 +555,9 @@ The lists of pathnames returned have following semantics:
              (mapcan (curry #'split-sequence #\Space)
                      (split-sequence #\Newline (string-right-trim '(#\Return #\Newline) output)))))))
 
-
 (defun git-branch-present-p (name &optional (directory *repository*))
-  (or (not (null (probe-file (ref-path (downstring name) directory))))
+  (declare (symbol name))
+  (or (ref-file-present-p name directory)
       (member name (git-branches directory) :test #'string=)))
 
 (defun git-remove-branch (name &optional (directory *repository*))
@@ -558,7 +568,7 @@ The lists of pathnames returned have following semantics:
   (declare (type (or list (integer 0)) refvalue))
   (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S"
                      branchname (consp refvalue) refvalue directory)
-    (nth-value 0 (git directory "branch" "-f" (downstring branchname) (cook-refval refvalue)))))
+    (nth-value 0 (git directory "branch" "-f" (downstring branchname) (cook-ref-value refvalue)))))
 
 (defun git-set-branch (name &optional (directory *repository*) (refvalue (get-head directory)) possibly-current-p)
   (with-maybe-detached-head (directory possibly-current-p)
@@ -658,7 +668,7 @@ of the corresponding commit as multiple values."
   (multiple-value-bind (status output)
       (with-executable-options (:explanation `("querying commit log of ~S at ~S" ,ref ,directory)
                                 :output :capture)
-        (git directory "log" "-1" (cook-refval ref)))
+        (git directory "log" "-1" (cook-ref-value ref)))
     (declare (ignore status))
     (with-input-from-string (s output)
       (let (commit-id author date (posn 0))
