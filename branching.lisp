@@ -59,3 +59,13 @@ Defaults to T.")
                               (ref (or ref (get-head repo-dir))))
   (unless (git-branch-present-p :tracker repo-dir)
     (git-set-branch :tracker repo-dir ref)))
+
+(defun ensure-op-branch (repository &aux
+                         (op '("desire" "op")))
+  "Make sure that the desire's 'op' branch exists within REPOSITORY."
+  (unless (ref-file-present-p op repository)
+    (set-ref-file-value op repository (get-head repository))))
+
+(defun switch-to-op (repository &aux
+                     (op '("desire" "op")))
+  )

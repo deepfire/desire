@@ -117,10 +117,8 @@ the provided directory is the final directory in the gate locality.")
           ((executable-failure ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
            (missing-executable ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond))))
         (with-git-repository-write-access (*new-repository-p*) repo-dir
-          ;; Let's go exhaustive.
+          ;; Cases not covered:
           ;; entirely painless:
-          ;;   - newness, sweet as morning dew
-          ;;   - an empty dir, as in really, completely empty, essentially equal to the above
           ;;   - clean, on a desire-specific branch
           ;;     - go ahead, in all above cases
           ;; systematic approach equals absolute safety:
