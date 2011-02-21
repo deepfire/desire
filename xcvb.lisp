@@ -24,22 +24,24 @@
 (defvar *xcvbifier-base-uri* "http://common-lisp.net/project/xcvb/releases/patches/")
 (defvar *xcvbifiable-module-set* '())
 
-(defun git-apply-diff (filename &optional directory (add-to-index t) (error-on-failure t))
-  (maybe-within-directory directory
-    (multiple-value-bind (successp output) (with-explanation ("applying gitdiff ~S in ~S" filename *default-pathname-defaults*)
-                                             (with-shell-predicate
-                                                 (apply #'git "apply" filename (append (when add-to-index '("--index"))))))
-      (cond (successp)
-            (t
-             (git-set-branch-index-tree)
-             (if error-on-failure
-                 (error 'patch-failure :pathname *default-pathname-defaults* :output output)
-                 (values nil output)))))))
+(defun git-apply-diff (filename &optional (directory *repository*) (add-to-index t) (error-on-failure t))
+  (multiple-value-bind (successp output) (with-explanation ("applying gitdiff ~S in ~S" filename directory)
+                                           (with-shell-predicate
+                                               (apply #'git directory "apply"
+                                                      filename (append (when add-to-index '("--index"))))))
+    (cond (successp)
+          (t
+           (git-set-branch-index-tree nil directory)
+           (if error-on-failure
+               (error 'patch-failure :pathname directory :output output)
+               (values nil output))))))
 
-(defun xcvbify-module (module &optional break-on-patch-failure)
+(defun xcvbify-module (module &optional break-on-patch-failure &aux
+                       (repo (module-pathname module)))
   "'I know what I do' mode: silently resets stuff."
   (update module)
-  (within-directory ((module-pathname module))
+  (with-git-repository-write-access (new-p) repo
+    (declare (ignore new-p))
     (let ((saved-head (get-head nil nil nil))
           (saved-xcvbify (ref-value '("heads" "xcvbify") nil :if-does-not-exist :continue)))
       (git-set-head-index-tree :tracker :reset)
@@ -47,10 +49,10 @@
       (git-set-head-index-tree :xcvbify :error)
       (unless (file-exists-p "build.xcvb")
         (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
-          (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" nil t nil)
+          (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" *repository* t nil)
             (cond (successp
                    (with-explanation ("committing xcvbification change")
-                     (git "commit" "-m" "Xcvbify.")))
+                     (git *repository* "commit" "-m" "Xcvbify.")))
                   (t
                    (git-set-head-index-tree saved-head :reset)
                    (if saved-head

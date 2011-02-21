@@ -39,12 +39,11 @@
   "Ensure that metafile called by NAME exists within METASTORE-DIRECTORY.
   
    The IF-EXISTS keyword is passed to OPEN."
-  (within-directory (metastore-directory)
-    (open (string name) :direction :probe :if-does-not-exist :create :if-exists if-exists)
-    (with-explanation ("creating metafile ~A in ~S" name *default-pathname-defaults*)
-      (git "add" (string name)))))
+  (open (merge-pathnames (string name) metastore-directory) :direction :probe :if-does-not-exist :create :if-exists if-exists)
+  (with-explanation ("creating metafile ~A in ~S" name metastore-directory)
+    (git metastore-directory "add" (string name))))
 
-(defmacro with-open-metafile ((stream name &optional (metastore-directory '*default-pathname-defaults*) &rest open-options) &body body)
+(defmacro with-open-metafile ((stream name &optional (metastore-directory '*repository*) &rest open-options) &body body)
   `(with-open-file (,stream (metafile-path ,name ,metastore-directory) :element-type 'character 
                                  ,@(remove-from-plist open-options :element-type))
      ,@body))
@@ -64,9 +63,8 @@
 (defun commit-metafile (name metastore-directory &optional (commit-message (format nil "Updated ~A" name)))
   "Commit contents of the metafile called by NAME in METASTORE-DIRECTORY.
 Return status indicates whether there were changes and a new commit was done."
-  (within-directory (metastore-directory)
-    (with-explanation ("committing changes (if any) to metafile ~A in ~S" (symbol-name name) *default-pathname-defaults*)
-      (git "commit" "-m" (format nil "~A" commit-message) (symbol-name name)))))
+  (with-explanation ("committing changes (if any) to metafile ~A in ~S" (symbol-name name) metastore-directory)
+    (git metastore-directory "commit" "-m" (format nil "~A" commit-message) (symbol-name name))))
 
 (defun metastore-present-p (directory &optional required-metafiles)
   "Determine if a metastore is present in DIRECTORY, optionally
@@ -79,15 +77,14 @@ additionally requiring that REQUIRED-METAFILES are present."
 (defun init-metastore (directory &optional required-metafiles (publicp t))
   "Initialise metastore in DIRECTORY, with optional, empty
 REQUIRED-METAFILES."
-  (within-directory (directory :if-does-not-exist :create :if-exists :error)
-    (with-explanation ("initialising git metastore database in ~S" *default-pathname-defaults*)
-      (git "init"))
-    (when publicp
-      (open  ".git/git-daemon-export-ok" :direction :probe :if-does-not-exist :create))
-    (dolist (mf required-metafiles)
-      (create-metafile mf directory)
-      (commit-metafile mf directory (format nil "Created metafile ~A" mf)))
-    t))
+  (with-explanation ("initialising git metastore database in ~S" directory)
+    (init-git-repo directory))
+  (when publicp
+    (open (merge-pathnames ".git/git-daemon-export-ok" directory) :direction :probe :if-does-not-exist :create))
+  (dolist (mf required-metafiles)
+    (create-metafile mf directory)
+    (commit-metafile mf directory (format nil "Created metafile ~A" mf)))
+  t)
 
 (defun ensure-metastore (directory &key required-metafiles (public t))
   "Ensure that a metastore exists at DIRECTORY.

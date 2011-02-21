@@ -29,8 +29,11 @@
                                                        (strconcat* "http_proxy=" *http-proxy*))))
 
 (defun git (work-tree &rest args)
-  (declare (string work-tree))
-  (apply #'%git (strconcat* "--work-tree=" work-tree) args))
+  (declare (type (or string pathname) work-tree))
+  (apply #'%git
+         (strconcat* "--work-tree=" (namestring work-tree))
+         (strconcat* "--git-dir=" (namestring work-tree) ".git/")
+         args))
 
 (define-condition vcs-condition ()
   ((vcs :reader condition-vcs :initarg :vcs)))
@@ -78,6 +81,10 @@
   "Given a repository DIRECTORY, return the path to its git storage
 directory."
   (merge-pathnames ".git/" directory))
+
+(defun init-git-repo (directory)
+  (ensure-directories-exist (dotgit directory))
+  (git directory "init"))
 
 ;; repository level
 (defun git-nonbare-repository-present-p (&optional (directory *repository*) &aux
@@ -476,7 +483,8 @@ The lists of pathnames returned have following semantics:
                                               (lambda (r v) (declare (ignore r)) v)
                                               directory)))
             (ecase if-does-not-exist
-              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>" ref (or directory *default-pathname-defaults*)))
+              (:error (git-error "~@<Ref named ~S doesn't exist in git repository at ~S.~:@>"
+                                 ref (or directory *repository*)))
               (:continue nil))))))
 
 (defun ref-coerce-to-value (ref-or-value &optional (directory *repository*))
@@ -549,7 +557,7 @@ The lists of pathnames returned have following semantics:
 ;;;
 (defun git-branches (&optional (directory *repository*))
   (multiple-value-bind (status output)
-      (with-executable-options (:explanation `("listing git branches in ~S" ,*default-pathname-defaults*)
+      (with-executable-options (:explanation `("listing git branches in ~S" ,directory)
                                 :output :capture)
         (git directory "branch"))
     (declare (ignore status))

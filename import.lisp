@@ -60,7 +60,7 @@ Defaults to NIL.")
     (with-executable-options (:explanation `("attempting to touch module ~A in ~S" ,(coerce-to-name name) ,(url o name)))
       (call-next-method)))
   (:method ((o git-remote) name)
-    (with-valid-exit-codes ((128 nil)) (git "peek-remote" (url o name))))
+    (with-valid-exit-codes ((128 nil)) (git "." "peek-remote" (url o name))))
   (:method ((o darcs-http-remote) name)
     (or (touch-www-file `(,(url o name) "_darcs/inventory"))
         (touch-www-file `(,(url o name) "_darcs/hashed_inventory"))))
@@ -92,11 +92,6 @@ Only for remotes of type SEPARATE-CLONE.")
 (defvar *we-drive-master-p*)
 (defvar *source-remote*
   "ISSUE:LOCALITY-SOURCE-REMOTE-TRACKING")
-
-(defun init-db-when-new-repository (name)
-  (when *new-repository-p*
-    (with-explanation ("initialising git repository of module ~A in ~S" name *default-pathname-defaults*)
-      (git "init-db"))))
 
 (defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname &optional branch)
   (:documentation
@@ -131,7 +126,8 @@ the provided directory is the final directory in the gate locality.")
 Note that this method doesn't affect working tree, instead deferring that
 to the above :AROUND method."
     (when *new-repository-p*
-      (init-db-when-new-repository name)
+      (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
+        (init-git-repo repo-dir))
       (ensure-gitremote (name o) (url o name)))
     (ensure-tracker-branch)
     (let ((we-drive-master-p (or *new-repository-p* *drive-git-masters* (and *drive-git-masters-matching-trackers*
@@ -157,11 +153,13 @@ to the above :AROUND method."
   (:method ((o svn-direct) name url repo-dir &optional branch)
     (multiple-value-bind (url wrinkle) (url o (module name))
       (when *new-repository-p*
-        (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S" name url *default-pathname-defaults*)
-          (git *repository* "svn" "init" url wrinkle)))
-      (git *repository* "svn" "fetch")))
+        (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S"
+                           name url repo-dir)
+          (git repo-dir "svn" "init" url wrinkle)))
+      (git repo-dir "svn" "fetch")))
   (:method ((o tarball-http-remote) name url-template repo-dir &optional branch)
-    (init-db-when-new-repository name)
+    (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
+      (init-git-repo *repository*))
     (iter (with last-version = (if *new-repository-p*
                                    (initial-tarball-version o)
                                    (git-repository-last-version-from-tag)))
@@ -195,34 +193,36 @@ to the above :AROUND method."
 
 (defgeneric convert-transit-module-using-locality (source-locality name source-repository)
   (:documentation
-   "Update conversion of module with NAME within the git repository at *DEFAULT-PATHNAME-DEFAULTS*,
-using SOURCE-REPOSITORY within SOURCE-LOCALITY.
-Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* variable.")
+   "Update conversion of module with NAME within the git repository at
+*REPOSITORY* using SOURCE-REPOSITORY within SOURCE-LOCALITY.  Can only
+be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE*
+variable.")
   (:method :around ((o locality) name from-repo-dir)
-    (with-explanation ("on behalf of module ~A, converting from ~A to ~A: ~S => ~S" name (vcs-type o) *gate-vcs-type* from-repo-dir *default-pathname-defaults*)
+           (with-explanation ("on behalf of module ~A, converting from ~A to ~A: ~S => ~S"
+                              name (vcs-type o) *gate-vcs-type* from-repo-dir *repository*)
       (call-next-method)))
   (:method ((o darcs-locality) name from-repo-dir)
-    (if (git-nonbare-repository-present-p *default-pathname-defaults*)
+    (if (git-nonbare-repository-present-p *repository*)
         (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
           (when untracked
             (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
-                    from-repo-dir *default-pathname-defaults* untracked)
+                    from-repo-dir *repository* untracked)
             (mapc #'delete-file untracked))
           (when (or staged-mod staged-del staged-new unstaged-mod unstaged-del)
             (ensure-clean-repository :error)))
-        (git "init"))
+        (init-git-repo *repository*))
     ;; We ignore exit status, as, sadly, it's not informative.
     ;; Thankfully, git-fast-import is pretty reliable.
     (let ((*output* nil))
       (pipe (darcs-fast-export from-repo-dir)
-            (git "fast-import"))))
+            (git *repository* "fast-import"))))
   (:method ((o hg-locality) name from-repo-dir)
-    (unless (git-nonbare-repository-present-p *default-pathname-defaults*)
-      (git "init"))
+    (unless (git-nonbare-repository-present-p *repository*)
+      (init-git-repo *repository*))
     (let ((*output* nil)
           (*error* nil))
       (pipe (hg-fast-export "-r" from-repo-dir)
-            (git "fast-import"))))
+            (git *repository* "fast-import"))))
   (:method ((o cvs-locality) name from-repo-dir)
     (multiple-value-bind (url cvs-module-name) (url *source-remote* name)
       (declare (ignore url))
@@ -240,15 +240,15 @@ Can only be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE* va
                 (finally
                  (definition-error "~@<During import of ~A from ~S: CVS module ~S does not exist, and it's name couldn't be guessed.~:@>" name from-repo-dir final-cvs-module-name))))
         (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module name :locality (gate *self*)))
-          (git "cvsimport" "-v" "-C" *default-pathname-defaults* "-d" (format nil ":local:~A" (string-right-trim "/" (namestring from-repo-dir))) final-cvs-module-name)))))
+          (git *repository* "cvsimport" "-v" "-C" *repository* "-d" (format nil ":local:~A" (string-right-trim "/" (namestring from-repo-dir))) final-cvs-module-name)))))
   (:method ((o svn-locality) name from-repo-dir)
     (when *new-repository-p*
       (multiple-value-bind (url wrinkle) (url *source-remote* name)
         (declare (ignore url))
         (with-executable-options (:explanation `("on behalf of module ~A, setting up svn to git conversion: ~S => ~S"
-                                                 name from-repo-dir *default-pathname-defaults*))
-          (git "svn" "init" `("file://" ,from-repo-dir ,wrinkle))))) ;; 'file://' -- gratuitious SVN complication
-    (git "svn" "fetch")))
+                                                 name from-repo-dir *repository*))
+          (git *repository* "svn" "init" `("file://" ,from-repo-dir ,wrinkle))))) ;; 'file://' -- gratuitious SVN complication
+    (git *repository* "svn" "fetch")))
 
 (defun determine-available-module-tarball-version-starting-after (url-template version &optional (search-depth 3))
   ;; XXX: security implications: URL-TEMPLATE comes from DEFINITIONS
@@ -284,8 +284,7 @@ when IF-UPDATE-FAILS is :ERROR, causes an error to be signalled."
           ;; do fetch
           (with-maybe-just-printing-conditions (t fetch-failure) (not *fetch-errors-serious*)
             (restart-bind ((retry (lambda ()
-                                    (within-directory (repo-dir)
-                                      (git "gui"))
+                                    (git repo-dir "gui")
                                     (invoke-restart (find-restart 'retry)))
                              :test-function (of-type 'repository-not-clean-during-fetch)
                              :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))

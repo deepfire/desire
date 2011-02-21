@@ -1386,39 +1386,40 @@ with SYSTEM specifying the driven variable binding."
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out.  Upon success a non-NIL
 value is returned."
-  (within-directory (metastore-pathname :if-does-not-exist :create :if-exists :error)
-    (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
-      (declare (ignore type cred port path))
-      (let ((remote-name (case type
-                           (git-locality 'localhost)
-                           (t            (canonicalise-name host)))))
-        (with-explanation ("cloning metastore ~A/.meta in ~S" url *default-pathname-defaults*)
-          (git "init-db")
-          (ensure-gitremote remote-name (concatenate 'string url ".meta"))
-          ;; This should go through fetch-git-remote, which is currently impossible
-          ;; due to how URL works.
-          (with-maybe-handled-executable-failures t
-              (git "fetch" (down-case-name remote-name))
-            (:handler (c)
-              (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
-                                  Retrying in dumb HTTP mode.~_The error was:~_~A~:@>~%"
-                      remote-name url c)
-              (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
-              (with-maybe-handled-executable-failures t
-                  (git "fetch" (down-case-name remote-name))
-                (:handler (c)
-                  (desire-error "~@<;;; ~@;Could not clone metastore from HTTP fallback ~S, caught error: ~<~A~:@>~:@>~%"
-                                http-url c)))
-              (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
-                                  Are we in a HTTP-only environment?  ~
-                                  Any further accesses to combined remotes will go through HTTP.~:@>~%")
-              (setf *combined-remotes-prefer-native-over-http* nil)
-              t)))
-        ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
-        (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") nil)))
-          (git-set-branch :master nil remote-master-val (not (head-detached-p))))
-        (git-set-head-index-tree :master)
-        (git-set-branch-index-tree (make-remote-ref remote-name branch))))))
+  (with-directory (metastore-pathname :if-does-not-exist :create :if-exists :error)
+    (let ((*repository* metastore-pathname))
+      (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
+        (declare (ignore type cred port path))
+        (let ((remote-name (case type
+                             (git-locality 'localhost)
+                             (t            (canonicalise-name host)))))
+          (with-explanation ("cloning metastore ~A/.meta in ~S" url metastore-pathname)
+            (init-git-repo metastore-pathname)
+            (ensure-gitremote remote-name (concatenate 'string url ".meta"))
+            ;; This should go through fetch-git-remote, which is currently impossible
+            ;; due to how URL works.
+            (with-maybe-handled-executable-failures t
+                (git metastore-pathname "fetch" (down-case-name remote-name))
+              (:handler (c)
+                (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
+                          Retrying in dumb HTTP mode.~_The error was:~_~A~:@>~%"
+                        remote-name url c)
+                (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
+                (with-maybe-handled-executable-failures t
+                    (git metastore-pathname "fetch" (down-case-name remote-name))
+                  (:handler (c)
+                            (desire-error "~@<;;; ~@;Could not clone metastore from HTTP fallback ~S, caught error: ~<~A~:@>~:@>~%"
+                                          http-url c)))
+                (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
+                          Are we in a HTTP-only environment?  ~
+                          Any further accesses to combined remotes will go through HTTP.~:@>~%")
+                (setf *combined-remotes-prefer-native-over-http* nil)
+                t)))
+          ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
+          (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") nil)))
+            (git-set-branch :master metastore-pathname remote-master-val (not (head-detached-p))))
+          (git-set-head-index-tree :master)
+          (git-set-branch-index-tree (make-remote-ref remote-name branch)))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)
