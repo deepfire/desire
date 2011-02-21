@@ -519,9 +519,11 @@ The lists of pathnames returned have following semantics:
 (defun get-head (&optional (directory *repository*) remote (dereference t))
   (symbolic-reffile-value (head-pathname directory remote) dereference))
 
-(defun set-head (new-value &optional (directory *repository*) remote)
+(defun set-head (new-value &optional (directory *repository*) remote &aux
+                 (path (head-pathname directory remote)))
   (declare (type (or cons (integer 0)) new-value))
-  (set-symbolic-reffile-value (head-pathname directory remote) new-value))
+  (prog1 (symbolic-reffile-value path nil)
+    (set-symbolic-reffile-value path new-value)))
 
 (defun git-detach-head (&optional (directory *repository*))
   (set-head (get-head directory) directory))
