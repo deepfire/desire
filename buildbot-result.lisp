@@ -68,7 +68,7 @@
   (:method ((o master-update-phase) (r result))
     (if-let ((commit (slot-value* r 'commit nil)))
       (concatenate 'string
-                   "<pre>Commit-ID: " (desr::cook-refval (desr::commit-id commit)) "</pre><br>"
+                   "<pre>Commit-ID: " (desr::cook-ref-value (desr::commit-id commit)) "</pre><br>"
                    "<pre>Author:    " (desr::commit-author commit) "</pre><br>"
                    "<pre>Date:      " (desr::commit-date commit) "</pre><br>")
       "")))

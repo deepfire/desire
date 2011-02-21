@@ -44,6 +44,9 @@
 
 (define-simple-error git-error)
 
+(defvar *repository*)
+(define-binder with-repository *repository*)
+
 (defun missing-remote-error (name &optional (directory *repository*))
   (repository-error directory "~@<At ~S: remote ~A not found, and no URL was provided.~:@>"
                     directory name))
@@ -57,10 +60,6 @@
 ;;;
 ;;; Repositories
 ;;;
-(defvar *repository*)
-
-(define-binder with-repository *repository*)
-
 (defun git-predicate (directory explanation-format-control git-arguments)
   (with-executable-options (:explanation `(,explanation-format-control ,directory) :output nil)
     (not (with-shell-predicate (apply #'git directory git-arguments)))))
