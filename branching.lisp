@@ -51,21 +51,15 @@ Defaults to T.")
   (:report (pathname output)
            "~@<Failed to apply patch in ~S. The output was:~%~A~%~:@>" pathname output))
 
-(defun master-detached-p (&optional repo-dir)
+(defun master-detached-p (&optional (repo-dir *repository*))
   "See if the master branch is driven by the user, that is out of desire's control."
   (not (ref= '("master") '("tracker") repo-dir)))
 
-(defun ensure-tracker-branch (&optional repo-dir ref &aux
+(defun ensure-tracker-branch (&optional (repo-dir *repository*) ref &aux
                               (ref (or ref (get-head repo-dir))))
   (unless (git-branch-present-p :tracker repo-dir)
     (git-set-branch :tracker repo-dir ref)))
 
-(defun ensure-op-branch (repository &aux
-                         (op '("desire" "op")))
-  "Make sure that the desire's 'op' branch exists within REPOSITORY."
-  (unless (ref-file-present-p op repository)
-    (set-ref-file-value op repository (get-head repository))))
-
-(defun switch-to-op (repository &aux
+(defun switch-to-op (&optional (repository *repository*) &aux
                      (op '("desire" "op")))
-  )
+  (set-head op repository))

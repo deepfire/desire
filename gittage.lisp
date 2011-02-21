@@ -386,9 +386,10 @@ The lists of pathnames returned have following semantics:
 ;;;
 ;;; Ref files
 ;;;
-(defun file-path-ref (pathname directory)
-  (let ((translated (translate-pathname pathname (merge-pathnames #p".git/refs/**/*" directory) #p"/**/*")))
-    (append (rest (pathname-directory translated)) (list (pathname-name translated)))))
+(defun file-path-ref (pathname &aux (dir (pathname-directory pathname)))
+  (destructuring-bind (ref repo-dir-head) (split-sequence ".git" (rest dir) :test #'equal)
+    (values ref
+            (make-pathname :directory (list* (first dir) repo-dir-head)))))
 
 (defun ref-file-path (ref &optional (directory *repository*))
   (subfile directory (list* ".git" "refs" (canonicalise-ref ref))))
@@ -444,20 +445,20 @@ The lists of pathnames returned have following semantics:
     (when (funcall predicate ref refval)
       (collect (funcall fn ref refval)))))
 
-(defun map-pathnames-full-refs (fn pathnames directory)
+(defun map-pathnames-full-refs (fn pathnames)
   (iter (for pathname in pathnames)
-        (collect (funcall fn (file-path-ref pathname directory) (ref-file-value pathname)))))
+        (collect (funcall fn (file-path-ref pathname) (ref-file-value pathname)))))
 
 (defun map-heads (fn directory)
-  (append (map-pathnames-full-refs fn (head-pathnames directory) directory)
+  (append (map-pathnames-full-refs fn (head-pathnames directory))
           (map-packed-refs (lambda (r v) (declare (ignore v)) (string= (first r) "heads")) fn directory)))
 
 (defun map-all-remote-heads (fn directory)
-  (append (map-pathnames-full-refs fn (all-remote-head-pathnames directory) directory)
+  (append (map-pathnames-full-refs fn (all-remote-head-pathnames directory))
           (map-packed-refs (lambda (r v) (declare (ignore v)) (string= (first r) "remotes")) fn directory)))
 
 (defun map-remote-heads (fn remote directory)
-  (append (map-pathnames-full-refs fn (remote-head-pathnames remote directory) directory)
+  (append (map-pathnames-full-refs fn (remote-head-pathnames remote directory))
           (map-packed-refs (lambda (r v) (declare (ignore v)) (and (string= (first r) "remotes") (string= (second r) remote))) fn directory)))
 
 (defun refs-by-value (refval directory)
@@ -491,16 +492,18 @@ The lists of pathnames returned have following semantics:
     (declare (ignore directory))
     (= x y)))
 
-(defun symbolic-reffile-value (pathname &optional dereference (directory *repository*))
-  (multiple-value-bind (ref refval) (parse-ref-value (file-line pathname))
-    (let ((normalised-ref (rest ref))) ; strip the "refs" component
-      (if dereference
-          (values (or refval
-                      (ref-value normalised-ref directory :if-does-not-exist :continue)
-                      (repository-error directory "~@<Reffile ~S references a missing ref ~S.~:@>"
-                                        pathname normalised-ref))
-                  normalised-ref)
-          (or normalised-ref refval)))))
+(defun symbolic-reffile-value (pathname &optional dereference)
+  (multiple-value-bind (ref directory) (file-path-ref pathname)
+    (declare (ignore ref))
+    (multiple-value-bind (ref refval) (parse-ref-value (file-line pathname))
+      (let ((normalised-ref (rest ref))) ; strip the "refs" component
+        (if dereference
+            (values (or refval
+                        (ref-value normalised-ref directory :if-does-not-exist :continue)
+                        (repository-error directory "~@<Reffile ~S references a missing ref ~S.~:@>"
+                                          pathname normalised-ref))
+                    normalised-ref)
+            (or normalised-ref refval))))))
 
 (defun set-symbolic-reffile-value (pathname value)
   (with-output-to-file (reffile pathname)
@@ -514,7 +517,7 @@ The lists of pathnames returned have following semantics:
   (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
 
 (defun get-head (&optional (directory *repository*) remote (dereference t))
-  (symbolic-reffile-value (head-pathname directory remote) dereference directory))
+  (symbolic-reffile-value (head-pathname directory remote) dereference))
 
 (defun set-head (new-value &optional (directory *repository*) remote)
   (declare (type (or cons (integer 0)) new-value))
@@ -587,7 +590,7 @@ in a temporary pseudo-commit."
   (with-explanation ("stashing changes in git repository at ~S" directory)
     (git directory "stash")))
 
-(defun ensure-clean-repository (&optional (if-changes (repository-policy-value :unsaved-changes)) (directory *repository*))
+(defun ensure-clean-repository (if-changes &optional (directory *repository*))
   (with-retry-restarts ((hardreset-repository ()
                           :report "Clear all uncommitted changes, both staged and unstaged."
                           (git-set-branch-index-tree nil directory)))
