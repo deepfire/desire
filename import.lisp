@@ -117,48 +117,14 @@ the provided directory is the final directory in the gate locality.")
           ((executable-failure ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
            (missing-executable ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond))))
         (with-git-repository-write-access (*new-repository-p*) repo-dir
-          ;; Cases not covered:
-          ;; entirely painless:
-          ;;   - clean, on a desire-specific branch
-          ;;     - go ahead, in all above cases
-          ;; systematic approach equals absolute safety:
-          ;;   - clean, on non-desire branch
-          ;;     - switch to a desire branch
-          ;; potentially dangerous:
-          ;;   - gitless, not quite empty dir: will, possibly, cause painful conflicts, sooner or later
-          ;;     - an error is definitely warranted
-          ;; critical:
-          ;;   - unsaved changes, no matter index or tree
-          ;;     - stash: moderately safe, although requires notification
-          ;;     - reset: can only do this if policy says so
-          ;;     - ..no other real choices.
-          (when (and (not *new-repository-p*) *follow-upstream*)
-            (ensure-clean-repository *dirty-repository-behaviour*))
-          (let ((*source-remote* o))
-            (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
-                               name (transport o) (vcs-type o) url repo-dir)
-              (call-next-method o name url repo-dir branch)))
-          ;; what to do with post-update-ly unsaved changes?
-          ;; - concurrent repository modifications
-          ;;   - well, don't do them!
-          ;; - conversion crap (do we have any in-place convertors?
-          ;;   - right, if it does happen, shall be dealt with..
-          ;; question: how vitally important is it to keep stuff clean?
-          ;; - in the former case, it's not quite really our business
-          ;; - in the latter case, yeah, all known cases must be plugged
-          ;; problem: no convincing way to discern between those.
-          ;; how policies can help:
-          ;; - the user can say: I never do concurrent modification,
-          ;;   which would effectively mean that we can interpret everything
-          ;;   as if any unsaved post-changes are of our own making
-          ;; - barring that, well, there's no certainty added and a painful
-          ;;   choice must be made:
-          ;;   - reset
-          ;;   - leave as-is
-          ;;   - stash
-          (git-set-head-index-tree branch (cond ((or *follow-upstream* *new-repository-p*) :reset)
-                                                (t :continue)))
-          (setf (git-repository-world-readable-p) *default-world-readable*)))))
+          (ensure-clean-repository (repository-policy-value :unsaved-changes))
+          (let ((old-head (switch-to-op)))
+            (let ((*source-remote* o))
+              (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
+                                 name (transport o) (vcs-type o) url repo-dir)
+                (call-next-method o name url repo-dir branch)))
+            (git-set-head-index-tree '("desire" "op") (repository-policy-value :unsaved-changes-postwrite))
+            (setf (git-repository-world-readable-p) *default-world-readable*))))))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir &optional branch)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
