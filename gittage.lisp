@@ -30,10 +30,8 @@
 
 (defun git (work-tree &rest args)
   (declare (type (or string pathname) work-tree))
-  (apply #'%git
-         (strconcat* "--work-tree=" (namestring work-tree))
-         (strconcat* "--git-dir=" (namestring work-tree) ".git/")
-         args))
+  (set-posix-working-directory work-tree)
+  (apply #'%git args))
 
 (define-condition vcs-condition ()
   ((vcs :reader condition-vcs :initarg :vcs)))
