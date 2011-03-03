@@ -89,37 +89,41 @@ Only for remotes of type SEPARATE-CLONE.")
     (hg "clone" url repo-dir)))
 
 (defvar *new-repository-p*)
-(defvar *we-drive-master-p*)
 (defvar *source-remote*
   "ISSUE:LOCALITY-SOURCE-REMOTE-TRACKING")
+
+(defun update-module-using-remote (module-name remote url repo-dir &aux
+                                   (ref '("desire" "op")))
+  "Update the repository in REPO-DIR for the module with MODULE-NAME,
+using URL within the REMOTE to the latest version available from it."
+  (with-error-resignaling
+      ((executable-failure ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond)))
+       (missing-executable ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond))))
+    (with-git-repository-write-access (*new-repository-p*) repo-dir
+      (ensure-clean-repository (repository-policy-value :unsaved-changes))
+      (let ((old-head (switch-to-op)))
+        (let ((*source-remote* remote))
+          (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
+                             module-name (transport remote) (vcs-type remote) url repo-dir)
+            (fetch-module-using-remote remote module-name url repo-dir ref)))
+        ;; HEAD option summary:            unsch  HEAD  head  wtree
+        ;;  - restore HEAD&head
+        ;;    f-m-u-r
+        ;;    - and reapply stash          stash  head  stay  stapp
+        ;;    - restore only HEAD          ???    head  stay  reset
+        ;;  - update HEAD&head
+        ;;    f-m-u-r and apply
+        ;;    - try merge unsaved changes  stash  head  ffor  stapp
+        ;;    - ignore unsaved changes     ???    head  ffor  reset
+        (git-set-head-index-tree ref (repository-policy-value :unsaved-changes-postwrite))
+        (setf (git-repository-world-readable-p) *default-world-readable*)
+        (let ((*executable-standard-output* nil))
+          (git-repository-update-for-dumb-servers repo-dir))))))
 
 (defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname &optional branch)
   (:documentation
    "Update the local repository, maybe creating it first.  Note that
 the provided directory is the final directory in the gate locality.")
-  ;; So, it appears that the above gives us the mandate to change files.
-  ;; the only question is whether it gives us the mandate to:
-  ;;   - change the current branch (unless it's desire-specific)
-  ;;   - change the branch HEAD points to
-  ;;
-  ;; However, I'd guess we'd want a lighter variant, for the reason of:
-  ;;   - transparent updates, with desire-specific, and maybe tracker branch updates
-  ;; We'd have to factor, then.
-  (:method :around ((o remote) name url repo-dir &optional branch)
-    (declare (type null branch))
-    (let ((branch (repository-policy-value :operating-branch)))
-      (with-error-resignaling
-          ((executable-failure ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond)))
-           (missing-executable ((cond) fetch-failure :remote o :module name :execution-error (format nil "~A" cond))))
-        (with-git-repository-write-access (*new-repository-p*) repo-dir
-          (ensure-clean-repository (repository-policy-value :unsaved-changes))
-          (let ((old-head (switch-to-op)))
-            (let ((*source-remote* o))
-              (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
-                                 name (transport o) (vcs-type o) url repo-dir)
-                (call-next-method o name url repo-dir branch)))
-            (git-set-head-index-tree '("desire" "op") (repository-policy-value :unsaved-changes-postwrite))
-            (setf (git-repository-world-readable-p) *default-world-readable*))))))
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir &optional branch)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
@@ -129,15 +133,9 @@ to the above :AROUND method."
       (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
         (init-git-repo repo-dir))
       (ensure-gitremote (name o) (url o name)))
-    (ensure-tracker-branch)
-    (let ((we-drive-master-p (or *new-repository-p* *drive-git-masters* (and *drive-git-masters-matching-trackers*
-                                                                             (not (master-detached-p))))))
-      (git-fetch-remote o name)
-      (let ((remote-master-val (ref-value `("remotes" ,(down-case-name o) "master") nil))
-            (head-in-clouds-p (head-detached-p)))
-        (git-set-branch :tracker nil remote-master-val (not head-in-clouds-p))
-        (when we-drive-master-p
-          (git-set-branch :master nil remote-master-val (not head-in-clouds-p))))))
+    (git-fetch-remote o name)
+    (let ((remote-master-val (ref-value (make-remote-ref name "master") nil)))
+      (git-set-branch branch *repository* remote-master-val (not head-in-clouds-p))))
   (:method :around ((o nongit-mixin) name url repo-dir &optional branch)
     (unless *new-repository-p*
       (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
@@ -291,7 +289,7 @@ when IF-UPDATE-FAILS is :ERROR, causes an error to be signalled."
               (let ((*executable-standard-output* (if pass-output t *executable-standard-output*)))
                 (format t ";; Fetching module ~A from ~A remote ~A, ~A~%"
                         module-name (vcs-type best-remote) (name best-remote) url)
-                (fetch-module-using-remote best-remote module-name url repo-dir)
+                (update-module-using-remote module-name best-remote url repo-dir)
                 (format t ";; Done fetching ~A~%" module-name)
                 (when *default-publishable*
                   (declare-module-converted module-name locality)))))

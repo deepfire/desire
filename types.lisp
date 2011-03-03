@@ -1386,7 +1386,7 @@ with SYSTEM specifying the driven variable binding."
   "Clone metastore from URL, with working directory optionally changed to
 LOCALITY-PATHNAME. BRANCH is then checked out.  Upon success a non-NIL
 value is returned."
-  (with-directory (metastore-pathname :if-does-not-exist :create :if-exists :error)
+  (with-directory (metastore-pathname :if-does-not-exist :create)
     (let ((*repository* metastore-pathname))
       (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
         (declare (ignore type cred port path))
@@ -1416,7 +1416,7 @@ value is returned."
                 (setf *combined-remotes-prefer-native-over-http* nil)
                 t)))
           ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
-          (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") nil)))
+          (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") metastore-pathname)))
             (git-set-branch :master metastore-pathname remote-master-val (not (head-detached-p))))
           (git-set-head-index-tree :master)
           (git-set-branch-index-tree (make-remote-ref remote-name branch)))))))
