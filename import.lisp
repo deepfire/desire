@@ -296,8 +296,7 @@ when IF-UPDATE-FAILS is :ERROR, causes an error to be signalled."
                 (when *default-publishable*
                   (declare-module-converted module-name locality)))))
           ;; alright, fetch went good, now tie in changes
-          (notice-module-repository module nil locality)
-          (sync-module module locality)))
+          (notice-module-repository module nil locality)))
     ;; no acceptable remote found..
     (unless (and (module-locally-present-p module)
                  (ecase if-update-fails

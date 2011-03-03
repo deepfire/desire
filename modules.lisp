@@ -272,12 +272,6 @@ meets desire's operational requirements.")
                                        (remove-if #'system-dependencies-up-to-date-p (module-systems o)))))
         (update-system-set-dependencies changed-systems)))))
 
-(defun sync-module (module &optional locality &aux
-                    (locality (or locality (gate *self*))))
-  (let ((*executable-standard-output* nil))
-    (git-repository-update-for-dumb-servers
-     (module-pathname (coerce-to-module module) locality))))
-
 (defgeneric module-post-install (name module locality pathname)
   (:method ((name symbol) (module module) (locality locality) pathname)))
 
