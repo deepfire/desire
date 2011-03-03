@@ -198,55 +198,35 @@ The lists of pathnames returned have following semantics:
 ;;;
 ;;; Policies
 ;;;
-;; policy atom:
-;;   - an attribute set
-;;     - on update, what to do with unsaved changes?
-;;   - default, or path-specific
 ;; policy:
-;;   - a set of policy atoms
+;;   - named
+;;   - attribute set
 ;;
-(defstruct policy-atom
-  (unsaved-changes     nil :type (or null (member :error :reset :stash)))
-  (missing-master      nil :type (or null (member :error :create-on-head)))
-  ;; hmm, it's not entirely clear this is the correct answer for a multitude of relevant questions
-  (operating-branch    nil :type (or (eql t) keyword))
-  (preexisting-gitless nil :type (or null (member :error :take-over))))
-
 (defclass repository-policy (named)
-  ((atoms :initarg :atoms))
-  (:default-initargs
-   :atoms       (make-hash-table :test 'equalp)))
+  ((unsaved-changes           :initarg :unsaved-changes           :type (or null (member :error :stash :commit)))
+   (unsaved-changes-postwrite :initarg :unsaved-changes-postwrite :type (or null (member :error :stash :reset)))
+   (missing-master            :initarg :missing-master            :type (or null (member :error :create-on-head)))
+   (preexisting-gitless       :initarg :preexisting-gitless       :type (or null (member :error :take-over)))))
 
-(define-subcontainer policy-atom :key-type t :container-slot atoms)
-
-(defun make-repository-policy (name &rest atom-specs)
-  (make-instance 'repository-policy :name name
-                 :atoms (alist-hash-table (mapcar (lambda (spec) (cons (first spec) (second spec)))
-                                                  atom-specs)
-                                          :test 'equalp)))
-
-(defun make-default-repository-policy (name &rest properties &key &allow-other-keys)
-  (make-repository-policy name (list nil (apply #'make-policy-atom properties))))
+(defun make-repository-policy (name &rest initargs)
+  (apply #'make-instance 'repository-policy :name name (remove-from-plist initargs :name)))
 
 (defparameter *repository-policies*
   (alist-hash-table
-   `((:default .  ,(make-default-repository-policy
+   `((:default .  ,(make-repository-policy
                     :default
                     :unsaved-changes     :stash
                     :missing-master      :create-on-head
-                    :operating-branch    :master
                     :preexisting-gitless :take-over))
-     (:new-repo . ,(make-default-repository-policy
+     (:new-repo . ,(make-repository-policy
                     :new-repo
                     :unsaved-changes     :error
                     :missing-master      :error
-                    :operating-branch    :master
                     :preexisting-gitless :error))
-     (:cautious . ,(make-default-repository-policy
+     (:cautious . ,(make-repository-policy
                     :cautious
                     :unsaved-changes     :error
                     :missing-master      :error
-                    :operating-branch    t ; use detached operation?
                     :preexisting-gitless :error)))
    :test 'eq))
 
@@ -262,9 +242,11 @@ The lists of pathnames returned have following semantics:
 (defmacro with-repository-policy (policy &body body)
   `(invoke-with-repository-policy ,policy (lambda () ,@body)))
 
-(defun repository-policy-value (value-name)
-  (or (slot-value *repository-policy* value-name)
-      (slot-value *default-repository-policy* value-name)))
+(defun repository-policy-value (value-name &aux (slot (find-symbol (string value-name) :desire)))
+  (unless (and slot (slot-exists-p *default-repository-policy* slot))
+    (error "~@<Repository policies do not define policy ~S.~:@>" (string value-name)))
+  (or (slot-value *repository-policy*         slot)
+      (slot-value *default-repository-policy* slot)))
 
 ;;;;
 ;;;; Commits
