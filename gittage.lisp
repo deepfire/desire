@@ -576,8 +576,13 @@ ref of the current branch."
 (defun git-stash (&optional (directory *repository*))
   "Same as GIT-SET-BRANCH-INDEX-TREE with no arguments, but saves changes
 in a temporary pseudo-commit."
-  (with-explanation ("stashing changes in git repository at ~S" directory)
+  (with-explanation ("stashing changes in ~S" directory)
     (git directory "stash")))
+
+(defun git-stash-apply (&optional (directory *repository*))
+  "Apply stashed changes."
+  (with-explanation ("applying stashed changes in ~S" directory)
+    (git directory "stash" "apply")))
 
 (defun ensure-clean-repository (if-changes &optional (directory *repository*))
   (with-retry-restarts ((hardreset-repository ()
