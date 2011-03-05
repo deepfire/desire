@@ -42,7 +42,7 @@
   (update module)
   (with-git-repository-write-access (new-p) repo
     (declare (ignore new-p))
-    (let ((saved-head (get-head nil nil nil))
+    (let ((saved-head (get-head nil repo))
           (saved-xcvbify (ref-value '("heads" "xcvbify") nil :if-does-not-exist :continue)))
       (git-set-head-index-tree :tracker :reset)
       (git-set-branch :xcvbify)

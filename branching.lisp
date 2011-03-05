@@ -56,7 +56,7 @@ Defaults to T.")
   (not (ref= '("master") '("tracker") repo-dir)))
 
 (defun ensure-tracker-branch (&optional (repo-dir *repository*) ref &aux
-                              (ref (or ref (get-head repo-dir))))
+                              (ref (or ref (get-head t repo-dir))))
   (unless (git-branch-present-p :tracker repo-dir)
     (git-set-branch :tracker repo-dir ref)))
 

@@ -503,7 +503,7 @@ The lists of pathnames returned have following semantics:
 (defun head-pathname (&optional (directory *repository*) remote)
   (subfile directory `(".git" ,@(when remote `("refs" "remotes" ,(downstring remote))) "HEAD")))
 
-(defun get-head (&optional (directory *repository*) remote (dereference t))
+(defun get-head (&optional dereference (directory *repository*) remote)
   (symbolic-reffile-value (head-pathname directory remote) dereference))
 
 (defun set-head (new-value &optional (directory *repository*) remote &aux
@@ -513,16 +513,16 @@ The lists of pathnames returned have following semantics:
     (set-symbolic-reffile-value path new-value)))
 
 (defun git-detach-head (&optional (directory *repository*))
-  (set-head (get-head directory) directory))
+  (set-head (get-head t directory) directory))
 
 (defun head-detached-p (&optional (directory *repository*) remote)
-  (let ((head (get-head directory remote nil)))
+  (let ((head (get-head nil directory remote)))
     (not (or (integerp head)
              (ref-value head directory :if-does-not-exist :continue)))))
 
 (defun invoke-with-maybe-detached-head (directory detachp fn)
   (if detachp
-      (let ((current-head (get-head directory)))
+      (let ((current-head (get-head t directory)))
         (unwind-protect (progn (git-detach-head directory)
                                (funcall fn))
           (when current-head
@@ -556,13 +556,13 @@ The lists of pathnames returned have following semantics:
   (with-explanation ("removing git branch ~A in ~S" name directory)
     (nth-value 0 (git directory "branch" "-d" (downstring name)))))
 
-(defun git-set-noncurrent-branch (branchname &optional (directory *repository*) (refvalue (get-head directory)))
+(defun git-set-noncurrent-branch (branchname &optional (directory *repository*) (refvalue (get-head t directory)))
   (declare (type (or list (integer 0)) refvalue))
   (with-explanation ("moving non-current ref ~A to ~:[~40,'0X~;~A~] in ~S"
                      branchname (consp refvalue) refvalue directory)
     (nth-value 0 (git directory "branch" "-f" (downstring branchname) (cook-ref-value refvalue)))))
 
-(defun git-set-branch (name &optional (directory *repository*) (refvalue (get-head directory)) possibly-current-p)
+(defun git-set-branch (name &optional (directory *repository*) (refvalue (get-head t directory)) possibly-current-p)
   (with-maybe-detached-head (directory possibly-current-p)
     (git-set-noncurrent-branch name directory refvalue)))
 
