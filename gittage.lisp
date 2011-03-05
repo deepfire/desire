@@ -206,7 +206,10 @@ The lists of pathnames returned have following semantics:
   ((unsaved-changes           :initarg :unsaved-changes           :type (or null (member :error :stash :commit)))
    (unsaved-changes-postwrite :initarg :unsaved-changes-postwrite :type (or null (member :error :stash :reset)))
    (missing-master            :initarg :missing-master            :type (or null (member :error :create-on-head)))
-   (preexisting-gitless       :initarg :preexisting-gitless       :type (or null (member :error :take-over)))))
+   (preexisting-gitless       :initarg :preexisting-gitless       :type (or null (member :error :take-over)))
+   (drive-head                :initarg :drive-head                :type boolean)
+   (drive-head-branch         :initarg :drive-head-branch         :type boolean)
+   (reapply-stash             :initarg :reapply-stash             :type boolean)))
 
 (defun make-repository-policy (name &rest initargs)
   (apply #'make-instance 'repository-policy :name name (remove-from-plist initargs :name)))
@@ -215,19 +218,31 @@ The lists of pathnames returned have following semantics:
   (alist-hash-table
    `((:default .  ,(make-repository-policy
                     :default
-                    :unsaved-changes     :stash
-                    :missing-master      :create-on-head
-                    :preexisting-gitless :take-over))
+                    :unsaved-changes           :stash
+                    :unsaved-changes-postwrite :stash
+                    :missing-master            :create-on-head
+                    :preexisting-gitless       :take-over
+                    :drive-head                nil
+                    :drive-head-branch         nil
+                    :reapply-stash             nil))
      (:new-repo . ,(make-repository-policy
                     :new-repo
-                    :unsaved-changes     :error
-                    :missing-master      :error
-                    :preexisting-gitless :error))
+                    :unsaved-changes           :error
+                    :unsaved-changes-postwrite :stash
+                    :missing-master            :error
+                    :preexisting-gitless       :error
+                    :drive-head                t
+                    :drive-head-branch         t
+                    :reapply-stash             nil))
      (:cautious . ,(make-repository-policy
                     :cautious
-                    :unsaved-changes     :error
-                    :missing-master      :error
-                    :preexisting-gitless :error)))
+                    :unsaved-changes           :error
+                    :unsaved-changes-postwrite :stash
+                    :missing-master            :error
+                    :preexisting-gitless       :error
+                    :drive-head                nil
+                    :drive-head-branch         nil
+                    :reapply-stash             t)))
    :test 'eq))
 
 (define-root-container *repository-policies* repository-policy :key-type symbol :coercer t)

@@ -232,8 +232,7 @@ to the above :AROUND method."
   (:method ((o indirect-fetch) name url repo-dir &optional branch)
     (convert-transit-module-using-locality (locality o) name (module-pathname name (locality o)))))
 
-(defun update-module-using-remote (module-name remote url repo-dir &aux
-                                   (ref '("desire" "op")))
+(defun update-module-using-remote (module-name remote url repo-dir)
   "Update the repository in REPO-DIR for the module with MODULE-NAME,
 using URL within the REMOTE to the latest version available from it."
   (with-error-resignaling
@@ -241,7 +240,13 @@ using URL within the REMOTE to the latest version available from it."
        (missing-executable ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond))))
     (with-git-repository-write-access (*new-repository-p*) repo-dir
       (ensure-clean-repository (repository-policy-value :unsaved-changes))
-      (let ((old-head (switch-to-op)))
+      (let* ((old-head (get-head))
+             (desire-op-ref '("desire" "op"))
+             (remote-ref (make-remote-ref remote "master"))
+             (drive-head-branch-p (repository-policy-value :drive-head-branch))
+             (operating-ref (if drive-head-branch-p
+                                old-head
+                                desire-op-ref)))
         (let ((*source-remote* remote))
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
                              module-name (transport remote) (vcs-type remote) url repo-dir)
@@ -253,9 +258,17 @@ using URL within the REMOTE to the latest version available from it."
         ;;    - restore only HEAD          ???    head  stay  reset
         ;;  - update HEAD&head
         ;;    f-m-u-r and apply
-        ;;    - try merge unsaved changes  stash  head  ffor  stapp
+        ;;    - try merge unsaved changes  stash  head  ffor  stapp  ; reasonable?
         ;;    - ignore unsaved changes     ???    head  ffor  reset
-        (git-set-head-index-tree ref (repository-policy-value :unsaved-changes-postwrite))
+        (git-update-ref desire-op-ref remote-ref)
+        (ensure-clean-repository (repository-policy-value :unsaved-changes-postwrite))
+        ;; stay here, move with branch, move to desir0op
+        (when (repository-policy-value :drive-head)
+          (if drive-head-branch
+              (git-set-branch-index-tree remote-ref)
+              (git-set-head-index-tree desire-op-ref)))
+        (when (repository-policy-value :reapply-stash)
+          (git-stash-apply))
         (setf (git-repository-world-readable-p) *default-world-readable*)
         (let ((*executable-standard-output* nil))
           (git-repository-update-for-dumb-servers repo-dir))))))
