@@ -185,7 +185,7 @@ to the above :AROUND method."
     (call-next-method); must operate on the local master
     (let ((master-val (ref-value '("master") nil)))
       (git-set-branch :tracker nil master-val t)
-      (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-refval master-val))))
+      (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
   ;; direct fetch, non-git
   (:method ((o cvs-native-remote) name url repo-dir &optional branch)
