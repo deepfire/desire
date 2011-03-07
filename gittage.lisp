@@ -642,6 +642,7 @@ in a temporary pseudo-commit."
 (defmacro with-gitremote ((remote &key (url nil urlp) (if-remote-does-not-exist nil if-remote-does-not-exist-p)
                                   (directory nil directoryp))
                           &body body)
+  "Must be used with *REPOSITORY* bound."
   `(invoke-with-gitremote ,remote (lambda () ,@body) ,@(pass-&key* url if-remote-does-not-exist directory)))
 
 ;;;;
@@ -671,7 +672,10 @@ in a temporary pseudo-commit."
           (funcall fn effectively-new))))))
 
 (defmacro with-git-repository-write-access ((new-repo-p) path &body body)
-  `(invoke-with-git-repository-write-access ,path (lambda (,new-repo-p) ,@body)))
+  (with-ignored-names ignores (_ new-repo-p)
+    `(invoke-with-git-repository-write-access ,path (lambda (,new-repo-p)
+                                                      ,@ignores
+                                                      ,@body))))
 
 ;;;;
 ;;;; Queries
