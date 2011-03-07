@@ -163,12 +163,12 @@ variable.")
           (git *repository* "svn" "init" `("file://" ,from-repo-dir ,wrinkle))))) ;; 'file://' -- gratuitious SVN complication
     (git *repository* "svn" "fetch")))
 
-(defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname &optional branch)
+(defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname)
   (:documentation
    "Update the local repository, maybe creating it first.  Note that
 the provided directory is the final directory in the gate locality.")
   ;; ========================== branch model aspect =============================
-  (:method ((o git-remote) name url repo-dir &optional branch)
+  (:method ((o git-remote) name url repo-dir)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
 Note that this method doesn't affect working tree, instead deferring that
 to the above :AROUND method."
@@ -176,29 +176,26 @@ to the above :AROUND method."
       (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
         (init-git-repo repo-dir))
       (ensure-gitremote (name o) (url o name)))
-    (git-fetch-remote o name)
-    (let ((remote-master-val (ref-value (make-remote-ref name "master") nil)))
-      (git-set-branch branch *repository* remote-master-val (not head-in-clouds-p))))
-  (:method :around ((o nongit-mixin) name url repo-dir &optional branch)
+    (git-fetch-remote o name))
+  (:method :around ((o nongit-mixin) name url repo-dir)
     (unless *new-repository-p*
       (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     (let ((master-val (ref-value '("master") nil)))
-      (git-set-branch :tracker nil master-val t)
       (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
   ;; direct fetch, non-git
-  (:method ((o cvs-native-remote) name url repo-dir &optional branch)
+  (:method ((o cvs-native-remote) name url repo-dir)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
       (git *repository* "cvsimport" "-d" url (or cvs-module-name (downstring name)))))
-  (:method ((o svn-direct) name url repo-dir &optional branch)
+  (:method ((o svn-direct) name url repo-dir)
     (multiple-value-bind (url wrinkle) (url o (module name))
       (when *new-repository-p*
         (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S"
                            name url repo-dir)
           (git repo-dir "svn" "init" url wrinkle)))
       (git repo-dir "svn" "fetch")))
-  (:method ((o tarball-http-remote) name url-template repo-dir &optional branch)
+  (:method ((o tarball-http-remote) name url-template repo-dir)
     (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
       (init-git-repo *repository*))
     (iter (with last-version = (if *new-repository-p*
@@ -216,20 +213,20 @@ to the above :AROUND method."
                                                        ,name ,(princ-version-to-string next-version)))
                 (git *repository* "import-orig" localised-tarball))))))
   ;; indirect-fetch
-  (:method :around ((o separate-clone) name url repo-di &optional branch)
+  (:method :around ((o separate-clone) name url repo-di)
     "Note that the fetches will be done later anyway."
     (let ((transit-repo-dir (module-pathname name (locality o))))
       (unless (directory-exists-p transit-repo-dir)
         (clone-transit-module-using-remote o name url transit-repo-dir)))
     (call-next-method))
-  (:method :before ((o darcs-http-remote) name url repo-dir &optional branch)
+  (:method :before ((o darcs-http-remote) name url repo-dir)
     (darcs "pull" "--all" "--repodir" (module-pathname name (locality o)) url))
-  (:method :before ((o hg-http-remote) name url repo-dir &optional branch)
+  (:method :before ((o hg-http-remote) name url repo-dir)
     (declare (ignore url))
     (hg "pull" "-R" (module-pathname name (locality o))))
-  (:method :before ((o rsync) name url repo-di &optional branch)
+  (:method :before ((o rsync) name url repo-di)
     (rsync "-ravPz" url (module-pathname name (locality o))))
-  (:method ((o indirect-fetch) name url repo-dir &optional branch)
+  (:method ((o indirect-fetch) name url repo-dir)
     (convert-transit-module-using-locality (locality o) name (module-pathname name (locality o)))))
 
 (defun update-module-using-remote (module-name remote url repo-dir)
@@ -250,7 +247,7 @@ using URL within the REMOTE to the latest version available from it."
         (let ((*source-remote* remote))
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
                              module-name (transport remote) (vcs-type remote) url repo-dir)
-            (fetch-module-using-remote remote module-name url repo-dir ref)))
+            (fetch-module-using-remote remote module-name url repo-dir)))
         ;; HEAD option summary:            unsch  HEAD  head  wtree
         ;;  - restore HEAD&head
         ;;    f-m-u-r
@@ -264,7 +261,7 @@ using URL within the REMOTE to the latest version available from it."
         (ensure-clean-repository (repository-policy-value :unsaved-changes-postwrite))
         ;; stay here, move with branch, move to desir0op
         (when (repository-policy-value :drive-head)
-          (if drive-head-branch
+          (if drive-head-branch-p
               (git-set-branch-index-tree remote-ref)
               (git-set-head-index-tree desire-op-ref)))
         (when (repository-policy-value :reapply-stash)
