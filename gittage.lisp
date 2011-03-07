@@ -651,22 +651,24 @@ in a temporary pseudo-commit."
                                                 (dotgit (dotgit path))
                                                 (*repository* path))
   (with-directory (path :if-does-not-exist :create)
-    (handler-bind ((error (lambda (c)
-                            (declare (ignore c))
-                            ;; Maintain the no-useless-directories-added invariant.
-                            ;; non-negotiable
-                            (when (and (directory-created-p)
-                                       (not (directory-has-git-objects-p dotgit)))
-                              (fad:delete-directory-and-files path))
-                            #| Continue signalling. |#)))
-      (let ((effectively-new (or (directory-created-p)
-                                 (directory-empty-p path))))
-        (unless (or effectively-new
-                    (directory-has-git-objects-p dotgit))
-          (ecase (repository-policy-value :preexisting-gitless)
-            (:error     (error 'empty-repository :pathname path))
-            (:take-over nil)))
-        (funcall fn effectively-new)))))
+    (with-repository-policy (when (directory-created-p)
+                              :new-repo)
+      (handler-bind ((error (lambda (c)
+                              (declare (ignore c))
+                              ;; Maintain the no-useless-directories-added invariant.
+                              ;; non-negotiable
+                              (when (and (directory-created-p)
+                                         (not (directory-has-git-objects-p dotgit)))
+                                (fad:delete-directory-and-files path))
+                              #| Continue signalling. |#)))
+        (let ((effectively-new (or (directory-created-p)
+                                   (directory-empty-p path))))
+          (unless (or effectively-new
+                      (directory-has-git-objects-p dotgit))
+            (ecase (repository-policy-value :preexisting-gitless)
+              (:error     (error 'empty-repository :pathname path))
+              (:take-over nil)))
+          (funcall fn effectively-new))))))
 
 (defmacro with-git-repository-write-access ((new-repo-p) path &body body)
   `(invoke-with-git-repository-write-access ,path (lambda (,new-repo-p) ,@body)))
