@@ -251,7 +251,10 @@ The lists of pathnames returned have following semantics:
 (defvar *repository-policy*         *default-repository-policy*)
 
 (defun invoke-with-repository-policy (policy fn)
-  (let ((*repository-policy* (coerce-to-repository-policy policy)))
+  (let ((*repository-policy* (if policy
+                                 (coerce-to-repository-policy policy)
+                                 (or *repository-policy*
+                                     (error "~@<Cannot bind *REPOSITORY-POLICY* to NIL.~:@>")))))
     (funcall fn)))
 
 (defmacro with-repository-policy (policy &body body)
