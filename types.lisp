@@ -1080,9 +1080,9 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defvar *attempting-git-fetch-recovery* nil)
 
-(defun git-fetch-remote (remote module-name &optional directory)
+(defun git-fetch-remote (remote module-name &optional (directory *repository*))
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
-  (maybe-within-directory directory
+  (with-git-repository-write-access (_) directory
     (with-condition-recourses error (with-gitremote ((name remote) :url (url remote module-name))
                                       (fetch-gitremote (name remote)))
       (:retry-with-http (c)
