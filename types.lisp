@@ -1434,7 +1434,7 @@ value is returned."
 
 (defmacro within-wishmaster-meta ((wishmaster branch &key update-p) &body body)
   (once-only (wishmaster)
-    `(within-directory ((meta *self*))
+    `(with-git-repository-write-access (_) (meta *self*)
        ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
        (with-branch-change ((make-remote-ref (down-case-name ,wishmaster) ,branch) :master)
          ,@body))))
