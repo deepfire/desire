@@ -20,20 +20,7 @@
 
 (in-package :desire)
 
-;;;;
-;;;; Fundamentals
-;;;;
 (defparameter *desire-version* "10.1.1")
-
-(defun canonicalise-name (name &optional preserve-case (package (load-time-value (find-package :desire))))
-  "Given an object's NAME, whether in form of a string, keyword or a symbol
-in any other package, return the canonical name, as a symbol in the
-'DESIRE' package.."
-  (intern (xform (not preserve-case) #'string-upcase
-                 (etypecase name
-                   (symbol (symbol-name name))
-                   (string name)))
-          package))
 
 ;;;
 ;;; Knobs
