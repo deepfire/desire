@@ -126,7 +126,8 @@ variable.")
         (init-git-repo *repository*))
     ;; We ignore exit status, as, sadly, it's not informative.
     ;; Thankfully, git-fast-import is pretty reliable.
-    (let ((*executable-standard-output* nil))
+    (let ((*executable-standard-output* nil)
+          (*executable-error-output* nil))
       (pipe (darcs-fast-export from-repo-dir)
             (git *repository* "fast-import"))))
   (:method ((o hg-locality) name from-repo-dir)

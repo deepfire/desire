@@ -341,7 +341,7 @@
     (setf pipe (make-pipe-stream :element-type 'character :buffering :none))
     (with-input-from-string (stream (compile-shell-command commands))
       (with-executable-input-stream stream
-        (let ((*executable-standard-output-direction* pipe))
+        (let ((*executable-standard-output* pipe))
           (setf process (with-asynchronous-execution
                           (ssh `(,(cred-username credentials) "@" ,(cred-hostname credentials)) "bash" "-s"))))))
     (close (two-way-stream-output-stream pipe))))
