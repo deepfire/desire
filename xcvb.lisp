@@ -20,10 +20,6 @@
 
 (in-package :desire)
 
-
-(defvar *xcvbifier-base-uri* "http://common-lisp.net/project/xcvb/releases/patches/")
-(defvar *xcvbifiable-module-set* '())
-
 (defun git-apply-diff (filename &optional (directory *repository*) (add-to-index t) (error-on-failure t))
   (multiple-value-bind (successp output) (with-explanation ("applying gitdiff ~S in ~S" filename directory)
                                            (with-shell-predicate

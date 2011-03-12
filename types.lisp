@@ -20,53 +20,6 @@
 
 (in-package :desire)
 
-(defparameter *desire-version* "10.1.1")
-
-;;;
-;;; Knobs
-;;;
-(defvar *default-bootstrap-wishmaster-name*        "git.feelingofgreen.ru")
-(defvar *bootstrap-wishmaster*                     nil
-  "This variable, during bootstrap (only if applicable), is set to the
-wishmaster we've bootstrapped from.")
-(defvar *default-bootstrap-wishmaster-http-suffix* "shared/src/")
-(defvar *desires*                                  nil "List of import descriptions.")
-(defvar *default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
-(defvar *default-publishable*                      t   "Whether to publish GIT repositories by default.")
-(defvar *self*                                     nil "Possibly unknown distributor whom we identify as.")
-(defvar *combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
-(defvar *default-system-type*                      'asdf-system)
-(defvar *merge-remote-wishmasters*                 t   "Whether to merge definitions from remote wishmasters.")
-(defvar *verbose-repository-maintenance*           nil)
-
-;;;
-;;; Globals
-;;;
-(defvar *distributors*       (make-hash-table :test #'equal) "Map distributor names to remotes.")
-(defvar *remotes*            (make-hash-table :test #'equal) "Map remote names to remotes.")
-(defvar *localities*         (make-hash-table :test #'equal) "Map names to localities.")
-(defvar *localities-by-path* (make-hash-table :test #'equal) "Map paths to localities.")
-(defvar *modules*            (make-hash-table :test #'equal) "Map module names to modules.")
-(defvar *leaves*             (make-hash-table :test #'equal) "Map module names to leaf modules.")
-(defvar *nonleaves*          (make-hash-table :test #'equal) "Map module names to nonleaf modules.")
-(defvar *systems*            (make-hash-table :test #'equal) "Map system names to remotes.")
-(defvar *apps*               (make-hash-table :test #'equal) "Map application names to remotes.")
-
-(defparameter *implementation-provided-system-names*
-  #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-CLTL2" "SB-COVER" "SB-EXECUTABLE" "SB-GROVEL"
-           "SB-INTROSPECT" "SB-MD5" "SB-POSIX" "SB-QUEUE" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS" "SB-SPROF")
-  #-sbcl nil)
-
-(defvar *unsaved-definition-changes-p* nil
-  "Whether the idea about the world changed, since INIT was performed, or
-SAVE-DEFINITIONS was called.")
-
-(defun clear-definitions ()
-  "Empty all global definitions."
-  (dolist (var '(*distributors* *remotes* *localities* *localities-by-path* *modules* *leaves* *nonleaves* *systems* *apps*))
-    (setf (symbol-value var) (make-hash-table :test #'equal)))
-  (values))
-
 ;;;;
 ;;;; Base
 ;;;;
@@ -80,6 +33,21 @@ SAVE-DEFINITIONS was called.")
    "Return a short string identifying O.")
   (:method ((o desirable))
     (format nil "<~A ~S>" (type-of o) (name o))))
+
+;;; CLASS-SLOT
+(define-root-container *class-slot-store* %class-slot :type t :if-exists :continue)
+
+(defun class-slot (&rest class-slot-name)
+  (%class-slot class-slot-name))
+
+(defun set-class-slot (class-name slot-name value)
+  (setf (%class-slot (list class-name slot-name)) value))
+
+(defsetf class-slot set-class-slot)
+
+(defmacro with-class-slot (classes slot-name &body body)
+  `(symbol-macrolet ,(iter (for class in classes) (collect `(,class (class-slot ',class ',slot-name))))
+     ,@body))
 
 ;;;;
 ;;;; Distributor
@@ -142,9 +110,6 @@ SAVE-DEFINITIONS was called.")
 ;;;;
 (defclass vcs-type-mixin () ((vcs-type :reader vcs-type :initarg :vcs-type)))
 (defmethod vcs-type ((s symbol)) nil)
-
-(defvar *supported-vcs-types* '(git hg darcs cvs svn tarball))
-(defvar *gate-vcs-type* 'git)
 
 (defclass wrinkle-mixin ()
   ((wrinkles :accessor wrinkles :initarg :wrinkles))
@@ -303,12 +268,6 @@ the DESIRE protocol) which holds (and possibly exports) converted modules."))
 
 (defstruct (host-access (:include credentials) (:conc-name cred-) (:constructor make-host-access (name &key hostname username password)))
   (hostname (definition-error "~@<Won't create a host-access credential without a hostname.~:@>") :type string))
-
-(defvar *credentials* (alist-hash-table `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous :username "anonymous" :password "anonymous"))
-                                          (anonymous-empty     . ,(make-cred 'anonymous-empty :username "anonymous" :password nil))
-                                          (cvspublic-cvspublic . ,(make-cred 'cvspublic-cvspublic :username "cvspublic" :password "cvspublic")))
-                                        :test #'equal)
-  "Credentials, by name. Not intended to be secure.")
 
 (defun credentials-match-p (credentials username password)
   "Determine whether supplied USERNAME and PASSWORD match CREDENTIALS."
@@ -1065,8 +1024,6 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
         ,@(unless condition `((declare (ignore ,condition-sym))))
         ,@handler-body))))
 
-(defvar *attempting-git-fetch-recovery* nil)
-
 (defun git-fetch-remote (remote module-name &optional (directory *repository*))
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (with-git-repository-write-access (_) directory
@@ -1100,6 +1057,9 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
         :report "Skip processing this module, marking it as having failed the operation."
         (funcall handle-fn)
         (return-from invoke-operating-on-module nil)))))
+
+(defun current-module ()
+  *module*)
 
 (defmacro with-module (module form &body handle-body)
   "Evaluate FORM within dynamic context, where *MODULE* is bound to

@@ -21,11 +21,6 @@
 (in-package :desire)
 
 
-(defparameter *vcs-appendage-types* '(darcs hg))
-(defvar       *bootstrap-time-component-names* nil
-  "Populated by the linearised bootstrap (see LINEARISE-SELF),
-for the purpose of INIT-time download and registration of already-loaded components.")
-
 (defun source-hub-location-p (directory)
   (some (lambda (x) (directory-exists-p (merge-pathnames x directory)))
         '("alexandria/" "cl-ppcre/" "cffi/" "desire/" "iterate/")))
@@ -156,7 +151,7 @@ locally present modules will be marked as converted."
            (meta-path (merge-pathnames #p".meta/" gate-path))
            (localmeta-path (merge-pathnames #p".local-meta/" gate-path))
            (need-bootstrap-p (not (metastore-present-p meta-path '(definitions)))))
-      (clear-definitions)
+      (setup-default-global-state)
       ;;
       ;; Set up tools
       ;;
@@ -295,7 +290,7 @@ locally present modules will be marked as converted."
 without losing *SELF*.
 This is a complex operation, because not losing *SELF* implies that we have
 to patch the newfangled world according to that."
-  (clear-definitions)
+  (initialize-domain)
   (when reset-metastore
     (reset-metastore))
   (read-definitions :force-source t)

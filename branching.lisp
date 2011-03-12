@@ -21,31 +21,6 @@
 (in-package :desire)
 
 
-(defvar *follow-upstream* t
-  "Whether HEAD in local repositories should be tracking upstream, as long as
-either *DRIVE-GIT-MASTERS* or *DRIVE-GIT-MASTERS-MATCHING-TRACKERS* cause
-the master branches to be updated.
-Defaults to T.")
-
-(defvar *dirty-repository-behaviour* :reset
-  "Whenever a dirty repository comes up in a situation which requires
-a clean one to proceed, do accordingly to the value of this variable:
-  :RESET  -  reset the dirty repository, losing unsaved changes,
-  :STASH  -  reset the dirty repository, stashing unsaved changes,
-  :ERROR  -  raise an error.
-Defaults to :RESET")
-
-(defvar *drive-git-masters* t
-  "Whether desire should be in control of the 'master' branches in modules
-natively git, essentially equating it to the 'tracker' branch.
-Defaults to T.")
-
-(defvar *drive-git-masters-matching-trackers* t
-  "Whether desire should be in control of the 'master' branches in modules
-natively git, when they match 'tracker' branches before module update,
-essentially equating it to the 'tracker' branch.
-Defaults to T.")
-
 (define-reported-condition patch-failure (repository-error)
   ((output :reader condition-output :initarg :output))
   (:report (pathname output)

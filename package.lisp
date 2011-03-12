@@ -114,7 +114,7 @@
    ;;   types.lisp :: metastore
    #:reset-metastore
    ;;   types.lisp :: global UI
-   #:clear-definitions
+   #:initialise-domain
    #:entry
    #:init
    #:reload-definitions

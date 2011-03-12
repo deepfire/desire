@@ -20,10 +20,6 @@
 
 (in-package :desire)
 
-
-(defvar *verbose-internalisation* nil
-  "Whether to comment on the progress of matching provided URLs vs. candidate remotes.")
-
 (defun add-distributor (type hostname port path &key gate-p)
   "Make a distributor residing at HOSTNAME, with a remote of TYPE,
 accesible at PORT and PATH.

@@ -20,9 +20,6 @@
 
 (in-package :desire)
 
-
-(defvar *libcl-project-index* "http://libcl.com/libcl-current/index.html")
-
 (defun examine-libcl ()
   (let ((libcl-module-names (mapcar #'canonicalise-name (extract-delimited-substrings (get-url-contents-as-string *libcl-project-index*)
                                                                                       "<tr><td>" #\<))))

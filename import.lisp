@@ -21,12 +21,6 @@
 (in-package :desire)
 
 
-(defvar *fetch-errors-serious* nil
-  "Whether to raise an error when external executables fail to fetch modules during LUST, DESIRE or UPDATE.
-Defaults to NIL.")
-
-(defvar *hg-to-git-location* #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py")
-
 (define-reported-condition fetch-failure (module-error remote-error)
   ((execution-error :reader condition-execution-error :initarg :execution-error))
   (:report (remote module execution-error)

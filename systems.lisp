@@ -20,10 +20,6 @@
 
 (in-package :desire)
 
-(defvar *system-pathname-typemap* '(("asd" . asdf-system) ("mb" . mudball-system) ("xcvb" . xcvb-system))
-  "The mapping between SYSTEM subclasses and definition pathname types.")
-(defparameter *asdf-system-blacklist* '("cffi-tests" "trivial-features-tests"))
-
 (defun system-type-to-file-type (type)
   (or (car (rassoc type *system-pathname-typemap* :test #'eq))
       (desire-error "~@<Unknown system type ~S.~:@>" type)))
@@ -48,8 +44,6 @@
 ;;;;
 ;;;; Generic
 ;;;;
-(defvar *source-registry-update-pending* nil)
-
 (defun invoke-with-source-registry-change (type fn)
   (unwind-protect (let ((*source-registry-update-pending* t))
                     (funcall fn))

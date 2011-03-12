@@ -21,8 +21,6 @@
 (in-package :desire)
 
 
-(defvar *http-proxy*                               nil)
-
 (define-executable (%git git)
     :may-want-display t
     :fixed-environment ("HOME=/tmp" "PAGER=/bin/cat" (when *http-proxy*
@@ -214,41 +212,7 @@ The lists of pathnames returned have following semantics:
 (defun make-repository-policy (name &rest initargs)
   (apply #'make-instance 'repository-policy :name name (remove-from-plist initargs :name)))
 
-(defparameter *repository-policies*
-  (alist-hash-table
-   `((:default .  ,(make-repository-policy
-                    :default
-                    :unsaved-changes           :stash
-                    :unsaved-changes-postwrite :stash
-                    :missing-master            :create-on-head
-                    :preexisting-gitless       :take-over
-                    :drive-head                nil
-                    :drive-head-branch         nil
-                    :reapply-stash             nil))
-     (:new-repo . ,(make-repository-policy
-                    :new-repo
-                    :unsaved-changes           :error
-                    :unsaved-changes-postwrite :stash
-                    :missing-master            :error
-                    :preexisting-gitless       :error
-                    :drive-head                t
-                    :drive-head-branch         t
-                    :reapply-stash             nil))
-     (:cautious . ,(make-repository-policy
-                    :cautious
-                    :unsaved-changes           :error
-                    :unsaved-changes-postwrite :stash
-                    :missing-master            :error
-                    :preexisting-gitless       :error
-                    :drive-head                nil
-                    :drive-head-branch         nil
-                    :reapply-stash             t)))
-   :test 'eq))
-
 (define-root-container *repository-policies* repository-policy :key-type symbol :coercer t)
-
-(defvar *default-repository-policy* (repository-policy :default))
-(defvar *repository-policy*         *default-repository-policy*)
 
 (defun invoke-with-repository-policy (policy fn)
   (let ((*repository-policy* (if policy

@@ -20,9 +20,6 @@
    ;; MINI-CLOSER
    #:class-prototype
    #:finalize-inheritance
-   ;; CLASS-SLOT
-   #:define-marked-class #:instance-class-marked-value
-   #:class-slot #:set-class-slot #:with-class-slot
    ;; Decoded time
    #:print-decoded-time
    ;;; encumbered
@@ -147,24 +144,6 @@ REGISTERED, in the mixing-in class precedence list, which provides the
     (ccl:finalize-inheritance o)
     #-(or sbcl ccl)
     (not-implemented 'FINALIZE-INHERITANCE)))
-;;;;
-;;;; CLASS-SLOT
-;;;;
-(defvar *class-slot-store* (make-hash-table :test 'equal))
-
-(define-root-container *class-slot-store* %class-slot :type t :if-exists :continue)
-
-(defun class-slot (&rest class-slot-name)
-  (%class-slot class-slot-name))
-
-(defun set-class-slot (class-name slot-name value)
-  (setf (%class-slot (list class-name slot-name)) value))
-
-(defsetf class-slot set-class-slot)
-
-(defmacro with-class-slot (classes slot-name &body body)
-  `(symbol-macrolet ,(iter (for class in classes) (collect `(,class (class-slot ',class ',slot-name))))
-     ,@body))
 
 ;;;
 ;;; Decoded time

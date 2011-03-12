@@ -18,23 +18,25 @@
                ;; Tier #
                (:file "package" :depends-on ("dependencies"))
                ;; Tier 0
-               (:file "gittage" :depends-on ("package"))
+               (:file "state" :depends-on ("package"))
                ;; Tier 1
-               (:file "metastore" :depends-on ("gittage"))
+               (:file "gittage" :depends-on ("state"))
                ;; Tier 2
-               (:file "types" :depends-on ("metastore"))
+               (:file "metastore" :depends-on ("gittage"))
                ;; Tier 3
+               (:file "types" :depends-on ("metastore"))
+               ;; Tier 4
                (:file "branching" :depends-on ("types"))
                (:file "export" :depends-on ("types"))
                (:file "names" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
                (:file "systems" :depends-on ("types"))
-               ;; Tier 4
-               (:file "modules" :depends-on ("branching" "systems"))
                ;; Tier 5
+               (:file "modules" :depends-on ("branching" "systems"))
+               ;; Tier 6
                (:file "import" :depends-on ("modules"))
                (:file "init" :depends-on ("print-read" "names" "modules" "export"))
-               ;; Tier 6
+               ;; Tier 7
                (:file "recursor" :depends-on ("import" "init"))
                ;; Tier at-the-end-of-it-all
                (:file "add-module" :depends-on ("types"))

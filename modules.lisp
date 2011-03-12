@@ -21,11 +21,6 @@
 (in-package :desire)
 
 
-(defvar *internal-module-names*
-  (mapcar #'canonicalise-name
-          '(".META" ".LOCAL-META"))
-  "The list of module names reserved to desire itself.")
-
 (define-reported-condition module-systems-unloadable-error (module-error)
   ((systems :reader condition-systems :initarg :systems))
   (:report (module systems)
@@ -282,7 +277,7 @@ meets desire's operational requirements.")
   `(let (,failed-modules)
      (handler-bind ((error (lambda (c)
                              (assert (boundp '*module*))
-                             (push (list *module* c) ,failed-modules)
+                             (push (list (get-current-module) c) ,failed-modules)
                              (invoke-restart (find-restart 'skip-module)))))
        ,@body)))
 
