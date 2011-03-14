@@ -72,8 +72,9 @@
 (defun pseudo-booted-entry (&rest args &key &allow-other-keys)
   (%booted-entry (mapcar #'name
                          (remove-duplicates
-                          (iter (for sysname = (backend-system-load-list (system :desire)))
-                                (collect (system-module (system sysname))))))
+                          (iter (for sysname in (backend-system-load-list (system :desire)))
+                                (when-let ((module (system-module (system sysname))))
+                                  (collect module)))))
                  (list* :pseudo t args)))
 
 (defun %booted-entry (bootstrap-modules args)
@@ -131,7 +132,7 @@
              as
              (root *default-pathname-defaults* path-specified-p)
              (bootstrap-name *default-bootstrap-wishmaster-name*)
-             bootstrap-components
+             bootstrap-modules
              bootstrap-url
              http-proxy
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
@@ -236,13 +237,13 @@ locally present modules will be marked as converted."
         ;;
         ;; Finish bootstrap
         ;;
-        (when-let ((systems (mapcar #'system bootstrap-components)))
+        (when-let ((systems (mapcar #'system bootstrap-modules)))
           (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
           (dolist (m (remove-duplicates (mapcar #'system-module systems)))
             (update m))))
       ;; ..finish finishing..
       #+asdf
-      (mapc (compose #'mark-system-loaded #'system) bootstrap-components)
+      (mapc (compose #'mark-system-loaded #'system) bootstrap-modules)
       (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
       (register-locality-with-system-backend *default-system-type* (gate *self*))
       ;;
