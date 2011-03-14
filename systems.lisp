@@ -189,6 +189,24 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
              (asdf:missing-dependency (c)
                (try-recover-system (asdf::missing-requires c)))))))))
 
+(defgeneric backend-system-component-load-list (system)
+  (:documentation
+   "Return an ordered list of abstract system components, loading
+which effects in SYSTEM being loaded.")
+  (:method ((o asdf-system))
+    (mapcar #'cdr
+            (remove-if-not (of-type 'asdf:load-op)
+                           (asdf::traverse (make-instance 'asdf:load-op :force :all)
+                                           (asdf:find-system (name o)))
+                           :key #'car))))
+
+(defgeneric backend-system-load-list (system)
+  (:documentation
+   "Return an ordered list of system names, denoting systems which
+must be loaded as part of loading SYSTEM.")
+  (:method ((o asdf-system))
+    (mapcar #'asdf:component-name (remove-if-not (of-type 'asdf:system) (backend-system-component-load-list o)))))
+
 ;;;;
 ;;;; Dependencies
 ;;;;
