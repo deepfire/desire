@@ -505,15 +505,6 @@ When SEAL-P is non-NIL, the changes are committed."
 (defparameter *early-components*
   '("command-line-arguments"))
 
-(defun self-spectacle ()
-  "What is needed to be done, in order to load self?"
-  #+asdf
-  (mapcar #'cdr
-          (remove-if-not (of-type 'asdf:load-op)
-                         (asdf::traverse (make-instance 'asdf:load-op :force :all)
-                                         (asdf:find-system :desire))
-                         :key #'car)))
-
 (defun component-parent      (x) #+asdf (asdf:component-parent x))
 (defun component-name        (x) #+asdf (asdf:component-name x))
 (defun component-filename    (x) #+asdf (asdf:component-pathname x))
@@ -679,9 +670,7 @@ bootstrap-geared, single-file form of desire.")
   (unless *quiet*
     (format t ", booted in ~4F seconds~%"
             (coerce (/ (- (get-internal-real-time) *started*) internal-time-units-per-second) 'float)))
-  (setf (symbol-value (find-symbol "*BOOTSTRAP-TIME-COMPONENT-NAMES*" :desire))
-        component-names)
-  (funcall (find-symbol "ENTRY" :desire)))
+  (funcall (find-symbol "BOOTED-ENTRY" :desire) component-names))
 
 (defun linearise-self (&optional (filename (merge-pathnames #p"self.lisp" (meta *self*))))
   (flet ((to-stringer (xs)
@@ -698,7 +687,7 @@ bootstrap-geared, single-file form of desire.")
                    (collect "(desire-boot:update-progress)")))))
     (let* ((*package* (find-package :desire))
            (*print-case* :downcase)
-           (spectacle (self-spectacle))
+           (spectacle (backend-system-component-load-list (system :desire)))
            (spectacle-source-components (remove-if-not #'relevant-source-component-p spectacle)))
       (multiple-value-bind (early-loaded loaded late) (iter (for c in spectacle-source-components)
                                                             (cond ((source-component-early-p c)  (collect c into early-loaded))

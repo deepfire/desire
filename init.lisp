@@ -62,48 +62,61 @@
 ;;;
 ;;; Entry
 ;;;
-(defun entry (&aux (option-spec *option-spec*))
-  (let ((args (command-line-arguments:process-command-line-options
-               option-spec
-               #+(or sbcl clisp) (command-line-arguments:get-command-line-arguments)
-               #-(or sbcl clisp) nil)))
-    (destructuring-bind (&key help version
-                              app system module
-                              bot-phases
-                              break-on-signals verbose
-                              &allow-other-keys) args
-      (cond ((or help version)
-             (cond (help    (command-line-arguments:show-option-help option-spec))
-                   (version (syncformat t "desire package management substrate bootstrap sequence, version ~A.~%" *desire-version*)))
-             (e.0:quit))
-            (t
-             (let ((*break-on-signals* (when break-on-signals 'error)))
-               (apply #'init (remove-from-plist args
-                                                :help :version
-                                                :app :system :module
-                                                :bot-phases
-                                                :break-on-signals
-                                                :debug))
-               (let* ((app (app app :if-does-not-exist :continue))
-                      (systems (append (when app    (list (app-system app)))
-                                       (when system (ensure-list (system system :if-does-not-exist :continue)))))
-                      (bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
-                      (modules (append (when system (list (system-module system)))
-                                       (when module (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue))
-                                                                        (split-sequence:split-sequence #\Space module :remove-empty-subseqs t))))))
-                      (desire (append (ensure-list app) (ensure-list system) (ensure-list module))))
-                 (when (and desire (not modules))
-                   (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
-                          desire))
-                 (when modules
-                   (get modules :verbose verbose :skip-present t)
-                   #+nil
-                   (if phases
-                       (buildslave modules phases verbose)
-                       (get modules :verbose verbose :skip-present t)))
-                 (mapc (rcurry #'loadsys :verbose verbose) systems)
-                 (when app
-                   (run app)))))))))
+(defun booted-entry (bootstrap-components)
+  (%booted-entry bootstrap-components
+                 (command-line-arguments:process-command-line-options
+                  *option-spec*
+                  #+(or sbcl clisp) (command-line-arguments:get-command-line-arguments)
+                  #-(or sbcl clisp) nil)))
+
+(defun pseudo-booted-entry (&rest args &key &allow-other-keys)
+  (%booted-entry (mapcar #'name
+                         (remove-duplicates
+                          (iter (for sysname = (backend-system-load-list :desire))
+                                (collect (system-module (system sysname))))))
+                 args))
+
+(defun %booted-entry (bootstrap-modules args)
+  "A factored bootstrap entry function for slime-friendly operation."
+  (destructuring-bind (&key help version
+                            app system module
+                            bot-phases
+                            break-on-signals verbose
+                            &allow-other-keys) args
+    (cond ((or help version)
+           (cond (help    (command-line-arguments:show-option-help *option-spec*))
+                 (version (syncformat t "desire package management substrate bootstrap sequence, version ~A.~%" *desire-version*)))
+           (e.0:quit))
+          (t
+           (let ((*break-on-signals* (when break-on-signals 'error)))
+             (apply #'init
+                    :bootstrap-modules bootstrap-modules
+                    (remove-from-plist args
+                                       :help :version
+                                       :app :system :module
+                                       :bot-phases
+                                       :break-on-signals
+                                       :debug))
+             (let* ((app (app app :if-does-not-exist :continue))
+                    (systems (append (when app    (list (app-system app)))
+                                     (when system (ensure-list (system system :if-does-not-exist :continue)))))
+                    (bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
+                    (modules (append (when system (list (system-module system)))
+                                     (when module (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue))
+                                                                      (split-sequence:split-sequence #\Space module :remove-empty-subseqs t))))))
+                    (desire (append (ensure-list app) (ensure-list system) (ensure-list module))))
+               (when (and desire (not modules))
+                 (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
+                        desire))
+               (when modules
+                 (get modules :verbose verbose :skip-present t)
+                 #+nil
+                 (if phases
+                     (buildslave modules phases verbose)
+                     (get modules :verbose verbose :skip-present t)))
+               (mapc (rcurry #'loadsys :verbose verbose) systems)
+               (when app
+                 (run app))))))))
 
 (defun maybe-yes-or-no-p (bool format-control &rest args)
   (or (when bool
@@ -117,6 +130,7 @@
              as
              (root *default-pathname-defaults* path-specified-p)
              (bootstrap-name *default-bootstrap-wishmaster-name*)
+             bootstrap-components
              bootstrap-url
              http-proxy
              (wishmaster-http-suffix *default-bootstrap-wishmaster-http-suffix*)
@@ -221,14 +235,13 @@ locally present modules will be marked as converted."
         ;;
         ;; Finish bootstrap
         ;;
-        (when-let ((systems (mapcar #'system *bootstrap-time-component-names*)))
+        (when-let ((systems (mapcar #'system bootstrap-components)))
           (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
           (dolist (m (remove-duplicates (mapcar #'system-module systems)))
             (update m))))
       ;; ..finish finishing..
       #+asdf
-      (mapc (compose #'mark-system-loaded #'system) *bootstrap-time-component-names*)
-      (setf *bootstrap-time-component-names* nil)
+      (mapc (compose #'mark-system-loaded #'system) bootstrap-components)
       (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
       (register-locality-with-system-backend *default-system-type* (gate *self*))
       ;;

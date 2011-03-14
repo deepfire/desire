@@ -75,12 +75,11 @@ wishmaster we've bootstrapped from.")
             "SB-INTROSPECT" "SB-MD5" "SB-POSIX" "SB-QUEUE" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS" "SB-SPROF")
    #-sbcl nil)
   (*libcl-project-index*            "http://libcl.com/libcl-current/index.html")
-  (*hg-to-git-location*             #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py"))
+  (*hg-to-git-location*             #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py")
+  (*xcvbifier-base-uri*             "http://common-lisp.net/project/xcvb/releases/patches/")
+  (*xcvbifiable-module-set*         '()))
 
 (define-variable-set assorted-globals
-  (*bootstrap-time-component-names* nil
-    "Populated by the linearised bootstrap (see LINEARISE-SELF),
-for the purpose of INIT-time download and registration of already-loaded components.")
   (*unsaved-definition-changes-p*   nil
     "Whether the idea about the world changed, since INIT was performed,
 or SAVE-DEFINITIONS was called.")
