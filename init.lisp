@@ -72,7 +72,7 @@
 (defun pseudo-booted-entry (&rest args &key &allow-other-keys)
   (%booted-entry (mapcar #'name
                          (remove-duplicates
-                          (iter (for sysname = (backend-system-load-list :desire))
+                          (iter (for sysname = (backend-system-load-list (system :desire)))
                                 (collect (system-module (system sysname))))))
                  (list* :pseudo t args)))
 
