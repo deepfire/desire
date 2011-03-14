@@ -237,9 +237,9 @@ locally present modules will be marked as converted."
         ;;
         ;; Finish bootstrap
         ;;
-        (when-let ((systems (mapcar #'system bootstrap-modules)))
+        (when bootstrap-modules
           (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
-          (dolist (m (remove-duplicates (mapcar #'system-module systems)))
+          (dolist (m bootstrap-modules)
             (update m))))
       ;; ..finish finishing..
       #+asdf
