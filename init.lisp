@@ -74,11 +74,11 @@
                          (remove-duplicates
                           (iter (for sysname = (backend-system-load-list :desire))
                                 (collect (system-module (system sysname))))))
-                 args))
+                 (list* :pseudo t args)))
 
 (defun %booted-entry (bootstrap-modules args)
   "A factored bootstrap entry function for slime-friendly operation."
-  (destructuring-bind (&key help version
+  (destructuring-bind (&key help version pseudo
                             app system module
                             bot-phases
                             break-on-signals verbose
@@ -86,13 +86,14 @@
     (cond ((or help version)
            (cond (help    (command-line-arguments:show-option-help *option-spec*))
                  (version (syncformat t "desire package management substrate bootstrap sequence, version ~A.~%" *desire-version*)))
-           (e.0:quit))
+           (unless pseudo
+             (e.0:quit)))
           (t
            (let ((*break-on-signals* (when break-on-signals 'error)))
              (apply #'init
                     :bootstrap-modules bootstrap-modules
                     (remove-from-plist args
-                                       :help :version
+                                       :help :version :pseudo
                                        :app :system :module
                                        :bot-phases
                                        :break-on-signals
