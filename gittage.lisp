@@ -248,19 +248,22 @@ The lists of pathnames returned have following semantics:
 ;;;
 ;;; Config variables
 ;;;
-(defun gitvar (var &optional (directory *repository*))
+(defun gitvar (var &optional directory)
   (declare (type symbol var))
   (with-executable-options (:explanation `("getting value of git variable ~A" ,(symbol-name var))
                             :output :capture)
-    (multiple-value-bind (setp output) (with-shell-predicate (git directory "config" (string-downcase (symbol-name var))))
+    (multiple-value-bind (setp output) (with-shell-predicate (git (or directory ".") "config"
+                                                                  (unless directory "--global")
+                                                                  (string-downcase (symbol-name var))))
       (when setp
         (string-right-trim '(#\Return #\Newline) output)))))
 
-(defun (setf gitvar) (val var &optional (directory *repository*) globalp)
+(defun (setf gitvar) (val var &optional directory)
   (declare (type symbol var) (type string val))
   (with-explanation ("setting git variable ~A to ~A" (symbol-name var) val)
-    (apply #'git directory "config"
-           (xform globalp (curry #'cons "--global") (list "--replace-all" (string-downcase (symbol-name var)) val)))))
+    (git (or directory ".") "config"
+         (unless directory "--global") "--replace-all"
+         (string-downcase (symbol-name var)) val)))
 
 ;;;
 ;;; Remotes

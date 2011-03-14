@@ -32,10 +32,10 @@
   directory)
 
 (defun ensure-committer-identity ()
-  (unless (gitvar 'user.name ".")
+  (unless (gitvar 'user.name)
     (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
       (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
-      (setf (gitvar 'user.name "." t) username))))
+      (setf (gitvar 'user.name) username))))
 
 (defgeneric try-ensure-importer-executable (type)
   (:method :around (o)
