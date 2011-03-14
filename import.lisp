@@ -252,7 +252,7 @@ using URL within the REMOTE to the latest version available from it."
         ;;    f-m-u-r and apply
         ;;    - try merge unsaved changes  stash  head  ffor  stapp  ; reasonable?
         ;;    - ignore unsaved changes     ???    head  ffor  reset
-        (git-update-ref desire-op-ref remote-ref)
+        (git *repository* "update-ref" desire-op-ref remote-ref)
         (ensure-clean-repository (repository-policy-value :unsaved-changes-postwrite))
         ;; stay here, move with branch, move to desir0op
         (when (repository-policy-value :drive-head)

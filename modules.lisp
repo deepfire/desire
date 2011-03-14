@@ -277,7 +277,7 @@ meets desire's operational requirements.")
   `(let (,failed-modules)
      (handler-bind ((error (lambda (c)
                              (assert (boundp '*module*))
-                             (push (list (get-current-module) c) ,failed-modules)
+                             (push (list (current-module) c) ,failed-modules)
                              (invoke-restart (find-restart 'skip-module)))))
        ,@body)))
 
