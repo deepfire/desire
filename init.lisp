@@ -70,6 +70,7 @@
                   #-(or sbcl clisp) nil)))
 
 (defun pseudo-booted-entry (boot-root &rest args &key root &allow-other-keys)
+  (set-posix-working-directory root)
   (init :root boot-root)
   (set-posix-working-directory root)
   (%booted-entry (mapcar #'name
