@@ -69,7 +69,9 @@
                   #+(or sbcl clisp) (command-line-arguments:get-command-line-arguments)
                   #-(or sbcl clisp) nil)))
 
-(defun pseudo-booted-entry (&rest args &key &allow-other-keys)
+(defun pseudo-booted-entry (boot-root &rest args &key root &allow-other-keys)
+  (init :root boot-root)
+  (set-posix-working-directory root)
   (%booted-entry (mapcar #'name
                          (remove-duplicates
                           (iter (for sysname in (backend-system-load-list (system :desire)))
