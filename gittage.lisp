@@ -572,7 +572,10 @@ in a temporary pseudo-commit."
 (defun ensure-clean-repository (if-changes &optional (directory *repository*))
   (with-retry-restarts ((hardreset-repository ()
                           :report "Clear all uncommitted changes, both staged and unstaged."
-                          (git-set-branch-index-tree nil directory)))
+                          (git-set-branch-index-tree nil directory))
+                        (stash-changes ()
+                          :report "Stash all uncommitted changes, both staged and unstaged."
+                          (git-stash directory)))
     (when (git-repository-changes-p directory)
       (ecase if-changes
         (:stash (git-stash directory))
