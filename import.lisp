@@ -69,53 +69,51 @@
   (:method ((o svn-http-remote) name)
     (touch-www-file (url o name))))
 
-(defvar *new-repository-p*)
 (defvar *source-remote*
   "ISSUE:LOCALITY-SOURCE-REMOTE-TRACKING")
 
-(defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname)
+(defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname initialp)
   (:documentation
    "Update the local repository, maybe creating it first.  Note that
 the provided directory is the final directory in the gate locality.")
   ;; ========================== branch model aspect =============================
-  (:method ((o git-remote) name url repo-dir)
+  (:method ((o git-remote) name url repo-dir initialp)
     "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
 Note that this method doesn't affect working tree, instead deferring that
 to the above :AROUND method."
-    (when *new-repository-p*
-      (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
+    (when initialp
+      (with-explanation ("initialising git repository of module ~A in ~S" name repo-dir)
         (init-git-repo repo-dir))
       (ensure-gitremote (name o) (url o name)))
     (git-fetch-remote o name))
-  (:method :around ((o nongit-mixin) name url repo-dir)
-    (unless *new-repository-p*
+  (:method :around ((o nongit-mixin) name url repo-dir initialp)
+    (unless initialp
       (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     (let ((master-val (ref-value '("master") nil)))
       (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
-  ;; direct fetch, non-git
-  (:method ((o hg-http-remote) name url repo-dir)
+  (:method ((o hg-http-remote) name url repo-dir initialp)
     (indirect-import-mercurial url repo-dir nil (module-pathname name (locality o))))
-  (:method ((o darcs-http-remote) name url repo-dir)
+  (:method ((o darcs-http-remote) name url repo-dir initialp)
     (indirect-import-darcs url repo-dir nil (module-pathname name (locality o))))
-  (:method ((o cvs-native-remote) name url repo-dir)
+  (:method ((o cvs-native-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
       (direct-import-cvs url repo-dir nil (or cvs-module-name (downstring name)))))
-  (:method ((o svn-direct) name url repo-dir)
+  (:method ((o svn-direct) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url *source-remote* name)
-      (direct-import-svn url repo-dir nil (or svn-module-name (downstring name)) *new-repository-p*)))
-  (:method ((o tarball-http-remote) name url-template repo-dir)
-    (direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when *new-repository-p*
+      (direct-import-svn url repo-dir nil (or svn-module-name (downstring name)) initialp)))
+  (:method ((o tarball-http-remote) name url-template repo-dir initialp)
+    (direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when initialp
                                                                                            (initial-tarball-version o))))
-  (:method ((o cvs-rsync-remote) name url repo-dir)
+  (:method ((o cvs-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o name)
       (indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
                            (or cvs-module-name (downstring name)) (cvs-locality-lock-path o))))
-  (:method ((o svn-rsync-remote) name url repo-dir)
+  (:method ((o svn-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url o name)
       (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
-                           (or svn-module-name (downstring name)) *new-repository-p*))))
+                           (or svn-module-name (downstring name)) initialp))))
 
 (defgeneric remote-import-takes-over-init (remote)
   (:documentation
@@ -130,7 +128,7 @@ using URL within the REMOTE to the latest version available from it."
   (with-error-resignaling
       ((executable-failure ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond)))
        (missing-executable ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond))))
-    (with-git-repository-write-access (*new-repository-p*
+    (with-git-repository-write-access (initial-import-p
                                        :if-repository-does-not-exist (if (remote-import-takes-over-init remote)
                                                                          :continue
                                                                          :create))
@@ -141,7 +139,7 @@ using URL within the REMOTE to the latest version available from it."
         (let ((*source-remote* remote))
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
                              module-name (transport remote) (vcs-type remote) url repo-dir)
-            (fetch-module-using-remote remote module-name url repo-dir)))
+            (fetch-module-using-remote remote module-name url repo-dir initial-import-p)))
         ;; HEAD option summary:            unsch  HEAD  head  wtree
         ;;  - restore HEAD&head
         ;;    f-m-u-r
