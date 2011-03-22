@@ -95,6 +95,10 @@ to the above :AROUND method."
       (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
   ;; direct fetch, non-git
+  (:method ((o hg-http-remote) name url repo-dir)
+    (indirect-import-mercurial url repo-dir nil (module-pathname name (locality o))))
+  (:method ((o darcs-http-remote) name url repo-dir)
+    (indirect-import-darcs url repo-dir nil (module-pathname name (locality o))))
   (:method ((o cvs-native-remote) name url repo-dir)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
       (direct-import-cvs url repo-dir nil (or cvs-module-name (downstring name)))))
@@ -104,12 +108,12 @@ to the above :AROUND method."
   (:method ((o tarball-http-remote) name url-template repo-dir)
     (direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when *new-repository-p*
                                                                                            (initial-tarball-version o))))
-  (:method ((o cvs-locality) name url repo-dir)
-    (multiple-value-bind (url cvs-module-name) (url *source-remote* name)
+  (:method ((o cvs-rsync-remote) name url repo-dir)
+    (multiple-value-bind (url cvs-module-name) (url o name)
       (indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
                            (or cvs-module-name (downstring name)) (cvs-locality-lock-path o))))
-  (:method ((o svn-locality) name url repo-dir)
-    (multiple-value-bind (url svn-module-name) (url *source-remote* name)
+  (:method ((o svn-rsync-remote) name url repo-dir)
+    (multiple-value-bind (url svn-module-name) (url o name)
       (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
                            (or svn-module-name (downstring name)) *new-repository-p*))))
 
