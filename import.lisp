@@ -113,21 +113,27 @@ to the above :AROUND method."
       (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
                            (or svn-module-name (downstring name)) *new-repository-p*))))
 
+(defgeneric remote-import-takes-over-init (remote)
+  (:documentation
+   "Whether a given remote requires an empty directory to initialise
+import.")
+  (:method ((o remote))     nil)
+  (:method ((o cvs-remote)) t))
+
 (defun update-module-using-remote (module-name remote url repo-dir)
   "Update the repository in REPO-DIR for the module with MODULE-NAME,
 using URL within the REMOTE to the latest version available from it."
   (with-error-resignaling
       ((executable-failure ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond)))
        (missing-executable ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond))))
-    (with-git-repository-write-access (*new-repository-p*) repo-dir
-      (ensure-clean-repository (repository-policy-value :unsaved-changes))
-      (let* ((old-head (get-head))
-             (desire-op-ref '("desire" "op"))
+    (with-git-repository-write-access (*new-repository-p*
+                                       :if-repository-does-not-exist (if (remote-import-takes-over-init remote)
+                                                                         :continue
+                                                                         :create))
+        repo-dir
+      (let* ((desire-op-ref '("desire" "op"))
              (remote-ref (make-remote-ref remote "master"))
-             (drive-head-branch-p (repository-policy-value :drive-head-branch))
-             (operating-ref (if drive-head-branch-p
-                                old-head
-                                desire-op-ref)))
+             (drive-head-branch-p (repository-policy-value :drive-head-branch)))
         (let ((*source-remote* remote))
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
                              module-name (transport remote) (vcs-type remote) url repo-dir)
