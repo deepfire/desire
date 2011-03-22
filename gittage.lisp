@@ -618,7 +618,8 @@ in a temporary pseudo-commit."
 ;;;;
 ;;;; Repository-level operations
 ;;;;
-(defun invoke-with-git-repository-write-access (path fn &aux
+(defun invoke-with-git-repository-write-access (path if-repository-does-not-exist if-gitless-nonempty
+                                                fn &aux
                                                 (dotgit (dotgit path))
                                                 (*repository* path))
   (with-directory (path :if-does-not-exist :create)
@@ -634,18 +635,28 @@ in a temporary pseudo-commit."
                               #| Continue signalling. |#)))
         (let ((effectively-new (or (directory-created-p)
                                    (directory-empty-p path))))
-          (unless (or effectively-new
-                      (directory-has-git-objects-p dotgit))
-            (ecase (repository-policy-value :preexisting-gitless)
-              (:error     (error 'empty-repository :pathname path))
-              (:take-over nil)))
+          (cond
+            (effectively-new
+             (ecase if-repository-does-not-exist
+               (:create    (git path "init"))
+               (:continue  nil)))
+            ((not (directory-has-git-objects-p dotgit))
+             (ecase if-gitless-nonempty
+               (:error     (error 'empty-repository :pathname path))
+               (:take-over nil)))
+            (t
+             (ensure-clean-repository (repository-policy-value :unsaved-changes))))
           (funcall fn effectively-new))))))
 
-(defmacro with-git-repository-write-access ((new-repo-p) path &body body)
+(defmacro with-git-repository-write-access ((new-repo-p &key
+                                                        (if-repository-does-not-exist :create)
+                                                        (if-gitless-nonempty '(repository-policy-value :preexisting-gitless)))
+                                            path &body body)
   (with-ignored-names ignores (_ new-repo-p)
-    `(invoke-with-git-repository-write-access ,path (lambda (,new-repo-p)
-                                                      ,@ignores
-                                                      ,@body))))
+    `(invoke-with-git-repository-write-access ,path ,if-repository-does-not-exist ,if-gitless-nonempty
+                                              (lambda (,new-repo-p)
+                                                ,@ignores
+                                                ,@body))))
 
 ;;;;
 ;;;; Queries
@@ -683,3 +694,104 @@ of the corresponding commit as multiple values."
     (declare (ignore successp))
     (when-let ((version (first (extract-delimited-substrings output "tag: upstream/" #\,))))
       (mapcar #'parse-integer (split-sequence #\. version)))))
+
+;;;;
+;;;; Import
+;;;;
+(defun direct-import-cvs (url to-repo target-ref cvs-module-name &aux (*repository* to-repo))
+  ;; -o ref -r remotes/ref/master
+  (git *repository* "cvsimport" "-d" url cvs-module-name))
+
+(defun direct-import-svn (url to-repo target-ref svn-module new-p &aux (*repository* to-repo))
+  (when new-p
+    (with-executable-options (:explanation `("setting up svn to git conversion: ~S => ~S" ,url ,to-repo))
+      (git to-repo "svn" "init" url svn-module)))
+  (git to-repo "svn" "fetch"))
+
+(defun direct-import-tarball (url-template to-repo target-ref temp-dir &optional tarball-version &aux
+                              (*repository* to-repo))
+  (flet ((determine-available-module-tarball-version-starting-after (url-template version &optional (search-depth 3))
+           ;; XXX: security implications: URL-TEMPLATE comes from DEFINITIONS
+           (iter (for depth below search-depth)
+                 (with current-depth-version = version)
+                 (for current-depth-variants = (next-version-variants current-depth-version))
+                 (iter (for next-version-variant in current-depth-variants)
+                       (for url = (string-right-trim '(#\/) (format nil url-template (princ-version-to-string next-version-variant))))
+                       (when (with-explanation ("touching URL ~S" url)
+                               (touch-www-file url))
+                         (return-from determine-available-module-tarball-version-starting-after (values url next-version-variant))))
+                 (setf current-depth-version (first current-depth-variants)))))
+
+    (iter (with last-version = (or tarball-version (git-repository-last-version-from-tag)))
+          (for (values url next-version) = (determine-available-module-tarball-version-starting-after url-template last-version))
+          (setf last-version next-version)
+          (while url)
+          (let* ((slash-pos (or (position #\/ url :from-end t)
+                                (git-error "~@<Error while calculating tarball URL from template ~A: ~S has no slashes.~:@>"
+                                           url-template url)))
+                 (localised-tarball (merge-pathnames (subseq url (1+ slash-pos)) temp-dir)))
+            (with-file-from-www (localised-tarball url)
+              (with-executable-options (:explanation `("in repository ~A: importing tarball version ~A"
+                                                       ,to-repo ,(princ-version-to-string next-version)))
+                (git *repository* "import-orig" localised-tarball)))))))
+
+;; PIPE!
+;; TODO: speed up incremental import: --{import,export}-marks
+(defun indirect-import-darcs (url to-repo target-ref transit-repo &aux (*repository* to-repo))
+  (unless (directory-exists-p transit-repo)
+    (darcs "get" url transit-repo))
+  (darcs "pull" "--all" "--repodir" transit-repo url)
+  (when (git-nonbare-repository-present-p to-repo)
+    (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
+      (when untracked
+        (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
+                transit-repo *repository* untracked)
+        (mapc #'delete-file untracked))
+      (when (or staged-mod staged-del staged-new unstaged-mod unstaged-del)
+        (ensure-clean-repository :error))))
+  ;; We ignore exit status, as, sadly, it's not informative.
+  ;; Thankfully, git-fast-import is pretty reliable.
+  (let ((*executable-standard-output* nil)
+        (*executable-error-output* nil))
+    (pipe (darcs-fast-export transit-repo (strconcat* "--git-branch=" (cook-ref-value target-ref)))
+          (git *repository* "fast-import"))))
+
+;; Untested!
+;; PIPE!
+;; TODO: clear up branch handling: -o/-M
+(defun indirect-import-mercurial (url to-repo target-ref transit-repo &aux (*repository* to-repo))
+  (unless (directory-exists-p transit-repo)
+    (hg "clone" url transit-repo))
+  (hg "pull" "-R" transit-repo)
+  (let ((*executable-standard-output* nil)
+        (*executable-error-output* nil))
+    (pipe (hg-fast-export "-r" transit-repo "-M" (cook-ref-value target-ref))
+          (git *repository* "fast-import"))))
+
+(defun indirect-import-cvs (url to-repo target-ref transit-repo cvs-module-name lockdir &aux (*repository* to-repo))
+  (rsync "-ravPz" url transit-repo)
+  (with-output-to-file (stream (subfile* transit-repo "CVSROOT" "config") :if-exists :supersede)
+    (format stream "LockDir=~A~%" lockdir))
+  (unless (directory-exists-p (subdirectory* transit-repo cvs-module-name))
+    ;; caller didn't guess the CVS module right, try to fix up..
+    (iter (for guess in '("src"))
+          (when (directory-exists-p (subdirectory* transit-repo guess))
+            (format t "~@<;;; ~@;During import from ~S: CVS module ~S does not exist, guessed an alternative: ~S.  Recording that as the new wrinkle.~:@>~%"
+                    transit-repo cvs-module-name guess)
+            (setf cvs-module-name guess)
+            ;; remnants of stateful import:
+            ;; (set-remote-module-wrinkle *source-remote* name guess)
+            (leave))
+          (finally
+           (definition-error "~@<During import from ~S: CVS module ~S does not exist, and it's name couldn't be guessed.~:@>" transit-repo cvs-module-name))))
+  (with-exit-code-to-error-translation ((9 'git-error :format-control "~@<Repository ~S not clean during fetch.~:@>"
+                                           :format-arguments (list to-repo)))
+    (git to-repo "cvsimport" "-v" "-C" to-repo "-o" (cook-ref-value target-ref)
+         "-d" (format nil ":local:~A" (string-right-trim "/" (namestring transit-repo))) cvs-module-name)))
+
+(defun indirect-import-svn (url to-repo target-ref transit-repo svn-module new-p &aux (*repository* to-repo))
+  (rsync "-ravPz" url transit-repo)
+  (when new-p
+    (with-executable-options (:explanation `("setting up svn to git conversion: ~S => ~S" ,transit-repo ,to-repo))
+      (git to-repo "svn" "init" `("file://" ,transit-repo ,svn-module)))) ;; 'file://' -- gratuitious SVN complication
+  (git to-repo "svn" "fetch"))

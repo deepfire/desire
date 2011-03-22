@@ -69,94 +69,9 @@
   (:method ((o svn-http-remote) name)
     (touch-www-file (url o name))))
 
-(defgeneric clone-transit-module-using-remote (remote module-name url new-local-repo-pathname)
-  (:documentation
-   "Create the local repository by performing an initial clone of the remote.
-Only for remotes of type SEPARATE-CLONE.")
-  (:method :around ((o separate-clone) name url repo-dir)
-    (declare (ignore name url))
-    (check-pathname-not-occupied repo-dir)
-    (call-next-method))
-  (:method ((o darcs-http-remote) name url repo-dir)
-    (darcs "get" url repo-dir))
-  (:method ((o hg-http-remote) name url repo-dir)
-    (hg "clone" url repo-dir)))
-
 (defvar *new-repository-p*)
 (defvar *source-remote*
   "ISSUE:LOCALITY-SOURCE-REMOTE-TRACKING")
-
-(defun determine-available-module-tarball-version-starting-after (url-template version &optional (search-depth 3))
-  ;; XXX: security implications: URL-TEMPLATE comes from DEFINITIONS
-  (iter (for depth below search-depth)
-        (with current-depth-version = version)
-        (for current-depth-variants = (next-version-variants current-depth-version))
-        (iter (for next-version-variant in current-depth-variants)
-              (for url = (string-right-trim '(#\/) (format nil url-template (princ-version-to-string next-version-variant))))
-              (when (with-explanation ("touching URL ~S" url)
-                      (touch-www-file url))
-                (return-from determine-available-module-tarball-version-starting-after (values url next-version-variant))))
-        (setf current-depth-version (first current-depth-variants))))
-
-(defgeneric convert-transit-module-using-locality (source-locality name source-repository)
-  (:documentation
-   "Update conversion of module with NAME within the git repository at
-*REPOSITORY* using SOURCE-REPOSITORY within SOURCE-LOCALITY.  Can only
-be called from FETCH-MODULE-USING-REMOTE, due to the *SOURCE-REMOTE*
-variable.")
-  (:method :around ((o locality) name from-repo-dir)
-           (with-explanation ("on behalf of module ~A, converting from ~A to ~A: ~S => ~S"
-                              name (vcs-type o) *gate-vcs-type* from-repo-dir *repository*)
-      (call-next-method)))
-  (:method ((o darcs-locality) name from-repo-dir)
-    (if (git-nonbare-repository-present-p *repository*)
-        (multiple-value-bind (staged-mod staged-del staged-new unstaged-mod unstaged-del untracked) (git-repository-status)
-          (when untracked
-            (format t "~@<;;; ~@;before conversion ~S -> ~S: untracked files ~A in the target repository.  Purging.~:@>~%"
-                    from-repo-dir *repository* untracked)
-            (mapc #'delete-file untracked))
-          (when (or staged-mod staged-del staged-new unstaged-mod unstaged-del)
-            (ensure-clean-repository :error)))
-        (init-git-repo *repository*))
-    ;; We ignore exit status, as, sadly, it's not informative.
-    ;; Thankfully, git-fast-import is pretty reliable.
-    (let ((*executable-standard-output* nil)
-          (*executable-error-output* nil))
-      (pipe (darcs-fast-export from-repo-dir)
-            (git *repository* "fast-import"))))
-  (:method ((o hg-locality) name from-repo-dir)
-    (unless (git-nonbare-repository-present-p *repository*)
-      (init-git-repo *repository*))
-    (let ((*executable-standard-output* nil)
-          (*executable-error-output* nil))
-      (pipe (hg-fast-export "-r" from-repo-dir)
-            (git *repository* "fast-import"))))
-  (:method ((o cvs-locality) name from-repo-dir)
-    (multiple-value-bind (url cvs-module-name) (url *source-remote* name)
-      (declare (ignore url))
-      (with-output-to-file (stream (subfile* from-repo-dir "CVSROOT" "config") :if-exists :supersede)
-        (format stream "LockDir=~A~%" (cvs-locality-lock-path o)))
-      (let ((final-cvs-module-name (or cvs-module-name (downstring name))))
-        (unless (directory-exists-p (subdirectory* from-repo-dir final-cvs-module-name))
-          (iter (for guess in '("src"))
-                (when (directory-exists-p (subdirectory* from-repo-dir guess))
-                  (format t "~@<;;; ~@;During import of ~A from ~S: CVS module ~S does not exist, guessed an alternative: ~S.  Recording that as the new wrinkle.~:@>~%"
-                          name from-repo-dir final-cvs-module-name guess)
-                  (setf final-cvs-module-name guess)
-                  (set-remote-module-wrinkle *source-remote* name guess)
-                  (leave))
-                (finally
-                 (definition-error "~@<During import of ~A from ~S: CVS module ~S does not exist, and it's name couldn't be guessed.~:@>" name from-repo-dir final-cvs-module-name))))
-        (with-exit-code-to-error-translation ((9 'repository-not-clean-during-fetch :module name :locality (gate *self*)))
-          (git *repository* "cvsimport" "-v" "-C" *repository* "-d" (format nil ":local:~A" (string-right-trim "/" (namestring from-repo-dir))) final-cvs-module-name)))))
-  (:method ((o svn-locality) name from-repo-dir)
-    (when *new-repository-p*
-      (multiple-value-bind (url wrinkle) (url *source-remote* name)
-        (declare (ignore url))
-        (with-executable-options (:explanation `("on behalf of module ~A, setting up svn to git conversion: ~S => ~S"
-                                                 name from-repo-dir *repository*))
-          (git *repository* "svn" "init" `("file://" ,from-repo-dir ,wrinkle))))) ;; 'file://' -- gratuitious SVN complication
-    (git *repository* "svn" "fetch")))
 
 (defgeneric fetch-module-using-remote (remote module-name url final-gate-repo-pathname)
   (:documentation
@@ -182,47 +97,21 @@ to the above :AROUND method."
   ;; direct fetch, non-git
   (:method ((o cvs-native-remote) name url repo-dir)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
-      (git *repository* "cvsimport" "-d" url (or cvs-module-name (downstring name)))))
+      (direct-import-cvs url repo-dir nil (or cvs-module-name (downstring name)))))
   (:method ((o svn-direct) name url repo-dir)
-    (multiple-value-bind (url wrinkle) (url o (module name))
-      (when *new-repository-p*
-        (with-explanation ("on behalf of module ~A, initialising import to git repository from SVN ~S in ~S"
-                           name url repo-dir)
-          (git repo-dir "svn" "init" url wrinkle)))
-      (git repo-dir "svn" "fetch")))
+    (multiple-value-bind (url svn-module-name) (url *source-remote* name)
+      (direct-import-svn url repo-dir nil (or svn-module-name (downstring name)) *new-repository-p*)))
   (:method ((o tarball-http-remote) name url-template repo-dir)
-    (with-explanation ("initialising git repository of module ~A in ~S" name *repository*)
-      (init-git-repo *repository*))
-    (iter (with last-version = (if *new-repository-p*
-                                   (initial-tarball-version o)
-                                   (git-repository-last-version-from-tag)))
-          (for (values url next-version) = (determine-available-module-tarball-version-starting-after url-template last-version))
-          (setf last-version next-version)
-          (while url)
-          (let* ((slash-pos (or (position #\/ url :from-end t)
-                                (remote-error o "~@<Error while calculating URL for module ~A in ~S: ~S has no slashes.~:@>"
-                                              name (name o) url)))
-                 (localised-tarball (merge-pathnames (subseq url (1+ slash-pos)) (gate-temp-directory (gate *self*)))))
-            (with-file-from-www (localised-tarball url)
-              (with-executable-options (:explanation `("on behalf of module ~A, importing tarball version ~A"
-                                                       ,name ,(princ-version-to-string next-version)))
-                (git *repository* "import-orig" localised-tarball))))))
-  ;; indirect-fetch
-  (:method :around ((o separate-clone) name url repo-di)
-    "Note that the fetches will be done later anyway."
-    (let ((transit-repo-dir (module-pathname name (locality o))))
-      (unless (directory-exists-p transit-repo-dir)
-        (clone-transit-module-using-remote o name url transit-repo-dir)))
-    (call-next-method))
-  (:method :before ((o darcs-http-remote) name url repo-dir)
-    (darcs "pull" "--all" "--repodir" (module-pathname name (locality o)) url))
-  (:method :before ((o hg-http-remote) name url repo-dir)
-    (declare (ignore url))
-    (hg "pull" "-R" (module-pathname name (locality o))))
-  (:method :before ((o rsync) name url repo-di)
-    (rsync "-ravPz" url (module-pathname name (locality o))))
-  (:method ((o indirect-fetch) name url repo-dir)
-    (convert-transit-module-using-locality (locality o) name (module-pathname name (locality o)))))
+    (direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when *new-repository-p*
+                                                                                           (initial-tarball-version o))))
+  (:method ((o cvs-locality) name url repo-dir)
+    (multiple-value-bind (url cvs-module-name) (url *source-remote* name)
+      (indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
+                           (or cvs-module-name (downstring name)) (cvs-locality-lock-path o))))
+  (:method ((o svn-locality) name url repo-dir)
+    (multiple-value-bind (url svn-module-name) (url *source-remote* name)
+      (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
+                           (or svn-module-name (downstring name)) *new-repository-p*))))
 
 (defun update-module-using-remote (module-name remote url repo-dir)
   "Update the repository in REPO-DIR for the module with MODULE-NAME,
