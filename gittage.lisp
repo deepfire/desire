@@ -698,42 +698,18 @@ of the corresponding commit as multiple values."
 ;;;;
 ;;;; Import
 ;;;;
-(defun direct-import-cvs (url to-repo target-ref cvs-module-name &aux (*repository* to-repo))
-  ;; -o ref -r remotes/ref/master
-  (git *repository* "cvsimport" "-d" url cvs-module-name))
-
-(defun direct-import-svn (url to-repo target-ref svn-module new-p &aux (*repository* to-repo))
-  (when new-p
-    (with-executable-options (:explanation `("setting up svn to git conversion: ~S => ~S" ,url ,to-repo))
-      (git to-repo "svn" "init" url svn-module)))
-  (git to-repo "svn" "fetch"))
-
-(defun direct-import-tarball (url-template to-repo target-ref temp-dir &optional tarball-version &aux
-                              (*repository* to-repo))
-  (flet ((determine-available-module-tarball-version-starting-after (url-template version &optional (search-depth 3))
-           ;; XXX: security implications: URL-TEMPLATE comes from DEFINITIONS
-           (iter (for depth below search-depth)
-                 (with current-depth-version = version)
-                 (for current-depth-variants = (next-version-variants current-depth-version))
-                 (iter (for next-version-variant in current-depth-variants)
-                       (for url = (string-right-trim '(#\/) (format nil url-template (princ-version-to-string next-version-variant))))
-                       (when (with-explanation ("touching URL ~S" url)
-                               (touch-www-file url))
-                         (return-from determine-available-module-tarball-version-starting-after (values url next-version-variant))))
-                 (setf current-depth-version (first current-depth-variants)))))
-
-    (iter (with last-version = (or tarball-version (git-repository-last-version-from-tag)))
-          (for (values url next-version) = (determine-available-module-tarball-version-starting-after url-template last-version))
-          (setf last-version next-version)
-          (while url)
-          (let* ((slash-pos (or (position #\/ url :from-end t)
-                                (git-error "~@<Error while calculating tarball URL from template ~A: ~S has no slashes.~:@>"
-                                           url-template url)))
-                 (localised-tarball (merge-pathnames (subseq url (1+ slash-pos)) temp-dir)))
-            (with-file-from-www (localised-tarball url)
-              (with-executable-options (:explanation `("in repository ~A: importing tarball version ~A"
-                                                       ,to-repo ,(princ-version-to-string next-version)))
-                (git *repository* "import-orig" localised-tarball)))))))
+;; Untested!
+;; PIPE!
+;; TODO: clear up branch handling: -o/-M
+(defun indirect-import-mercurial (url to-repo target-ref transit-repo &aux (*repository* to-repo))
+  (unless (directory-exists-p transit-repo)
+    (hg "clone" url transit-repo))
+  (hg "pull" "-R" transit-repo)
+  (let ((*executable-standard-output* nil)
+        (*executable-error-output* nil))
+    (pipe (hg-fast-export "-r" transit-repo ;; "-M" (cook-ref-value target-ref)
+                          )
+          (git *repository* "fast-import"))))
 
 ;; PIPE!
 ;; TODO: speed up incremental import: --{import,export}-marks
@@ -753,20 +729,34 @@ of the corresponding commit as multiple values."
   ;; Thankfully, git-fast-import is pretty reliable.
   (let ((*executable-standard-output* nil)
         (*executable-error-output* nil))
-    (pipe (darcs-fast-export transit-repo (strconcat* "--git-branch=" (cook-ref-value target-ref)))
+    (pipe (darcs-fast-export transit-repo ;; (strconcat* "--git-branch=" (cook-ref-value target-ref))
+                             )
           (git *repository* "fast-import"))))
 
-;; Untested!
-;; PIPE!
-;; TODO: clear up branch handling: -o/-M
-(defun indirect-import-mercurial (url to-repo target-ref transit-repo &aux (*repository* to-repo))
-  (unless (directory-exists-p transit-repo)
-    (hg "clone" url transit-repo))
-  (hg "pull" "-R" transit-repo)
-  (let ((*executable-standard-output* nil)
-        (*executable-error-output* nil))
-    (pipe (hg-fast-export "-r" transit-repo "-M" (cook-ref-value target-ref))
-          (git *repository* "fast-import"))))
+(defun direct-import-cvs (url to-repo target-ref cvs-module-name &aux (*repository* to-repo))
+  ;; -o ref -r remotes/ref/master
+  (git *repository* "cvsimport" "-d" url cvs-module-name))
+
+(defun direct-import-svn (url to-repo target-ref svn-module new-p &aux (*repository* to-repo))
+  (when new-p
+    (with-executable-options (:explanation `("setting up svn to git conversion: ~S => ~S" ,url ,to-repo))
+      (git to-repo "svn" "init" url svn-module)))
+  (git to-repo "svn" "fetch"))
+
+(defun direct-import-tarball (url-template to-repo target-ref temp-dir &optional tarball-version &aux
+                              (*repository* to-repo))
+  (iter (with last-version = (or tarball-version (git-repository-last-version-from-tag)))
+        (for (values url next-version) = (determine-available-module-tarball-version-starting-after url-template last-version))
+        (setf last-version next-version)
+        (while url)
+        (let* ((slash-pos (or (position #\/ url :from-end t)
+                              (git-error "~@<Error while calculating tarball URL from template ~A: ~S has no slashes.~:@>"
+                                         url-template url)))
+               (localised-tarball (merge-pathnames (subseq url (1+ slash-pos)) temp-dir)))
+          (with-file-from-www (localised-tarball url)
+            (with-executable-options (:explanation `("in repository ~A: importing tarball version ~A"
+                                                     ,to-repo ,(princ-version-to-string next-version)))
+              (git *repository* "import-orig" localised-tarball))))))
 
 (defun indirect-import-cvs (url to-repo target-ref transit-repo cvs-module-name lockdir &aux (*repository* to-repo))
   (rsync "-ravPz" url transit-repo)
@@ -786,7 +776,7 @@ of the corresponding commit as multiple values."
            (definition-error "~@<During import from ~S: CVS module ~S does not exist, and it's name couldn't be guessed.~:@>" transit-repo cvs-module-name))))
   (with-exit-code-to-error-translation ((9 'git-error :format-control "~@<Repository ~S not clean during fetch.~:@>"
                                            :format-arguments (list to-repo)))
-    (git to-repo "cvsimport" "-v" "-C" to-repo "-o" (cook-ref-value target-ref)
+    (git to-repo "cvsimport" "-v" "-C" to-repo ;; "-o" (cook-ref-value target-ref)
          "-d" (format nil ":local:~A" (string-right-trim "/" (namestring transit-repo))) cvs-module-name)))
 
 (defun indirect-import-svn (url to-repo target-ref transit-repo svn-module new-p &aux (*repository* to-repo))
@@ -795,3 +785,16 @@ of the corresponding commit as multiple values."
     (with-executable-options (:explanation `("setting up svn to git conversion: ~S => ~S" ,transit-repo ,to-repo))
       (git to-repo "svn" "init" `("file://" ,transit-repo ,svn-module)))) ;; 'file://' -- gratuitious SVN complication
   (git to-repo "svn" "fetch"))
+
+;;; Utility
+(defun determine-available-module-tarball-version-starting-after (url-template version &optional (search-depth 3))
+  ;; XXX: security implications: URL-TEMPLATE comes from DEFINITIONS
+  (iter (for depth below search-depth)
+        (with current-depth-version = version)
+        (for current-depth-variants = (next-version-variants current-depth-version))
+        (iter (for next-version-variant in current-depth-variants)
+              (for url = (string-right-trim '(#\/) (format nil url-template (princ-version-to-string next-version-variant))))
+              (when (with-explanation ("touching URL ~S" url)
+                      (touch-www-file url))
+                (return-from determine-available-module-tarball-version-starting-after (values url next-version-variant))))
+        (setf current-depth-version (first current-depth-variants))))

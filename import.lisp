@@ -78,18 +78,15 @@
 the provided directory is the final directory in the gate locality.")
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir initialp)
-    "ISSUE:IMPLICIT-VS-EXPLICIT-PULLS
-Note that this method doesn't affect working tree, instead deferring that
-to the above :AROUND method."
     (when initialp
-      (with-explanation ("initialising git repository of module ~A in ~S" name repo-dir)
-        (init-git-repo repo-dir))
       (ensure-gitremote (name o) (url o name)))
     (git-fetch-remote o name))
   (:method :around ((o nongit-mixin) name url repo-dir initialp)
+    ;; 1. figure out what convertors do with the master branch/the head
     (unless initialp
       (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
+    ;; 2. figure out in what refs convertors store the conversion result
     (let ((master-val (ref-value '("master") nil)))
       (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
