@@ -480,7 +480,7 @@ When SEAL-P is non-NIL, the changes are committed."
     (("bot-phase" #\p)        :type string  :documentation "")
     #+nil (("optimize-debug" #\d)  :type boolean :documentation "") ;; N/A
     ("yes"                    :type boolean :documentation "Accept 'yes' as an answer for binary interactive questions.")
-    (("no-debugger" #\g)      :type boolean :documentation "Disable debugger, causing desire dump stack and abort on errors, instead of entering the debugger.")
+    (("disable-debugger" #\g) :type boolean :documentation "Disable debugger, causing desire dump stack and abort on errors, instead of entering the debugger.")
     (("break-on-signals" #\B) :type boolean :documentation "Execute with *BREAK-ON-SIGNALS* bound to ERROR.")
     (("explain" #\e)          :type boolean :documentation "Enable explanations about external program invocations.")
     ("debug"                  :type boolean :documentation "Proclaim debug optimisation.")
