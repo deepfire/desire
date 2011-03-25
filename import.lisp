@@ -131,7 +131,7 @@ using URL within the REMOTE to the latest version available from it."
                                                                          :create))
         repo-dir
       (let* ((desire-op-ref '("desire" "op"))
-             (remote-ref (make-remote-ref remote "master"))
+             (remote-ref (make-remote-ref (name remote) "master"))
              (drive-head-branch-p (repository-policy-value :drive-head-branch)))
         (let ((*source-remote* remote))
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
