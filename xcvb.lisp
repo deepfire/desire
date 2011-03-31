@@ -20,40 +20,28 @@
 
 (in-package :desire)
 
-(defun git-apply-diff (filename &optional (directory *repository*) (add-to-index t) (error-on-failure t))
-  (multiple-value-bind (successp output) (with-explanation ("applying gitdiff ~S in ~S" filename directory)
-                                           (with-shell-predicate
-                                               (apply #'git directory "apply"
-                                                      filename (append (when add-to-index '("--index"))))))
-    (cond (successp)
-          (t
-           (git-set-branch-index-tree nil directory)
-           (if error-on-failure
-               (error 'patch-failure :pathname directory :output output)
-               (values nil output))))))
-
 (defun xcvbify-module (module &optional break-on-patch-failure &aux
                        (repo (module-pathname module)))
   "'I know what I do' mode: silently resets stuff."
   (update module)
-  (with-git-repository-write-access (new-p) repo
+  (with-repository-write-access (new-p) repo
     (declare (ignore new-p))
     (let ((saved-head (get-head nil repo))
           (saved-xcvbify (ref-value '("heads" "xcvbify") nil :if-does-not-exist :continue)))
-      (git-set-head-index-tree :tracker :reset)
-      (git-set-branch :xcvbify)
-      (git-set-head-index-tree :xcvbify :error)
+      (set-head-index-tree :tracker :reset)
+      (set-branch :xcvbify)
+      (set-head-index-tree :xcvbify :error)
       (unless (file-exists-p "build.xcvb")
         (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
-          (multiple-value-bind (successp output) (git-apply-diff ".xcvbifier.diff" *repository* t nil)
+          (multiple-value-bind (successp output) (apply-diff ".xcvbifier.diff" *repository* t nil)
             (cond (successp
                    (with-explanation ("committing xcvbification change")
                      (git *repository* "commit" "-m" "Xcvbify.")))
                   (t
-                   (git-set-head-index-tree saved-head :reset)
+                   (set-head-index-tree saved-head :reset)
                    (if saved-head
-                       (git-set-branch :xcvbify nil saved-xcvbify)
-                       (git-remove-branch :xcvbify))
+                       (set-branch :xcvbify nil saved-xcvbify)
+                       (remove-branch :xcvbify))
                    (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
                      (if break-on-patch-failure
                          (break control-string (name module) output)

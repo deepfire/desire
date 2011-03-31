@@ -151,7 +151,7 @@ The value returned is the mergeed value of SUBJECT-SLOT in SUBJECT.")
                         (list `(:modules ,module-names)))
                       (when-let ((converted-names (and (typep o 'gate)
                                                        (slot-or-abort-print-object stream o 'converted-module-names))))
-                        (list `(:converted-module-names ,(sort (mapcar #'downstring converted-names) #'string<))))
+                        (list `(:converted-module-names ,(sort (mapcar #'down-case-string converted-names) #'string<))))
                       (when-let ((initial-version (and (typep o 'tarball) (slot-or-abort-print-object stream o 'initial-version))))
                         (list `(:initial-version ,initial-version)))
                       (when-let ((credentials (remote-module-credentials o)))
@@ -245,9 +245,9 @@ The value returned is the merged type for SUBJECT-REMOTE.")
               (string (name gate))
               (append
                (when-let ((unpublished-names (slot-or-abort-print-object stream gate 'unpublished-module-names)))
-                 (list `(:unpublished ,(sort (mapcar #'downstring unpublished-names) #'string<))))
+                 (list `(:unpublished ,(sort (mapcar #'down-case-string unpublished-names) #'string<))))
                (when-let ((hidden-names (slot-or-abort-print-object stream gate 'hidden-module-names)))
-                 (list `(:hidden ,(sort (mapcar #'downstring hidden-names) #'string<)))))))))
+                 (list `(:hidden ,(sort (mapcar #'down-case-string hidden-names) #'string<)))))))))
 
 (defun read-gate-local (name &key unpublished hidden)
   (let ((gate (gate *self*)))
@@ -452,13 +452,13 @@ When SEAL-P is non-NIL, the changes are committed."
       (with-output-to-new-metafile (definitions 'definitions localmeta :commit-p seal :commit-message commit-message)
         (serialise-local-definitions definitions)
         (terpri definitions))
-      (git-repository-update-for-dumb-servers meta)
+      (update-repository-for-dumb-servers meta)
       (setf *unsaved-definition-changes-p* nil)
       (values))))
 
 (defun unsaved-definition-changes-p ()
   "See whether there are unsaved changes to DEFINITIONS."
-  (git-repository-changes-p (meta *self*)))
+  (repository-changes-p (meta *self*)))
 
 ;;;
 ;;; Automated desire bootstrap generation

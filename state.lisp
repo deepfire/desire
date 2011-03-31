@@ -83,39 +83,7 @@ wishmaster we've bootstrapped from.")
   (*unsaved-definition-changes-p*   nil
     "Whether the idea about the world changed, since INIT was performed,
 or SAVE-DEFINITIONS was called.")
-  (*source-registry-update-pending* nil)
-  (*http-proxy*                     nil)
-  (*repository-policies*            (alist-hash-table
-                                     `((:default .  ,(make-repository-policy
-                                                      :default
-                                                      :unsaved-changes           :stash
-                                                      :unsaved-changes-postwrite :stash
-                                                      :missing-master            :create-on-head
-                                                      :preexisting-gitless       :take-over
-                                                      :drive-head                nil
-                                                      :drive-head-branch         nil
-                                                      :reapply-stash             nil))
-                                       (:new-repo . ,(make-repository-policy
-                                                      :new-repo
-                                                      :unsaved-changes           :error
-                                                      :unsaved-changes-postwrite :stash
-                                                      :missing-master            :error
-                                                      :preexisting-gitless       :error
-                                                      :drive-head                t
-                                                      :drive-head-branch         t
-                                                      :reapply-stash             nil))
-                                       (:cautious . ,(make-repository-policy
-                                                      :cautious
-                                                      :unsaved-changes           :error
-                                                      :unsaved-changes-postwrite :stash
-                                                      :missing-master            :error
-                                                      :preexisting-gitless       :error
-                                                      :drive-head                nil
-                                                      :drive-head-branch         nil
-                                                      :reapply-stash             t)))
-                                     :test 'eq))
-  (*default-repository-policy*      (repository-policy :default))
-  (*repository-policy*              *default-repository-policy*))
+  (*source-registry-update-pending* nil))
 
 (defun setup-default-global-state ()
   (initialize-knobs)

@@ -198,8 +198,8 @@
     ;; XXX: need to ensure that the working directory is up to date (the default) --
     ;; that we drive masters, etc.
     (prog1 (run-module-test :master-update-phase (result-module current-result) nil t)
-      (setf (result-commit current-result) (desr::git-commit-log '("tracker")
-                                                                 (result-path current-result)))))
+      (setf (result-commit current-result) (gittage:commit-log '("tracker")
+                                                               (result-path current-result)))))
   (:method ((m-r buildmaster-run) (p master-recurse-phase) current-result &key &allow-other-keys)
     (run-module-test :master-recurse-phase (name (result-module current-result)) nil t))
   (:method ((m-r buildmaster-run) (p remote-test-phase) result-marker

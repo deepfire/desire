@@ -45,7 +45,7 @@ return the subdomain part of DOMAIN before the dot.  Otherwise return NIL."
       (subseq domain 0 dot-posn))))
 
 (defun find-distributor-fuzzy (domain-name &aux
-                               (downcase-domain-name (downstring domain-name)))
+                               (downcase-domain-name (down-case-string domain-name)))
   "Find a distributor which looks like a match for DOMAIN-NAME.
 For example, domain name OGRE.SVN.SOURCEFORGE.NET refers to a distributor
 called SVN.SOURCEFORGE.NET.
@@ -186,7 +186,7 @@ The values returned are:
                   existing-distributor (null subdomain) distributor-name subdomain (when subdomain
                                                                                      (name existing-distributor))))
         (multiple-value-bind (remote domain-name-takeover umbrellised-remote-path deduced-path)
-            (match-module-url-components-against-remote-set distributor-name subdomain port pathname-component-list dirp (downstring module-name)
+            (match-module-url-components-against-remote-set distributor-name subdomain port pathname-component-list dirp (down-case-string module-name)
                                                             (remove-if-not (curry #'remote-types-compatible-p remote-type)
                                                                            (distributor-remotes distributor)))
           (values distributor (not existing-distributor)
@@ -311,7 +311,7 @@ The values returned are:
     (when (location-defines-module-p locality name)
       (module-error name "~@<Module ~A is already provided by ~A.~:@>" name (locality-pathname locality)))
     (let ((repo-dir (module-pathname name locality)))
-      (unless (git-nonbare-repository-present-p repo-dir)
+      (unless (nonbare-repository-present-p repo-dir)
         (module-error name "~@<Module ~A doesn't appear to have a repository with objects in ~S.~:@>" name repo-dir)))
     (with-module name
         (lret* ((present (module name :if-does-not-exist :continue))

@@ -173,11 +173,11 @@
                            (butlast request-path))))
     (destructuring-bind (&optional (mode :summary) (run-nr 0) (result-id 0)) request-path
       (flet ((mode-run-result ()
-               (list (downstring mode) (write-to-string run-nr) (write-to-string result-id)))
+               (list (down-case-string mode) (write-to-string run-nr) (write-to-string result-id)))
              (mode-run ()
-               (list (downstring mode) (write-to-string run-nr)))
+               (list (down-case-string mode) (write-to-string run-nr)))
              (mode ()
-               (list (downstring mode))))
+               (list (down-case-string mode))))
         (multiple-value-bind (content-type path-fn) (ecase mode
                                                       ((:out :cond)     (values :text/plain #'mode-run-result))
                                                       (:runcond            (values :text/plain #'mode-run))

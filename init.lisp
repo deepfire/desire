@@ -32,10 +32,10 @@
   directory)
 
 (defun ensure-committer-identity ()
-  (unless (gitvar 'user.name)
+  (unless (config-var 'user.name)
     (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
       (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
-      (setf (gitvar 'user.name) username))))
+      (setf (config-var 'user.name) username))))
 
 (defgeneric try-ensure-importer-executable (type)
   (:method :around (o)
@@ -50,10 +50,11 @@
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
-  (let ((present (cons *gate-vcs-type* (unzip #'find-and-register-tools-for-remote-type (set-difference *supported-vcs-types* (list *gate-vcs-type*))))))
+  (let ((present (cons *gate-vcs-type* (remove-if-not #'locate-vcs-import-executables *supported-import-types*))))
+    (dolist (vcs-type present)
+      (setf (class-slot vcs-type 'enabled-p) t))
     (do-remotes (r)
       (setf (remote-disabled-p r) (not (member (vcs-type r) present))))
-    (find-executable 'wget)
     (find-executable 'make)
     (find-executable 'cp)
     (find-executable 'gzip)
@@ -172,15 +173,12 @@ locally present modules will be marked as converted."
            (need-bootstrap-p (not (metastore-present-p meta-path '(definitions)))))
       (setup-default-global-state)
       ;;
-      ;; Set up tools
+      ;; Set up git
       ;;
-      ;; NOTE: there's some profound crap there
-      (with-class-slot (git hg darcs cvs svn tarball) required-executables
-        (setf git '(git) hg '(hg python)  darcs '(darcs darcs-fast-export wget) cvs '(rsync git cvs) svn '(rsync git) tarball '(git)))
-      (with-class-slot (git hg darcs cvs svn tarball) enabled-p
-        (setf git nil hg nil darcs nil cvs nil svn nil tarball nil))
-      (unless (find-and-register-tools-for-remote-type *gate-vcs-type*)
-        (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+      (if (find-executable *gate-vcs-type*)
+          (setf (class-slot *gate-vcs-type* 'enabled-p) t)
+          (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+
       (ensure-committer-identity)
       ;;
       ;; Bootstrap domain knowledge

@@ -154,12 +154,6 @@ its 'best remote'."
 
 (defsetf module-wrinkle set-module-wrinkle)
 
-(defun find-and-register-tools-for-remote-type (type)
-  "Find and make available executables for fetching from remotes of TYPE.
-   Return T when all executables required by TYPE are available, or NIL."
-  (setf (class-slot type 'enabled-p)
-        (every #'find-executable (class-slot type 'required-executables))))
-
 (defclass schema-mixin () ((schema :reader schema :initarg :schema)))
 (defclass transport-mixin (schema-mixin) ((transport :reader transport :initarg :transport)))
 (defclass clone-separation-mixin () ())
@@ -474,7 +468,7 @@ differ in only slight detail -- gate property, for example."
 
 (defun module-pathname (module &optional (locality (gate *self*)))
   "Return MODULE's path in LOCALITY, which defaults to master Git locality."
-  (subdirectory* (locality-pathname locality) (downstring (coerce-to-name module))))
+  (subdirectory* (locality-pathname locality) (down-case-string (coerce-to-name module))))
 
 ;;;
 ;;; Local distributor methods
@@ -944,8 +938,6 @@ This notably excludes converted modules."
 (define-condition module-condition (desire-condition)      ((module :reader condition-module :initarg :module)))
 (define-condition system-condition (desire-condition)      ((system :reader condition-system :initarg :system)))
 (define-condition application-condition (desire-condition) ((application :reader condition-application :initarg :application)))
-(define-condition repository-condition (locality-condition module-condition)
-  ((pathname :reader condition-pathname :initarg :pathname)))
 
 (define-condition desire-error (desire-condition error) ())
 (define-condition definition-error (definition-condition desire-error) ())
@@ -957,7 +949,6 @@ This notably excludes converted modules."
 (define-condition module-error (module-condition desire-error) ())
 (define-condition system-error (system-condition desire-error) ())
 (define-condition application-error (application-condition desire-error) ())
-(define-condition repository-error (repository-condition desire-error) ())
 
 (define-simple-error desire-error)
 (define-simple-error definition-error)
@@ -969,7 +960,6 @@ This notably excludes converted modules."
 (define-simple-error module-error :object-initarg :module)
 (define-simple-error system-error :object-initarg :system)
 (define-simple-error application-error :object-initarg :application)
-(define-simple-error repository-error :object-initarg :pathname)
 
 (define-reported-condition insatiable-desire (desire-error)
   ((desire :accessor condition-desire :initarg :desire))
@@ -1024,26 +1014,25 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
         ,@(unless condition `((declare (ignore ,condition-sym))))
         ,@handler-body))))
 
-(defun git-fetch-remote (remote module-name &optional (directory *repository*))
+(defun fetch-git-remote (remote module-name &optional (directory *repository*))
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
-  (with-git-repository-write-access (_) directory
-    (with-condition-recourses error (with-gitremote ((name remote) :url (url remote module-name))
-                                      (fetch-gitremote (name remote)))
-      (:retry-with-http (c)
-        (unless (and (typep remote 'git-combined-remote)
-                     *combined-remotes-prefer-native-over-http*)
-          ;; Not a combined remote, or already degraded to a dumb,
-          ;; transport?  Nothing we can do here, then..
-          (error c))
-        (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
+  (with-condition-recourses error (with-remote ((name remote) :url (url remote module-name))
+                                    (fetch-remote (name remote)))
+    (:retry-with-http (c)
+                      (unless (and (typep remote 'git-combined-remote)
+                                   *combined-remotes-prefer-native-over-http*)
+                        ;; Not a combined remote, or already degraded to a dumb,
+                        ;; transport?  Nothing we can do here, then..
+                        (error c))
+                      (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
                             Retrying in dumb HTTP mode.~:@>~%"
-                (name remote) (url remote module-name))
-        (let ((*combined-remotes-prefer-native-over-http* nil))
-          (multiple-value-prog1 (try)
-            (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
+                              (name remote) (url remote module-name))
+                      (let ((*combined-remotes-prefer-native-over-http* nil))
+                        (multiple-value-prog1 (try)
+                          (format t "~@<;; ~@;Fetch from a combined git remote in HTTP mode succeeded.  ~
                                 Are we in a HTTP-only environment?  ~
                                 Any further accesses to combined remotes will go through HTTP.~:@>~%")
-            (setf *combined-remotes-prefer-native-over-http* nil)))))))
+                          (setf *combined-remotes-prefer-native-over-http* nil))))))
 
 ;;;;
 ;;;; Modules, in context of knowledge base
@@ -1080,8 +1069,8 @@ behavior of the SKIP-MODULE restart."
 (defgeneric compile-remote-module-path-strings (remote module module-name)
   (:method :around ((r remote) module module-name)
     ;; That's the only place, except WITH-MODULE, where we can bind *MODULE*.
-    (let ((*module* (when module-name (downstring module-name)))
-          (*umbrella* (when module (downstring (module-umbrella module)))))
+    (let ((*module* (when module-name (down-case-string module-name)))
+          (*umbrella* (when module (down-case-string (module-umbrella module)))))
       (declare (special *module* *umbrella*))
       (iter (for insn-spec in (call-next-method))
             (cond ((eq insn-spec :/)) ; we have "/" by default, so no-op
@@ -1109,7 +1098,7 @@ behavior of the SKIP-MODULE restart."
                                                            (coerce-to-name module))))
              (multiple-value-bind (core maybe-wrinkle) (call-next-method)
                (values (apply #'concatenate 'simple-base-string
-                              (downstring (schema r))
+                              (down-case-string (schema r))
                               core
                               (unless (remote-domain-name-takeover r)
                                 (down-case-name (remote-distributor r)))
@@ -1140,7 +1129,7 @@ behavior of the SKIP-MODULE restart."
                         module)))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
-  (git-nonbare-repository-present-p (module-pathname module locality)))
+  (nonbare-repository-present-p (module-pathname module locality)))
 
 (defun update-module-presence (module &optional (locality (gate *self*)) (force-to nil forcep))
   "Recompute MODULE's presence in LOCALITY, updating MODULE's presence cache.
@@ -1243,7 +1232,7 @@ to general public within LOCALITY."
   (removef (gate-converted-module-names locality) name)
   (removef (gate-unpublished-module-names locality) name)
   (pushnew name (gate-hidden-module-names locality))
-  (setf (git-repository-world-readable-p (module-pathname module locality)) nil))
+  (setf (repository-world-readable-p (module-pathname module locality)) nil))
 
 (defun make-module-unpublished (module &optional (locality (gate *self*)) &aux
                                 (module (coerce-to-module module))
@@ -1253,7 +1242,7 @@ If it is hidden, unhide it."
   (removef (location-module-names locality) name)
   (removef (gate-converted-module-names locality) name)
   (pushnew name (gate-unpublished-module-names locality))
-  (setf (git-repository-world-readable-p (module-pathname module locality)) t)
+  (setf (repository-world-readable-p (module-pathname module locality)) t)
   (removef (gate-hidden-module-names locality) name))
 
 (defun declare-module-converted (module &optional (locality (gate *self*)) &aux
@@ -1272,7 +1261,7 @@ If it is hidden, unhide it."
 (defun module-hidden-p (module &optional (locality (gate *self*)))
   "Determine whether MODULE is hidden, with regard to LOCALITY.
 This is a function of MODULE repository's anonymous accessibility."
-  (not (git-repository-world-readable-p (module-pathname (coerce-to-module module) locality))))
+  (not (repository-world-readable-p (module-pathname (coerce-to-module module) locality))))
 
 (defun module-publishable-p (module &optional (locality (gate *self*)))
   "Determine whether MODULE is publishable via gate LOCALITY.
@@ -1327,7 +1316,7 @@ with SYSTEM specifying the driven variable binding."
 ;;;;
 (defun reset-metastore (&optional (metastore-pathname (meta *self*)))
   "Drop unsaved changes recorded in METASTORE-PATHNAME."
-  (git-set-branch-index-tree nil metastore-pathname))
+  (set-branch-index-tree nil metastore-pathname))
 
 (defun clone-metastore (url http-url metastore-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
@@ -1341,8 +1330,8 @@ value is returned."
                              (git-locality 'localhost)
                              (t            (canonicalise-name host)))))
           (with-explanation ("cloning metastore ~A/.meta in ~S" url metastore-pathname)
-            (init-git-repo metastore-pathname)
-            (ensure-gitremote remote-name (concatenate 'string url ".meta"))
+            (init-repo metastore-pathname)
+            (ensure-remote remote-name (concatenate 'string url ".meta"))
             ;; This should go through fetch-git-remote, which is currently impossible
             ;; due to how URL works.
             (with-maybe-handled-executable-failures t
@@ -1351,7 +1340,7 @@ value is returned."
                 (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
                           Retrying in dumb HTTP mode.~_The error was:~_~A~:@>~%"
                         remote-name url c)
-                (ensure-gitremote remote-name (concatenate 'string http-url ".meta/.git"))
+                (ensure-remote remote-name (concatenate 'string http-url ".meta/.git"))
                 (with-maybe-handled-executable-failures t
                     (git metastore-pathname "fetch" (down-case-name remote-name))
                   (:handler (c)
@@ -1364,9 +1353,9 @@ value is returned."
                 t)))
           ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
           (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") metastore-pathname)))
-            (git-set-branch :master metastore-pathname remote-master-val (not (head-detached-p))))
-          (git-set-head-index-tree :master)
-          (git-set-branch-index-tree (make-remote-ref remote-name branch)))))))
+            (set-branch :master metastore-pathname remote-master-val (not (head-detached-p))))
+          (set-head-index-tree :master)
+          (set-branch-index-tree (make-remote-ref remote-name branch)))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)
@@ -1381,8 +1370,8 @@ value is returned."
 
 (defmacro within-wishmaster-meta ((wishmaster branch &key update-p) &body body)
   (once-only (wishmaster)
-    `(with-git-repository-write-access (_) (meta *self*)
-       ,@(when update-p `((git-fetch-remote (gate ,wishmaster) :.meta)))
+    `(with-repository-write-access (_) (meta *self*)
+       ,@(when update-p `((fetch-git-remote (gate ,wishmaster) :.meta)))
        (with-branch-change ((make-remote-ref (down-case-name ,wishmaster) ,branch) :master)
          ,@body))))
 
@@ -1392,8 +1381,11 @@ value is returned."
                   (rel-branch r)
                   "master"))
         (metastore (meta *self*)))
-    (within-wishmaster-meta (wishmaster branch :update-p t)
-      (read-definitions :source wishmaster :force-source nil :metastore metastore))))
+    (with-repository-write-access (_) metastore
+      (handler-case (within-wishmaster-meta (wishmaster branch :update-p t)
+                      (read-definitions :source wishmaster :force-source nil :metastore metastore))
+        (executable-error (c)
+          (error 'fetch-failure :execution-error c))))))
 
 ;;;;
 ;;;; Localities.  Utilities not used anywhere at this moment.

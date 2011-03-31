@@ -21,19 +21,14 @@
 (in-package :desire)
 
 
-(define-reported-condition patch-failure (repository-error)
-  ((output :reader condition-output :initarg :output))
-  (:report (pathname output)
-           "~@<Failed to apply patch in ~S. The output was:~%~A~%~:@>" pathname output))
-
 (defun master-detached-p (&optional (repo-dir *repository*))
   "See if the master branch is driven by the user, that is out of desire's control."
   (not (ref= '("master") '("tracker") repo-dir)))
 
 (defun ensure-tracker-branch (&optional (repo-dir *repository*) ref &aux
                               (ref (or ref (get-head t repo-dir))))
-  (unless (git-branch-present-p :tracker repo-dir)
-    (git-set-branch :tracker repo-dir ref)))
+  (unless (branch-present-p :tracker repo-dir)
+    (set-branch :tracker repo-dir ref)))
 
 (defun switch-to-op (&optional (repository *repository*) &aux
                      (op '("desire" "op")))

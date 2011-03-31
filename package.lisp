@@ -2,7 +2,7 @@
 
 (defpackage desire
   (:nicknames :desr)
-  (:use :common-lisp :alexandria :pergamum :iterate :portable-spawn :executor :elsewhere.0 :split-sequence)
+  (:use :common-lisp :alexandria :iterate :split-sequence :pergamum :elsewhere.0 :portable-spawn :executor :gittage)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow
    #:*modules*
@@ -180,21 +180,18 @@
    #:module-condition
    #:system-condition
    #:application-condition
-   #:repository-condition
    #:distributor-error
    #:remote-error
    #:locality-error
    #:module-error
    #:system-error
    #:application-error
-   #:repository-error
    #:simple-distributor-error
    #:simple-remote-error
    #:simple-locality-error
    #:simple-module-error
    #:simple-system-error
    #:simple-application-error
-   #:simple-repository-error
    #:recursor-progress-halted
    #:counterproductive-system-definition
    #:insatiable-desire

@@ -13,30 +13,29 @@
                :com.informatimago.common-lisp.lisp-reader
                ;;
                :pergamum
-               :executor)
+               :executor
+               :gittage)
   :components ((:file "dependencies")
                ;; Tier #
                (:file "package" :depends-on ("dependencies"))
                ;; Tier 0
                (:file "state" :depends-on ("package"))
                ;; Tier 1
-               (:file "gittage" :depends-on ("state"))
+               (:file "metastore" :depends-on ("state"))
                ;; Tier 2
-               (:file "metastore" :depends-on ("gittage"))
-               ;; Tier 3
                (:file "types" :depends-on ("metastore"))
-               ;; Tier 4
+               ;; Tier 3
                (:file "branching" :depends-on ("types"))
                (:file "export" :depends-on ("types"))
                (:file "names" :depends-on ("types"))
                (:file "print-read" :depends-on ("types"))
                (:file "systems" :depends-on ("types"))
-               ;; Tier 5
+               ;; Tier 4
                (:file "modules" :depends-on ("branching" "systems"))
-               ;; Tier 6
+               ;; Tier 5
                (:file "import" :depends-on ("modules"))
                (:file "init" :depends-on ("print-read" "names" "modules" "export"))
-               ;; Tier 7
+               ;; Tier 6
                (:file "recursor" :depends-on ("import" "init"))
                ;; Tier at-the-end-of-it-all
                (:file "add-module" :depends-on ("types"))

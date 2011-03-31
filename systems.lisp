@@ -456,7 +456,7 @@ differently from that system's name."
          (progn
            (setf asdf::*defined-systems* test)
            (handler-case (let ((*break-on-signals* nil)
-                               (name (downstring name)))
+                               (name (down-case-string name)))
                            (unless (asdf-system-name-blacklisted-p name)
                              (asdf:find-system name)))
              (error (c)

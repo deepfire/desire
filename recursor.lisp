@@ -82,7 +82,7 @@
                  (format t "~@<;;; ~@;Un~@<defined sysdeps of ~A:~{ ~A~}~:@>~:@>~%" (name system) undefined))
                (multiple-value-bind (known unknown) (unzip #'system-known-p
                                                            (mapcar #'system defined))
-                 (multiple-value-bind (known-local known-external) (unzip (compose (feq module) #'system-module)
+                 (multiple-value-bind (known-local known-external) (unzip (compose (eq-to module) #'system-module)
                                                                           known)
                    (multiple-value-bind (host-provided-external truly-external) (unzip #'system-host-p
                                                                                        known-external)

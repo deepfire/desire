@@ -99,7 +99,7 @@ system TYPE within LOCALITY."
                (setf *unsaved-definition-changes-p* t)
                (make-instance system-type :name name :module module
                               :definition-pathname-name (when-let* ((pathname-name (pathname-name path))
-                                                                    (hidden-p (not (equal pathname-name (downstring name)))))
+                                                                    (hidden-p (not (equal pathname-name (down-case-string name)))))
                                                           pathname-name)))
              (ensure-system (name path)
                (lret ((system (or (when-let ((present-system (system name :if-does-not-exist :continue)))
@@ -295,7 +295,7 @@ meets desire's operational requirements.")
                               (with-module name
                                   (when-let ((module (and (not (module name :if-does-not-exist :continue))
                                                           (not (member name *internal-module-names*))
-                                                          (git-nonbare-repository-present-p subdir)
+                                                          (nonbare-repository-present-p subdir)
                                                           (add-module-local name :publish locality))))
                                     (collect (name module))))))))
         (format t "~@<;; ~@;Found new modules:~{ ~A~}~:@>~%" new)))

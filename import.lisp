@@ -26,25 +26,8 @@
   (:report (remote module execution-error)
            "~@<An attempt to fetch module ~S from ~S has failed.~@:_~S~:@>"
            (coerce-to-name module) (string-id remote) execution-error))
-(define-reported-condition repository-not-clean-during-fetch (repository-error executable-failure) ()
-  (:report (locality module)
-           "~@<Repository for ~S in ~S has uncommitted changes during fetch.~:@>" (coerce-to-name module) locality))
-(define-reported-condition dirt-files-in-repository (repository-error)
-  ((dirt-files :accessor condition-dirt-files :initarg :dirt-files))
-  (:report (dirt-files module locality)
-           "~@<Dirt files ~S prevented from importing ~A in ~S.~@:>" dirt-files (coerce-to-name module) (module-pathname module locality)))
-(define-reported-condition empty-repository (repository-error)
-  ()
-  (:report (pathname) "~@<Repository in ~S has no objects.~:@>" pathname))
 
 (progn
-  (define-executable darcs)
-  (define-executable darcs-fast-export)
-  (define-executable hg)
-  (define-executable hg-fast-export)
-  (define-executable python)            ; this is for hg-to-git.py
-  (define-executable rsync)
-  (define-executable cvs)
   ;; these are needed for XCVB stack's postinstall
   (define-executable cp)
   (define-executable make))
@@ -54,16 +37,16 @@
     (with-executable-options (:explanation `("attempting to touch module ~A in ~S" ,(coerce-to-name name) ,(url o name)))
       (call-next-method)))
   (:method ((o git-remote) name)
-    (with-valid-exit-codes ((128 nil)) (git "." "peek-remote" (url o name))))
+    (touch-repository (url o name)))
   (:method ((o darcs-http-remote) name)
     (or (touch-www-file `(,(url o name) "_darcs/hashed_inventory"))
         (touch-www-file `(,(url o name) "_darcs/inventory"))))
   (:method ((o hg-http-remote) name)
     (touch-www-file `(,(url o name) "?cmd=heads")))
   (:method ((o rsync) name)
-    (with-valid-exit-codes ((23 nil)) (rsync "--list-only" (url o name))))
+    (touch-rsync-repository (url o name)))
   (:method ((o cvs-native-remote) name)
-    (with-valid-exit-codes ((1 nil)) (cvs "-d" (url o name) "history")))
+    (touch-cvs-repository (url o name)))
   (:method ((o tarball-http-remote) name)
     (not (null (determine-available-module-tarball-version-starting-after (url o name) (initial-tarball-version o)))))
   (:method ((o svn-http-remote) name)
@@ -79,12 +62,12 @@ the provided directory is the final directory in the gate locality.")
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir initialp)
     (when initialp
-      (ensure-gitremote (name o) (url o name)))
-    (git-fetch-remote o name))
+      (ensure-remote (name o) (url o name)))
+    (fetch-git-remote o name))
   (:method :around ((o nongit-mixin) name url repo-dir initialp)
     ;; 1. figure out what convertors do with the master branch/the head
     (unless initialp
-      (git-set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
+      (set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     ;; 2. figure out in what refs convertors store the conversion result
     (let ((master-val (ref-value '("master") nil)))
@@ -96,21 +79,21 @@ the provided directory is the final directory in the gate locality.")
     (indirect-import-darcs url repo-dir nil (module-pathname name (locality o))))
   (:method ((o cvs-native-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
-      (direct-import-cvs url repo-dir nil (or cvs-module-name (downstring name)))))
+      (direct-import-cvs url repo-dir nil (or cvs-module-name (down-case-string name)))))
   (:method ((o svn-direct) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url *source-remote* name)
-      (direct-import-svn url repo-dir nil (or svn-module-name (downstring name)) initialp)))
+      (direct-import-svn url repo-dir nil (or svn-module-name (down-case-string name)) initialp)))
   (:method ((o tarball-http-remote) name url-template repo-dir initialp)
     (direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when initialp
                                                                                            (initial-tarball-version o))))
   (:method ((o cvs-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o name)
       (indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
-                           (or cvs-module-name (downstring name)) (cvs-locality-lock-path o))))
+                           (or cvs-module-name (down-case-string name)) (cvs-locality-lock-path o))))
   (:method ((o svn-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url o name)
       (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
-                           (or svn-module-name (downstring name)) initialp))))
+                           (or svn-module-name (down-case-string name)) initialp))))
 
 (defgeneric remote-import-takes-over-init (remote)
   (:documentation
@@ -125,10 +108,10 @@ using URL within the REMOTE to the latest version available from it."
   (with-error-resignaling
       ((executable-failure ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond)))
        (missing-executable ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond))))
-    (with-git-repository-write-access (initial-import-p
-                                       :if-repository-does-not-exist (if (remote-import-takes-over-init remote)
-                                                                         :continue
-                                                                         :create))
+    (with-repository-write-access (initial-import-p
+                                   :if-repository-does-not-exist (if (remote-import-takes-over-init remote)
+                                                                     :continue
+                                                                     :create))
         repo-dir
       (let* ((desire-op-ref '("desire" "op"))
              (remote-ref (make-remote-ref (name remote) "master"))
@@ -151,13 +134,13 @@ using URL within the REMOTE to the latest version available from it."
         ;; stay here, move with branch, move to desir0op
         (when (repository-policy-value :drive-head)
           (if drive-head-branch-p
-              (git-set-branch-index-tree remote-ref)
-              (git-set-head-index-tree desire-op-ref)))
+              (set-branch-index-tree remote-ref)
+              (set-head-index-tree desire-op-ref)))
         (when (repository-policy-value :reapply-stash)
-          (git-stash-apply))
-        (setf (git-repository-world-readable-p) *default-world-readable*)
+          (apply-stash))
+        (setf (repository-world-readable-p) *default-world-readable*)
         (let ((*executable-standard-output* nil))
-          (git-repository-update-for-dumb-servers repo-dir))))))
+          (update-repository-for-dumb-servers repo-dir))))))
 
 (defun update (module &key (locality (gate *self*)) pass-output (if-update-fails nil) &aux
                (module (coerce-to-module module)))

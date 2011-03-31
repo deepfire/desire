@@ -87,7 +87,7 @@
                   (unless (find module-name (location-module-names remote))
                     (ensure-remote-module remote module-name (or maybe-umbrella-name module-name) :credentials cred)
                     (when (typep remote 'cvs)
-                      (let* ((default-cvs-module-name (downstring module-name))
+                      (let* ((default-cvs-module-name (down-case-string module-name))
                              (cvs-module-name (or posturl default-cvs-module-name)))
                         (unless (string= cvs-module-name default-cvs-module-name)
                           (push (list module-name cvs-module-name) (wrinkles remote))))))))))
@@ -95,7 +95,7 @@
         (flet ((module-url-reformulable (name url current remotes)
                  (multiple-value-bind (type cred hostname port path) (parse-remote-namestring url :slashless (typep current 'cvs-native-remote) :type-hint (vcs-type current))
                    (declare (ignore cred)) ; XXX: is it the right thing to do?
-                   (match-module-url-components-against-remote-set hostname nil port path nil (downstring name) ; XXX: do we waste the *UMBRELLA* matcher here?
+                   (match-module-url-components-against-remote-set hostname nil port path nil (down-case-string name) ; XXX: do we waste the *UMBRELLA* matcher here?
                                                                    (remove-if-not (curry #'remote-types-compatible-p type) remotes)))))
           (iter (for (new-remote module-url module-name) in new-remotes)
                 (when-let* ((module-name (when (null (rest (location-module-names new-remote))) ; we're after single-module remotes

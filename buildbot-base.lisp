@@ -524,7 +524,7 @@
            (etypecase x
              (integer (write-to-string x))
              (string x)
-             (symbol (downstring x)))))
+             (symbol (down-case-string x)))))
     (let ((processed-path (mapcar #'interpret-path-element path)))
       (lret ((uri (format nil "<a href='~A~:[~;.~:*~A~]'>~A</a>"
                           (flatten-path-list (if *emitting-static*
