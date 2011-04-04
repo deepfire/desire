@@ -51,16 +51,7 @@ wishmaster we've bootstrapped from.")
   (*apps*                  (make-hash-table :test 'equal) "Map application names to remotes.")
   (*class-slot-store*      (make-hash-table :test 'equal))
   (*internal-module-names* (mapcar #'canonicalise-name '(".META" ".LOCAL-META"))
-    "The list of module names reserved to desire itself.")
-  (*credentials*           (alist-hash-table
-                            `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous
-                                                                 :username "anonymous" :password "anonymous"))
-                              (anonymous-empty     . ,(make-cred 'anonymous-empty
-                                                                 :username "anonymous" :password nil))
-                              (cvspublic-cvspublic . ,(make-cred 'cvspublic-cvspublic
-                                                                 :username "cvspublic" :password "cvspublic")))
-                            :test 'equal)
-                           "Credentials, by name. Not intended to be secure."))
+    "The list of module names reserved to desire itself."))
 
 (define-variable-set (constants :apply-defaults t)
   (*desire-version*                 "10.1.1")
@@ -80,8 +71,23 @@ wishmaster we've bootstrapped from.")
   (*xcvbifiable-module-set*         '()))
 
 (define-variable-set assorted-globals
+  (*credentials*           (alist-hash-table
+                            `((anonymous-anonymous . ,(make-cred 'anonymous-anonymous
+                                                                 :username "anonymous" :password "anonymous"))
+                              (anonymous-empty     . ,(make-cred 'anonymous-empty
+                                                                 :username "anonymous" :password nil))
+                              (cvspublic-cvspublic . ,(make-cred 'cvspublic-cvspublic
+                                                                 :username "cvspublic" :password "cvspublic"))
+                              (:buildslave .
+                                           ,(make-host-access :buildslave :hostname "betelheise" :username "empty"))
+                              (:buildslave-empty .
+                                                 ,(make-host-access :buildslave-empty :hostname "betelheise" :username "emptier"))
+                              (:buildmaster .
+                                            ,(make-host-access :buildmaster :hostname "localhost" :username "buildmaster")))
+                            :test 'equal)
+                           "Credentials, by name. Not intended to be secure.")
   (*unsaved-definition-changes-p*   nil
-    "Whether the idea about the world changed, since INIT was performed,
+                                    "Whether the idea about the world changed, since INIT was performed,
 or SAVE-DEFINITIONS was called.")
   (*source-registry-update-pending* nil))
 

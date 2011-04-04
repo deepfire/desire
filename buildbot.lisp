@@ -21,10 +21,6 @@
 (in-package :desire-buildbot)
 
 
-(defhostaccess :buildslave        :hostname "betelheise" :username "empty" :password nil)
-(defhostaccess :buildslave-empty  :hostname "betelheise" :username "emptier" :password nil)
-(defhostaccess :buildmaster       :hostname "localhost" :username "buildmaster" :password nil)
-
 (defvar *default-master* :git.feelingofgreen.ru)
 (defparameter *default-remote-lisp-credentials* :buildslave)
 (defparameter *bootstrap-script-location* "http://www.feelingofgreen.ru/shared/src/desire/climb.sh")
@@ -340,10 +336,10 @@
   (with-slots (credentials commands pipe process) ctx
     (setf pipe (make-pipe-stream :element-type 'character :buffering :none))
     (with-input-from-string (stream (compile-shell-command commands))
-      (with-executable-input-stream stream
-        (let ((*executable-standard-output* pipe))
-          (setf process (with-asynchronous-execution
-                          (ssh `(,(cred-username credentials) "@" ,(cred-hostname credentials)) "bash" "-s"))))))
+      (let ((*executable-standard-input* stream)
+            (*executable-standard-output* pipe))
+        (setf process (with-asynchronous-execution
+                        (ssh `(,(cred-username credentials) "@" ,(cred-hostname credentials)) "bash" "-s")))))
     (close (two-way-stream-output-stream pipe))))
 
 (defconstant ssh-connection-error-exit-code 255)

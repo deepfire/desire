@@ -1017,7 +1017,7 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 (defun fetch-git-remote (remote module-name &optional (directory *repository*))
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
   (with-condition-recourses error (with-remote ((name remote) :url (url remote module-name))
-                                    (fetch-remote (name remote)))
+                                    (fetch-remote (name remote) directory))
     (:retry-with-http (c)
                       (unless (and (typep remote 'git-combined-remote)
                                    *combined-remotes-prefer-native-over-http*)
@@ -1325,7 +1325,7 @@ value is returned."
   (with-directory (metastore-pathname :if-does-not-exist :create)
     (let ((*repository* metastore-pathname))
       (multiple-value-bind (type cred host port path) (parse-remote-namestring url)
-        (declare (ignore type cred port path))
+        (declare (ignore cred port path))
         (let ((remote-name (case type
                              (git-locality 'localhost)
                              (t            (canonicalise-name host)))))

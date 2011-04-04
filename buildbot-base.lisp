@@ -20,7 +20,8 @@
 
 (defpackage desire-buildbot
   (:nicknames :desree)
-  (:use :common-lisp :iterate :alexandria :pergamum :executor :portable-spawn :desire :hunchentoot :cl-who :elsewhere.0)
+  (:use :common-lisp :iterate :alexandria :hunchentoot :cl-who :split-sequence
+        :elsewhere.0 :pergamum :executor :portable-spawn :desire)
   (:export
    ;; buildmaster
    #:buildbot-condition
@@ -168,7 +169,7 @@
 
 (defvar *verbose-termination* nil)
 (define-binder with-verbose-termination *verbose-termination* :fixed-value t)
-(define-binder with-verbose-termination *verbose-termination* :fixed-value t :maybe t)
+(define-binder with-maybe-verbose-termination *verbose-termination* :fixed-value t :maybep t)
 
 (defun invoke-with-tracked-termination (action handlep fn)
   (let (normally-executed-p

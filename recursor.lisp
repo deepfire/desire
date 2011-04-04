@@ -269,5 +269,5 @@ Defined keywords:
 which might be absent due to undeclared dependencies."
   (load-system (coerce-to-system system)
                (lambda (system)
-                 (get (list (list (system-module system) system))
-                      :skip-present t :verbose verbose))))
+                 (take (list (list (system-module system) system))
+                       :skip-present t :verbose verbose))))
