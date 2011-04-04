@@ -115,7 +115,7 @@
                  (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
                         desire))
                (when modules
-                 (get modules :verbose verbose :skip-present t)
+                 (take modules :verbose verbose :skip-present t)
                  #+nil
                  (if phases
                      (buildslave modules phases verbose)

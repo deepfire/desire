@@ -5,8 +5,7 @@
   (:use :common-lisp :alexandria :iterate :split-sequence :pergamum :elsewhere.0 :portable-spawn :executor :gittage)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
   (:shadow
-   #:*modules*
-   #:get)
+   #:*modules*)
   (:export
    ;; dependencies.lisp
    #:name
@@ -232,7 +231,7 @@
    #:update
    ;; recursor.lisp
    #:*fetch-errors-serious*
-   #:get
+   #:take
    #:loadsys
    ;; desire.lisp :: tests
    #:run-module-test

@@ -224,7 +224,7 @@
             :verbose verbose))
          (return (values module-dictionary system-dictionary)))))
 
-(defun get (desires &key complete skip-present skip-missing (seal t) verbose)
+(defun take (desires &key complete skip-present skip-missing (seal t) verbose)
   "Satisfy module DESIRES and return the list of names of updated modules.
 
 Desire satisfaction means:
