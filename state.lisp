@@ -79,11 +79,11 @@ wishmaster we've bootstrapped from.")
                               (cvspublic-cvspublic . ,(make-cred 'cvspublic-cvspublic
                                                                  :username "cvspublic" :password "cvspublic"))
                               (:buildslave .
-                                           ,(make-host-access :buildslave :hostname "betelheise" :username "empty"))
+                                           ,(make-host-access :buildslave :hostname "betelheise" :username "empty" :password nil))
                               (:buildslave-empty .
-                                                 ,(make-host-access :buildslave-empty :hostname "betelheise" :username "emptier"))
+                                                 ,(make-host-access :buildslave-empty :hostname "betelheise" :username "emptier" :password nil))
                               (:buildmaster .
-                                            ,(make-host-access :buildmaster :hostname "localhost" :username "buildmaster")))
+                                            ,(make-host-access :buildmaster :hostname "localhost" :username "buildmaster" :password nil)))
                             :test 'equal)
                            "Credentials, by name. Not intended to be secure.")
   (*unsaved-definition-changes-p*   nil
