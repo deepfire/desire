@@ -129,14 +129,16 @@ using URL within the REMOTE to the latest version available from it."
         ;;    f-m-u-r and apply
         ;;    - try merge unsaved changes  stash  head  ffor  stapp  ; reasonable?
         ;;    - ignore unsaved changes     ???    head  ffor  reset
-        (git *repository* "update-ref" desire-op-ref remote-ref)
-        (ensure-clean-repository (repository-policy-value :unsaved-changes-postwrite))
+        (git *repository* "update-ref" desire-op-ref (cook-ref-value remote-ref))
+        (unless initial-import-p
+          (ensure-clean-repository (repository-policy-value :unsaved-changes-postwrite)))
         ;; stay here, move with branch, move to desir0op
         (when (repository-policy-value :drive-head)
           (if drive-head-branch-p
               (set-branch-index-tree remote-ref)
               (set-head-index-tree desire-op-ref)))
-        (when (repository-policy-value :reapply-stash)
+        (when (and (repository-policy-value :reapply-stash)
+                   (not initial-import-p))
           (apply-stash))
         (setf (repository-world-readable-p) *default-world-readable*)
         (let ((*executable-standard-output* nil))
