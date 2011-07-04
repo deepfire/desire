@@ -174,9 +174,9 @@ when IF-UPDATE-FAILS is :ERROR, causes an error to be signalled."
                 (update-module-using-remote module-name best-remote url repo-dir)
                 (format t ";; Done fetching ~A~%" module-name)
                 (when *default-publishable*
-                  (declare-module-converted module-name locality)))))
-          ;; alright, fetch went good, now tie in changes
-          (notice-module-repository module nil locality)))
+                  (declare-module-converted module-name locality))
+                ;; alright, fetch went good, now tie in changes
+                (notice-module-repository module nil locality))))))
     ;; no acceptable remote found..
     (unless (and (module-locally-present-p module)
                  (ecase if-update-fails
