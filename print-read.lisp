@@ -337,11 +337,12 @@ The value returned is the merged type for SUBJECT-REMOTE.")
 ;;; READ path
 ;;;
 (defmacro with-definition-read-context (&body body)
-  `(let ((*readtable* (copy-readtable))
-         (*read-eval* nil)
-         (*read-universal-time* (get-universal-time))
-         (*package* #.*package*))
-     ,@body))
+  `(with-standard-io-syntax
+     (let ((*readtable* (copy-readtable))
+           (*read-eval* nil)
+           (*read-universal-time* (get-universal-time))
+           (*package* #.*package*))
+       ,@body)))
 
 (defun distributor-reader (stream &optional char sharp)
   (declare (ignore char sharp))
