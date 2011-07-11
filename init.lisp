@@ -43,10 +43,10 @@
       (call-next-method)))
   (:method ((o (eql 'darcs)))
     (when-let ((executable (module-wildfile :bzr-fastimport "darcs-fast-export")))
-      (setf (executable 'darcs-fast-export) executable)))
+      (setf (executable 'gittage::darcs-fast-export) executable)))
   (:method ((o (eql 'hg)))
     (when-let ((executable (module-wildfile :bzr-fastimport "hg-fast-export" :type "py")))
-      (setf (executable 'hg-fast-export) executable))))
+      (setf (executable 'gittage::hg-fast-export) executable))))
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
@@ -223,6 +223,7 @@ locally present modules will be marked as converted."
       ;; Set up tools for import
       ;;
       (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
+      (locate-import-executables)
       (dolist (type *vcs-appendage-types*)
         (try-ensure-importer-executable type))
       (determine-tools-and-update-remote-accessibility)

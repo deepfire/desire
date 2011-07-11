@@ -70,7 +70,7 @@ the provided directory is the final directory in the gate locality.")
       (set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     ;; 2. figure out in what refs convertors store the conversion result
-    (let ((master-val (ref-value '("master") nil)))
+    (let ((master-val (ref-value '("master") repo-dir)))
       (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
   (:method ((o hg-http-remote) name url repo-dir initialp)
@@ -89,7 +89,7 @@ the provided directory is the final directory in the gate locality.")
   (:method ((o cvs-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o name)
       (indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
-                           (or cvs-module-name (down-case-string name)) (cvs-locality-lock-path o))))
+                           (or cvs-module-name (down-case-string name)) (cvs-locality-lock-path (locality o)))))
   (:method ((o svn-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url o name)
       (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
