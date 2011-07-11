@@ -107,7 +107,7 @@ part is done by ENSURE-MODULE-SYSTEMS-LOADABLE.")
         (destructuring-bind (option maybe-stored-system-registry-path) form
           (if (eq option :include)
               (unless (equal maybe-stored-system-registry-path system-registry-path)
-                (syncformat "~@<;; ~@;Taking over source registry entry ~S.~_Redirecting source registry from ~S to ~S.~:@>~%"
+                (syncformat t "~@<;; ~@;Taking over source registry entry ~S.~_Redirecting source registry from ~S to ~S.~:@>~%"
                             desire-asdf-source-location-registry maybe-stored-system-registry-path system-registry-path))
               (takeover-config)))
         (takeover-config)))))
