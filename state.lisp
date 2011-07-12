@@ -63,7 +63,7 @@ wishmaster we've bootstrapped from.")
   (*asdf-system-blacklist*          '("cffi-tests" "trivial-features-tests"))
   (*implementation-provided-system-names*
    #+sbcl '("ASDF-INSTALL" "SB-ACLREPL" "SB-BSD-SOCKETS" "SB-CLTL2" "SB-COVER" "SB-EXECUTABLE" "SB-GROVEL"
-            "SB-INTROSPECT" "SB-MD5" "SB-POSIX" "SB-QUEUE" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS" "SB-SPROF")
+            "SB-INTROSPECT" "SB-MD5" "SB-CONCURRENCY" "SB-POSIX" "SB-QUEUE" "SB-ROTATE-BYTE" "SB-RT" "SB-SIMPLE-STREAMS" "SB-SPROF")
    #-sbcl nil)
   (*libcl-project-index*            "http://libcl.com/libcl-current/index.html")
   (*hg-to-git-location*             #p"/usr/share/doc/git-core/contrib/hg-to-git/hg-to-git.py")

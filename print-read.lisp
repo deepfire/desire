@@ -492,7 +492,7 @@ When SEAL-P is non-NIL, the changes are committed."
 
 (defparameter *impl-components*
   (alist-hash-table
-   `((:sbcl  :asdf :sb-grovel :sb-posix)
+   `((:sbcl  :asdf :sb-grovel :sb-posix :sb-concurrency)
      (:ecl   :asdf :cmp)
      (:clisp :asdf))))
 
