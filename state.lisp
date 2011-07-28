@@ -20,7 +20,7 @@
 
 (in-package :desire)
 
-(define-variable-set knobs
+(define-variable-set (knobs :apply-defaults t)
   (*default-bootstrap-wishmaster-name*        "git.feelingofgreen.ru")
   (*bootstrap-wishmaster*                     nil
     "This variable, during bootstrap (only if applicable), is set to the
