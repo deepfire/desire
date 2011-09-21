@@ -262,68 +262,69 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
       (with-container recomputedp (recomputedp :type boolean :if-does-not-exist :continue)
         (labels ((do-calc-sysdeps (depstack s)
                    ;; XXX: ensure-slot-value special form ?
-                   (with-slots (name direct-dependency-names dependencies definition-complete-p) s
-                     (when verbose
-                       (format t ";;;; computing deps of ~A for~{ ~A~}~%" name (mapcar #'name depstack)))
-                     (cond ((member s depstack) ; dependency loop?
-                            (when verbose
-                              (format t "~@<;;;; ~@;...dependency loop: ~A~:@>~%" (mapcar #'name depstack)))
-                            (push name (removed-links (first depstack)))
-                            (deletef (slot-value (first depstack) 'direct-dependency-names) name)
-                            ;; not re-adding dependencies
-                            ;; NOTE: what about incompleteness propagation?
-                            (values t nil))
-                           ((and (slot-boundp s 'dependencies) ; cached?
-                                 definition-complete-p
-                                 (or (system-host-p s) ; it's constant
-                                     (not force-recompute)
-                                     (recomputedp s)))
-                            (when verbose
-                              (format t "~@<;;;;;; ~@;...already computed, returning ~:[in~;~]complete,~
+                   (with-slots (name dependencies definition-complete-p) s
+                     (let ((direct-deps (direct-system-dependencies s)))
+                       (when verbose
+                         (format t ";;;; computing deps of ~A for~{ ~A~}~%" name (mapcar #'name depstack)))
+                       (cond ((member s depstack) ; dependency loop?
+                              (when verbose
+                                (format t "~@<;;;; ~@;...dependency loop: ~A~:@>~%" (mapcar #'name depstack)))
+                              (push name (removed-links (first depstack)))
+                              (deletef (slot-value (first depstack) 'direct-dependency-names) name)
+                              ;; not re-adding dependencies
+                              ;; NOTE: what about incompleteness propagation?
+                              (values t nil))
+                             ((and (slot-boundp s 'dependencies) ; cached?
+                                   definition-complete-p
+                                   (or (system-host-p s) ; it's constant
+                                       (not force-recompute)
+                                       (recomputedp s)))
+                              (when verbose
+                                (format t "~@<;;;;;; ~@;...already computed, returning ~:[in~;~]complete,~
                                                       ~:[ leaf~;~%~10T~:*~A~]~:@>~%"
-                                      definition-complete-p (mapcar #'name dependencies)))
-                            (values definition-complete-p
-                                    dependencies))
-                           ((system-locally-present-p s) ; available?
-                            (when verbose
-                              (format t ";;;; ...computing, directs: ~A~%" direct-dependency-names))
-                            (setf dependencies
-                                  (delete-duplicates
-                                   (iter (for depname in direct-dependency-names)
-                                         (for depsys = (ensure-system depname))
-                                         (when verbose
-                                           (format t ";;;;;; processing direct ~A, ~
+                                        definition-complete-p (mapcar #'name dependencies)))
+                              (values definition-complete-p
+                                      dependencies))
+                             ((system-locally-present-p s) ; available?
+                              (when verbose
+                                (format t ";;;; ...computing, directs: ~A~%" direct-deps))
+                              (setf dependencies
+                                    (delete-duplicates
+                                     (iter (for depname in direct-deps)
+                                           (for depsys = (ensure-system depname))
+                                           (when verbose
+                                             (format t ";;;;;; processing direct ~A, ~
                                                              ~:[missing~;present, ~:[un~;~]known~]~%"
-                                                   depname depsys (and depsys (system-known-p depsys))))
-                                         (nconcing
-                                          (cond
-                                            ((not (system-known-p depsys))
-                                             ;; There are three reasons for system's definitions to be incomplete.
-                                             ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
-                                             (setf definition-complete-p nil)
-                                             (list depsys))
-                                            (t
-                                             (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
-                                               ;; Incomplete dependencies being contagious are the second reason.
-                                               (setf definition-complete-p complete-p)
-                                               (cons depsys (copy-list deps))))))))
-                                  (recomputedp s) t)
-                            (unless direct-dependency-names ; no deps, no problems
-                              (setf definition-complete-p t))
-                            (when verbose
-                              (format t "~@<;;;; ~@;...computed: ~A~:@>~%"
-                                      (mapcar (curry #'xform-if #'identity #'name) dependencies))
-                              (format t "~@<;;;;;; ~@;computed dependencies of ~A: ~:[in~;~]complete,~
+                                                     depname depsys (and depsys (system-known-p depsys))))
+                                           (nconcing
+                                            (cond
+                                              ((not (system-known-p depsys))
+                                               ;; There are three reasons for system's definitions to be incomplete.
+                                               ;; Martian (i.e. not mentioned in DEFINITIONS) dependencies is the first one.
+                                               (setf definition-complete-p nil)
+                                               (list depsys))
+                                              (t
+                                               (multiple-value-bind (complete-p deps) (do-calc-sysdeps (cons s depstack) depsys)
+                                                 ;; Incomplete dependencies being contagious are the second reason.
+                                                 (setf definition-complete-p complete-p)
+                                                 (cons depsys (copy-list deps))))))))
+                                    (recomputedp s) t)
+                              (unless direct-deps ; no deps, no problems
+                                (setf definition-complete-p t))
+                              (when verbose
+                                (format t "~@<;;;; ~@;...computed: ~A~:@>~%"
+                                        (mapcar (curry #'xform-if #'identity #'name) dependencies))
+                                (format t "~@<;;;;;; ~@;computed dependencies of ~A: ~:[in~;~]complete,~
                                                       ~:[ leaf~;~%~10T~:*~A~]~:@>~%"
-                                      name definition-complete-p (mapcar #'name dependencies)))
-                            (values definition-complete-p
-                                    dependencies))
-                           (t
-                            (when verbose
-                              (format t ";;;; ...not locally present, skipping~%"))
-                            ;; System not being locally present is the third reason.
-                            (values (setf definition-complete-p nil)
-                                    nil)))))
+                                        name definition-complete-p (mapcar #'name dependencies)))
+                              (values definition-complete-p
+                                      dependencies))
+                             (t
+                              (when verbose
+                                (format t ";;;; ...not locally present, skipping~%"))
+                              ;; System not being locally present is the third reason.
+                              (values (setf definition-complete-p nil)
+                                      nil))))))
                  (sysdeps (s)
                    (unwind-protect (do-calc-sysdeps nil s)
                      ;; reinstate loops..
