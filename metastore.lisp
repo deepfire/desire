@@ -54,7 +54,7 @@
                      (setf return-value (funcall fn stream)))))
       (with-output-to-file (stream (metafile-path name metastore-directory) :element-type 'character :if-does-not-exist :create)
         (write-string content stream)))
-    (when (and commit-p (repository-changes-p metastore-directory))
+    (when (and commit-p (gittage:repository-changes-p metastore-directory))
       (commit-metafile name metastore-directory commit-message))))
 
 (defmacro with-output-to-new-metafile ((stream name metastore-directory &key commit-p commit-message) &body body)
@@ -78,7 +78,7 @@ additionally requiring that REQUIRED-METAFILES are present."
   "Initialise metastore in DIRECTORY, with optional, empty
 REQUIRED-METAFILES."
   (with-explanation ("initialising git metastore database in ~S" directory)
-    (init-repo directory))
+    (gittage:init-repo directory))
   (when publicp
     (open (merge-pathnames ".git/git-daemon-export-ok" directory) :direction :probe :if-does-not-exist :create))
   (dolist (mf required-metafiles)

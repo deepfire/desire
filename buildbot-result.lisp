@@ -68,9 +68,9 @@
   (:method ((o master-update-phase) (r result))
     (if-let ((commit (slot-value* r 'commit nil)))
       (concatenate 'string
-                   "<pre>Commit-ID: " (desr::cook-ref-value (desr::commit-id commit)) "</pre><br>"
-                   "<pre>Author:    " (desr::commit-author commit) "</pre><br>"
-                   "<pre>Date:      " (desr::commit-date commit) "</pre><br>")
+                   "<pre>Commit-ID: " (gittage:cook-ref-value (gittage:commit-id commit)) "</pre><br>"
+                   "<pre>Author:    " (gittage:commit-author commit) "</pre><br>"
+                   "<pre>Date:      " (gittage:commit-date commit) "</pre><br>")
       "")))
 
 (defun invalidate-result-hint-cache (&optional (buildmaster-run (first *buildmaster-runs*)))

@@ -2,8 +2,9 @@
 
 (defpackage desire
   (:nicknames :desr)
-  (:use :common-lisp :alexandria :iterate :split-sequence :pergamum :elsewhere.0 :portable-spawn :executor :gittage)
+  (:use :common-lisp :alexandria :iterate :split-sequence :pergamum :elsewhere.0 :portable-spawn :executor)
   (:import-from :cl-fad #:directory-exists-p #:file-exists-p)
+  (:import-from :gittage #:git #:*repository*)
   (:shadow
    #:*modules*)
   (:export
@@ -217,16 +218,6 @@
    #:module-post-install
    #:sync-module
    #:ensure-module-systems-loadable
-   ;; gittage.lisp
-   #:*repository*
-   #:repo-var
-   #:module-git-branches
-   #:module-git-remotes
-   #:module-add-git-remote
-   #:ensure-module-git-remote
-   #:module-bare-p
-   #:module-locally-present-p
-   #:module-world-readable-p
    ;; import.lisp
    #:update
    ;; recursor.lisp

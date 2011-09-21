@@ -24,24 +24,24 @@
                        (repo (module-pathname module)))
   "'I know what I do' mode: silently resets stuff."
   (update module)
-  (with-repository-write-access (new-p) repo
+  (gittage:with-repository-write-access (new-p) repo
     (declare (ignore new-p))
-    (let ((saved-head (get-head nil repo))
-          (saved-xcvbify (ref-value '("heads" "xcvbify") nil :if-does-not-exist :continue)))
-      (set-head-index-tree :tracker :reset)
-      (set-branch :xcvbify)
-      (set-head-index-tree :xcvbify :error)
+    (let ((saved-head (gittage:get-head nil repo))
+          (saved-xcvbify (gittage:ref-value '("heads" "xcvbify") nil :if-does-not-exist :continue)))
+      (gittage:set-head-index-tree :tracker :reset)
+      (gittage:set-branch :xcvbify)
+      (gittage:set-head-index-tree :xcvbify :error)
       (unless (file-exists-p "build.xcvb")
         (with-file-from-www (".xcvbifier.diff" `(,*xcvbifier-base-uri* ,(down-case-name module) ".diff"))
-          (multiple-value-bind (successp output) (apply-diff ".xcvbifier.diff" *repository* t nil)
+          (multiple-value-bind (successp output) (gittage:apply-diff ".xcvbifier.diff" *repository* t nil)
             (cond (successp
                    (with-explanation ("committing xcvbification change")
                      (git *repository* "commit" "-m" "Xcvbify.")))
                   (t
-                   (set-head-index-tree saved-head :reset)
+                   (gittage:set-head-index-tree saved-head :reset)
                    (if saved-head
-                       (set-branch :xcvbify nil saved-xcvbify)
-                       (remove-branch :xcvbify))
+                       (gittage:set-branch :xcvbify nil saved-xcvbify)
+                       (gittage:remove-branch :xcvbify))
                    (let ((control-string "~@<;; ~@;failed to apply XCVBification diff to ~A:~%~A~:@>~%"))
                      (if break-on-patch-failure
                          (break control-string (name module) output)

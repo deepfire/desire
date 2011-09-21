@@ -263,29 +263,29 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
         (labels ((do-calc-sysdeps (depstack s)
                    ;; XXX: ensure-slot-value special form ?
                    (with-slots (name dependencies definition-complete-p) s
-                     (let ((direct-deps (direct-system-dependencies s)))
-                       (when verbose
-                         (format t ";;;; computing deps of ~A for~{ ~A~}~%" name (mapcar #'name depstack)))
-                       (cond ((member s depstack) ; dependency loop?
-                              (when verbose
-                                (format t "~@<;;;; ~@;...dependency loop: ~A~:@>~%" (mapcar #'name depstack)))
-                              (push name (removed-links (first depstack)))
-                              (deletef (slot-value (first depstack) 'direct-dependency-names) name)
-                              ;; not re-adding dependencies
-                              ;; NOTE: what about incompleteness propagation?
-                              (values t nil))
-                             ((and (slot-boundp s 'dependencies) ; cached?
-                                   definition-complete-p
-                                   (or (system-host-p s) ; it's constant
-                                       (not force-recompute)
-                                       (recomputedp s)))
-                              (when verbose
-                                (format t "~@<;;;;;; ~@;...already computed, returning ~:[in~;~]complete,~
+                     (when verbose
+                       (format t ";;;; computing deps of ~A for~{ ~A~}~%" name (mapcar #'name depstack)))
+                     (cond ((member s depstack) ; dependency loop?
+                            (when verbose
+                              (format t "~@<;;;; ~@;...dependency loop: ~A~:@>~%" (mapcar #'name depstack)))
+                            (push name (removed-links (first depstack)))
+                            (deletef (slot-value (first depstack) 'direct-dependency-names) name)
+                            ;; not re-adding dependencies
+                            ;; NOTE: what about incompleteness propagation?
+                            (values t nil))
+                           ((and (slot-boundp s 'dependencies) ; cached?
+                                 definition-complete-p
+                                 (or (system-host-p s) ; it's constant
+                                     (not force-recompute)
+                                     (recomputedp s)))
+                            (when verbose
+                              (format t "~@<;;;;;; ~@;...already computed, returning ~:[in~;~]complete,~
                                                       ~:[ leaf~;~%~10T~:*~A~]~:@>~%"
-                                        definition-complete-p (mapcar #'name dependencies)))
-                              (values definition-complete-p
-                                      dependencies))
-                             ((system-locally-present-p s) ; available?
+                                      definition-complete-p (mapcar #'name dependencies)))
+                            (values definition-complete-p
+                                    dependencies))
+                           ((system-locally-present-p s) ; available?
+                            (let ((direct-deps (direct-system-dependencies s)))
                               (when verbose
                                 (format t ";;;; ...computing, directs: ~A~%" direct-deps))
                               (setf dependencies
@@ -318,13 +318,13 @@ When FORCE-RECOMPUTE is non-NIL full system dependency caches are recomputed."
                                                       ~:[ leaf~;~%~10T~:*~A~]~:@>~%"
                                         name definition-complete-p (mapcar #'name dependencies)))
                               (values definition-complete-p
-                                      dependencies))
-                             (t
-                              (when verbose
-                                (format t ";;;; ...not locally present, skipping~%"))
-                              ;; System not being locally present is the third reason.
-                              (values (setf definition-complete-p nil)
-                                      nil))))))
+                                      dependencies)))
+                           (t
+                            (when verbose
+                              (format t ";;;; ...not locally present, skipping~%"))
+                            ;; System not being locally present is the third reason.
+                            (values (setf definition-complete-p nil)
+                                    nil)))))
                  (sysdeps (s)
                    (unwind-protect (do-calc-sysdeps nil s)
                      ;; reinstate loops..

@@ -35,7 +35,7 @@
                                   `(,(concatenate 'string (down-case-name module) "_latest.tar"))
                                   :type "gz")))
     (with-output-to-file (*output* output-filename)
-      (pipe (git repo "archive" `("--prefix=" ,(down-case-name module) "_latest/") (cook-ref-value ref))
+      (pipe (git repo "archive" `("--prefix=" ,(down-case-name module) "_latest/") (gittage:cook-ref-value ref))
             (gzip)))
     (with-executable-options (:environment `(,(format nil "GPG_AGENT_INFO=~A" gpg-agent-info))
                                            :output nil)

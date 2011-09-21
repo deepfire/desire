@@ -453,13 +453,13 @@ When SEAL-P is non-NIL, the changes are committed."
       (with-output-to-new-metafile (definitions 'definitions localmeta :commit-p seal :commit-message commit-message)
         (serialise-local-definitions definitions)
         (terpri definitions))
-      (update-repository-for-dumb-servers meta)
+      (gittage:update-repository-for-dumb-servers meta)
       (setf *unsaved-definition-changes-p* nil)
       (values))))
 
 (defun unsaved-definition-changes-p ()
   "See whether there are unsaved changes to DEFINITIONS."
-  (repository-changes-p (meta *self*)))
+  (gittage:repository-changes-p (meta *self*)))
 
 ;;;
 ;;; Automated desire bootstrap generation

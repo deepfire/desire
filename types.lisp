@@ -1016,8 +1016,8 @@ DARCS/CVS/SVN need darcs://, cvs:// and svn:// schemas, correspondingly."
 
 (defun fetch-git-remote (remote module-name &optional (directory *repository*))
   "Fetch from REMOTE, with working directory optionally changed to DIRECTORY."
-  (with-condition-recourses error (with-remote ((name remote) :url (url remote module-name))
-                                    (fetch-remote (name remote) directory))
+  (with-condition-recourses error (gittage:with-remote ((name remote) :url (url remote module-name))
+                                    (gittage:fetch-remote (name remote) directory))
     (:retry-with-http (c)
                       (unless (and (typep remote 'git-combined-remote)
                                    *combined-remotes-prefer-native-over-http*)
@@ -1129,7 +1129,7 @@ behavior of the SKIP-MODULE restart."
                         module)))
 
 (defun compute-module-presence (module &optional (locality (gate *self*)))
-  (nonbare-repository-present-p (module-pathname module locality)))
+  (gittage:nonbare-repository-present-p (module-pathname module locality)))
 
 (defun update-module-presence (module &optional (locality (gate *self*)) (force-to nil forcep))
   "Recompute MODULE's presence in LOCALITY, updating MODULE's presence cache.
@@ -1232,7 +1232,7 @@ to general public within LOCALITY."
   (removef (gate-converted-module-names locality) name)
   (removef (gate-unpublished-module-names locality) name)
   (pushnew name (gate-hidden-module-names locality))
-  (setf (repository-world-readable-p (module-pathname module locality)) nil))
+  (setf (gittage:repository-world-readable-p (module-pathname module locality)) nil))
 
 (defun make-module-unpublished (module &optional (locality (gate *self*)) &aux
                                 (module (coerce-to-module module))
@@ -1242,7 +1242,7 @@ If it is hidden, unhide it."
   (removef (location-module-names locality) name)
   (removef (gate-converted-module-names locality) name)
   (pushnew name (gate-unpublished-module-names locality))
-  (setf (repository-world-readable-p (module-pathname module locality)) t)
+  (setf (gittage:repository-world-readable-p (module-pathname module locality)) t)
   (removef (gate-hidden-module-names locality) name))
 
 (defun declare-module-converted (module &optional (locality (gate *self*)) &aux
@@ -1261,7 +1261,7 @@ If it is hidden, unhide it."
 (defun module-hidden-p (module &optional (locality (gate *self*)))
   "Determine whether MODULE is hidden, with regard to LOCALITY.
 This is a function of MODULE repository's anonymous accessibility."
-  (not (repository-world-readable-p (module-pathname (coerce-to-module module) locality))))
+  (not (gittage:repository-world-readable-p (module-pathname (coerce-to-module module) locality))))
 
 (defun module-publishable-p (module &optional (locality (gate *self*)))
   "Determine whether MODULE is publishable via gate LOCALITY.
@@ -1316,7 +1316,7 @@ with SYSTEM specifying the driven variable binding."
 ;;;;
 (defun reset-metastore (&optional (metastore-pathname (meta *self*)))
   "Drop unsaved changes recorded in METASTORE-PATHNAME."
-  (set-branch-index-tree nil metastore-pathname))
+  (gittage:set-branch-index-tree nil metastore-pathname))
 
 (defun clone-metastore (url http-url metastore-pathname branch)
   "Clone metastore from URL, with working directory optionally changed to
@@ -1330,8 +1330,8 @@ value is returned."
                              (git-locality 'localhost)
                              (t            (canonicalise-name host)))))
           (with-explanation ("cloning metastore ~A/.meta in ~S" url metastore-pathname)
-            (init-repo metastore-pathname)
-            (ensure-remote remote-name (concatenate 'string url ".meta"))
+            (gittage:init-repo metastore-pathname)
+            (gittage:ensure-remote remote-name (concatenate 'string url ".meta"))
             ;; This should go through fetch-git-remote, which is currently impossible
             ;; due to how URL works.
             (with-maybe-handled-executable-failures t
@@ -1340,7 +1340,7 @@ value is returned."
                 (format t "~@<;; ~@;Failed to fetch from a combined git remote ~A (~A) in native mode.  ~
                           Retrying in dumb HTTP mode.~_The error was:~_~A~:@>~%"
                         remote-name url c)
-                (ensure-remote remote-name (concatenate 'string http-url ".meta/.git"))
+                (gittage:ensure-remote remote-name (concatenate 'string http-url ".meta/.git"))
                 (with-maybe-handled-executable-failures t
                     (git metastore-pathname "fetch" (down-case-name remote-name))
                   (:handler (c)
@@ -1352,14 +1352,14 @@ value is returned."
                 (setf *combined-remotes-prefer-native-over-http* nil)
                 t)))
           ;; Pasted from GIT-FETCH-MODULE-USING-REMOTE's GIT-REMOTE method.
-          (let ((remote-master-val (ref-value `("remotes" ,(down-case-name remote-name) "master") metastore-pathname)))
-            (set-branch :master metastore-pathname remote-master-val (not (head-detached-p))))
-          (set-head-index-tree :master)
-          (set-branch-index-tree (make-remote-ref remote-name branch)))))))
+          (let ((remote-master-val (gittage:ref-value `("remotes" ,(down-case-name remote-name) "master") metastore-pathname)))
+            (gittage:set-branch :master metastore-pathname remote-master-val (not (gittage:head-detached-p))))
+          (gittage:set-head-index-tree :master)
+          (gittage:set-branch-index-tree (gittage:make-remote-ref remote-name branch)))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)
-    (iter (for (nil remote-name branch-name) in (remove-if-not #'ref-remotep (refs-by-value (ref-value '("master") metastore-pathname)
+    (iter (for (nil remote-name branch-name) in (remove-if-not #'gittage:ref-remotep (gittage:refs-by-value (gittage:ref-value '("master") metastore-pathname)
                                                                                             metastore-pathname)))
           ;; that's a pretty silent assumption: the gate remote is named after the entity
           (for d = (distributor (string-upcase remote-name) :if-does-not-exist :continue))
@@ -1370,9 +1370,9 @@ value is returned."
 
 (defmacro within-wishmaster-meta ((wishmaster branch &key update-p) &body body)
   (once-only (wishmaster)
-    `(with-repository-write-access (_) (meta *self*)
+    `(gittage:with-repository-write-access (_) (meta *self*)
        ,@(when update-p `((fetch-git-remote (gate ,wishmaster) :.meta)))
-       (with-branch-change ((make-remote-ref (down-case-name ,wishmaster) ,branch) :master)
+       (gittage:with-branch-change ((gittage:make-remote-ref (down-case-name ,wishmaster) ,branch) :master)
          ,@body))))
 
 (defun merge-remote-wishmaster (wishmaster)
@@ -1381,7 +1381,7 @@ value is returned."
                   (rel-branch r)
                   "master"))
         (metastore (meta *self*)))
-    (with-repository-write-access (_) metastore
+    (gittage:with-repository-write-access (_) metastore
       (handler-case (within-wishmaster-meta (wishmaster branch :update-p t)
                       (read-definitions :source wishmaster :force-source nil :metastore metastore))
         (executable-error (c)

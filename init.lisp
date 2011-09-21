@@ -32,10 +32,10 @@
   directory)
 
 (defun ensure-committer-identity ()
-  (unless (config-var 'user.name)
+  (unless (gittage:config-var 'user.name)
     (let ((username (format nil "Desire operator on ~A" (down-case-name *self*))))
       (syncformat t "~@<;;; ~@;Setting git user name to ~S~:@>~%" username)
-      (setf (config-var 'user.name) username))))
+      (setf (gittage:config-var 'user.name) username))))
 
 (defgeneric try-ensure-importer-executable (type)
   (:method :around (o)
@@ -50,7 +50,7 @@
 
 (defun determine-tools-and-update-remote-accessibility ()
   "Find out which and where VCS tools are available and disable correspondingly inaccessible remotes."
-  (let ((present (cons *gate-vcs-type* (remove-if-not #'locate-vcs-import-executables *supported-import-types*))))
+  (let ((present (cons *gate-vcs-type* (remove-if-not #'gittage:locate-vcs-import-executables gittage:*supported-import-types*))))
     (dolist (vcs-type present)
       (setf (class-slot vcs-type 'enabled-p) t))
     (do-remotes (r)
@@ -188,7 +188,7 @@ locally present modules will be marked as converted."
           (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S ~
                                   (with HTTP fallback to ~S~:[~;, and proxy ~:*~S~])~:@>~%"
                       meta-path bootstrap-url bootstrap-http-url http-proxy)
-          (setf *http-proxy* http-proxy)
+          (setf gittage:*http-proxy* http-proxy)
           (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
       (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
       (let ((last-author (read-definitions :force-source t :metastore meta-path)))
@@ -223,7 +223,7 @@ locally present modules will be marked as converted."
       ;; Set up tools for import
       ;;
       (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
-      (locate-import-executables)
+      (gittage:locate-import-executables)
       (dolist (type *vcs-appendage-types*)
         (try-ensure-importer-executable type))
       (determine-tools-and-update-remote-accessibility)

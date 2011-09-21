@@ -23,13 +23,13 @@
 
 (defun master-detached-p (&optional (repo-dir *repository*))
   "See if the master branch is driven by the user, that is out of desire's control."
-  (not (ref= '("master") '("tracker") repo-dir)))
+  (not (gittage:ref= '("master") '("tracker") repo-dir)))
 
 (defun ensure-tracker-branch (&optional (repo-dir *repository*) ref &aux
-                              (ref (or ref (get-head t repo-dir))))
-  (unless (branch-present-p :tracker repo-dir)
-    (set-branch :tracker repo-dir ref)))
+                              (ref (or ref (gittage:get-head t repo-dir))))
+  (unless (gittage:branch-present-p :tracker repo-dir)
+    (gittage:set-branch :tracker repo-dir ref)))
 
 (defun switch-to-op (&optional (repository *repository*) &aux
                      (op '("desire" "op")))
-  (set-head op repository))
+  (gittage:set-head op repository))

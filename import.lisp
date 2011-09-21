@@ -37,18 +37,18 @@
     (with-executable-options (:explanation `("attempting to touch module ~A in ~S" ,(coerce-to-name name) ,(url o name)))
       (call-next-method)))
   (:method ((o git-remote) name)
-    (touch-repository (url o name)))
+    (gittage:touch-repository (url o name)))
   (:method ((o darcs-http-remote) name)
     (or (touch-www-file `(,(url o name) "_darcs/hashed_inventory"))
         (touch-www-file `(,(url o name) "_darcs/inventory"))))
   (:method ((o hg-http-remote) name)
     (touch-www-file `(,(url o name) "?cmd=heads")))
   (:method ((o rsync) name)
-    (touch-rsync-repository (url o name)))
+    (gittage:touch-rsync-repository (url o name)))
   (:method ((o cvs-native-remote) name)
-    (touch-cvs-repository (url o name)))
+    (gittage:touch-cvs-repository (url o name)))
   (:method ((o tarball-http-remote) name)
-    (not (null (determine-available-module-tarball-version-starting-after (url o name) (initial-tarball-version o)))))
+    (not (null (gittage:determine-available-module-tarball-version-starting-after (url o name) (initial-tarball-version o)))))
   (:method ((o svn-http-remote) name)
     (touch-www-file (url o name))))
 
@@ -62,38 +62,38 @@ the provided directory is the final directory in the gate locality.")
   ;; ========================== branch model aspect =============================
   (:method ((o git-remote) name url repo-dir initialp)
     (when initialp
-      (ensure-remote (name o) (url o name)))
+      (gittage:ensure-remote (name o) (url o name)))
     (fetch-git-remote o name))
   (:method :around ((o nongit-mixin) name url repo-dir initialp)
     ;; 1. figure out what convertors do with the master branch/the head
     (unless initialp
-      (set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
+      (gittage:set-head-index-tree :master)) ; ISSUE:FREE-THE-MASTER-BRANCH-IN-CONVERTED-REPOSITORIES-FOR-THE-USER
     (call-next-method); must operate on the local master
     ;; 2. figure out in what refs convertors store the conversion result
-    (let ((master-val (ref-value '("master") repo-dir)))
-      (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (cook-ref-value master-val))))
+    (let ((master-val (gittage:ref-value '("master") repo-dir)))
+      (git *repository* "update-ref" `("refs/remotes/" ,(down-case-name o) "/master") (gittage:cook-ref-value master-val))))
   ;; ====================== end of branch model aspect ==========================
   (:method ((o hg-http-remote) name url repo-dir initialp)
-    (indirect-import-mercurial url repo-dir nil (module-pathname name (locality o))))
+    (gittage:indirect-import-mercurial url repo-dir nil (module-pathname name (locality o))))
   (:method ((o darcs-http-remote) name url repo-dir initialp)
-    (indirect-import-darcs url repo-dir nil (module-pathname name (locality o))))
+    (gittage:indirect-import-darcs url repo-dir nil (module-pathname name (locality o))))
   (:method ((o cvs-native-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o (module name))
-      (direct-import-cvs url repo-dir nil (or cvs-module-name (down-case-string name)))))
+      (gittage:direct-import-cvs url repo-dir nil (or cvs-module-name (down-case-string name)))))
   (:method ((o svn-direct) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url *source-remote* name)
-      (direct-import-svn url repo-dir nil (or svn-module-name (down-case-string name)) initialp)))
+      (gittage:direct-import-svn url repo-dir nil (or svn-module-name (down-case-string name)) initialp)))
   (:method ((o tarball-http-remote) name url-template repo-dir initialp)
-    (direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when initialp
-                                                                                           (initial-tarball-version o))))
+    (gittage:direct-import-tarball url-template repo-dir nil (gate-temp-directory (gate *self*)) (when initialp
+                                                                                                   (initial-tarball-version o))))
   (:method ((o cvs-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url cvs-module-name) (url o name)
-      (indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
-                           (or cvs-module-name (down-case-string name)) (cvs-locality-lock-path (locality o)))))
+      (gittage:indirect-import-cvs url repo-dir nil (module-pathname name (locality o))
+                                   (or cvs-module-name (down-case-string name)) (cvs-locality-lock-path (locality o)))))
   (:method ((o svn-rsync-remote) name url repo-dir initialp)
     (multiple-value-bind (url svn-module-name) (url o name)
-      (indirect-import-svn url repo-dir nil (module-pathname name (locality o))
-                           (or svn-module-name (down-case-string name)) initialp))))
+      (gittage:indirect-import-svn url repo-dir nil (module-pathname name (locality o))
+                                   (or svn-module-name (down-case-string name)) initialp))))
 
 (defgeneric remote-import-takes-over-init (remote)
   (:documentation
@@ -108,14 +108,14 @@ using URL within the REMOTE to the latest version available from it."
   (with-error-resignaling
       ((executable-failure ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond)))
        (missing-executable ((cond) fetch-failure :remote remote :module module-name :execution-error (format nil "~A" cond))))
-    (with-repository-write-access (initial-import-p
-                                   :if-repository-does-not-exist (if (remote-import-takes-over-init remote)
-                                                                     :continue
-                                                                     :create))
+    (gittage:with-repository-write-access (initial-import-p
+                                           :if-repository-does-not-exist (if (remote-import-takes-over-init remote)
+                                                                             :continue
+                                                                             :create))
         repo-dir
       (let* ((desire-op-ref '("desire" "op"))
-             (remote-ref (make-remote-ref (name remote) "master"))
-             (drive-head-branch-p (repository-policy-value :drive-head-branch)))
+             (remote-ref (gittage:make-remote-ref (name remote) "master"))
+             (drive-head-branch-p (gittage:repository-policy-value :drive-head-branch)))
         (let ((*source-remote* remote))
           (with-explanation ("on behalf of module ~A, fetching from remote ~A to ~S"
                              module-name (transport remote) (vcs-type remote) url repo-dir)
@@ -129,20 +129,20 @@ using URL within the REMOTE to the latest version available from it."
         ;;    f-m-u-r and apply
         ;;    - try merge unsaved changes  stash  head  ffor  stapp  ; reasonable?
         ;;    - ignore unsaved changes     ???    head  ffor  reset
-        (git *repository* "update-ref" desire-op-ref (cook-ref-value remote-ref))
+        (git *repository* "update-ref" desire-op-ref (gittage:cook-ref-value remote-ref))
         (unless initial-import-p
-          (ensure-clean-repository (repository-policy-value :unsaved-changes-postwrite)))
+          (gittage:ensure-clean-repository (gittage:repository-policy-value :unsaved-changes-postwrite)))
         ;; stay here, move with branch, move to desir0op
-        (when (repository-policy-value :drive-head)
+        (when (gittage:repository-policy-value :drive-head)
           (if drive-head-branch-p
-              (set-branch-index-tree remote-ref)
-              (set-head-index-tree desire-op-ref)))
-        (when (and (repository-policy-value :reapply-stash)
+              (gittage:set-branch-index-tree remote-ref)
+              (gittage:set-head-index-tree desire-op-ref)))
+        (when (and (gittage:repository-policy-value :reapply-stash)
                    (not initial-import-p))
-          (apply-stash))
-        (setf (repository-world-readable-p) *default-world-readable*)
+          (gittage:apply-stash))
+        (setf (gittage:repository-world-readable-p) *default-world-readable*)
         (let ((*executable-standard-output* nil))
-          (update-repository-for-dumb-servers repo-dir))))))
+          (gittage:update-repository-for-dumb-servers repo-dir))))))
 
 (defun update (module &key (locality (gate *self*)) pass-output (if-update-fails nil) &aux
                (module (coerce-to-module module)))
@@ -168,7 +168,7 @@ when IF-UPDATE-FAILS is :ERROR, causes an error to be signalled."
             (restart-bind ((retry (lambda ()
                                     (git repo-dir "gui")
                                     (invoke-restart (find-restart 'retry)))
-                             :test-function (of-type 'repository-not-clean-during-fetch)
+                             :test-function (of-type 'gittage:repository-not-clean-during-fetch)
                              :report-function (formatter "Launch git gui to fix the issue, then retry the operation.")))
               (let ((*executable-standard-output* (if pass-output t *executable-standard-output*)))
                 (format t ";; Fetching module ~A from ~A remote ~A, ~A~%"
