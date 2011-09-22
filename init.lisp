@@ -194,19 +194,22 @@ locally present modules will be marked as converted."
         (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
         (let ((last-author (read-definitions :force-source t :metastore meta-path)))
           (syncformat t "~@<;;; ~@;Last author of DEFINITIONS just read: ~A~:@>~%"
-                      (if last-author (name last-author) "Unknown")))
-        ;;
-        ;; Set up *SELF* and complete definitions
-        ;;
-        (setf *self* (with-measured-time-lapse (sec)
-                         (if-let ((d (and as (distributor as))))
-                           (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
-                                  (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
-                           (let ((local-name (choose-local-name gate-path)))
-                             (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
-                             (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path)))
-                       (when verbose
-                         (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
+                      (if last-author (name last-author) "Unknown"))
+          ;;
+          ;; Set up *SELF* and complete definitions
+          ;;
+          (setf *self* (with-measured-time-lapse (sec)
+                           (if-let ((d (and as (distributor as))))
+                             (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
+                                    (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
+                             (let ((local-name (choose-local-name gate-path)))
+                               (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
+                               (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path)))
+                         (when verbose
+                           (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
+          (unless (eq last-author *self*)
+            (syncformat t ";;; Bootstrapped from distributor '~S'.~%" (name last-author))
+            (setf *bootstrap-wishmaster* last-author)))
         (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
         (read-local-definitions :metastore localmeta-path)
         (reestablish-metastore-subscriptions meta-path)
