@@ -1,1 +1,10 @@
-* module-remotes is actually module-origin-remotes ?
+* DEFINITIONS might actually need non-well-knowns, for the sake of internal distribution
+* module <-> remote links are truly chaotic
+  - module-remotes
+  - remote-provides-module
+* what GATE-CONVERTED-MODULE-NAMES should return for bootstrap chains?
+* duplicated mechanisms
+*** SCAN-LOCALITY
+*** UPDATE-GATE-CONVERSIONS
+*** UPDATE-LOCAL-DISTRIBUTOR-CONVERSIONS
+*** INITIALISE-WISHMASTER-GATE

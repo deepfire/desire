@@ -545,25 +545,24 @@ differ in only slight detail -- gate property, for example."
 
 (defgeneric initialise-wishmaster-gate (distributor &optional well-known-p root)
   (:method ((o local-distributor) &optional well-known-p root)
-    (if well-known-p
-        (let* ((gate (find-if (of-type 'git) (distributor-remotes o)))
-               (converted (gate-converted-module-names gate)))
-          (when-let ((intersection (intersection converted (location-module-names gate))))
-            (definition-error "~@<Bad local definitions: intersection between exported ~
+    (let* ((gate (if well-known-p
+                     (find-if (of-type 'git) (distributor-remotes o))
+                     (define-local-distributor-locality o nil 'git-gate-locality :path '(*module*) :registrator #'(setf loc))))
+           (converted (gate-converted-module-names gate)))
+      (when-let ((intersection (intersection converted (location-module-names gate))))
+        (definition-error "~@<Bad local definitions: intersection between exported ~
                                   and converted modules: ~S.~:@>"
-                intersection))
-          (setf (gate o) (change-class gate 'git-gate-locality :pathname root))
-          ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
-          (update-local-distributor-conversions o converted))
-        (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc)
-                                           :path '(*module*)))))
+            intersection))
+      (setf (gate o) (change-class gate 'git-gate-locality :pathname root))
+      ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
+      (update-local-distributor-conversions o converted))))
 
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
   (initialise-wishmaster-gate w t root))
 
-(defmethod initialize-instance :after ((o local-distributor) &key &allow-other-keys)
-  (initialise-wishmaster-gate o))
+(defmethod initialize-instance :after ((o local-distributor) &key root &allow-other-keys)
+  (initialise-wishmaster-gate o nil root))
 
 ;;;
 ;;; Remote methods

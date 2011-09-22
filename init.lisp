@@ -232,17 +232,17 @@ locally present modules will be marked as converted."
       ;;
       (with-source-registry-change *default-system-type*
         ;;
-        ;; Per-repository branch model maintenance, system discovery and loadability
-        ;;
-        (syncformat t ";;; Enumerating present modules and systems~%")
-        (scan-locality (gate *self*) :known t :unknown t :verbose verbose)
-        ;;
         ;; Finish bootstrap
         ;;
         (when bootstrap-modules
           (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
           (dolist (m bootstrap-modules)
-            (update m))))
+            (update m)))
+        ;;
+        ;; Per-repository branch model maintenance, system discovery and loadability
+        ;;
+        (syncformat t ";;; Enumerating present modules and systems~%")
+        (scan-locality (gate *self*) :known t :unknown t :verbose verbose))
       ;; ..finish finishing..
       #+asdf
       (mapc (compose #'mark-system-loaded #'system) bootstrap-modules)
