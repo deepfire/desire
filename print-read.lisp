@@ -471,6 +471,8 @@ When SEAL-P is non-NIL, the changes are committed."
     #+nil (("lisp" #\l)       :type string  :documentation "") ;; N/A
     (("bootstrap-name" #\n)   :type string  :documentation "Specify the hostname of the bootstrap desire node.")
     (("bootstrap-url" #\b)    :type string  :documentation "Specify an URL of a bootstrap desire node.")
+    #+nil
+    (("follow-boot-path" #\f) :type boolean :documentation "Obtain modules from the bootstrap node.")
     (("http-proxy" #\y)       :type string  :documentation "Specify the HTTP proxy. Defaults to ${http_proxy}.")
     #+nil (("branch" #\t)     :type string  :documentation "") ;; N/A
     (("module" #\m)           :type string  :documentation "Retrieve a space-separated list of MODULEs, once ready.")

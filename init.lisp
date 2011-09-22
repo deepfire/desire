@@ -161,7 +161,7 @@ locally present modules will be marked as converted."
                                       ('no' to choose another place):~:@>~%"
                                  root))
     (apply #'init :root (read-line) (remove-from-plist args :root)))
-  (flet ((default-bootstrap-wishmaster-urls ()
+  (flet ((compute-bootstrap-wishmaster-urls ()
            (values (or bootstrap-url (strconcat* "git://" bootstrap-name "/"))
                    (strconcat* "http://" bootstrap-name "/" wishmaster-http-suffix))))
     (let* ((gate-path (lret ((gate-path (if (pathname-absolute-p root)
@@ -184,7 +184,7 @@ locally present modules will be marked as converted."
       ;; Bootstrap domain knowledge
       ;;
       (when need-bootstrap-p
-        (multiple-value-bind (bootstrap-url bootstrap-http-url) (default-bootstrap-wishmaster-urls)
+        (multiple-value-bind (bootstrap-url bootstrap-http-url) (compute-bootstrap-wishmaster-urls)
           (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S ~
                                   (with HTTP fallback to ~S~:[~;, and proxy ~:*~S~])~:@>~%"
                       meta-path bootstrap-url bootstrap-http-url http-proxy)
