@@ -555,7 +555,8 @@ differ in only slight detail -- gate property, for example."
           (setf (gate o) (change-class gate 'git-gate-locality :pathname root))
           ;; the above line ran UPDATE-GATE-CONVERSIONS using SHARED-INITIALISE :AFTER on GATE-LOCALITY
           (update-local-distributor-conversions o converted))
-        (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc) :path nil))))
+        (define-local-distributor-locality o nil 'git-gate-locality :registrator #'(setf loc)
+                                           :path '(*module*)))))
 
 (defmethod update-instance-for-different-class :after ((d distributor) (w local-distributor) &key root &allow-other-keys)
   "Called once, during INIT, if we're pretending to be someone well-known."
