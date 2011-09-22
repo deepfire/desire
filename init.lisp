@@ -103,16 +103,16 @@
                                        :bot-phases
                                        :break-on-signals
                                        :debug))
-             (let* ((app (app app :if-does-not-exist :continue))
+             (let* ((bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
+                    (app (app app :if-does-not-exist :continue))
                     (systems (append (when app    (list (app-system app)))
                                      (when system (ensure-list (system system :if-does-not-exist :continue)))))
-                    (bot-phases (split-sequence:split-sequence #\Space bot-phases :remove-empty-subseqs t))
-                    (modules (append (when system (list (system-module system)))
+                    (modules (append (mapcar #'system-module systems)
                                      (when module (remove nil (mapcar (lambda (x) (module x :if-does-not-exist :continue))
                                                                       (split-sequence:split-sequence #\Space module :remove-empty-subseqs t))))))
                     (desire (append (ensure-list app) (ensure-list system) (ensure-list module))))
                (when (and desire (not modules))
-                 (error "~@<~S was/were desired, but no corresponding entities (application, system or module) are known.~:@>"
+                 (error "~@<~S was/were desired, but at least some corresponding entities (application, system or module) are unknown.~:@>"
                         desire))
                (when modules
                  (take modules :verbose verbose :skip-present t)
