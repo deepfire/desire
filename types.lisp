@@ -1162,6 +1162,11 @@ cache results."
         (update-module-presence module locality)
         nil)))
 
+;;;
+;;; FR: A priority system is clearly needed here.
+;;;
+;;; Ordering of distributors, and individual remotes (HTTP preference).
+;;;
 (defun module-best-remote (module &key (if-does-not-exist :error) allow-self (prefer-self t))
   "Return the preferred remote among those providing MODULE.
 Currently implements a static 'gates are preferred' policy.
