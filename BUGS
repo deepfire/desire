@@ -10,3 +10,4 @@
 *** INITIALISE-WISHMASTER-GATE
 * COMPUTE-LOCALITY-MODULE-PRESENCE logic is unclear, even if present..
 * need a force-update-from-wishmaster restart for --module/--system/--app option
+* manual pulls are broken
