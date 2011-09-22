@@ -248,7 +248,7 @@ locally present modules will be marked as converted."
           (syncformat t ";;; Enumerating present modules and systems~%")
           (scan-locality (gate *self*) :known t :unknown t :verbose verbose))
         ;; ..finish finishing..
-        #+asdf
+        #+nil
         (mapc (compose #'mark-system-loaded #'system) bootstrap-modules)
         (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
         (register-locality-with-system-backend *default-system-type* (gate *self*))
