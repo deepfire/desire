@@ -318,7 +318,7 @@ The values returned are:
                 (m (or present (make-instance 'module :name name :umbrella name :path-whitelist path-whitelist :path-blacklist path-blacklist))))
           (ecase mode
             (:publish (location-link-module locality m))
-            (:convert (push name (gate-converted-module-names locality)))
+            (:convert (push name (gate-module-names locality)))
             (:unpublished (push name (gate-unpublished-module-names locality)))
             (:hidden (push name (gate-hidden-module-names locality))))
           (notice-module-repository m t locality))

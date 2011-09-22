@@ -80,7 +80,7 @@
   "Produce a summary about locally available modules."
   (let* ((gate (gate *self*))
          (origin (sort (copy-list (location-module-names gate)) #'string<))
-         (converted (sort (copy-list (gate-converted-module-names gate)) #'string<))
+         (converted (sort (copy-list (gate-module-names gate)) #'string<))
          (unpublished (sort (copy-list (gate-unpublished-module-names gate)) #'string<))
          (hidden (sort (copy-list (gate-hidden-module-names gate)) #'string<))
          (present (append origin converted unpublished hidden))

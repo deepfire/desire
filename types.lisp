@@ -207,7 +207,7 @@ its 'best remote'."
    :module-names nil))
 
 (defclass gate (location)
-  ((converted-module-names :accessor gate-converted-module-names :initarg :converted-module-names :documentation "Complex computation.")
+  ((converted-module-names :accessor gate-module-names :initarg :converted-module-names :documentation "Complex computation.")
    (identity-p :reader gate-identity-p :initarg :identity-p))
   (:default-initargs
    :converted-module-names nil
@@ -453,7 +453,7 @@ differ in only slight detail -- gate property, for example."
           (format t "~@<;; ~@;Publishable:~{ ~A~}~:@>~%" publishable-names)
           (format t "~@<;; ~@;Unpublished:~{ ~A~}~:@>~%" unpublishable-names)
           (format t "~@<;; ~@;Hidden:~{ ~A~}~:@>~%" hidden-names))
-        (setf (gate-converted-module-names o) publishable-names
+        (setf (gate-module-names o) publishable-names
               (gate-unpublished-module-names o) unpublishable-names
               (gate-hidden-module-names o) hidden-names)))))
 
@@ -499,7 +499,7 @@ differ in only slight detail -- gate property, for example."
       (let (;; The logic here is that if we're engaging in this whole game,
             ;; we're only releasing via our gate remote.
             (release-set (location-module-names gate))
-            (present (gate-converted-module-names gate))
+            (present (gate-module-names gate))
             (unpublished (gate-unpublished-module-names gate))
             (hidden (gate-hidden-module-names gate)))
         (let* ((release-missing (set-difference release-set present))
@@ -534,12 +534,12 @@ differ in only slight detail -- gate property, for example."
               (unless (typep m 'origin-module)
                 (change-class m 'origin-module))))
           (setf (location-module-names gate) release-set
-                (gate-converted-module-names gate) converted-set))))))
+                (gate-module-names gate) converted-set))))))
 
 (defgeneric update-gate (&optional distributor)
   (:method (&optional (distributor *self*))
     (let* ((gate (gate distributor))
-           (converted (gate-converted-module-names gate)))
+           (converted (gate-module-names gate)))
       (update-gate-conversions gate)
       (update-local-distributor-conversions distributor converted))))
 
@@ -548,7 +548,7 @@ differ in only slight detail -- gate property, for example."
     (let* ((gate (if well-known-p
                      (find-if (of-type 'git) (distributor-remotes o))
                      (define-local-distributor-locality o nil 'git-gate-locality :path '(*module*) :registrator #'(setf loc))))
-           (converted (gate-converted-module-names gate)))
+           (converted (gate-module-names gate)))
       (when-let ((intersection (intersection converted (location-module-names gate))))
         (definition-error "~@<Bad local definitions: intersection between exported ~
                                   and converted modules: ~S.~:@>"
@@ -706,7 +706,7 @@ instead."
   (let ((name (coerce-to-name module)))
     (or (not (null (find name (location-module-names location))))
         (when (typep location 'gate)
-          (not (null (find name (gate-converted-module-names location))))))))
+          (not (null (find name (gate-module-names location))))))))
 
 ;;;;
 ;;;; Systems
@@ -902,7 +902,7 @@ This notably excludes converted modules."
       (when (location-defines-module-p r m)
         (removef (location-module-names r) (name m))
         (when (typep r 'gate)
-          (removef (gate-converted-module-names r) (name m))
+          (removef (gate-module-names r) (name m))
           (removef (gate-unpublished-module-names r) (name m))
           (removef (gate-hidden-module-names r) (name m))))))
   (do-remove-module m))
@@ -1256,7 +1256,7 @@ whether the attempt was successful."
   "Stop advertising MODULE in definitions, as well as make it inaccessible
 to general public within LOCALITY."
   (removef (location-module-names locality) name)
-  (removef (gate-converted-module-names locality) name)
+  (removef (gate-module-names locality) name)
   (removef (gate-unpublished-module-names locality) name)
   (pushnew name (gate-hidden-module-names locality))
   (setf (gittage:repository-world-readable-p (module-pathname module locality)) nil))
@@ -1267,7 +1267,7 @@ to general public within LOCALITY."
   "Stop advertising MODULE in definitions, without completely hiding it.
 If it is hidden, unhide it."
   (removef (location-module-names locality) name)
-  (removef (gate-converted-module-names locality) name)
+  (removef (gate-module-names locality) name)
   (pushnew name (gate-unpublished-module-names locality))
   (setf (gittage:repository-world-readable-p (module-pathname module locality)) t)
   (removef (gate-hidden-module-names locality) name))
@@ -1281,7 +1281,7 @@ If it is hidden, unhide it."
   (when (find name (location-module-names locality))
     (module-error "~@<Cannot declare ~A as converted by local gate ~A, as it is already released there.~:@>"
                   name (name locality)))
-  (pushnew name (gate-converted-module-names locality))
+  (pushnew name (gate-module-names locality))
   (removef (gate-unpublished-module-names locality) name)
   (removef (gate-hidden-module-names locality) name))
 
@@ -1295,7 +1295,7 @@ This is a function of MODULE repository's anonymous accessibility."
 This is a function of intent expressed by MODULE's membership
 in non-unpublished remotes."
   (not (null (or (find (name module) (location-module-names locality))
-                 (find (name module) (gate-converted-module-names locality))))))
+                 (find (name module) (gate-module-names locality))))))
 
 (defun compute-locality-module-presence (&optional (locality (gate *self*)))
   "Scan LOCALITY for known modules and update its and those modules's idea

@@ -101,7 +101,7 @@
    #:location-module-names
    #:location-defines-module-p
    ;;   types.lisp :: remote
-   #:gate-converted-module-names
+   #:gate-module-names
    #:gate-unpublished-module-names
    #:gate-hidden-module-names
    #:url

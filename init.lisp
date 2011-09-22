@@ -280,18 +280,18 @@ locally present modules will be marked as converted."
           (gate self) incumbent-gate
           (remote-distributor incumbent-gate) self
           (distributor-remotes self) (list incumbent-gate))
-    (update-local-distributor-conversions self (gate-converted-module-names old-gate))))
+    (update-local-distributor-conversions self (gate-module-names old-gate))))
 
 (defun carry-over-module-locality-presence-cache-from-old-gate (old-gate self)
   (let ((fixed-gate (gate self)))
     ;; restore module locality presence cache
     (let ((oldmodule-scapolos (make-hash-table :test 'eq))
           (old-gate-modules (append (location-module-names old-gate)
-                                    (gate-converted-module-names old-gate)
+                                    (gate-module-names old-gate)
                                     (gate-unpublished-module-names old-gate)
                                     (gate-hidden-module-names old-gate)))
           (fixed-gate-modules (append (location-module-names fixed-gate)
-                                      (gate-converted-module-names fixed-gate)
+                                      (gate-module-names fixed-gate)
                                       (gate-unpublished-module-names fixed-gate)
                                       (gate-hidden-module-names fixed-gate))))
       (with-container oldmodule-scapolos (oldmodule-scapolos :type list)

@@ -447,7 +447,7 @@
                        (:defined (do-modules (m) (collect (name m))))
                        (:desirable (do-modules (m) (when (typep (module-best-remote m :if-does-not-exist :continue :allow-self t) 'gate)
                                                      (collect (name m)))))
-                       (:converted (gate-converted-module-names gate))
+                       (:gated (gate-module-names gate))
                        (:release (location-module-names gate)))))))
 
 (defun compute-run-module-set (&key modules (module-sets *default-buildmaster-module-sets*))

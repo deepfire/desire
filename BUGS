@@ -2,7 +2,7 @@
 * module <-> remote links are truly chaotic
   - module-remotes
   - remote-provides-module
-* what GATE-CONVERTED-MODULE-NAMES should return for bootstrap chains?
+* :CONVERTED-MODULE-NAMES vs. GATE-MODULE-NAMES name inconsistency
 * duplicated mechanisms
 *** SCAN-LOCALITY
 *** UPDATE-GATE-CONVERSIONS
