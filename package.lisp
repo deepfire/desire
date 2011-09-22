@@ -12,6 +12,12 @@
    #:name
    ;;   knobs
    #:*verbose-repository-maintenance*
+   #:*prefer-bootstrap-path*
+   #:*default-system-type*
+   #:*default-wishmaster*
+   #:*default-world-readable*
+   #:*default-publishable*
+   #:*desires*
    ;; types.lisp
    #:*desire-version*
    #:canonicalise-name
@@ -131,8 +137,13 @@
    ;;   types.lisp :: module
    #:remote-link-module
    #:remote-unlink-module
+   #:prefer-bootstrap-path
+   #:prefer-gate
+   #:prefer-git-preferred
+   #:prefer-git-http
+   #:prefer-git
+   #:module-remote-preferences
    #:module-best-remote
-   #:module-best-distributor
    #:module-fetch-url
    #:module-wrinkle
    #:touch-module
@@ -157,14 +168,8 @@
    #:add-desire
    #:module-desired-p
    ;;   types.lisp :: knobs
-   #:*default-system-type*
-   #:*default-wishmaster*
-   #:*default-world-readable*
-   #:*default-publishable*
-   #:*desires*
    #:*self*
    #:root
-   #:*combined-remotes-prefer-native-over-http*
    ;;   types.lisp :: conditions
    #:desire-condition
    #:desire-error

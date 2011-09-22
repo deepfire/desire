@@ -1167,32 +1167,54 @@ cache results."
 ;;;
 ;;; Ordering of distributors, and individual remotes (HTTP preference).
 ;;;
-(defun module-best-remote (module &key (if-does-not-exist :error) allow-self (prefer-self t))
-  "Return the preferred remote among those providing MODULE.
-Currently implements a static 'gates are preferred' policy.
+(defun calculate-preference (x y f)
+  (let ((x-pref (funcall f x))
+        (y-pref (funcall f y)))
+    (when (xor x-pref y-pref)
+      (values t x-pref))))
 
-Note: PREFER-SELF doesn't quite work, because of CHOOSE-GATE-OR-ELSE."
-  (let ((module (coerce-to-module module))
-        own-remote)
-    (or (choose-gate-or-else (let ((remotes
-                                    (do-remotes (r)
-                                      (when (location-defines-module-p r module)
-                                        (if (eq (remote-distributor r) *self*)
-                                            (when allow-self
-                                              (setf own-remote r))
-                                            (collect r))))))
-                               (append (when prefer-self (ensure-list own-remote))
-                                       remotes
-                                       (unless prefer-self (ensure-list own-remote)))))
+(defun prefer-type (x y type)
+  (calculate-preference x y (lambda (r) (typep r type))))
+
+(defun prefer-gate (x y)       (prefer-type x y 'gate-remote))
+(defun prefer-git (x y)        (prefer-type x y 'git-remote))
+
+(defun prefer-git-preferred-in-combined (x y)
+  (when (and (typep x 'git-combined-remote)
+             (typep y 'git-combined-remote)
+             (eq (remote-distributor x) (remote-distributor y)))
+    (prefer-type x y (if *combined-remotes-prefer-native-over-http*
+                         'git-native-remote
+                         'git-http-remote))))
+
+(defun prefer-bootstrap-path (x y)
+  (when *bootstrap-wishmaster*
+    (calculate-preference x y (lambda (r) (eq (remote-distributor r) *bootstrap-wishmaster*)))))
+
+(defun better-remote-p (x y)
+  "_Try_ to determine whether remote X is more preferable to Y, given
+the list of *REMOTE-PREFERENCE-CRITERIONS*."
+  (dolist (criterion *remote-preference-criterions*)
+    (multiple-value-bind (authoritative greaterp) (funcall criterion x y)
+      (when authoritative
+        (return greaterp)))))
+
+(defun module-remote-preferences (module &aux
+                                  (module (coerce-to-module module)))
+  "List MODULE's remotes, in the order defined by BETTER-REMOTE-P."
+  (sort (do-remotes (r)
+          (when (location-defines-module-p r module)
+            (collect r)))
+        #'better-remote-p))
+
+(defun module-best-remote (module &key (if-does-not-exist :error) allow-self)
+  "Return the preferred remote among those providing MODULE."
+  (let ((module (coerce-to-module module)))
+    (or (first (remove-if (lambda (r) (unless allow-self (eq r *self*))) (module-remote-preferences module)
+                          :key #'remote-distributor))
         (ecase if-does-not-exist
           (:error (error 'insatiable-desire :desire module))
           (:continue nil)))))
-
-(defun module-best-distributor (module &key (if-does-not-exist :error) allow-self)
-  "Find the best-suited distributor occuring to provide MODULE.
-Those distributors with a gate best-remote are preferred, obviously."
-  (when-let ((r (module-best-remote module :if-does-not-exist if-does-not-exist :allow-self allow-self)))
-    (remote-distributor r)))
 
 (defun module-fetch-url (module &key allow-self (if-does-not-exist :error))
   "Return the URL which is to be used while fetching MODULE,

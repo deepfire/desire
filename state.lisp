@@ -26,11 +26,23 @@
     "This variable, during bootstrap (only if applicable), is set to the
 wishmaster we've bootstrapped from.")
   (*default-bootstrap-wishmaster-http-suffix* "shared/src/")
+  (*combined-remotes-prefer-native-over-http* t)
+  (*remote-preference-criterions*             '(prefer-bootstrap-path
+                                                prefer-gate
+                                                prefer-git-preferred-in-combined ; consults *combined-remotes-prefer-native-over-http*
+                                                prefer-git-native
+                                                prefer-git)
+                                            "A list of strings, interpreted as names of functions from the
+DESIRE package, which are expected to accept two remotes and return
+two boolean values, the first of which denotes whether the function
+was successful in differentiation, the second being the value of the
+ordering predicate.
+
+The criterions are intended to be consulted in order.")
   (*desires*                                  nil "List of import descriptions.")
   (*default-world-readable*                   t   "Whether to make GIT repositories anonymously accessible by default.")
   (*default-publishable*                      t   "Whether to publish GIT repositories by default.")
   (*self*                                     nil "Possibly unknown distributor whom we identify as.")
-  (*combined-remotes-prefer-native-over-http* t   "Whether multi-protocol Git remotes prefer native git protocol to HTTP.")
   (*default-system-type*                      'asdf-system)
   (*merge-remote-wishmasters*                 t   "Whether to merge definitions from remote wishmasters.")
   (*verbose-repository-maintenance*           nil)
