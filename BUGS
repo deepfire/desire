@@ -8,3 +8,5 @@
 *** UPDATE-GATE-CONVERSIONS
 *** UPDATE-LOCAL-DISTRIBUTOR-CONVERSIONS
 *** INITIALISE-WISHMASTER-GATE
+* COMPUTE-LOCALITY-MODULE-PRESENCE logic is unclear, even if present..
+* initial metastore classifies local modules as converted.. rectified later, though

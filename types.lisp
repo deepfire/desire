@@ -1306,12 +1306,12 @@ The value returned is the list of found modules."
       (cond ((not presentp))
             ((module-hidden-p module locality)
              (collect module into hidden-modules))
-            ((not (module-publishable-p module locality))
-             (collect module into unpublishable-modules))
+            ;; ((not (module-publishable-p module locality))
+            ;;  (collect module into unpublishable-modules))
             (t
              (collect module into publishable-modules))))
     (finally (return (values publishable-modules
-                             unpublishable-modules
+                             nil
                              hidden-modules)))))
 
 (defmacro do-present-modules ((module &optional (locality '(gate *self*)) block-name) &body body)
