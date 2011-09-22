@@ -1176,6 +1176,7 @@ cache results."
   (calculate-preference x y (lambda (r) (typep r type))))
 
 (defun prefer-gate (x y)       (prefer-type x y 'gate-remote))
+(defun prefer-git-native (x y) (prefer-type x y 'git-native-remote))
 (defun prefer-git (x y)        (prefer-type x y 'git-remote))
 
 (defun prefer-git-preferred-in-combined (x y)
