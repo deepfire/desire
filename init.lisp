@@ -63,8 +63,8 @@
 ;;;
 ;;; Entry
 ;;;
-(defun booted-entry (bootstrap-components)
-  (%booted-entry bootstrap-components
+(defun booted-entry (bootstrap-modules)
+  (%booted-entry bootstrap-modules
                  (command-line-arguments:process-command-line-options
                   *option-spec*
                   #+(or sbcl clisp) (command-line-arguments:get-command-line-arguments)
