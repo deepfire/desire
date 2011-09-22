@@ -1356,7 +1356,8 @@ value is returned."
           (let ((remote-master-val (gittage:ref-value `("remotes" ,(down-case-name remote-name) "master") metastore-pathname)))
             (gittage:set-branch :master metastore-pathname remote-master-val (not (gittage:head-detached-p))))
           (gittage:set-head-index-tree :master)
-          (gittage:set-branch-index-tree (gittage:make-remote-ref remote-name branch)))))))
+          (gittage:set-branch-index-tree (gittage:make-remote-ref remote-name branch))
+          (setf (gittage:repository-world-readable-p) t))))))
 
 (defun reestablish-metastore-subscriptions (metastore-pathname)
   (within-directory (metastore-pathname)
