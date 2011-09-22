@@ -172,99 +172,100 @@ locally present modules will be marked as converted."
            (localmeta-path (merge-pathnames #p".local-meta/" gate-path))
            (need-bootstrap-p (not (metastore-present-p meta-path '(definitions)))))
       (setup-default-global-state)
-      ;;
-      ;; Set up git
-      ;;
-      (if (find-executable *gate-vcs-type*)
-          (setf (class-slot *gate-vcs-type* 'enabled-p) t)
-          (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
+      (let ((*verbose-repository-maintenance* verbose))
+        ;;
+        ;; Set up git
+        ;;
+        (if (find-executable *gate-vcs-type*)
+            (setf (class-slot *gate-vcs-type* 'enabled-p) t)
+            (desire-error "The executable of gate VCS (~A) is missing, and so, DESIRE is of no use." *gate-vcs-type*))
 
-      (ensure-committer-identity)
-      ;;
-      ;; Bootstrap domain knowledge
-      ;;
-      (when need-bootstrap-p
-        (multiple-value-bind (bootstrap-url bootstrap-http-url) (compute-bootstrap-wishmaster-urls)
-          (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S ~
+        (ensure-committer-identity)
+        ;;
+        ;; Bootstrap domain knowledge
+        ;;
+        (when need-bootstrap-p
+          (multiple-value-bind (bootstrap-url bootstrap-http-url) (compute-bootstrap-wishmaster-urls)
+            (syncformat t "~@<;;; ~@;No metastore found in ~S, bootstrapping from ~S ~
                                   (with HTTP fallback to ~S~:[~;, and proxy ~:*~S~])~:@>~%"
-                      meta-path bootstrap-url bootstrap-http-url http-proxy)
-          (setf gittage:*http-proxy* http-proxy)
-          (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
-      (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
-      (let ((last-author (read-definitions :force-source t :metastore meta-path)))
-        (syncformat t "~@<;;; ~@;Last author of DEFINITIONS just read: ~A~:@>~%"
-                    (if last-author (name last-author) "Unknown")))
-      ;;
-      ;; Set up *SELF* and complete definitions
-      ;;
-      (setf *self* (with-measured-time-lapse (sec)
-                       (if-let ((d (and as (distributor as))))
-                         (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
-                                (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
-                         (let ((local-name (choose-local-name gate-path)))
-                           (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
-                           (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path)))
-                     (when verbose
-                       (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
-      (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
-      (read-local-definitions :metastore localmeta-path)
-      (reestablish-metastore-subscriptions meta-path)
-      (when merge-remote-wishmasters
-        (syncformat t ";;; Merging definitions from remote wishmasters...~%")
-        (do-wishmasters (w)
-          (unless (eq w *self*)
-            (handler-case
-                ;; This is clearly non-critical, as we chiefly rely
-                ;; on the initially-obtained information
-                (merge-remote-wishmaster w)
-              (fetch-failure ())))))
-      (setf *unsaved-definition-changes-p* nil)
-      ;;
-      ;; Set up tools for import
-      ;;
-      (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
-      (gittage:locate-import-executables)
-      (dolist (type *vcs-appendage-types*)
-        (try-ensure-importer-executable type))
-      (determine-tools-and-update-remote-accessibility)
-      ;;
-      ;; Generic part of system loadability
-      ;;
-      (with-source-registry-change *default-system-type*
+                        meta-path bootstrap-url bootstrap-http-url http-proxy)
+            (setf gittage:*http-proxy* http-proxy)
+            (clone-metastore bootstrap-url bootstrap-http-url meta-path wishmaster-branch)))
+        (syncformat t "~@<;;; ~@;Loading definitions from ~S~:@>~%" (metafile-path 'definitions meta-path))
+        (let ((last-author (read-definitions :force-source t :metastore meta-path)))
+          (syncformat t "~@<;;; ~@;Last author of DEFINITIONS just read: ~A~:@>~%"
+                      (if last-author (name last-author) "Unknown")))
         ;;
-        ;; Finish bootstrap
+        ;; Set up *SELF* and complete definitions
         ;;
-        (when bootstrap-modules
-          (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
-          (dolist (m bootstrap-modules)
-            (update m)))
+        (setf *self* (with-measured-time-lapse (sec)
+                         (if-let ((d (and as (distributor as))))
+                           (progn (syncformat t "~@<;;; ~@;Trying to establish self as ~A~:@>~%" as)
+                                  (change-class d 'local-distributor :root gate-path :meta meta-path :localmeta localmeta-path))
+                           (let ((local-name (choose-local-name gate-path)))
+                             (syncformat t "~@<;;; ~@;Establishing self as non-well-known distributor ~A~:@>~%" local-name)
+                             (make-instance 'local-distributor :name local-name :root gate-path :meta meta-path :localmeta localmeta-path)))
+                       (when verbose
+                         (syncformat t ";;; Scanned locality for module presence in ~D seconds.~%" sec))))
+        (ensure-metastore localmeta-path :required-metafiles '(definitions) :public nil)
+        (read-local-definitions :metastore localmeta-path)
+        (reestablish-metastore-subscriptions meta-path)
+        (when merge-remote-wishmasters
+          (syncformat t ";;; Merging definitions from remote wishmasters...~%")
+          (do-wishmasters (w)
+            (unless (eq w *self*)
+              (handler-case
+                  ;; This is clearly non-critical, as we chiefly rely
+                  ;; on the initially-obtained information
+                  (merge-remote-wishmaster w)
+                (fetch-failure ())))))
+        (setf *unsaved-definition-changes-p* nil)
         ;;
-        ;; Per-repository branch model maintenance, system discovery and loadability
+        ;; Set up tools for import
         ;;
-        (syncformat t ";;; Enumerating present modules and systems~%")
-        (scan-locality (gate *self*) :known t :unknown t :verbose verbose))
-      ;; ..finish finishing..
-      #+asdf
-      (mapc (compose #'mark-system-loaded #'system) bootstrap-modules)
-      (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
-      (register-locality-with-system-backend *default-system-type* (gate *self*))
-      ;;
-      (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
-              (sort (do-present-modules (m)
-                      (collect (name m)))
-                    #'string<))
-      ;;
-      ;; Evolve definitions.
-      ;;
-      (linearise-self (merge-pathnames #p"self.lisp" meta-path))
-      (save-definitions :commit-message "Init-time seal." :seal t)
-      ;;
-      ;; Quirks
-      ;;
-      (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
-      (setenv "LISP_FASL_CACHE" "NIL")
-      (syncformat t ";;; desire node fully functional~%")
-      (values))))
+        (syncformat t ";;; Determining available import-related tools and deducing accessible remotes~%")
+        (gittage:locate-import-executables)
+        (dolist (type *vcs-appendage-types*)
+          (try-ensure-importer-executable type))
+        (determine-tools-and-update-remote-accessibility)
+        ;;
+        ;; Generic part of system loadability
+        ;;
+        (with-source-registry-change *default-system-type*
+          ;;
+          ;; Finish bootstrap
+          ;;
+          (when bootstrap-modules
+            (syncformat t ";;; Completing bootstrap: obtaining own components' source code.~%")
+            (dolist (m bootstrap-modules)
+              (update m)))
+          ;;
+          ;; Per-repository branch model maintenance, system discovery and loadability
+          ;;
+          (syncformat t ";;; Enumerating present modules and systems~%")
+          (scan-locality (gate *self*) :known t :unknown t :verbose verbose))
+        ;; ..finish finishing..
+        #+asdf
+        (mapc (compose #'mark-system-loaded #'system) bootstrap-modules)
+        (syncformat t "~@<;;; ~@;Registering gate locality ~S with system backend ~A~:@>~%" (locality-pathname (gate *self*)) *default-system-type*)
+        (register-locality-with-system-backend *default-system-type* (gate *self*))
+        ;;
+        (format t "~@<;;; ~@;Mod~@<ules present locally:~{ ~A~}~:@>~:@>~%"
+                (sort (do-present-modules (m)
+                        (collect (name m)))
+                      #'string<))
+        ;;
+        ;; Evolve definitions.
+        ;;
+        (linearise-self (merge-pathnames #p"self.lisp" meta-path))
+        (save-definitions :commit-message "Init-time seal." :seal t)
+        ;;
+        ;; Quirks
+        ;;
+        (syncformat t ";;; Tweaking environment for CL-LAUNCH~%")
+        (setenv "LISP_FASL_CACHE" "NIL")
+        (syncformat t ";;; desire node fully functional~%")
+        (values)))))
 
 (defun reinit ()
   "Execute INIT with the arguments that were passed to it last time."
